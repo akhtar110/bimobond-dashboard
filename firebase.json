@@ -1,0 +1,39 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "bomibondapp",
+          "appId": "1:550929645796:android:a57bb9271ed4cb807becf1",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "bomibondapp",
+          "configurations": {
+            "android": "1:550929645796:android:a57bb9271ed4cb807becf1",
+            "ios": "1:550929645796:ios:bc7b5ed8e81c2aa47becf1",
+            "macos": "1:550929645796:ios:228cfeafd3dad8ee7becf1",
+            "web": "1:550929645796:web:45b1aeaa3919f7567becf1",
+            "windows": "1:550929645796:web:b0dd9d7a951f361a7becf1"
+          }
+        }
+      }
+    }
+  }
+}

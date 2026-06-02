@@ -1,0 +1,546 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/localization/localization.dart';
+import '../../domain/entities/post_filters.dart';
+import '../bloc/posts_bloc.dart';
+
+/// Advanced filters for the posts feed (search + dropdowns).
+class PostsFilterBar extends StatefulWidget {
+  const PostsFilterBar({
+    super.key,
+    required this.isDark,
+    this.compact = false,
+  });
+
+  final bool isDark;
+  final bool compact;
+
+  @override
+  State<PostsFilterBar> createState() => _PostsFilterBarState();
+}
+
+class _PostsFilterBarState extends State<PostsFilterBar> {
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
+  String _lastAppliedSearch = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchFocusNode.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _apply(PostFilters filters) {
+    context.read<PostsBloc>().add(UpdatePostFiltersEvent(filters));
+  }
+
+  void _applySearch(String value) {
+    final trimmed = value.trim();
+    final normalized = trimmed.isEmpty ? '' : trimmed;
+    if (normalized == _lastAppliedSearch) return;
+
+    _lastAppliedSearch = normalized;
+    final bloc = context.read<PostsBloc>();
+    _apply(
+      bloc.activeFilters.copyWith(
+        search: normalized.isEmpty ? null : normalized,
+        clearSearch: normalized.isEmpty,
+      ),
+    );
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      _applySearch(value);
+    });
+  }
+
+  void _syncSearchFromFilters(PostFilters filters, {bool force = false}) {
+    if (!force && _searchFocusNode.hasFocus) return;
+    final text = filters.search ?? '';
+    if (_searchController.text == text) return;
+    _searchController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _lastAppliedSearch = text;
+  }
+
+  InputDecoration _fieldDecoration({
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    final isDark = widget.isDark;
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      isDense: true,
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF9FAFB),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: widget.compact ? 10 : 12,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF3D4654) : const Color(0xFFE5E7EB),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF3D4654) : const Color(0xFFE5E7EB),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final isDark = widget.isDark;
+
+    return BlocListener<PostsBloc, PostsState>(
+      listenWhen: (prev, next) {
+        final prevF = _filtersFromState(prev);
+        final nextF = _filtersFromState(next);
+        return prevF.search != nextF.search;
+      },
+      listener: (context, state) {
+        _syncSearchFromFilters(_filtersFromState(state), force: true);
+      },
+      child: BlocBuilder<PostsBloc, PostsState>(
+        buildWhen: (prev, next) {
+          final prevF = _filtersFromState(prev);
+          final nextF = _filtersFromState(next);
+          return prevF != nextF ||
+              _isApplyingFilters(prev) != _isApplyingFilters(next);
+        },
+        builder: (context, state) {
+          final filters = _filtersFromState(state);
+          final isApplying = _isApplyingFilters(state);
+
+          final content = _FilterContent(
+            searchField: _searchField(l10n, theme, isApplying),
+            dropdowns: [
+              _typeDropdown(l10n, filters, isApplying),
+              _sortDropdown(l10n, filters, isApplying),
+              _auctionDropdown(l10n, filters, isApplying),
+            ],
+            activeFilters: _activeFilters(l10n, theme, filters, isApplying),
+            compact: widget.compact,
+          );
+
+          if (widget.compact) return content;
+
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF2E3440)
+                    : const Color(0xFFE8ECF0),
+              ),
+            ),
+            child: content,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _searchField(
+    AppLocalizations l10n,
+    ThemeData theme,
+    bool isApplying,
+  ) {
+    final isDark = widget.isDark;
+    return TextField(
+      controller: _searchController,
+      focusNode: _searchFocusNode,
+      onChanged: _onSearchChanged,
+      onSubmitted: _applySearch,
+      textInputAction: TextInputAction.search,
+      style: TextStyle(fontSize: widget.compact ? 13 : 14),
+      decoration: _fieldDecoration(
+        hint: l10n.t('postFilterSearch'),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          size: widget.compact ? 18 : 20,
+          color: isDark ? Colors.grey.shade400 : const Color(0xFF9CA3AF),
+        ),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isApplying)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 4),
+                child: SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            if (_searchController.text.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                onPressed: () {
+                  _searchController.clear();
+                  _applySearch('');
+                },
+                tooltip: l10n.t('clear'),
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _activeFilters(
+    AppLocalizations l10n,
+    ThemeData theme,
+    PostFilters filters,
+    bool isApplying,
+  ) {
+    if (!filters.hasAdvancedFilters) return const [];
+
+    final isDark = widget.isDark;
+    return [
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Text(
+            context.tr('activeFiltersCount', {
+              'count': '${filters.advancedActiveCount}',
+            }),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
+            ),
+          ),
+          const Spacer(),
+          TextButton(
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            onPressed: isApplying
+                ? null
+                : () {
+                    _searchController.clear();
+                    _lastAppliedSearch = '';
+                    context.read<PostsBloc>().add(ClearPostFiltersEvent());
+                  },
+            child: Text(
+              l10n.t('clearAllFilters'),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 4),
+      _ActiveFilterChips(
+        filters: filters,
+        onClearSearch: () {
+          _searchController.clear();
+          _lastAppliedSearch = '';
+          final bloc = context.read<PostsBloc>();
+          _apply(bloc.activeFilters.copyWith(clearSearch: true));
+        },
+      ),
+    ];
+  }
+
+  bool _isApplyingFilters(PostsState state) =>
+      state is PostsLoaded && state.isApplyingFilters;
+
+  PostFilters _filtersFromState(PostsState state) {
+    return switch (state) {
+      PostsLoaded(:final filters) => filters,
+      PostsEmpty(:final filters) => filters,
+      PostsError() => context.read<PostsBloc>().activeFilters,
+      _ => context.read<PostsBloc>().activeFilters,
+    };
+  }
+
+  Widget _typeDropdown(
+    AppLocalizations l10n,
+    PostFilters filters,
+    bool loading,
+  ) {
+    return DropdownButtonFormField<String?>(
+      initialValue: filters.type,
+      isExpanded: true,
+      decoration: _fieldDecoration(hint: l10n.t('postFilterType')),
+      items: [
+        DropdownMenuItem(value: null, child: Text(l10n.t('postFilterTypeAll'))),
+        DropdownMenuItem(
+          value: 'VIDEO',
+          child: Text(l10n.t('postFilterTypeVideo')),
+        ),
+        DropdownMenuItem(
+          value: 'IMAGE',
+          child: Text(l10n.t('postFilterTypeImage')),
+        ),
+        DropdownMenuItem(
+          value: 'CAROUSEL',
+          child: Text(l10n.t('postFilterTypeCarousel')),
+        ),
+      ],
+      onChanged: loading
+          ? null
+          : (v) {
+              final bloc = context.read<PostsBloc>();
+              _apply(
+                bloc.activeFilters.copyWith(type: v, clearType: v == null),
+              );
+            },
+    );
+  }
+
+  Widget _sortDropdown(
+    AppLocalizations l10n,
+    PostFilters filters,
+    bool loading,
+  ) {
+    return DropdownButtonFormField<String>(
+      initialValue: filters.sort ?? PostFilters.defaultSort,
+      isExpanded: true,
+      decoration: _fieldDecoration(hint: l10n.t('postFilterSort')),
+      items: [
+        DropdownMenuItem(
+          value: 'LATEST',
+          child: Text(l10n.t('postFilterSortLatest')),
+        ),
+        DropdownMenuItem(
+          value: 'POPULAR',
+          child: Text(l10n.t('postFilterSortPopular')),
+        ),
+      ],
+      onChanged: loading
+          ? null
+          : (v) {
+              if (v == null) return;
+              final bloc = context.read<PostsBloc>();
+              _apply(bloc.activeFilters.copyWith(sort: v));
+            },
+    );
+  }
+
+  Widget _auctionDropdown(
+    AppLocalizations l10n,
+    PostFilters filters,
+    bool loading,
+  ) {
+    final auctionOnly = filters.isAuctionable == true;
+    return DropdownButtonFormField<bool>(
+      initialValue: auctionOnly,
+      isExpanded: true,
+      decoration: _fieldDecoration(hint: l10n.t('postFilterAuction')),
+      items: [
+        DropdownMenuItem(
+          value: false,
+          child: Text(l10n.t('postFilterAuctionAll')),
+        ),
+        DropdownMenuItem(
+          value: true,
+          child: Text(l10n.t('postFilterAuctionOnly')),
+        ),
+      ],
+      onChanged: loading
+          ? null
+          : (v) {
+              if (v == null) return;
+              final bloc = context.read<PostsBloc>();
+              _apply(
+                bloc.activeFilters.copyWith(
+                  isAuctionable: v ? true : null,
+                  clearAuction: !v,
+                ),
+              );
+            },
+    );
+  }
+}
+
+class _ActiveFilterChips extends StatelessWidget {
+  const _ActiveFilterChips({
+    required this.filters,
+    required this.onClearSearch,
+  });
+
+  final PostFilters filters;
+  final VoidCallback onClearSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final chips = <Widget>[];
+
+    void addChip(String label, VoidCallback onRemove) {
+      chips.add(
+        InputChip(
+          label: Text(label, style: const TextStyle(fontSize: 12)),
+          onDeleted: onRemove,
+          deleteIcon: const Icon(Icons.close, size: 16),
+          visualDensity: VisualDensity.compact,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      );
+    }
+
+    final search = filters.search?.trim();
+    if (search != null && search.isNotEmpty) {
+      addChip(
+        context.tr('filterChipSearch', {'value': search}),
+        onClearSearch,
+      );
+    }
+
+    if (filters.type != null) {
+      final label = switch (filters.type) {
+        'VIDEO' => l10n.t('postFilterTypeVideo'),
+        'IMAGE' => l10n.t('postFilterTypeImage'),
+        'CAROUSEL' => l10n.t('postFilterTypeCarousel'),
+        _ => filters.type!,
+      };
+      addChip(
+        label,
+        () => _remove(context, (f) => f.copyWith(clearType: true)),
+      );
+    }
+
+    if (filters.sort != null && filters.sort != PostFilters.defaultSort) {
+      final label = filters.sort == 'POPULAR'
+          ? l10n.t('postFilterSortPopular')
+          : l10n.t('postFilterSortLatest');
+      addChip(
+        label,
+        () => _remove(context, (f) => f.copyWith(clearSort: true)),
+      );
+    }
+
+    if (filters.isAuctionable == true) {
+      addChip(
+        l10n.t('postFilterAuctionOnly'),
+        () => _remove(context, (f) => f.copyWith(clearAuction: true)),
+      );
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(spacing: 6, runSpacing: 6, children: chips);
+  }
+
+  void _remove(BuildContext context, PostFilters Function(PostFilters) update) {
+    final bloc = context.read<PostsBloc>();
+    context.read<PostsBloc>().add(UpdatePostFiltersEvent(update(bloc.activeFilters)));
+  }
+}
+
+class _FilterContent extends StatelessWidget {
+  const _FilterContent({
+    required this.searchField,
+    required this.dropdowns,
+    required this.activeFilters,
+    required this.compact,
+  });
+
+  final Widget searchField;
+  final List<Widget> dropdowns;
+  final List<Widget> activeFilters;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < (compact ? 560 : 640);
+
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              searchField,
+              const SizedBox(height: 8),
+              for (var i = 0; i < dropdowns.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                dropdowns[i],
+              ],
+              ...activeFilters,
+            ],
+          );
+        }
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SizedBox(width: 220, child: searchField),
+                  SizedBox(width: 128, child: dropdowns[0]),
+                  SizedBox(width: 128, child: dropdowns[1]),
+                  SizedBox(width: 142, child: dropdowns[2]),
+                ],
+              ),
+              ...activeFilters,
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            searchField,
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: dropdowns[0]),
+                const SizedBox(width: 8),
+                Expanded(child: dropdowns[1]),
+                const SizedBox(width: 8),
+                Expanded(child: dropdowns[2]),
+              ],
+            ),
+            ...activeFilters,
+          ],
+        );
+      },
+    );
+  }
+}
