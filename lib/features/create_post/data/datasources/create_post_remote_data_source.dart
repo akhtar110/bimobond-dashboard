@@ -46,6 +46,7 @@ class CreatePostRemoteDataSourceImpl implements CreatePostRemoteDataSource {
     );
 
     final data = response.data;
+    print("Data received from uploading the post $data");
     if (data is Map<String, dynamic>) {
       final nested = data['data'];
       final urls = data['urls'] ??
