@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
+import 'core/utils/media_url_resolver.dart';
 import 'features/auth/data/datasource/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
@@ -127,6 +128,10 @@ String _resolveApiBaseUrl() {
 }
 
 Future<void> init() async {
+  // Initialise media URL resolver so relative API paths become absolute URLs
+  // before they reach CachedNetworkImage / VideoPlayerController.
+  MediaUrlResolver.init(_resolveApiBaseUrl());
+
   // =========================
   // Firebase
   // =========================

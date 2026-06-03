@@ -1,3 +1,5 @@
+import '../../../../core/utils/media_url_resolver.dart';
+
 class PostMediaEntity {
   const PostMediaEntity({
     required this.url,
@@ -12,9 +14,14 @@ class PostMediaEntity {
   final String? id;
 
   factory PostMediaEntity.fromJson(Map<String, dynamic> json) {
+    // Resolve relative paths returned by the API (e.g. /uploads/media/…) to
+    // absolute URLs so CachedNetworkImage / VideoPlayerController can load them.
+    final rawUrl = json['url']?.toString() ?? '';
+    final resolvedUrl = resolveMediaUrl(rawUrl) ?? rawUrl;
+
     return PostMediaEntity(
       id: json['id']?.toString(),
-      url: json['url']?.toString() ?? '',
+      url: resolvedUrl,
       mediaType: json['mediaType']?.toString() ?? 'IMAGE',
       order: _readInt(json['order']) ?? 0,
     );

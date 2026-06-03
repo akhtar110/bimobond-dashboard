@@ -1,3 +1,4 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/data/models/category_model.dart';
 import '../../domain/entities/managed_post_entity.dart';
 
@@ -55,20 +56,26 @@ class ManagedPostModel extends ManagedPostEntity {
       parsedCategory = rawCategory;
     }
 
+    // Resolve user avatar — API field is "avatarUrl" (also accept legacy names).
+    final rawAvatar = user?['avatarUrl'] as String? ??
+        user?['avatar'] as String? ??
+        user?['profileImage'] as String? ??
+        user?['profilePicture'] as String?;
+
     return ManagedPostModel(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
       type: json['type']?.toString() ?? 'VIDEO',
-      userName: user?['username'] as String? ??
-          user?['name'] as String?,
-      userProfileImage: user?['avatar'] as String? ??
-          user?['profileImage'] as String? ??
-          user?['profilePicture'] as String?,
-      videoUrl: json['videoUrl'] as String?,
-      hlsUrl: json['hlsUrl'] as String?,
-      thumbnailUrl: json['thumbnailUrl'] as String?,
+      userName: user?['username'] as String? ?? user?['name'] as String?,
+      // Resolve relative avatar URL to absolute so CircleAvatar loads the image.
+      userProfileImage: resolveMediaUrl(rawAvatar),
+      // Resolve all media URL fields from relative → absolute.
+      videoUrl: resolveMediaUrl(json['videoUrl'] as String?),
+      hlsUrl: resolveMediaUrl(json['hlsUrl'] as String?),
+      thumbnailUrl: resolveMediaUrl(json['thumbnailUrl'] as String?),
+      // PostMediaEntity.fromJson already resolves each item's URL internally.
       media: PostMediaEntity.listFromJson(json['media']),
-      animatedCoverUrl: json['animatedCoverUrl'] as String?,
+      animatedCoverUrl: resolveMediaUrl(json['animatedCoverUrl'] as String?),
       description: json['description'] as String?,
       category: parsedCategory,
       categoryEntity: parsedCategoryEntity,

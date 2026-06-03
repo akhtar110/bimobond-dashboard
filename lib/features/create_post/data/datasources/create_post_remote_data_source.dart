@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/create_post_payload_builder.dart';
 import '../../domain/entities/local_media_file.dart';
@@ -46,33 +47,42 @@ class CreatePostRemoteDataSourceImpl implements CreatePostRemoteDataSource {
     );
 
     final data = response.data;
-    print("Data received from uploading the post $data");
+    debugPrint('[Upload] response: $data');
+
     if (data is Map<String, dynamic>) {
       final nested = data['data'];
       final urls = data['urls'] ??
           (nested is Map<String, dynamic> ? nested['urls'] : null);
       if (urls is List) {
-        return urls
+        final resolved = urls
             .map(CreatePostPayloadBuilder.parseUploadUrlEntry)
             .toList(growable: false);
+        debugPrint('[Upload] URLs parsed: $resolved');
+        return resolved;
       }
     }
     if (data is List) {
-      return data
+      final resolved = data
           .map(CreatePostPayloadBuilder.parseUploadUrlEntry)
           .toList(growable: false);
+      debugPrint('[Upload] URLs parsed (list): $resolved');
+      return resolved;
     }
-    throw Exception('Invalid upload response');
+    throw Exception('Invalid upload response: $data');
   }
 
   @override
   Future<Map<String, dynamic>> createPost(CreatePostDto dto) async {
+    final payload = dto.toJson();
+    debugPrint('[CreatePost] payload: $payload');
+
     final response = await _dio.post(
       '/posts',
-      data: dto.toJson(),
+      data: payload,
       options: Options(contentType: Headers.jsonContentType),
     );
     final data = response.data;
+    debugPrint('[CreatePost] response: $data');
     if (data is Map<String, dynamic>) return data;
     return {'data': data};
   }

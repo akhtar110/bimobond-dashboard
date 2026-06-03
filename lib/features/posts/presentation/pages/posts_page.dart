@@ -350,6 +350,13 @@ class _CategoryFilter extends StatelessWidget {
 
   final bool isDark;
 
+  /// Reads the active category ID from whichever state/bloc is available.
+  static String? _activeCategoryId(PostsState state, BuildContext context) {
+    if (state is PostsLoaded) return state.filters.categoryId;
+    // For loading/error states fall back to the bloc's live activeFilters.
+    return context.read<PostsBloc>().activeFilters.categoryId;
+  }
+
   static const _palette = [
     Color(0xFF6366F1),
     Color(0xFF0EA5E9),
@@ -382,22 +389,19 @@ class _CategoryFilter extends StatelessWidget {
         // filters change — including optimistic updates from the bloc.
         return BlocBuilder<PostsBloc, PostsState>(
           buildWhen: (prev, next) {
-            // Only rebuild when the selected category actually changes
-            String? prevId;
-            String? nextId;
-            if (prev is PostsLoaded) prevId = prev.filters.categoryId;
-            if (next is PostsLoaded) nextId = next.filters.categoryId;
-            // Also check bloc.activeFilters for the optimistic case
-            return prevId != nextId ||
-                prev.runtimeType != next.runtimeType;
+            // Rebuild whenever the selected category ID changes in the bloc's
+            // active filters (covers both the optimistic update and the final
+            // loaded state), or whenever the state type changes.
+            final prevId = _activeCategoryId(prev, context);
+            final nextId = _activeCategoryId(next, context);
+            return prevId != nextId || prev.runtimeType != next.runtimeType;
           },
           builder: (context, postsState) {
-            // ── Category ID resolution ────────────────────────────────────
-            // Prefer the bloc's activeFilters (always up-to-date) over
-            // just reading from state, so optimistic chip selection works
-            // even when the state hasn't finished loading.
-            final bloc = context.read<PostsBloc>();
-            final selectedId = bloc.activeFilters.categoryId;
+            // Always read selectedId from bloc.activeFilters — it is updated
+            // synchronously in the event handler before any async work, so it
+            // reflects the user's latest selection even while an API call is
+            // in-flight.
+            final selectedId = context.read<PostsBloc>().activeFilters.categoryId;
 
             return SizedBox(
               height: 36,

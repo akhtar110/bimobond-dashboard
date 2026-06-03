@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/post_filters.dart';
 import '../models/post_model.dart';
@@ -49,9 +50,27 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
     }
 
     final response = await _dio.get(
-      '/posts/feed',
+      '/posts/admin/all',
       queryParameters: params,
     );
-    return PostsPageModel.fromJson(response.data as Map<String, dynamic>);
+
+    final raw = response.data as Map<String, dynamic>;
+    final result = PostsPageModel.fromJson(raw);
+
+    if (kDebugMode) {
+      debugPrint('[Posts] fetched ${result.posts.length} posts '
+          '(page ${result.currentPage}/${result.lastPage})');
+      for (final p in result.posts.take(3)) {
+        debugPrint('  post ${p.id}: type=${p.type} '
+            'thumbnailUrl=${p.thumbnailUrl} '
+            'videoUrl=${p.videoUrl} '
+            'media.length=${p.media.length}');
+        for (final m in p.media) {
+          debugPrint('    media url=${m.url} type=${m.mediaType}');
+        }
+      }
+    }
+
+    return result;
   }
 }
