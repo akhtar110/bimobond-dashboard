@@ -39,12 +39,14 @@ abstract class UserActivityRepository {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserLikeEntity>> getUserLikes(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserMentionEntity>> getUserMentions(

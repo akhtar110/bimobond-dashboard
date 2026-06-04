@@ -8,6 +8,7 @@ class UserLikeModel extends UserLikeEntity {
     required super.postId,
     required super.createdAt,
     required super.post,
+    super.user,
   });
 
   factory UserLikeModel.fromJson(Map<String, dynamic> json) {
@@ -19,6 +20,9 @@ class UserLikeModel extends UserLikeEntity {
       post: ActivityPostSummaryModel.fromJson(
         json['post'] as Map<String, dynamic>?,
       ),
+      user: json['user'] is Map<String, dynamic>
+          ? ActivityUserModel.fromJson(json['user'] as Map<String, dynamic>)
+          : null,
     );
   }
 

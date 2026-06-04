@@ -7,6 +7,7 @@ class UserCommentModel extends UserCommentEntity {
     required super.content,
     required super.postId,
     required super.userId,
+    super.user,
     super.parentId,
     required super.likeCount,
     required super.replyCount,
@@ -23,6 +24,9 @@ class UserCommentModel extends UserCommentEntity {
       content: json['content']?.toString() ?? '',
       postId: json['postId']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
+      user: json['user'] is Map<String, dynamic>
+          ? ActivityUserModel.fromJson(json['user'] as Map<String, dynamic>)
+          : null,
       parentId: json['parentId'] as String?,
       likeCount: _int(json['likeCount']) ?? 0,
       replyCount: _int(json['replyCount']) ?? 0,

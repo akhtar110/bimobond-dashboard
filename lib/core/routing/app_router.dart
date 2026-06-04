@@ -1,7 +1,7 @@
 import 'package:bimo_bond_dashboard/features/auctions/domain/entities/auction_entity.dart';
 import 'package:bimo_bond_dashboard/features/auctions/presentation/bloc/auction_detail_bloc.dart';
 import 'package:bimo_bond_dashboard/features/auctions/presentation/pages/auction_detail_page.dart';
-import 'package:bimo_bond_dashboard/features/post_management/domain/entities/managed_post_entity.dart';
+import 'package:bimo_bond_dashboard/features/post_management/domain/entities/post_management_route_args.dart';
 import 'package:bimo_bond_dashboard/features/post_management/presentation/screens/post_management_detail_screen.dart';
 import 'package:bimo_bond_dashboard/features/users/domain/entities/user_entity.dart';
 import 'package:bimo_bond_dashboard/features/user_activity/presentation/bloc/user_activity_bloc.dart';
@@ -104,11 +104,16 @@ class AppRouter {
             child: UserDetailScreen(user: user),
           ),
         );
-      case AppRoutes.postManagementDetail:
-        final post = settings.arguments as ManagedPostEntity;
-        return MaterialPageRoute(
-          builder: (_) => PostManagementDetailScreen(post: post),
+      case AppRoutes.postManagementDetail: {
+        final deepLink = PostManagementRouteArgs.tryParseRouteName(
+          settings.name,
         );
+        final args = deepLink ??
+            PostManagementRouteArgs.resolve(settings.arguments);
+        return MaterialPageRoute(
+          builder: (_) => PostManagementDetailScreen.fromArgs(args),
+        );
+      }
       case AppRoutes.auctionDetail:
         final auction = settings.arguments as AuctionEntity;
         return MaterialPageRoute(

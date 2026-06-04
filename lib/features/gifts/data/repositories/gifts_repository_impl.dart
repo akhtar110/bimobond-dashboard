@@ -9,9 +9,20 @@ class GiftsRepositoryImpl implements GiftsRepository {
   @override
   Future<List<GiftEntity>> getAdminGifts() => _dataSource.getAdminGifts();
 
+  /// Upload the selected image first, then create the gift with the returned URL.
   @override
-  Future<GiftEntity> createGift(CreateGiftData data) =>
-      _dataSource.createGift(data);
+  Future<GiftEntity> createGift(CreateGiftData data) async {
+    final thumbnailUrl = await _dataSource.uploadGiftImage(
+      data.imageBytes,
+      data.imageName,
+    );
+    return _dataSource.createGiftWithUrl(
+      name: data.name,
+      thumbnailUrl: thumbnailUrl,
+      priceUsd: data.priceUsd,
+      isActive: data.isActive,
+    );
+  }
 
   @override
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data) =>

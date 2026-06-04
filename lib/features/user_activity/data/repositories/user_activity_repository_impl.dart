@@ -59,16 +59,18 @@ class UserActivityRepositoryImpl implements UserActivityRepository {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) =>
-      _remote.getUserComments(userId, page: page, limit: limit);
+      _remote.getUserComments(userId, page: page, limit: limit, type: type);
 
   @override
   Future<PaginatedPage<UserLikeEntity>> getUserLikes(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) =>
-      _remote.getUserLikes(userId, page: page, limit: limit);
+      _remote.getUserLikes(userId, page: page, limit: limit, type: type);
 
   @override
   Future<PaginatedPage<UserMentionEntity>> getUserMentions(

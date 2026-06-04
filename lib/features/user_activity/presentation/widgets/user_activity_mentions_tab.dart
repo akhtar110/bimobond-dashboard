@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../post_management/domain/entities/activity_context.dart';
+import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/user_mention_entity.dart';
 import '../bloc/user_mentions_bloc.dart';
 import '../utils/activity_navigation.dart';
@@ -11,9 +13,14 @@ import 'activity_list_widgets.dart';
 import 'user_activity_shimmer.dart';
 
 class UserActivityMentionsTab extends StatefulWidget {
-  const UserActivityMentionsTab({super.key, required this.isDark});
+  const UserActivityMentionsTab({
+    super.key,
+    required this.isDark,
+    this.sourceUser,
+  });
 
   final bool isDark;
+  final UserEntity? sourceUser;
 
   @override
   State<UserActivityMentionsTab> createState() =>
@@ -116,7 +123,25 @@ class _UserActivityMentionsTabState extends State<UserActivityMentionsTab> {
                 mention: mention,
                 isDark: widget.isDark,
                 onTap: postId != null
-                    ? () => openPostManagementById(context, postId)
+                    ? () {
+                        final m = mention;
+                        final text = m.isCommentMention && m.comment != null
+                            ? m.comment!.content
+                            : m.post?.description;
+                        openPostInvestigation(
+                          context,
+                          postId: postId,
+                          sourceUser: widget.sourceUser,
+                          activityContext: ActivityContext.mention(
+                            activityDate: m.createdAt,
+                            mentionText: text,
+                            mentionSource: m.isCommentMention
+                                ? context.l10n.t('mentionInComment')
+                                : context.l10n.t('mentionInPost'),
+                            postOwnerName: m.post?.user?.displayName,
+                          ),
+                        );
+                      }
                     : null,
               );
             },

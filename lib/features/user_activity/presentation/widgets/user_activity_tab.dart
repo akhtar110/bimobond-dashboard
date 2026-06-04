@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../post_management/domain/entities/activity_context.dart';
+import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/user_activity_item_entity.dart';
 import '../bloc/user_unified_activity_bloc.dart';
 import '../utils/activity_navigation.dart';
@@ -11,9 +13,14 @@ import 'activity_list_widgets.dart';
 import 'user_activity_shimmer.dart';
 
 class UserActivityTab extends StatefulWidget {
-  const UserActivityTab({super.key, required this.isDark});
+  const UserActivityTab({
+    super.key,
+    required this.isDark,
+    this.sourceUser,
+  });
 
   final bool isDark;
+  final UserEntity? sourceUser;
 
   @override
   State<UserActivityTab> createState() => _UserActivityTabState();
@@ -59,7 +66,15 @@ class _UserActivityTabState extends State<UserActivityTab> {
   void _onItemTap(UserActivityItemEntity item) {
     final postId = item.detailString('postId');
     if (postId != null && postId.isNotEmpty) {
-      openPostManagementById(context, postId);
+      openPostInvestigation(
+        context,
+        postId: postId,
+        sourceUser: widget.sourceUser,
+        activityContext: ActivityContext.feed(
+          activityDate: item.createdAt,
+          label: item.type,
+        ),
+      );
     }
   }
 

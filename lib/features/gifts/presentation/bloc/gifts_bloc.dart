@@ -1,4 +1,5 @@
-import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/gift_entity.dart';
@@ -8,11 +9,55 @@ import '../../domain/usecases/delete_gift_usecase.dart';
 import '../../domain/usecases/get_admin_gifts_usecase.dart';
 import '../../domain/usecases/update_gift_usecase.dart';
 
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum GiftFilterTab { all, active, inactive }
+
+enum GiftSortType {
+  priceLowToHigh,
+  priceHighToLow,
+  dateOldToNew,
+  dateNewToOld,
+}
+
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 abstract class GiftsEvent {}
 
 class LoadAdminGiftsEvent extends GiftsEvent {}
+
+class ChangeGiftTabFilterEvent extends GiftsEvent {
+  ChangeGiftTabFilterEvent(this.filter);
+  final GiftFilterTab filter;
+}
+
+class ChangeGiftSortEvent extends GiftsEvent {
+  ChangeGiftSortEvent(this.sortType);
+  final GiftSortType sortType;
+}
+
+/// Real-time search by gift name (case-insensitive).
+class SearchGiftsEvent extends GiftsEvent {
+  SearchGiftsEvent(this.query);
+  final String query;
+}
+
+/// Set or clear the date-range filter on createdAt.
+/// Pass both [fromDate] and [toDate] as null to clear the range.
+class SetDateRangeFilterEvent extends GiftsEvent {
+  SetDateRangeFilterEvent({required this.fromDate, required this.toDate});
+  final DateTime? fromDate;
+  final DateTime? toDate;
+}
+
+/// Hold image bytes in BLoC state so the create dialog can preview it.
+class SetGiftImageEvent extends GiftsEvent {
+  SetGiftImageEvent({required this.bytes, required this.name});
+  final Uint8List bytes;
+  final String name;
+}
+
+class ClearGiftImageEvent extends GiftsEvent {}
 
 class CreateGiftEvent extends GiftsEvent {
   CreateGiftEvent(this.data);
@@ -36,11 +81,6 @@ class DeleteGiftEvent extends GiftsEvent {
   final String giftId;
 }
 
-class ToggleGiftsFilterEvent extends GiftsEvent {
-  ToggleGiftsFilterEvent(this.showInactiveOnly);
-  final bool showInactiveOnly;
-}
-
 // ─── States ──────────────────────────────────────────────────────────────────
 
 abstract class GiftsState {}
@@ -52,24 +92,126 @@ class GiftsLoading extends GiftsState {}
 class GiftsLoaded extends GiftsState {
   GiftsLoaded({
     required this.gifts,
-    this.showInactiveOnly = false,
+    this.selectedTab = GiftFilterTab.all,
+    this.selectedSort = GiftSortType.dateNewToOld,
+    this.searchQuery = '',
+    this.fromDate,
+    this.toDate,
+    this.pendingImageBytes,
+    this.pendingImageName,
     this.isActioning = false,
     this.successMessage,
     this.errorMessage,
   });
 
   final List<GiftEntity> gifts;
-  final bool showInactiveOnly;
+  final GiftFilterTab selectedTab;
+  final GiftSortType selectedSort;
+
+  /// Case-insensitive name filter (empty = no filter).
+  final String searchQuery;
+
+  /// Inclusive date-range filter on [GiftEntity.createdAt].
+  final DateTime? fromDate;
+  final DateTime? toDate;
+
+  /// Image selected by the admin before submitting the create form.
+  final Uint8List? pendingImageBytes;
+  final String? pendingImageName;
+
   final bool isActioning;
   final String? successMessage;
   final String? errorMessage;
 
-  List<GiftEntity> get displayed =>
-      showInactiveOnly ? gifts.where((g) => !g.isActive).toList() : gifts;
+  // ── All filters + sort applied here, never in the UI ─────────────────────
+
+  List<GiftEntity> get displayed {
+    Iterable<GiftEntity> list = gifts;
+
+    // 1. Tab filter (active / inactive / all)
+    switch (selectedTab) {
+      case GiftFilterTab.all:
+        break;
+      case GiftFilterTab.active:
+        list = list.where((g) => g.isActive);
+        break;
+      case GiftFilterTab.inactive:
+        list = list.where((g) => !g.isActive);
+        break;
+    }
+
+    // 2. Name search (case-insensitive, partial match)
+    if (searchQuery.isNotEmpty) {
+      final q = searchQuery.toLowerCase().trim();
+      list = list.where((g) => g.name.toLowerCase().contains(q));
+    }
+
+    // 3. Date-range filter on createdAt (inclusive, day precision)
+    if (fromDate != null || toDate != null) {
+      list = list.where((g) {
+        final d = g.createdAt;
+        if (d == null) return false;
+        final day = DateTime(d.year, d.month, d.day);
+        if (fromDate != null) {
+          final from =
+              DateTime(fromDate!.year, fromDate!.month, fromDate!.day);
+          if (day.isBefore(from)) return false;
+        }
+        if (toDate != null) {
+          final to = DateTime(toDate!.year, toDate!.month, toDate!.day);
+          if (day.isAfter(to)) return false;
+        }
+        return true;
+      });
+    }
+
+    // 4. Sort
+    final sorted = list.toList();
+    switch (selectedSort) {
+      case GiftSortType.priceLowToHigh:
+        sorted.sort((a, b) => a.priceUsd.compareTo(b.priceUsd));
+        break;
+      case GiftSortType.priceHighToLow:
+        sorted.sort((a, b) => b.priceUsd.compareTo(a.priceUsd));
+        break;
+      case GiftSortType.dateOldToNew:
+        sorted.sort((a, b) {
+          final aD = a.createdAt ?? DateTime(0);
+          final bD = b.createdAt ?? DateTime(0);
+          return aD.compareTo(bD);
+        });
+        break;
+      case GiftSortType.dateNewToOld:
+        sorted.sort((a, b) {
+          final aD = a.createdAt ?? DateTime(0);
+          final bD = b.createdAt ?? DateTime(0);
+          return bD.compareTo(aD);
+        });
+        break;
+    }
+    return sorted;
+  }
+
+  /// Whether any filter other than the default is active.
+  bool get hasActiveFilters =>
+      selectedTab != GiftFilterTab.all ||
+      searchQuery.isNotEmpty ||
+      fromDate != null ||
+      toDate != null;
 
   GiftsLoaded copyWith({
     List<GiftEntity>? gifts,
-    bool? showInactiveOnly,
+    GiftFilterTab? selectedTab,
+    GiftSortType? selectedSort,
+    String? searchQuery,
+    // Use setDateRange = true to explicitly assign fromDate / toDate
+    // (needed to set them to null for "clear").
+    bool setDateRange = false,
+    DateTime? fromDate,
+    DateTime? toDate,
+    Uint8List? pendingImageBytes,
+    String? pendingImageName,
+    bool clearPendingImage = false,
     bool? isActioning,
     String? successMessage,
     String? errorMessage,
@@ -77,10 +219,22 @@ class GiftsLoaded extends GiftsState {
   }) {
     return GiftsLoaded(
       gifts: gifts ?? this.gifts,
-      showInactiveOnly: showInactiveOnly ?? this.showInactiveOnly,
+      selectedTab: selectedTab ?? this.selectedTab,
+      selectedSort: selectedSort ?? this.selectedSort,
+      searchQuery: searchQuery ?? this.searchQuery,
+      fromDate: setDateRange ? fromDate : (fromDate ?? this.fromDate),
+      toDate: setDateRange ? toDate : (toDate ?? this.toDate),
+      pendingImageBytes: clearPendingImage
+          ? null
+          : (pendingImageBytes ?? this.pendingImageBytes),
+      pendingImageName: clearPendingImage
+          ? null
+          : (pendingImageName ?? this.pendingImageName),
       isActioning: isActioning ?? this.isActioning,
-      successMessage: clearMessages ? null : (successMessage ?? this.successMessage),
-      errorMessage: clearMessages ? null : (errorMessage ?? this.errorMessage),
+      successMessage:
+          clearMessages ? null : (successMessage ?? this.successMessage),
+      errorMessage:
+          clearMessages ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }
@@ -104,11 +258,16 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         _deleteGift = deleteGift,
         super(GiftsInitial()) {
     on<LoadAdminGiftsEvent>(_onLoad);
+    on<ChangeGiftTabFilterEvent>(_onChangeTab);
+    on<ChangeGiftSortEvent>(_onChangeSort);
+    on<SearchGiftsEvent>(_onSearch);
+    on<SetDateRangeFilterEvent>(_onSetDateRange);
+    on<SetGiftImageEvent>(_onSetImage);
+    on<ClearGiftImageEvent>(_onClearImage);
     on<CreateGiftEvent>(_onCreate);
     on<UpdateGiftEvent>(_onUpdate);
     on<ToggleGiftActiveEvent>(_onToggleActive);
     on<DeleteGiftEvent>(_onDelete);
-    on<ToggleGiftsFilterEvent>(_onToggleFilter);
   }
 
   final GetAdminGifts _getAdminGifts;
@@ -116,93 +275,167 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   final UpdateGift _updateGift;
   final DeleteGift _deleteGift;
 
+  // ── Load ──────────────────────────────────────────────────────────────────
+
   Future<void> _onLoad(
-      LoadAdminGiftsEvent event, Emitter<GiftsState> emit) async {
-    emit(GiftsLoading());
+    LoadAdminGiftsEvent event,
+    Emitter<GiftsState> emit,
+  ) async {
+    final prev = state;
+    if (prev is! GiftsLoaded) emit(GiftsLoading());
     try {
       final gifts = await _getAdminGifts();
-      emit(GiftsLoaded(gifts: gifts));
+      if (prev is GiftsLoaded) {
+        emit(prev.copyWith(gifts: gifts, clearMessages: true));
+      } else {
+        emit(GiftsLoaded(gifts: gifts));
+      }
     } catch (e) {
       emit(GiftsError(e.toString()));
     }
   }
 
+  // ── Filter / sort ─────────────────────────────────────────────────────────
+
+  void _onChangeTab(
+    ChangeGiftTabFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(selectedTab: event.filter, clearMessages: true));
+    }
+  }
+
+  void _onChangeSort(
+    ChangeGiftSortEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(selectedSort: event.sortType, clearMessages: true));
+    }
+  }
+
+  void _onSearch(SearchGiftsEvent event, Emitter<GiftsState> emit) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(searchQuery: event.query, clearMessages: true));
+    }
+  }
+
+  void _onSetDateRange(
+    SetDateRangeFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(
+        setDateRange: true,
+        fromDate: event.fromDate,
+        toDate: event.toDate,
+        clearMessages: true,
+      ));
+    }
+  }
+
+  // ── Pending image ─────────────────────────────────────────────────────────
+
+  void _onSetImage(SetGiftImageEvent event, Emitter<GiftsState> emit) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(
+        pendingImageBytes: event.bytes,
+        pendingImageName: event.name,
+        clearMessages: true,
+      ));
+    }
+  }
+
+  void _onClearImage(ClearGiftImageEvent event, Emitter<GiftsState> emit) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(clearPendingImage: true, clearMessages: true));
+    }
+  }
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+
   Future<void> _onCreate(
-      CreateGiftEvent event, Emitter<GiftsState> emit) async {
-    final current = state;
-    if (current is! GiftsLoaded) return;
-    emit(current.copyWith(isActioning: true, clearMessages: true));
+    CreateGiftEvent event,
+    Emitter<GiftsState> emit,
+  ) async {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+    emit(c.copyWith(isActioning: true, clearMessages: true));
     try {
       final gift = await _createGift(event.data);
-      emit(current.copyWith(
-        gifts: [...current.gifts, gift],
+      emit(c.copyWith(
+        gifts: [...c.gifts, gift],
         isActioning: false,
+        clearPendingImage: true,
         successMessage: 'Gift "${gift.name}" created successfully',
       ));
     } catch (e) {
-      emit(current.copyWith(
-          isActioning: false, errorMessage: e.toString()));
+      emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
     }
   }
 
   Future<void> _onUpdate(
-      UpdateGiftEvent event, Emitter<GiftsState> emit) async {
-    final current = state;
-    if (current is! GiftsLoaded) return;
-    emit(current.copyWith(isActioning: true, clearMessages: true));
+    UpdateGiftEvent event,
+    Emitter<GiftsState> emit,
+  ) async {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+    emit(c.copyWith(isActioning: true, clearMessages: true));
     try {
       final updated = await _updateGift(event.giftId, event.data);
-      final gifts = current.gifts.map((g) => g.id == event.giftId ? updated : g).toList();
-      emit(current.copyWith(
+      final gifts =
+          c.gifts.map((g) => g.id == event.giftId ? updated : g).toList();
+      emit(c.copyWith(
         gifts: gifts,
         isActioning: false,
         successMessage: 'Gift updated successfully',
       ));
     } catch (e) {
-      emit(current.copyWith(
-          isActioning: false, errorMessage: e.toString()));
+      emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
     }
   }
 
   Future<void> _onToggleActive(
-      ToggleGiftActiveEvent event, Emitter<GiftsState> emit) async {
-    final current = state;
-    if (current is! GiftsLoaded) return;
+    ToggleGiftActiveEvent event,
+    Emitter<GiftsState> emit,
+  ) async {
+    final c = state;
+    if (c is! GiftsLoaded) return;
     try {
-      final updated = await _updateGift(
-          event.giftId, UpdateGiftData(isActive: event.isActive));
+      final updated =
+          await _updateGift(event.giftId, UpdateGiftData(isActive: event.isActive));
       final gifts =
-          current.gifts.map((g) => g.id == event.giftId ? updated : g).toList();
-      emit(current.copyWith(gifts: gifts));
+          c.gifts.map((g) => g.id == event.giftId ? updated : g).toList();
+      emit(c.copyWith(gifts: gifts));
     } catch (e) {
-      emit(current.copyWith(errorMessage: e.toString()));
-    }
-  }
-
-  void _onToggleFilter(
-      ToggleGiftsFilterEvent event, Emitter<GiftsState> emit) {
-    final current = state;
-    if (current is GiftsLoaded) {
-      emit(current.copyWith(showInactiveOnly: event.showInactiveOnly));
+      emit(c.copyWith(errorMessage: e.toString()));
     }
   }
 
   Future<void> _onDelete(
-      DeleteGiftEvent event, Emitter<GiftsState> emit) async {
-    final current = state;
-    if (current is! GiftsLoaded) return;
-    emit(current.copyWith(isActioning: true, clearMessages: true));
+    DeleteGiftEvent event,
+    Emitter<GiftsState> emit,
+  ) async {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+    emit(c.copyWith(isActioning: true, clearMessages: true));
     try {
       await _deleteGift(event.giftId);
-      final gifts = current.gifts.where((g) => g.id != event.giftId).toList();
-      emit(current.copyWith(
+      final gifts = c.gifts.where((g) => g.id != event.giftId).toList();
+      emit(c.copyWith(
         gifts: gifts,
         isActioning: false,
         successMessage: 'Gift deleted successfully',
       ));
     } catch (e) {
-      emit(current.copyWith(
-          isActioning: false, errorMessage: e.toString()));
+      emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
     }
   }
 }

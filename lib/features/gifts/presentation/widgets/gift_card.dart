@@ -1,10 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../bloc/gifts_bloc.dart';
+
+// ─── Main card ────────────────────────────────────────────────────────────────
 
 class GiftCard extends StatelessWidget {
   const GiftCard({
@@ -27,15 +30,17 @@ class GiftCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          color: isDark
+              ? const Color(0xFF2E3440)
+              : const Color(0xFFE8ECF0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -49,62 +54,49 @@ class GiftCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Name + badge row
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
                         gift.name,
-                        style: const TextStyle(
+                        style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                          height: 1.25,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     _ActiveBadge(isActive: gift.isActive),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
+                const SizedBox(height: 8),
+
+                // Published date
+                _PublishedDate(gift: gift),
+                const SizedBox(height: 8),
+
+                // Price chip + animated badge
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                    _PriceChip(theme: theme, priceUsd: gift.priceUsd),
+                    if (gift.animationUrl != null &&
+                        gift.animationUrl!.isNotEmpty)
+                      _MiniChip(
+                        icon: Icons.animation_rounded,
+                        label: 'Animated',
+                        isDark: isDark,
                       ),
-                      child: Text(
-                        '\$${gift.priceUsd.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    if (gift.animationUrl != null) ...[
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.animation_rounded,
-                        size: 14,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        'Animated',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 12),
+
+                // Action row
                 Row(
                   children: [
                     Expanded(
@@ -117,7 +109,8 @@ class GiftCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 8),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -134,7 +127,8 @@ class GiftCard extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         style: IconButton.styleFrom(
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -149,6 +143,112 @@ class GiftCard extends StatelessWidget {
   }
 }
 
+// ─── Published date ───────────────────────────────────────────────────────────
+
+class _PublishedDate extends StatelessWidget {
+  const _PublishedDate({required this.gift});
+  final GiftEntity gift;
+
+  static final _fmt = DateFormat('MMM d, yyyy · HH:mm');
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
+    final date = gift.createdAt;
+
+    return Row(
+      children: [
+        Icon(Icons.calendar_today_outlined, size: 12, color: muted),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            date != null
+                ? 'Published ${_fmt.format(date.toLocal())}'
+                : 'Publish date unavailable',
+            style: TextStyle(
+              fontSize: 11,
+              color: muted,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Price chip ───────────────────────────────────────────────────────────────
+
+class _PriceChip extends StatelessWidget {
+  const _PriceChip({required this.theme, required this.priceUsd});
+  final ThemeData theme;
+  final double priceUsd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '\$${priceUsd.toStringAsFixed(2)}',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Mini chip ────────────────────────────────────────────────────────────────
+
+class _MiniChip extends StatelessWidget {
+  const _MiniChip({
+    required this.icon,
+    required this.label,
+    required this.isDark,
+  });
+  final IconData icon;
+  final String label;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Thumbnail ────────────────────────────────────────────────────────────────
+
 class _GiftThumbnail extends StatelessWidget {
   const _GiftThumbnail({required this.gift});
   final GiftEntity gift;
@@ -156,29 +256,29 @@ class _GiftThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(
-      height: 130,
+    return AspectRatio(
+      aspectRatio: 4 / 3,
       child: gift.thumbnailUrl.isNotEmpty
           ? CachedNetworkImage(
               imageUrl: gift.thumbnailUrl,
               fit: BoxFit.cover,
-              placeholder: (context, url) => _ph(isDark),
-              errorWidget: (context, url, error) => _ph(isDark),
+              placeholder: (_, __) => _placeholder(isDark),
+              errorWidget: (_, __, ___) => _placeholder(isDark),
             )
-          : _ph(isDark),
+          : _placeholder(isDark),
     );
   }
 
-  Widget _ph(bool isDark) {
-    return Container(
-      color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF4F5F7),
-      child: const Center(
-        child: Icon(Icons.card_giftcard_rounded,
-            size: 40, color: Color(0xFF9CA3AF)),
-      ),
-    );
-  }
+  Widget _placeholder(bool isDark) => Container(
+        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF4F5F7),
+        child: const Center(
+          child: Icon(Icons.card_giftcard_rounded,
+              size: 40, color: Color(0xFF9CA3AF)),
+        ),
+      );
 }
+
+// ─── Active badge ─────────────────────────────────────────────────────────────
 
 class _ActiveBadge extends StatelessWidget {
   const _ActiveBadge({required this.isActive});
@@ -188,11 +288,9 @@ class _ActiveBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isActive
-            ? const Color(0xFFDCFCE7)
-            : const Color(0xFFF3F4F6),
+        color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -208,6 +306,8 @@ class _ActiveBadge extends StatelessWidget {
   }
 }
 
+// ─── Toggle button ────────────────────────────────────────────────────────────
+
 class _ToggleButton extends StatelessWidget {
   const _ToggleButton({required this.gift});
   final GiftEntity gift;
@@ -221,11 +321,9 @@ class _ToggleButton extends StatelessWidget {
       child: Tooltip(
         message: gift.isActive ? l10n.t('deactivate') : l10n.t('activate'),
         child: IconButton.outlined(
-          onPressed: () {
-            context
-                .read<GiftsBloc>()
-                .add(ToggleGiftActiveEvent(gift.id, !gift.isActive));
-          },
+          onPressed: () => context
+              .read<GiftsBloc>()
+              .add(ToggleGiftActiveEvent(gift.id, !gift.isActive)),
           icon: Icon(
             gift.isActive
                 ? Icons.visibility_off_rounded
@@ -236,7 +334,8 @@ class _ToggleButton extends StatelessWidget {
           padding: EdgeInsets.zero,
           style: IconButton.styleFrom(
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
       ),
@@ -248,21 +347,23 @@ class _ToggleButton extends StatelessWidget {
 
 class GiftCardSkeleton extends StatefulWidget {
   const GiftCardSkeleton({super.key});
+
   @override
   State<GiftCardSkeleton> createState() => _GiftCardSkeletonState();
 }
 
 class _GiftCardSkeletonState extends State<GiftCardSkeleton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-          ..repeat(reverse: true);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
@@ -276,36 +377,39 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFEEEEF0);
-    final highlight =
-        isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF8F8FA);
+    final hi = isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF8F8FA);
 
     return AnimatedBuilder(
       animation: _anim,
-      builder: (context, child) {
-        final color = Color.lerp(base, highlight, _anim.value)!;
+      builder: (_, __) {
+        final c = Color.lerp(base, hi, _anim.value)!;
         return Container(
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF161622) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              color: isDark
+                  ? const Color(0xFF2E3440)
+                  : const Color(0xFFE8ECF0),
             ),
           ),
           clipBehavior: Clip.hardEdge,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(height: 130, color: color),
+              AspectRatio(aspectRatio: 4 / 3, child: ColoredBox(color: c)),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sh(color, 140, 14),
+                    _sh(c, 150, 14),
                     const SizedBox(height: 8),
-                    _sh(color, 80, 26, radius: 8),
+                    _sh(c, 110, 11),
+                    const SizedBox(height: 8),
+                    _sh(c, 80, 26, r: 8),
                     const SizedBox(height: 12),
-                    _sh(color, double.infinity, 36, radius: 8),
+                    _sh(c, double.infinity, 36, r: 8),
                   ],
                 ),
               ),
@@ -316,14 +420,12 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
     );
   }
 
-  Widget _sh(Color color, double width, double height, {double radius = 6}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
+  Widget _sh(Color color, double w, double h, {double r = 6}) => Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(r),
+        ),
+      );
 }

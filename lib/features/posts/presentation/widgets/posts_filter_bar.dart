@@ -42,23 +42,21 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     super.dispose();
   }
 
+  /// Dispatches [UpdatePostFiltersEvent] for dropdown-driven filter changes.
+  /// Always reads [PostsBloc.activeFilters] as the base so the current
+  /// category (and any other filter) is preserved.
   void _apply(PostFilters filters) {
     context.read<PostsBloc>().add(UpdatePostFiltersEvent(filters));
   }
 
+  /// Dispatches the dedicated [SearchPostsEvent].
+  /// The BLoC handler merges the search query into the current filters so
+  /// the active category and other filters are never lost.
   void _applySearch(String value) {
     final trimmed = value.trim();
-    final normalized = trimmed.isEmpty ? '' : trimmed;
-    if (normalized == _lastAppliedSearch) return;
-
-    _lastAppliedSearch = normalized;
-    final bloc = context.read<PostsBloc>();
-    _apply(
-      bloc.activeFilters.copyWith(
-        search: normalized.isEmpty ? null : normalized,
-        clearSearch: normalized.isEmpty,
-      ),
-    );
+    if (trimmed == _lastAppliedSearch) return;
+    _lastAppliedSearch = trimmed;
+    context.read<PostsBloc>().add(SearchPostsEvent(trimmed));
   }
 
   void _onSearchChanged(String value) {
@@ -268,8 +266,9 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
         onClearSearch: () {
           _searchController.clear();
           _lastAppliedSearch = '';
-          final bloc = context.read<PostsBloc>();
-          _apply(bloc.activeFilters.copyWith(clearSearch: true));
+          // Use SearchPostsEvent('') to clear search while preserving all
+          // other active filters (category, type, sort, isAuctionable).
+          context.read<PostsBloc>().add(SearchPostsEvent(''));
         },
       ),
     ];
@@ -292,7 +291,10 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     PostFilters filters,
     bool loading,
   ) {
+    // ValueKey forces the FormField to recreate (and apply the new initialValue)
+    // whenever the type filter changes externally (e.g. ClearPostFiltersEvent).
     return DropdownButtonFormField<String?>(
+      key: ValueKey('type_${filters.type}'),
       initialValue: filters.type,
       isExpanded: true,
       decoration: _fieldDecoration(hint: l10n.t('postFilterType')),
@@ -327,8 +329,10 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     PostFilters filters,
     bool loading,
   ) {
+    final sortValue = filters.sort ?? PostFilters.defaultSort;
     return DropdownButtonFormField<String>(
-      initialValue: filters.sort ?? PostFilters.defaultSort,
+      key: ValueKey('sort_$sortValue'),
+      initialValue: sortValue,
       isExpanded: true,
       decoration: _fieldDecoration(hint: l10n.t('postFilterSort')),
       items: [
@@ -345,8 +349,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
           ? null
           : (v) {
               if (v == null) return;
-              final bloc = context.read<PostsBloc>();
-              _apply(bloc.activeFilters.copyWith(sort: v));
+              _apply(context.read<PostsBloc>().activeFilters.copyWith(sort: v));
             },
     );
   }
@@ -358,6 +361,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
   ) {
     final auctionOnly = filters.isAuctionable == true;
     return DropdownButtonFormField<bool>(
+      key: ValueKey('auction_$auctionOnly'),
       initialValue: auctionOnly,
       isExpanded: true,
       decoration: _fieldDecoration(hint: l10n.t('postFilterAuction')),

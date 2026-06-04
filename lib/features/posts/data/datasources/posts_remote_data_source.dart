@@ -49,8 +49,13 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       params['isAuctionable'] = 'true';
     }
 
+    // README: GET /posts/feed is the endpoint documented under FeedQueryDto and
+    // is the only endpoint that accepts category, search, type, sort, and
+    // isAuctionable filters.  GET /posts/admin/all is only filterable by
+    // "status" (per the Admin section of the README) — all other params sent
+    // to that endpoint are silently ignored by the backend.
     final response = await _dio.get(
-      '/posts/admin/all',
+      '/posts/feed',
       queryParameters: params,
     );
 

@@ -44,16 +44,22 @@ abstract class UserActivityRemoteDataSource {
     required int limit,
   });
 
+  /// [type] must be `'made'` (comments this user wrote) or
+  /// `'received'` (comments left on this user's posts). Defaults to `'received'`.
   Future<PaginatedPage<UserCommentEntity>> getUserComments(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
+  /// [type] must be `'made'` (likes this user gave) or
+  /// `'received'` (likes on this user's posts). Defaults to `'received'`.
   Future<PaginatedPage<UserLikeEntity>> getUserLikes(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserMentionEntity>> getUserMentions(
@@ -157,10 +163,11 @@ class UserActivityRemoteDataSourceImpl implements UserActivityRemoteDataSource {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) async {
     final response = await _dio.get(
       '/users/$userId/comments',
-      queryParameters: {'page': page, 'limit': limit},
+      queryParameters: {'page': page, 'limit': limit, 'type': type},
     );
     final data = response.data as Map<String, dynamic>;
     final items = (data['comments'] as List? ?? [])
@@ -174,10 +181,11 @@ class UserActivityRemoteDataSourceImpl implements UserActivityRemoteDataSource {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) async {
     final response = await _dio.get(
       '/users/$userId/likes',
-      queryParameters: {'page': page, 'limit': limit},
+      queryParameters: {'page': page, 'limit': limit, 'type': type},
     );
     final data = response.data as Map<String, dynamic>;
     final items = (data['likes'] as List? ?? [])

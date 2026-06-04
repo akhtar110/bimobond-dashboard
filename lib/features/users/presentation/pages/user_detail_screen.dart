@@ -4,10 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../user_activity/presentation/widgets/user_activity_auctions_tab.dart';
-import '../../../user_activity/presentation/widgets/user_activity_comments_tab.dart';
+import '../../../user_activity/presentation/widgets/user_activity_comments_subtabs.dart';
 import '../../../user_activity/presentation/widgets/user_activity_devices_tab.dart';
 import '../../../user_activity/presentation/widgets/user_activity_gifts_tab.dart';
-import '../../../user_activity/presentation/widgets/user_activity_likes_tab.dart';
+import '../../../user_activity/presentation/widgets/user_activity_likes_subtabs.dart';
 import '../../../user_activity/presentation/widgets/user_activity_mentions_tab.dart';
 import '../../../user_activity/presentation/widgets/user_activity_posts_tab.dart';
 import '../../../user_activity/presentation/widgets/user_activity_tab.dart';
@@ -490,11 +490,26 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     UserActivityPostsTab(
                       userId: user.id,
                       isDark: isDark,
+                      sourceUser: user,
                     ),
-                    UserActivityCommentsTab(isDark: isDark),
-                    UserActivityLikesTab(isDark: isDark),
-                    UserActivityMentionsTab(isDark: isDark),
-                    UserActivityTab(isDark: isDark),
+                    UserActivityCommentsSubtabs(
+                      userId: user.id,
+                      isDark: isDark,
+                      sourceUser: user,
+                    ),
+                    UserActivityLikesSubtabs(
+                      userId: user.id,
+                      isDark: isDark,
+                      sourceUser: user,
+                    ),
+                    UserActivityMentionsTab(
+                      isDark: isDark,
+                      sourceUser: user,
+                    ),
+                    UserActivityTab(
+                      isDark: isDark,
+                      sourceUser: user,
+                    ),
                     UserActivityAuctionsTab(isDark: isDark),
                     UserActivityGiftsTab(isDark: isDark),
                     UserActivityDevicesTab(isDark: isDark),

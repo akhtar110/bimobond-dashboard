@@ -61,7 +61,13 @@ class PostFilters {
     return count;
   }
 
+  /// True when at least one advanced filter (search / type / sort / auction)
+  /// is active.  Does NOT count the selected category chip.
   bool get hasAdvancedFilters => advancedActiveCount > 0;
+
+  /// True when any filter is active — advanced filters OR a category chip.
+  /// Use this to decide whether to show a "Clear all filters" affordance.
+  bool get hasAnyFilters => hasAdvancedFilters || categoryId != null;
 
   @override
   bool operator ==(Object other) {

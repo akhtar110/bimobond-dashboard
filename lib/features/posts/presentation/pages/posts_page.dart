@@ -59,7 +59,12 @@ class _PostsPageState extends State<PostsPage> {
       context,
       AppRoutes.postManagementDetail,
       arguments: post,
-    );
+    ).then((result) {
+      if (!mounted) return;
+      if (result is ManagedPostEntity) {
+        context.read<PostsBloc>().add(PatchPostEvent(result));
+      }
+    });
   }
 
   @override
@@ -155,11 +160,14 @@ class _PageHeader extends StatelessWidget {
 
           if (desktop) {
             return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(child: title),
+                // Title takes only the space it needs on the left.
+                title,
                 const SizedBox(width: 16),
-                Flexible(flex: 3, child: toolbar),
+                // Toolbar expands to fill all remaining space so the Create Post
+                // button is always anchored to the far right edge of the header.
+                Expanded(child: toolbar),
               ],
             );
           }
@@ -205,25 +213,33 @@ class _HeaderTitle extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        BlocSelector<PostsBloc, PostsState, String>(
-          selector: (state) {
-            if (state is PostsLoaded) {
-              final cat = state.selectedCategoryName;
-              return cat != null
-                  ? context.tr('showingPostsIn', {'name': cat})
-                  : l10n.t('allCategories');
-            }
-            return l10n.t('allCategories');
+        // Use BlocSelector to rebuild only when the selected category name
+        // changes.  Fall back to bloc.activeFilters during loading/error so
+        // the subtitle stays correct while an API call is in-flight.
+        BlocSelector<PostsBloc, PostsState, String?>(
+          selector: (state) => switch (state) {
+            PostsLoaded(:final filters) => filters.categoryName,
+            PostsEmpty(:final filters) => filters.categoryName,
+            _ => null, // resolved below from activeFilters
           },
-          builder: (_, subtitle) => Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isDark ? Colors.grey.shade500 : const Color(0xFF6B7280),
-              height: 1.2,
-            ),
-          ),
+          builder: (ctx, categoryNameFromState) {
+            // Prefer the state value; fall back to the bloc's live activeFilters
+            // so the subtitle updates immediately when a chip is tapped, even
+            // before the API call completes.
+            final catName = categoryNameFromState ??
+                ctx.read<PostsBloc>().activeFilters.categoryName;
+            return Text(
+              catName != null
+                  ? ctx.tr('showingPostsIn', {'name': catName})
+                  : l10n.t('allCategories'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isDark ? Colors.grey.shade500 : const Color(0xFF6B7280),
+                height: 1.2,
+              ),
+            );
+          },
         ),
       ],
     );
@@ -269,10 +285,11 @@ class _HeaderFilterToolbar extends StatelessWidget {
         }
 
         return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Flexible(child: PostsFilterBar(isDark: isDark, compact: true)),
+            // Filter bar expands to fill the available toolbar width,
+            // which naturally pushes the Create Post button to the far right.
+            Expanded(child: PostsFilterBar(isDark: isDark, compact: true)),
             const SizedBox(width: 8),
             createButton,
           ],
@@ -786,8 +803,11 @@ class _EmptyView extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
 
+    // hasAnyFilters covers both the category chip and advanced filters
+    // (search / type / sort / auction) — the button should appear in any
+    // situation where clearing filters might reveal more posts.
     final hasFilters =
-        context.read<PostsBloc>().activeFilters.hasAdvancedFilters;
+        context.read<PostsBloc>().activeFilters.hasAnyFilters;
 
     return Center(
       child: Padding(

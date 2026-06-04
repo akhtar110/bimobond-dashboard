@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/gifts_repository.dart';
@@ -5,7 +7,17 @@ import '../models/gift_model.dart';
 
 abstract class GiftsRemoteDataSource {
   Future<List<GiftModel>> getAdminGifts();
-  Future<GiftModel> createGift(CreateGiftData data);
+
+  /// Upload raw image bytes and return the resulting absolute URL.
+  Future<String> uploadGiftImage(Uint8List bytes, String filename);
+
+  Future<GiftModel> createGiftWithUrl({
+    required String name,
+    required String thumbnailUrl,
+    required double priceUsd,
+    bool isActive = true,
+  });
+
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
 }
@@ -14,25 +26,91 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   const GiftsRemoteDataSourceImpl(this._dio);
   final Dio _dio;
 
+  // ── GET gifts ──────────────────────────────────────────────────────────────
+
   @override
   Future<List<GiftModel>> getAdminGifts() async {
     final response = await _dio.get('/gifts/admin');
     final data = response.data;
-    final list = data is List ? data : (data['gifts'] ?? data['data'] ?? []) as List;
-    return list.map((e) => GiftModel.fromJson(e as Map<String, dynamic>)).toList();
+    final list =
+        data is List ? data : (data['gifts'] ?? data['data'] ?? []) as List;
+    return list
+        .map((e) => GiftModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
+  // ── Upload image ───────────────────────────────────────────────────────────
+
   @override
-  Future<GiftModel> createGift(CreateGiftData data) async {
-    final response = await _dio.post('/gifts/admin', data: {
-      'name': data.name,
-      'thumbnailUrl': data.thumbnailUrl,
-      if (data.animationUrl != null) 'animationUrl': data.animationUrl,
-      'priceUsd': data.priceUsd,
-      'isActive': data.isActive,
-    });
+  Future<String> uploadGiftImage(Uint8List bytes, String filename) async {
+    final formData = FormData();
+    formData.files.add(
+      MapEntry(
+        'files',
+        MultipartFile.fromBytes(bytes, filename: filename),
+      ),
+    );
+
+    final response = await _dio.post(
+      '/posts/upload',
+      data: formData,
+      options: Options(
+        sendTimeout: const Duration(minutes: 5),
+        receiveTimeout: const Duration(minutes: 5),
+      ),
+    );
+
+    final data = response.data;
+    String? url;
+
+    if (data is Map<String, dynamic>) {
+      final nested = data['data'];
+      final urls = data['urls'] ??
+          (nested is Map<String, dynamic> ? nested['urls'] : null);
+      if (urls is List && urls.isNotEmpty) {
+        url = _parseUrl(urls.first);
+      }
+    } else if (data is List && data.isNotEmpty) {
+      url = _parseUrl(data.first);
+    }
+
+    if (url == null || url.isEmpty) {
+      throw Exception('Image upload failed: no URL returned');
+    }
+    return url;
+  }
+
+  String _parseUrl(dynamic entry) {
+    if (entry is String) return entry;
+    if (entry is Map<String, dynamic>) {
+      return (entry['url'] ?? entry['path'] ?? '').toString();
+    }
+    return '';
+  }
+
+  // ── Create gift ────────────────────────────────────────────────────────────
+
+  @override
+  Future<GiftModel> createGiftWithUrl({
+    required String name,
+    required String thumbnailUrl,
+    required double priceUsd,
+    bool isActive = true,
+  }) async {
+    final response = await _dio.post(
+      '/gifts/admin',
+      data: {
+        'name': name,
+        'thumbnailUrl': thumbnailUrl,
+        'priceUsd': priceUsd,
+        'isActive': isActive,
+      },
+      options: Options(contentType: Headers.jsonContentType),
+    );
     return _parse(response.data);
   }
+
+  // ── Update gift ────────────────────────────────────────────────────────────
 
   @override
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data) async {
@@ -42,14 +120,23 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     if (data.animationUrl != null) body['animationUrl'] = data.animationUrl;
     if (data.priceUsd != null) body['priceUsd'] = data.priceUsd;
     if (data.isActive != null) body['isActive'] = data.isActive;
-    final response = await _dio.patch('/gifts/admin/$giftId', data: body);
+
+    final response = await _dio.patch(
+      '/gifts/admin/$giftId',
+      data: body,
+      options: Options(contentType: Headers.jsonContentType),
+    );
     return _parse(response.data);
   }
+
+  // ── Delete gift ────────────────────────────────────────────────────────────
 
   @override
   Future<void> deleteGift(String giftId) async {
     await _dio.delete('/gifts/admin/$giftId');
   }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   GiftModel _parse(dynamic data) {
     if (data is Map<String, dynamic>) {

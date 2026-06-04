@@ -29,6 +29,11 @@
   "active": "Active",
   "banned": "Banned",
   "verified": "Verified",
+  "postAuthor": "Post Author",
+  "userProfile": "User Profile",
+  "userId": "User ID",
+  "joined": "Joined",
+  "accountStatus": "Account Status",
   "inactive": "Inactive",
   "followers": "Followers",
   "following": "Following",
@@ -136,7 +141,6 @@
   "categoryNameHint": "e.g. Fashion, Music, Sports",
   "categoryDescription": "Description (optional)",
   "categoryDescriptionHint": "Brief description of this category",
-  "displayOrder": "Display Order",
   "nameRequired": "Name is required",
   "activeLabel": "Active",
   "visibleToPublic": "Visible to public users",
@@ -147,7 +151,16 @@
   "createFirstCategoryHint": "Create your first category to help organize posts.",
   "deactivate": "Deactivate",
   "activate": "Activate",
-  "orderLabel": "Order: {order}",
+  "parentCategory": "Parent Category (optional)",
+  "noParentCategory": "None — Root category",
+  "noActiveCategories": "No active categories",
+  "noInactiveCategories": "No inactive categories",
+  "showAllCategories": "Show all categories",
+  "addSubcategory": "Add Subcategory",
+  "showSubcategories": "{count} subcategories",
+  "hideSubcategories": "Hide subcategories",
+  "deleteSubcategoriesFirst": "Delete subcategories first",
+  "cannotChangeParentWithChildren": "Cannot change parent while this category has subcategories.",
   "categoryCreatedSuccess": "Category \"{name}\" created successfully.",
   "categoryUpdatedSuccess": "Category \"{name}\" updated successfully.",
   "categoryDeletedSuccess": "Category \"{name}\" deleted successfully.",
@@ -160,6 +173,16 @@
   "showInactiveOnly": "Show inactive only",
   "noGiftsFound": "No gifts found",
   "failedToLoadGifts": "Failed to load gifts",
+  "sortByPrice": "Sort by price",
+  "sortByDate": "Sort by date",
+  "giftFilterAll": "Show All",
+  "giftFilterActive": "Active Only",
+  "giftFilterInactive": "Inactive Only",
+  "priceLowToHigh": "Price: Low → High",
+  "priceHighToLow": "Price: High → Low",
+  "dateOldToNew": "Date: Oldest first",
+  "dateNewToOld": "Date: Newest first",
+  "uploadImage": "Upload Image",
   "auctionDetails": "Auction Details",
   "forceCancel": "Force Cancel",
   "manuallyResolve": "Manually Resolve",
@@ -198,6 +221,11 @@
   "views": "Views",
   "likes": "Likes",
   "comments": "Comments",
+  "commentsMade": "Comments Made",
+  "commentsReceived": "Comments Received",
+  "likesMade": "Likes Made",
+  "likesReceived": "Likes Received",
+  "receivedLike": "Received a like",
   "shares": "Shares",
   "saves": "Saves",
   "privacy": "Privacy",
@@ -252,6 +280,10 @@
   "moderation": "Moderation",
   "adminActions": "Admin Actions",
   "postTimestamps": "Created {created} · Updated {updated}",
+  "postInformation": "Post Information",
+  "postStatistics": "Statistics",
+  "moderationSettings": "Moderation Settings",
+  "unsavedChanges": "You have unsaved changes",
   "newStatus": "New Status",
   "signInSubtitle": "Please enter your details to sign in.",
   "loginHeroTitle": "Manage your data\nwith modern tools.",
@@ -407,5 +439,47 @@
   "back": "Back",
   "next": "Next",
   "remove": "Remove",
-  "previewEmpty": "Complete the form to see a preview"
+  "previewEmpty": "Complete the form to see a preview",
+  "activityUser": "Activity User",
+  "viewFullProfile": "View Full Profile",
+  "quickModeration": "Quick Moderation",
+  "activityContextTitle": "Activity Context",
+  "activityCommentTitle": "Comment Activity",
+  "activityLikeTitle": "Like Activity",
+  "activityMentionTitle": "Mention Activity",
+  "activityPostTitle": "Post Activity",
+  "activityFeedTitle": "Activity Feed",
+  "likeId": "Like ID",
+  "mentionSource": "Mention Source",
+  "mentionedUsers": "Mentioned Users",
+  "postOwner": "Post Owner",
+  "selectedActivity": "Selected Activity",
+  "activityBannerCommented": "{actor} commented on a post created by {owner}",
+  "@activityBannerCommented": {
+    "placeholders": {
+      "actor": { "type": "String" },
+      "owner": { "type": "String" }
+    }
+  },
+  "activityBannerLiked": "{actor} liked {owner}'s post",
+  "@activityBannerLiked": {
+    "placeholders": {
+      "actor": { "type": "String" },
+      "owner": { "type": "String" }
+    }
+  },
+  "activityBannerMentioned": "{actor} mentioned someone in {owner}'s post",
+  "@activityBannerMentioned": {
+    "placeholders": {
+      "actor": { "type": "String" },
+      "owner": { "type": "String" }
+    }
+  },
+  "activityBannerGeneric": "{actor} interacted with a post by {owner}",
+  "@activityBannerGeneric": {
+    "placeholders": {
+      "actor": { "type": "String" },
+      "owner": { "type": "String" }
+    }
+  }
 }

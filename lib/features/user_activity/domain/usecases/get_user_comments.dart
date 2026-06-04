@@ -7,11 +7,19 @@ class GetUserComments {
 
   final UserActivityRepository _repository;
 
+  /// [type] — `'made'` = comments written by this user;
+  ///          `'received'` = comments others left on this user's posts (default).
   Future<PaginatedPage<UserCommentEntity>> call(
     String userId, {
     required int page,
     int limit = 10,
+    String type = 'received',
   }) {
-    return _repository.getUserComments(userId, page: page, limit: limit);
+    return _repository.getUserComments(
+      userId,
+      page: page,
+      limit: limit,
+      type: type,
+    );
   }
 }

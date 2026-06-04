@@ -10,7 +10,15 @@ class ManagedPostEntity {
     required this.userId,
     required this.type,
     this.userName,
+    this.userFullName,
+    this.userEmail,
     this.userProfileImage,
+    this.userIsVerified = false,
+    this.userFollowersCount = 0,
+    this.userFollowingCount = 0,
+    this.userPostsCount = 0,
+    this.userJoinedAt,
+    this.userIsBanned = false,
     this.videoUrl,
     this.hlsUrl,
     this.thumbnailUrl,
@@ -47,8 +55,18 @@ class ManagedPostEntity {
   final String id;
   final String userId;
   final String type;
+
+  // ── Author info ────────────────────────────────────────────────────────
   final String? userName;
+  final String? userFullName;
+  final String? userEmail;
   final String? userProfileImage;
+  final bool userIsVerified;
+  final int userFollowersCount;
+  final int userFollowingCount;
+  final int userPostsCount;
+  final DateTime? userJoinedAt;
+  final bool userIsBanned;
   final String? videoUrl;
   final String? hlsUrl;
   final String? thumbnailUrl;
@@ -92,7 +110,15 @@ class ManagedPostEntity {
     String? userId,
     String? type,
     String? userName,
+    String? userFullName,
+    String? userEmail,
     String? userProfileImage,
+    bool? userIsVerified,
+    int? userFollowersCount,
+    int? userFollowingCount,
+    int? userPostsCount,
+    DateTime? userJoinedAt,
+    bool? userIsBanned,
     String? videoUrl,
     String? hlsUrl,
     String? thumbnailUrl,
@@ -130,7 +156,15 @@ class ManagedPostEntity {
       userId: userId ?? this.userId,
       type: type ?? this.type,
       userName: userName ?? this.userName,
+      userFullName: userFullName ?? this.userFullName,
+      userEmail: userEmail ?? this.userEmail,
       userProfileImage: userProfileImage ?? this.userProfileImage,
+      userIsVerified: userIsVerified ?? this.userIsVerified,
+      userFollowersCount: userFollowersCount ?? this.userFollowersCount,
+      userFollowingCount: userFollowingCount ?? this.userFollowingCount,
+      userPostsCount: userPostsCount ?? this.userPostsCount,
+      userJoinedAt: userJoinedAt ?? this.userJoinedAt,
+      userIsBanned: userIsBanned ?? this.userIsBanned,
       videoUrl: videoUrl ?? this.videoUrl,
       hlsUrl: hlsUrl ?? this.hlsUrl,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,

@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/localization/localization.dart';
-import '../../../../core/routing/app_router.dart';
 import '../../../post_management/data/mappers/managed_post_mapper.dart';
+import '../../../post_management/domain/entities/activity_context.dart';
+import '../../../users/domain/entities/user_entity.dart';
 import '../../../users/domain/entities/user_post_entity.dart';
 import '../bloc/user_activity_bloc.dart';
+import '../utils/activity_navigation.dart';
 import 'activity_empty_state.dart';
 import 'user_activity_shimmer.dart';
 
@@ -15,10 +17,12 @@ class UserActivityPostsTab extends StatefulWidget {
     super.key,
     required this.userId,
     required this.isDark,
+    this.sourceUser,
   });
 
   final String userId;
   final bool isDark;
+  final UserEntity? sourceUser;
 
   @override
   State<UserActivityPostsTab> createState() => _UserActivityPostsTabState();
@@ -51,10 +55,12 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
   }
 
   Future<void> _openPost(UserPostEntity post) async {
-    await Navigator.pushNamed(
+    await openPostInvestigation(
       context,
-      AppRoutes.postManagementDetail,
-      arguments: managedPostFromUserPost(post),
+      postId: post.id,
+      post: managedPostFromUserPost(post),
+      sourceUser: widget.sourceUser,
+      activityContext: ActivityContext.post(activityDate: post.createdAt),
     );
     if (!context.mounted) return;
     context.read<UserActivityBloc>().add(LoadPosts());

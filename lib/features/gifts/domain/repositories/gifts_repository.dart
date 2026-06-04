@@ -1,16 +1,22 @@
+import 'dart:typed_data';
+
 import '../entities/gift_entity.dart';
 
+/// Payload for creating a new gift.
+/// The [imageBytes] + [imageName] are uploaded first; the returned URL
+/// is used as [thumbnailUrl] when calling POST /gifts/admin.
 class CreateGiftData {
   const CreateGiftData({
     required this.name,
-    required this.thumbnailUrl,
-    this.animationUrl,
+    required this.imageBytes,
+    required this.imageName,
     required this.priceUsd,
     this.isActive = true,
   });
+
   final String name;
-  final String thumbnailUrl;
-  final String? animationUrl;
+  final Uint8List imageBytes;
+  final String imageName;
   final double priceUsd;
   final bool isActive;
 }
@@ -23,6 +29,7 @@ class UpdateGiftData {
     this.priceUsd,
     this.isActive,
   });
+
   final String? name;
   final String? thumbnailUrl;
   final String? animationUrl;

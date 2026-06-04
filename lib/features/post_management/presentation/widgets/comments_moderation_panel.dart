@@ -7,17 +7,61 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../bloc/post_management_bloc.dart';
 
-class CommentsModerationPanel extends StatelessWidget {
+class CommentsModerationPanel extends StatefulWidget {
   const CommentsModerationPanel({
     super.key,
     required this.state,
     required this.isDark,
     required this.isBusy,
+    this.highlightCommentId,
   });
 
   final PostManagementLoaded state;
   final bool isDark;
   final bool isBusy;
+  final String? highlightCommentId;
+
+  @override
+  State<CommentsModerationPanel> createState() =>
+      _CommentsModerationPanelState();
+}
+
+class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
+  final _scrollController = ScrollController();
+  final _highlightKeys = <String, GlobalKey>{};
+  bool _didScrollToHighlight = false;
+
+  PostManagementLoaded get state => widget.state;
+  bool get isDark => widget.isDark;
+  bool get isBusy => widget.isBusy;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(CommentsModerationPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.highlightCommentId != widget.highlightCommentId) {
+      _didScrollToHighlight = false;
+    }
+  }
+
+  void _scrollToHighlight() {
+    final id = widget.highlightCommentId;
+    if (id == null || _didScrollToHighlight) return;
+    final key = _highlightKeys[id];
+    if (key?.currentContext == null) return;
+    _didScrollToHighlight = true;
+    Scrollable.ensureVisible(
+      key!.currentContext!,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.2,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,10 +159,24 @@ class CommentsModerationPanel extends StatelessWidget {
           itemBuilder: (context, index) {
             final comment = state.comments[index];
             final isDeleting = state.deletingCommentId == comment.id;
+            final highlighted =
+                widget.highlightCommentId != null &&
+                widget.highlightCommentId == comment.id;
+            final key = _highlightKeys.putIfAbsent(
+              comment.id,
+              GlobalKey.new,
+            );
+            if (highlighted && !_didScrollToHighlight) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _scrollToHighlight();
+              });
+            }
             return _CommentTile(
+              key: key,
               comment: comment,
               isDark: isDark,
               isDeleting: isDeleting,
+              highlighted: highlighted,
               disabled: isBusy || state.deletingCommentId != null,
               onDelete: () => _confirmDeleteComment(context, bloc, comment),
               onBanUser: () {
@@ -191,9 +249,11 @@ class CommentsModerationPanel extends StatelessWidget {
 
 class _CommentTile extends StatelessWidget {
   const _CommentTile({
+    super.key,
     required this.comment,
     required this.isDark,
     required this.isDeleting,
+    required this.highlighted,
     required this.disabled,
     required this.onDelete,
     required this.onBanUser,
@@ -202,6 +262,7 @@ class _CommentTile extends StatelessWidget {
   final CommentEntity comment;
   final bool isDark;
   final bool isDeleting;
+  final bool highlighted;
   final bool disabled;
   final VoidCallback onDelete;
   final VoidCallback onBanUser;
@@ -211,12 +272,46 @@ class _CommentTile extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = context.l10n;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
+    final primary = theme.colorScheme.primary;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: highlighted
+          ? BoxDecoration(
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: primary, width: 1.5),
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (highlighted)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    l10n.t('selectedActivity'),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           CircleAvatar(
             radius: 16,
             backgroundImage: comment.avatarUrl != null &&
@@ -324,6 +419,8 @@ class _CommentTile extends StatelessWidget {
                 ),
               ],
             ),
+            ],
+          ),
         ],
       ),
     );

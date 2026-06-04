@@ -17,11 +17,13 @@ class CategoriesRemoteDataSourceImpl implements CategoriesRemoteDataSource {
 
   @override
   Future<List<CategoryModel>> getAllCategories() async {
+    // Admin endpoint — returns all categories (active + inactive), flat list.
     final response = await _dio.get('/categories/admin/all');
     final data = response.data;
     final list = data is List
         ? data
         : (data['categories'] ?? data['data'] ?? []) as List;
+    print("The list of categories is $list");
     return list
         .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -33,9 +35,10 @@ class CategoriesRemoteDataSourceImpl implements CategoriesRemoteDataSource {
       '/categories',
       data: {
         'name': data.name,
-        if (data.description != null) 'description': data.description,
+        if (data.description != null && data.description!.isNotEmpty)
+          'description': data.description,
         'isActive': data.isActive,
-        'order': data.order,
+        if (data.parentId != null) 'parentId': data.parentId,
       },
     );
     return CategoryModel.fromJson(response.data as Map<String, dynamic>);
@@ -47,7 +50,9 @@ class CategoriesRemoteDataSourceImpl implements CategoriesRemoteDataSource {
       if (data.name != null) 'name': data.name,
       if (data.description != null) 'description': data.description,
       if (data.isActive != null) 'isActive': data.isActive,
-      if (data.order != null) 'order': data.order,
+      // Include parentId only when explicitly requested (setParentId == true).
+      // Sending null clears the parent (Prisma disconnect semantics on backend).
+      if (data.setParentId) 'parentId': data.parentId,
     };
     final response = await _dio.patch('/categories/$id', data: body);
     return CategoryModel.fromJson(response.data as Map<String, dynamic>);

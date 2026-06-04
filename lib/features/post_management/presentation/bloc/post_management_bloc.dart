@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../users/domain/entities/user_entity.dart';
+import '../../domain/entities/activity_context.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/usecases/ban_post_usecase.dart';
@@ -15,8 +17,15 @@ import '../../domain/usecases/update_post_status_usecase.dart';
 sealed class PostManagementEvent {}
 
 class LoadManagedPostEvent extends PostManagementEvent {
-  LoadManagedPostEvent(this.post);
+  LoadManagedPostEvent(
+    this.post, {
+    this.sourceUser,
+    this.activityContext,
+  });
+
   final ManagedPostEntity post;
+  final UserEntity? sourceUser;
+  final ActivityContext? activityContext;
 }
 
 class ChangeManagedPostFieldEvent extends PostManagementEvent {
@@ -62,6 +71,8 @@ class PostManagementLoaded extends PostManagementState {
   PostManagementLoaded({
     required this.post,
     required this.draft,
+    this.sourceUser,
+    this.activityContext,
     this.isSaving = false,
     this.isDeleting = false,
     this.isActioning = false,
@@ -78,6 +89,8 @@ class PostManagementLoaded extends PostManagementState {
 
   final ManagedPostEntity post;
   final ManagedPostEntity draft;
+  final UserEntity? sourceUser;
+  final ActivityContext? activityContext;
   final bool isSaving;
   final bool isDeleting;
   final bool isActioning;
@@ -95,6 +108,8 @@ class PostManagementLoaded extends PostManagementState {
   PostManagementLoaded copyWith({
     ManagedPostEntity? post,
     ManagedPostEntity? draft,
+    UserEntity? sourceUser,
+    ActivityContext? activityContext,
     bool? isSaving,
     bool? isDeleting,
     bool? isActioning,
@@ -114,6 +129,8 @@ class PostManagementLoaded extends PostManagementState {
     return PostManagementLoaded(
       post: post ?? this.post,
       draft: draft ?? this.draft,
+      sourceUser: sourceUser ?? this.sourceUser,
+      activityContext: activityContext ?? this.activityContext,
       isSaving: isSaving ?? this.isSaving,
       isDeleting: isDeleting ?? this.isDeleting,
       isActioning: isActioning ?? this.isActioning,
@@ -192,6 +209,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         PostManagementLoaded(
           post: fresh,
           draft: fresh,
+          sourceUser: event.sourceUser,
+          activityContext: event.activityContext,
           isCommentsLoading: true,
         ),
       );
@@ -201,6 +220,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         PostManagementLoaded(
           post: event.post,
           draft: event.post,
+          sourceUser: event.sourceUser,
+          activityContext: event.activityContext,
           isCommentsLoading: true,
         ),
       );

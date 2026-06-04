@@ -7,12 +7,22 @@ class CategoryModel extends CategoryEntity {
     required super.slug,
     super.description,
     required super.isActive,
-    required super.order,
+    super.order = 0,
     required super.createdAt,
     required super.updatedAt,
+    super.parentId,
+    super.children = const [],
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    // Parse nested children list recursively.
+    final rawChildren = json['children'];
+    final List<CategoryEntity> children = rawChildren is List
+        ? rawChildren
+            .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
+            .toList()
+        : const [];
+
     return CategoryModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -22,6 +32,8 @@ class CategoryModel extends CategoryEntity {
       order: (json['order'] as num?)?.toInt() ?? 0,
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
+      parentId: json['parentId'] as String?,
+      children: children,
     );
   }
 

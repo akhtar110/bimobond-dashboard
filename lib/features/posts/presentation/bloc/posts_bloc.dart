@@ -13,8 +13,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<GetAllPostsEvent>(_onGetAll);
     on<LoadMorePostsEvent>(_onLoadMore);
     on<FilterPostsByCategoryEvent>(_onFilterCategory);
+    on<SearchPostsEvent>(_onSearch);
     on<UpdatePostFiltersEvent>(_onUpdateFilters);
     on<ClearPostFiltersEvent>(_onClearFilters);
+    on<PatchPostEvent>(_onPatchPost);
   }
 
   final GetAllPosts getAllPosts;
@@ -58,6 +60,27 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       categorySlug: event.categorySlug,
       clearCategory: clear,
     );
+    await _loadFirstPage(emit);
+  }
+
+  Future<void> _onSearch(
+    SearchPostsEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    final trimmed = event.query.trim();
+    // Build new filters by merging the search term into the existing filters
+    // so that the active category, type, sort etc. are all preserved.
+    final updated = _filters.copyWith(
+      search: trimmed.isEmpty ? null : trimmed,
+      clearSearch: trimmed.isEmpty,
+    );
+    if (_filters == updated) return; // nothing changed
+    _filters = updated;
+
+    if (kDebugMode) {
+      debugPrint('[PostsBloc] search → "${trimmed.isEmpty ? '<cleared>' : trimmed}"');
+    }
+
     await _loadFirstPage(emit);
   }
 
@@ -200,6 +223,19 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     } finally {
       _loadMoreBusy = false;
     }
+  }
+
+  // ── Single-post patch ────────────────────────────────────────────────────
+  // Called after a successful save in PostManagementDetailScreen so the list
+  // reflects the new values instantly, without a full page reload.
+
+  void _onPatchPost(PatchPostEvent event, Emitter<PostsState> emit) {
+    final current = state;
+    if (current is! PostsLoaded) return;
+    final updated = current.posts.map(
+      (p) => p.id == event.updatedPost.id ? event.updatedPost : p,
+    ).toList();
+    emit(current.copyWith(posts: updated));
   }
 
   String _messageFrom(Object e) =>
