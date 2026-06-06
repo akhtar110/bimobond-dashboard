@@ -45,3 +45,10 @@ class PatchPostEvent extends PostsEvent {
   PatchPostEvent(this.updatedPost);
   final ManagedPostEntity updatedPost;
 }
+
+/// Remove a single post from the loaded list without re-fetching.
+/// Dispatched by PostsPage after a successful deletion in PostManagementDetailScreen.
+class RemovePostEvent extends PostsEvent {
+  RemovePostEvent(this.postId);
+  final String postId;
+}

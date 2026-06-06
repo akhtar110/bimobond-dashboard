@@ -6,7 +6,7 @@ class GiftEntity {
     this.animationUrl,
     required this.priceUsd,
     required this.isActive,
-    this.createdAt,
+    this.publishedAt,
   });
 
   final String id;
@@ -16,8 +16,8 @@ class GiftEntity {
   final double priceUsd;
   final bool isActive;
 
-  /// When the gift was created / published on the server.
-  final DateTime? createdAt;
+  /// When the gift was published (maps to `publishedAt` on the server).
+  final DateTime? publishedAt;
 
   GiftEntity copyWith({
     String? name,
@@ -25,7 +25,7 @@ class GiftEntity {
     String? animationUrl,
     double? priceUsd,
     bool? isActive,
-    DateTime? createdAt,
+    DateTime? publishedAt,
   }) {
     return GiftEntity(
       id: id,
@@ -34,7 +34,7 @@ class GiftEntity {
       animationUrl: animationUrl ?? this.animationUrl,
       priceUsd: priceUsd ?? this.priceUsd,
       isActive: isActive ?? this.isActive,
-      createdAt: createdAt ?? this.createdAt,
+      publishedAt: publishedAt ?? this.publishedAt,
     );
   }
 }

@@ -146,10 +146,10 @@ class GiftsLoaded extends GiftsState {
       list = list.where((g) => g.name.toLowerCase().contains(q));
     }
 
-    // 3. Date-range filter on createdAt (inclusive, day precision)
+    // 3. Date-range filter on publishedAt (inclusive, day precision)
     if (fromDate != null || toDate != null) {
       list = list.where((g) {
-        final d = g.createdAt;
+        final d = g.publishedAt;
         if (d == null) return false;
         final day = DateTime(d.year, d.month, d.day);
         if (fromDate != null) {
@@ -176,15 +176,15 @@ class GiftsLoaded extends GiftsState {
         break;
       case GiftSortType.dateOldToNew:
         sorted.sort((a, b) {
-          final aD = a.createdAt ?? DateTime(0);
-          final bD = b.createdAt ?? DateTime(0);
+          final aD = a.publishedAt ?? DateTime(0);
+          final bD = b.publishedAt ?? DateTime(0);
           return aD.compareTo(bD);
         });
         break;
       case GiftSortType.dateNewToOld:
         sorted.sort((a, b) {
-          final aD = a.createdAt ?? DateTime(0);
-          final bD = b.createdAt ?? DateTime(0);
+          final aD = a.publishedAt ?? DateTime(0);
+          final bD = b.publishedAt ?? DateTime(0);
           return bD.compareTo(aD);
         });
         break;

@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/gift_entity.dart';
@@ -874,92 +878,11 @@ class _SliverGrid extends StatelessWidget {
   }
 
   void _showEditDialog(BuildContext context, GiftEntity gift) {
-    final l10n = context.l10n;
-    final nameCtrl = TextEditingController(text: gift.name);
-    final thumbCtrl = TextEditingController(text: gift.thumbnailUrl);
-    final animCtrl = TextEditingController(text: gift.animationUrl ?? '');
-    final priceCtrl =
-        TextEditingController(text: gift.priceUsd.toStringAsFixed(2));
-    final formKey = GlobalKey<FormState>();
-
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.t('editGift')),
-        content: SizedBox(
-          width: 440,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _field(nameCtrl, 'Gift Name'),
-                const SizedBox(height: 12),
-                _field(thumbCtrl, 'Thumbnail URL'),
-                const SizedBox(height: 12),
-                _field(animCtrl, 'Animation URL (optional)'),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: priceCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Price (USD)',
-                    prefixText: '\$',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  validator: (v) =>
-                      v?.isNotEmpty == true && double.tryParse(v!.trim()) == null
-                          ? l10n.t('requiredField')
-                          : null,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.t('cancel')),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(ctx);
-              context.read<GiftsBloc>().add(UpdateGiftEvent(
-                    gift.id,
-                    UpdateGiftData(
-                      name: nameCtrl.text.trim().isEmpty
-                          ? null
-                          : nameCtrl.text.trim(),
-                      thumbnailUrl: thumbCtrl.text.trim().isEmpty
-                          ? null
-                          : thumbCtrl.text.trim(),
-                      animationUrl: animCtrl.text.trim().isEmpty
-                          ? null
-                          : animCtrl.text.trim(),
-                      priceUsd: double.tryParse(priceCtrl.text.trim()),
-                    ),
-                  ));
-            },
-            child: Text(l10n.t('save')),
-          ),
-        ],
-      ),
+      builder: (_) => _EditGiftDialog(pageContext: context, gift: gift),
     );
   }
-
-  Widget _field(TextEditingController ctrl, String label) =>
-      TextFormField(
-        controller: ctrl,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
 
   void _confirmDelete(BuildContext context, String id, String name) {
     final l10n = context.l10n;
@@ -1003,6 +926,7 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
   final _priceCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _imageError;
+  DateTime? _publishedAt;
 
   @override
   void dispose() {
@@ -1020,6 +944,33 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
     setState(() => _imageError = null);
   }
 
+  Future<void> _pickPublishedAt() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _publishedAt ?? now,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (date == null) return;
+    if (!mounted) return;
+    final initialTime = TimeOfDay.fromDateTime(_publishedAt ?? now);
+    final time = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      if (time != null) {
+        _publishedAt =
+            DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      } else {
+        _publishedAt = date;
+      }
+    });
+  }
+
   void _submit(GiftsLoaded state) {
     if (state.pendingImageBytes == null) {
       setState(() => _imageError = 'Please select an image');
@@ -1034,6 +985,7 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
               imageBytes: state.pendingImageBytes!,
               imageName: state.pendingImageName ?? 'gift.jpg',
               priceUsd: double.parse(_priceCtrl.text.trim()),
+              publishedAt: _publishedAt,
             ),
           ),
         );
@@ -1146,6 +1098,16 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
                     ],
                     const SizedBox(height: 14),
 
+                    // Published At
+                    _PublishedAtPicker(
+                      value: _publishedAt,
+                      onTap: state.isActioning ? null : _pickPublishedAt,
+                      onClear: _publishedAt != null
+                          ? () => setState(() => _publishedAt = null)
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+
                     // Price
                     TextFormField(
                       controller: _priceCtrl,
@@ -1201,6 +1163,371 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
           ],
         );
       },
+    );
+  }
+}
+
+// ─── Edit dialog ─────────────────────────────────────────────────────────────
+
+class _EditGiftDialog extends StatefulWidget {
+  const _EditGiftDialog({required this.pageContext, required this.gift});
+
+  final BuildContext pageContext;
+  final GiftEntity gift;
+
+  @override
+  State<_EditGiftDialog> createState() => _EditGiftDialogState();
+}
+
+class _EditGiftDialogState extends State<_EditGiftDialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _priceCtrl;
+  final _formKey = GlobalKey<FormState>();
+
+  Uint8List? _newImageBytes;
+  String? _newImageName;
+  DateTime? _publishedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.gift.name);
+    _priceCtrl = TextEditingController(
+        text: widget.gift.priceUsd.toStringAsFixed(2));
+    _publishedAt = widget.gift.publishedAt;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _priceCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await pickGiftImage();
+    if (!mounted || picked == null) return;
+    setState(() {
+      _newImageBytes = picked.bytes;
+      _newImageName = picked.name;
+    });
+  }
+
+  Future<void> _pickPublishedAt() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _publishedAt ?? now,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (date == null) return;
+    if (!mounted) return;
+    final initialTime = TimeOfDay.fromDateTime(_publishedAt ?? now);
+    final time = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+    );
+    if (!mounted) return;
+    setState(() {
+      _publishedAt = time != null
+          ? DateTime(date.year, date.month, date.day, time.hour, time.minute)
+          : date;
+    });
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(context);
+    widget.pageContext.read<GiftsBloc>().add(UpdateGiftEvent(
+          widget.gift.id,
+          UpdateGiftData(
+            name: _nameCtrl.text.trim().isEmpty
+                ? null
+                : _nameCtrl.text.trim(),
+            priceUsd: double.tryParse(_priceCtrl.text.trim()),
+            publishedAt: _publishedAt,
+            imageBytes: _newImageBytes,
+            imageName: _newImageName,
+          ),
+        ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final screenW = MediaQuery.sizeOf(context).width;
+    final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
+    final hasNewImage = _newImageBytes != null;
+
+    return BlocListener<GiftsBloc, GiftsState>(
+      bloc: widget.pageContext.read<GiftsBloc>(),
+      listenWhen: (p, c) =>
+          c is GiftsLoaded &&
+          (p is! GiftsLoaded || p.isActioning != c.isActioning),
+      listener: (_, state) {
+        if (state is GiftsLoaded && !state.isActioning) {
+          if (mounted) Navigator.of(context, rootNavigator: true).maybePop();
+        }
+      },
+      child: BlocBuilder<GiftsBloc, GiftsState>(
+        bloc: widget.pageContext.read<GiftsBloc>(),
+        buildWhen: (p, c) =>
+            c is GiftsLoaded &&
+            (p is! GiftsLoaded || p.isActioning != c.isActioning),
+        builder: (_, state) {
+          final isActioning =
+              state is GiftsLoaded && state.isActioning;
+
+          return AlertDialog(
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: screenW < 560 ? 16 : 24,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: Text(l10n.t('editGift')),
+            content: SizedBox(
+              width: dialogW,
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // ── Gift Name ────────────────────────────────────
+                      TextFormField(
+                        controller: _nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Gift Name *',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        validator: (v) => v?.trim().isEmpty == true
+                            ? l10n.t('requiredField')
+                            : null,
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── Image section ────────────────────────────────
+                      OutlinedButton.icon(
+                        onPressed: isActioning ? null : _pickImage,
+                        icon: const Icon(Icons.upload_file_outlined, size: 18),
+                        label: Text(
+                          hasNewImage
+                              ? 'Change Image'
+                              : 'Upload New Image',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Preview: new bytes OR existing URL
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: hasNewImage
+                              ? Image.memory(
+                                  _newImageBytes!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _imagePlaceholder(),
+                                )
+                              : (widget.gift.thumbnailUrl.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: widget.gift.thumbnailUrl,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) =>
+                                          _imagePlaceholder(),
+                                      errorWidget: (_, __, ___) =>
+                                          _imagePlaceholder(),
+                                    )
+                                  : _imagePlaceholder()),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        hasNewImage
+                            ? _newImageName ?? ''
+                            : 'Current image (tap button to replace)',
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // ── Price ────────────────────────────────────────
+                      TextFormField(
+                        controller: _priceCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Price (USD) *',
+                          prefixText: '\$',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v?.trim().isEmpty == true) {
+                            return l10n.t('requiredField');
+                          }
+                          if (double.tryParse(v!.trim()) == null) {
+                            return l10n.t('requiredField');
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── Published At ─────────────────────────────────
+                      _PublishedAtPicker(
+                        value: _publishedAt,
+                        onTap: isActioning ? null : _pickPublishedAt,
+                        onClear: _publishedAt != null
+                            ? () => setState(() => _publishedAt = null)
+                            : null,
+                      ),
+
+                      // ── Uploading indicator ──────────────────────────
+                      if (isActioning) ...[
+                        const SizedBox(height: 14),
+                        const Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2),
+                            ),
+                            SizedBox(width: 10),
+                            Text('Saving changes…'),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l10n.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: isActioning ? null : _submit,
+                child: Text(l10n.t('save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _imagePlaceholder() => Container(
+        color: const Color(0xFFF4F5F7),
+        child: const Center(
+          child: Icon(Icons.card_giftcard_rounded,
+              size: 40, color: Color(0xFF9CA3AF)),
+        ),
+      );
+}
+
+// ─── Published-at picker widget (used in both create & edit dialogs) ──────────
+
+class _PublishedAtPicker extends StatelessWidget {
+  const _PublishedAtPicker({
+    required this.value,
+    required this.onTap,
+    this.onClear,
+  });
+
+  final DateTime? value;
+  final VoidCallback? onTap;
+  final VoidCallback? onClear;
+
+  static final _fmt = DateFormat('MMM d, yyyy  HH:mm');
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = theme.colorScheme.primary;
+    final hasValue = value != null;
+
+    final borderColor = hasValue
+        ? primary
+        : (isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0));
+    final bgColor = hasValue
+        ? primary.withValues(alpha: 0.07)
+        : (isDark ? const Color(0xFF1A1F2E) : Colors.white);
+    final textColor = hasValue
+        ? primary
+        : (isDark ? Colors.grey.shade300 : const Color(0xFF4B5563));
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 50,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.event_rounded, size: 18, color: textColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Published At',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: textColor.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    hasValue ? _fmt.format(value!.toLocal()) : 'Defaults to now',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onClear != null)
+              GestureDetector(
+                onTap: onClear,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Icon(Icons.close_rounded, size: 16, color: textColor),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

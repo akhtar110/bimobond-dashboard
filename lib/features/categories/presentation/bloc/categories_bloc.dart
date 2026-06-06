@@ -164,7 +164,12 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     Emitter<CategoriesState> emit,
   ) {
     if (state is CategoriesLoaded) {
-      emit((state as CategoriesLoaded).copyWith(filter: event.filter));
+      // Clear any stale success/failure messages so changing the filter
+      // never re-fires the snackbar listener.
+      emit(
+        (state as CategoriesLoaded)
+            .copyWith(filter: event.filter, clearMessages: true),
+      );
     }
   }
 
@@ -203,17 +208,20 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     Emitter<CategoriesState> emit,
   ) async {
     final list = _currentList();
-    emit(CategoriesLoaded(list, isSubmitting: true));
+    // Capture filter BEFORE emitting — the isSubmitting emit changes state
+    // and _currentFilter() would return CategoryFilter.all afterwards.
+    final filter = _currentFilter();
+    emit(CategoriesLoaded(list, filter: filter, isSubmitting: true));
     try {
       final created = await _create(event.data);
       final updated = _sorted([...list, created]);
       emit(CategoriesLoaded(
         updated,
-        filter: _currentFilter(),
+        filter: filter,
         successMessage: l10nMsg('categoryCreatedSuccess', created.name),
       ));
     } catch (e) {
-      emit(CategoriesLoaded(list, failureMessage: _msg(e)));
+      emit(CategoriesLoaded(list, filter: filter, failureMessage: _msg(e)));
     }
   }
 
@@ -222,7 +230,8 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     Emitter<CategoriesState> emit,
   ) async {
     final list = _currentList();
-    emit(CategoriesLoaded(list, isSubmitting: true));
+    final filter = _currentFilter();
+    emit(CategoriesLoaded(list, filter: filter, isSubmitting: true));
     try {
       final updated = await _update(event.id, event.data);
       final newList = _sorted([
@@ -231,11 +240,11 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
       ]);
       emit(CategoriesLoaded(
         newList,
-        filter: _currentFilter(),
+        filter: filter,
         successMessage: l10nMsg('categoryUpdatedSuccess', updated.name),
       ));
     } catch (e) {
-      emit(CategoriesLoaded(list, failureMessage: _msg(e)));
+      emit(CategoriesLoaded(list, filter: filter, failureMessage: _msg(e)));
     }
   }
 
@@ -244,8 +253,9 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     Emitter<CategoriesState> emit,
   ) async {
     final list = _currentList();
+    final filter = _currentFilter();
     final target = list.where((c) => c.id == event.id).firstOrNull;
-    emit(CategoriesLoaded(list, isSubmitting: true));
+    emit(CategoriesLoaded(list, filter: filter, isSubmitting: true));
     try {
       await _delete(event.id);
       // Remove the deleted category AND any orphaned subcategories.
@@ -254,11 +264,11 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
           .toList();
       emit(CategoriesLoaded(
         _sorted(newList),
-        filter: _currentFilter(),
+        filter: filter,
         successMessage: l10nMsg('categoryDeletedSuccess', target?.name ?? ''),
       ));
     } catch (e) {
-      emit(CategoriesLoaded(list, failureMessage: _msg(e)));
+      emit(CategoriesLoaded(list, filter: filter, failureMessage: _msg(e)));
     }
   }
 

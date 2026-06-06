@@ -125,7 +125,7 @@ class ManagedPostModel extends ManagedPostEntity {
   static Map<String, dynamic> updatePayload(ManagedPostUpdateData data) {
     return {
       if (data.description != null) 'description': data.description,
-      if (data.category != null) 'category': data.category,
+      if (data.categoryId != null) 'categoryId': data.categoryId,
       if (data.privacyStatus != null) 'privacyStatus': data.privacyStatus,
       if (data.status != null) 'status': data.status,
       if (data.allowComments != null) 'allowComments': data.allowComments,

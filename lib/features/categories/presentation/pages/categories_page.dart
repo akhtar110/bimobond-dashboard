@@ -35,22 +35,37 @@ class CategoriesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<CategoriesBloc, CategoriesState>(
+      // Only invoke listener when a NEW message actually arrives — i.e. the
+      // message in the incoming state differs from the one in the previous state.
+      // This prevents filter changes or rebuilds from re-showing stale snackbars.
+      listenWhen: (previous, current) {
+        if (current is! CategoriesLoaded) return false;
+        final newMsg =
+            current.successMessage ?? current.failureMessage;
+        if (newMsg == null) return false;
+        if (previous is! CategoriesLoaded) return true;
+        final prevMsg = previous.successMessage ?? previous.failureMessage;
+        return newMsg != prevMsg;
+      },
       listener: (context, state) {
-        if (state is CategoriesLoaded) {
-          if (state.successMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        if (state is! CategoriesLoaded) return;
+        final messenger = ScaffoldMessenger.of(context);
+        if (state.successMessage != null) {
+          messenger
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(
               content: Text(localizeMessage(context, state.successMessage!)),
               backgroundColor: Colors.green.shade700,
               behavior: SnackBarBehavior.floating,
             ));
-          }
-          if (state.failureMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        } else if (state.failureMessage != null) {
+          messenger
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(
               content: Text(state.failureMessage!),
               backgroundColor: Colors.red.shade700,
               behavior: SnackBarBehavior.floating,
             ));
-          }
         }
       },
       builder: (context, state) {

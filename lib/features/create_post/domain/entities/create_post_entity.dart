@@ -15,6 +15,7 @@ class CreatePostEntity {
     this.animatedCoverUrl,
     this.description,
     this.category,
+    this.categoryId,
     this.status = 'PUBLISHED',
     this.duration,
     this.videoWidth,
@@ -42,6 +43,9 @@ class CreatePostEntity {
   final String? animatedCoverUrl;
   final String? description;
   final String? category;
+  /// The backend UUID of the chosen category.  Sent as `categoryId` in
+  /// `POST /posts` and used as the filter key in `GET /posts/feed`.
+  final String? categoryId;
   final String status;
   final int? duration;
   final int? videoWidth;
@@ -69,6 +73,7 @@ class CreatePostEntity {
     String? animatedCoverUrl,
     String? description,
     String? category,
+    String? categoryId,
     String? status,
     int? duration,
     int? videoWidth,
@@ -105,7 +110,10 @@ class CreatePostEntity {
       animatedCoverUrl:
           clearVideoFields ? null : (animatedCoverUrl ?? this.animatedCoverUrl),
       description: clearDescription ? null : (description ?? this.description),
+      // clearCategory wipes both the display name and the UUID together so
+      // the two fields are always in sync.
       category: clearCategory ? null : (category ?? this.category),
+      categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
       status: status ?? this.status,
       duration: duration ?? this.duration,
       videoWidth: videoWidth ?? this.videoWidth,
@@ -136,12 +144,14 @@ class CreatePostEntity {
   bool get hasDescription =>
       description != null && description!.trim().isNotEmpty;
 
-  bool get hasCategory => category != null && category!.trim().isNotEmpty;
+  /// True when a category has been explicitly chosen OR when null (= "All /
+  /// General feed").  A post without a category is posted to the global feed
+  /// and will appear under every category filter, including "All".
+  bool get hasCategory => true;
 
   bool get canSubmit =>
       hasLocalMedia &&
       hasDescription &&
-      hasCategory &&
       (!isAuctionable || (auction?.isComplete ?? false));
 
   /// Inferred API post type from attached media (used when building payload).

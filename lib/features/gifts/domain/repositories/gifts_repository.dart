@@ -12,6 +12,7 @@ class CreateGiftData {
     required this.imageName,
     required this.priceUsd,
     this.isActive = true,
+    this.publishedAt,
   });
 
   final String name;
@@ -19,6 +20,9 @@ class CreateGiftData {
   final String imageName;
   final double priceUsd;
   final bool isActive;
+
+  /// Explicit publish timestamp. Defaults to server-side `DateTime.now()` when null.
+  final DateTime? publishedAt;
 }
 
 class UpdateGiftData {
@@ -28,6 +32,9 @@ class UpdateGiftData {
     this.animationUrl,
     this.priceUsd,
     this.isActive,
+    this.publishedAt,
+    this.imageBytes,
+    this.imageName,
   });
 
   final String? name;
@@ -35,6 +42,13 @@ class UpdateGiftData {
   final String? animationUrl;
   final double? priceUsd;
   final bool? isActive;
+
+  /// Update the published timestamp. Pass `null` to leave it unchanged.
+  final DateTime? publishedAt;
+
+  /// When set, the image is uploaded first and the resulting URL replaces [thumbnailUrl].
+  final Uint8List? imageBytes;
+  final String? imageName;
 }
 
 abstract class GiftsRepository {

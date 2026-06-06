@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -63,6 +64,9 @@ class _PostsPageState extends State<PostsPage> {
       if (!mounted) return;
       if (result is ManagedPostEntity) {
         context.read<PostsBloc>().add(PatchPostEvent(result));
+      } else if (result == true) {
+        // Post was deleted in the detail screen — remove it from the list instantly.
+        context.read<PostsBloc>().add(RemovePostEvent(post.id));
       }
     });
   }
@@ -440,19 +444,28 @@ class _CategoryFilter extends StatelessWidget {
                   final cat = catState.categories[index - 1];
                   return _CategoryChip(
                     label: cat.name,
-                    isSelected: selectedId == cat.id,
+                    isSelected: cat.id.isNotEmpty && selectedId == cat.id,
                     isDark: isDark,
                     accentColor: _colorForCategory(cat),
-                    onTap: () => context.read<PostsBloc>().add(
-                          FilterPostsByCategoryEvent(
-                            categoryId: cat.id,
-                            categoryName: cat.name,
-                            // Slug is the value the API `?category=` param expects
-                            categorySlug: cat.slug.isNotEmpty
-                                ? cat.slug
-                                : cat.name.toLowerCase(),
-                          ),
-                        ),
+                    onTap: () {
+                      if (kDebugMode) {
+                        debugPrint(
+                          '[CategoryChip] tapped → '
+                          'id="${cat.id}"  '
+                          'name="${cat.name}"  '
+                          'slug="${cat.slug}"',
+                        );
+                      }
+                      context.read<PostsBloc>().add(
+                            FilterPostsByCategoryEvent(
+                              categoryId: cat.id,
+                              categoryName: cat.name,
+                              categorySlug: cat.slug.isNotEmpty
+                                  ? cat.slug
+                                  : cat.name.toLowerCase(),
+                            ),
+                          );
+                    },
                   );
                 },
               ),

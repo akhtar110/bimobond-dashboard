@@ -65,6 +65,7 @@ class CreatePostPayloadBuilder {
     final common = CreatePostEntity(
       description: form.description,
       category: form.category,
+      categoryId: form.categoryId,
       status: form.status,
       duration: form.duration,
       videoWidth: form.videoWidth,

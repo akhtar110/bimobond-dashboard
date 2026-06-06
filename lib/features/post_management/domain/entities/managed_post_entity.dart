@@ -204,6 +204,7 @@ class ManagedPostUpdateData {
   const ManagedPostUpdateData({
     this.description,
     this.category,
+    this.categoryId,
     this.privacyStatus,
     this.status,
     this.allowComments,
@@ -213,6 +214,7 @@ class ManagedPostUpdateData {
 
   final String? description;
   final String? category;
+  final String? categoryId;
   final String? privacyStatus;
   final String? status;
   final bool? allowComments;

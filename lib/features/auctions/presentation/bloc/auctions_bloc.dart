@@ -21,6 +21,13 @@ class AdminCancelAuctionFromListEvent extends AuctionsEvent {
   final String auctionId;
 }
 
+/// Replaces a single auction in the loaded list without reloading everything.
+/// Emitted by [AuctionDetailPage] after a cancel / resolve / socket update.
+class AuctionStatusUpdatedEvent extends AuctionsEvent {
+  AuctionStatusUpdatedEvent(this.auction);
+  final AuctionEntity auction;
+}
+
 // ─── States ──────────────────────────────────────────────────────────────────
 
 abstract class AuctionsState {}
@@ -82,6 +89,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     on<LoadAllAuctionsEvent>(_onLoad);
     on<FilterAuctionsEvent>(_onFilter);
     on<AdminCancelAuctionFromListEvent>(_onCancel);
+    on<AuctionStatusUpdatedEvent>(_onStatusUpdated);
   }
 
   final GetAllAuctions _getAllAuctions;
@@ -125,5 +133,20 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     } catch (e) {
       emit(current.copyWith(isActioning: false));
     }
+  }
+
+  /// Replaces a single auction by id without touching the rest of the list.
+  /// Counts and filtered view are recalculated automatically via getters.
+  void _onStatusUpdated(
+      AuctionStatusUpdatedEvent event, Emitter<AuctionsState> emit) {
+    final current = state;
+    if (current is! AuctionsLoaded) return;
+
+    final idx = current.allAuctions.indexWhere((a) => a.id == event.auction.id);
+    if (idx == -1) return; // auction not in list yet — ignore
+
+    final updated = List<AuctionEntity>.from(current.allAuctions);
+    updated[idx] = event.auction;
+    emit(current.copyWith(allAuctions: updated));
   }
 }

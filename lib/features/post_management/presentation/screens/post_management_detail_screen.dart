@@ -8,7 +8,11 @@ import '../../domain/entities/activity_context.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/entities/post_management_route_args.dart';
 import '../bloc/post_management_bloc.dart';
+import '../utils/moderation_confirm_dialog.dart';
 import '../utils/post_detail_labels.dart';
+import '../utils/post_status_confirm_dialog.dart';
+import '../widgets/investigation/investigation_header.dart';
+import '../widgets/investigation/investigation_skeleton.dart';
 import '../widgets/investigation/post_investigation_layout.dart';
 
 class PostManagementDetailScreen extends StatelessWidget {
@@ -57,25 +61,14 @@ class _PostManagementDetailView extends StatefulWidget {
 
 class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
   final _captionController = TextEditingController();
-  final _categoryController = TextEditingController();
 
   String? _lastDraftKey;
   String? _lastSnack;
   ManagedPostEntity? _updatedPost;
 
-  static const _postStatuses = [
-    'PUBLISHED',
-    'DRAFT',
-    'HIDDEN',
-    'BANNED',
-    'UNDER_REVIEW',
-    'ARCHIVED',
-  ];
-
   @override
   void dispose() {
     _captionController.dispose();
-    _categoryController.dispose();
     super.dispose();
   }
 
@@ -84,7 +77,6 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
     if (_lastDraftKey == key) return;
     _lastDraftKey = key;
     _captionController.text = draft.description ?? '';
-    _categoryController.text = draft.category ?? '';
   }
 
   void _patchDraftFromControllers(PostManagementBloc bloc) {
@@ -94,9 +86,6 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
       ChangeManagedPostFieldEvent(
         state.draft.copyWith(
           description: _captionController.text.trim(),
-          category: _categoryController.text.trim().isEmpty
-              ? null
-              : _categoryController.text.trim(),
         ),
       ),
     );
@@ -114,16 +103,26 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
   void _showSnack(BuildContext context, String msg, {bool isError = false}) {
     if (_lastSnack == msg) return;
     _lastSnack = msg;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isError
-            ? Theme.of(context).colorScheme.error
-            : Colors.green.shade700,
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: isError
+              ? Theme.of(context).colorScheme.error
+              : Colors.green.shade700,
+        ),
+      );
+  }
+
+  Future<void> _showDeleteConfirmDialog(BuildContext context) async {
+    final bloc = context.read<PostManagementBloc>();
+    final confirmed = await showDeletePostConfirmDialog(context);
+
+    if (confirmed && context.mounted) {
+      bloc.add(DeleteManagedPostEvent());
+    }
   }
 
   Future<void> _showChangeStatusDialog(
@@ -131,12 +130,11 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
     String currentStatus,
   ) async {
     final l10n = context.l10n;
-    final bloc = context.read<PostManagementBloc>();
     final scheme = Theme.of(context).colorScheme;
 
-    var selected = _postStatuses.contains(currentStatus.toUpperCase())
+    var selected = kPostAdminStatuses.contains(currentStatus.toUpperCase())
         ? currentStatus.toUpperCase()
-        : _postStatuses.first;
+        : kPostAdminStatuses.first;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -146,12 +144,12 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Text(l10n.t('changePostStatus')),
+            title: Text(l10n.t('changeStatus')),
             content: SizedBox(
               width: 360,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: _postStatuses.map((status) {
+                children: kPostAdminStatuses.map((status) {
                   final isSelected = selected == status;
                   final label = postStatusLabel(l10n, status);
                   return Padding(
@@ -217,7 +215,11 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
     );
 
     if (confirmed == true && context.mounted) {
-      bloc.add(UpdatePostStatusEvent(selected));
+      await requestPostStatusChange(
+        context,
+        currentStatus: currentStatus,
+        newStatus: selected,
+      );
     }
   }
 
@@ -225,6 +227,7 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
+    final isDark = theme.brightness == Brightness.dark;
 
     return PopScope(
       canPop: false,
@@ -232,6 +235,14 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
         if (!didPop) Navigator.of(context).pop(_updatedPost);
       },
       child: BlocConsumer<PostManagementBloc, PostManagementState>(
+        listenWhen: (prev, curr) {
+          if (curr is PostManagementLoaded) {
+            if (curr.successMessage != null || curr.errorMessage != null) {
+              return true;
+            }
+          }
+          return curr is PostManagementDeleted || curr is PostManagementError;
+        },
         listener: (context, state) {
           if (state is PostManagementLoaded) {
             _syncDraftControllers(state.draft);
@@ -260,59 +271,76 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
               hasDraftChanges(loaded.post, loaded.draft);
 
           return Scaffold(
-            backgroundColor: theme.colorScheme.surface,
-            appBar: AppBar(
-              elevation: 0,
-              backgroundColor: theme.colorScheme.surface,
-              scrolledUnderElevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                onPressed: () => Navigator.pop(context, _updatedPost),
-              ),
-              titleSpacing: 0,
-              title: Text(
-                l10n.t('postManagementTitle'),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+            backgroundColor:
+                isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF7F9FC),
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (loaded != null)
+                  InvestigationHeader(
+                    isDark: isDark,
+                    isBusy: isBusy,
+                    isSaving: loaded.isSaving,
+                    dirty: dirty,
+                    onBack: () => Navigator.pop(context, _updatedPost),
+                    onSave: () => context
+                        .read<PostManagementBloc>()
+                        .add(UpdateManagedPostEvent()),
+                    onChangeStatus: () => _showChangeStatusDialog(
+                      context,
+                      loaded.draft.status,
+                    ),
+                    onDelete: () => _showDeleteConfirmDialog(context),
+                  ),
+                Expanded(
+                  child: switch (state) {
+                    PostManagementLoading() || PostManagementInitial() =>
+                      const InvestigationSkeleton(),
+                    PostManagementError(:final message) => Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(message, textAlign: TextAlign.center),
+                        ),
+                      ),
+                    PostManagementDeleted() => const SizedBox.shrink(),
+                    PostManagementLoaded() => PostInvestigationLayout(
+                        isDark: isDark,
+                        isBusy: isBusy,
+                        isSaving: loaded!.isSaving,
+                        dirty: dirty,
+                        captionController: _captionController,
+                        onCaptionChanged: () => _patchDraftFromControllers(
+                          context.read<PostManagementBloc>(),
+                        ),
+                        onCategorySelected: (CategoryEntity cat) =>
+                            _updateDraft(
+                          context.read<PostManagementBloc>(),
+                          (d) => d.copyWith(
+                            category: cat.name,
+                            categoryEntity: cat,
+                          ),
+                        ),
+                        onPrivacyChanged: (v) => _updateDraft(
+                          context.read<PostManagementBloc>(),
+                          (d) => d.copyWith(privacyStatus: v),
+                        ),
+                        onDraftToggle: (updater) => _updateDraft(
+                          context.read<PostManagementBloc>(),
+                          updater,
+                        ),
+                        onChangeStatus: () => _showChangeStatusDialog(
+                          context,
+                          loaded.draft.status,
+                        ),
+                        onSave: () => context
+                            .read<PostManagementBloc>()
+                            .add(UpdateManagedPostEvent()),
+                        onDelete: () => _showDeleteConfirmDialog(context),
+                      ),
+                  },
                 ),
-              ),
+              ],
             ),
-            body: switch (state) {
-              PostManagementLoading() || PostManagementInitial() =>
-                const Center(child: CircularProgressIndicator()),
-              PostManagementError(:final message) =>
-                Center(child: Text(message)),
-              PostManagementDeleted() => const SizedBox.shrink(),
-              PostManagementLoaded() => PostInvestigationLayout(
-                  isDark: theme.brightness == Brightness.dark,
-                  isBusy: isBusy,
-                  isSaving: loaded!.isSaving,
-                  dirty: dirty,
-                  captionController: _captionController,
-                  categoryController: _categoryController,
-                  onCaptionChanged: () => _patchDraftFromControllers(
-                    context.read<PostManagementBloc>(),
-                  ),
-                  onCategoryChanged: () => _patchDraftFromControllers(
-                    context.read<PostManagementBloc>(),
-                  ),
-                  onPrivacyChanged: (v) => _updateDraft(
-                    context.read<PostManagementBloc>(),
-                    (d) => d.copyWith(privacyStatus: v),
-                  ),
-                  onDraftToggle: (updater) => _updateDraft(
-                    context.read<PostManagementBloc>(),
-                    updater,
-                  ),
-                  onChangeStatus: () => _showChangeStatusDialog(
-                    context,
-                    loaded.draft.status,
-                  ),
-                  onSave: () => context
-                      .read<PostManagementBloc>()
-                      .add(UpdateManagedPostEvent()),
-                ),
-            },
           );
         },
       ),

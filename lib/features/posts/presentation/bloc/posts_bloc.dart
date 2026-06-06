@@ -17,6 +17,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<UpdatePostFiltersEvent>(_onUpdateFilters);
     on<ClearPostFiltersEvent>(_onClearFilters);
     on<PatchPostEvent>(_onPatchPost);
+    on<RemovePostEvent>(_onRemovePost);
   }
 
   final GetAllPosts getAllPosts;
@@ -51,15 +52,50 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     FilterPostsByCategoryEvent event,
     Emitter<PostsState> emit,
   ) async {
-    final clear = event.categoryId == null &&
+    final isAll = event.categoryId == null &&
         event.categoryName == null &&
         event.categorySlug == null;
-    _filters = _filters.copyWith(
-      categoryId: event.categoryId,
-      categoryName: event.categoryName,
-      categorySlug: event.categorySlug,
-      clearCategory: clear,
-    );
+
+    if (kDebugMode) {
+      debugPrint(
+        '[PostsBloc] filterCategory → '
+        'id=${event.categoryId}  '
+        'name=${event.categoryName}  '
+        'slug=${event.categorySlug}  '
+        'isAll=$isAll',
+      );
+    }
+
+    if (isAll) {
+      // "All" chip — clear category filter, keep all other filters intact.
+      _filters = _filters.copyWith(clearCategory: true);
+    } else {
+      // Specific category selected. Rebuild filters wholesale so we can
+      // replace the category triple (id, name, slug) without the copyWith
+      // null-means-keep-old ambiguity.  Empty string id is normalised to null
+      // so the datasource does not send a blank ?categoryId= parameter.
+      final effectiveId = (event.categoryId?.trim().isEmpty ?? true)
+          ? null
+          : event.categoryId;
+      _filters = PostFilters(
+        categoryId: effectiveId,
+        categoryName: event.categoryName,
+        categorySlug: event.categorySlug,
+        search: _filters.search,
+        type: _filters.type,
+        sort: _filters.sort,
+        isAuctionable: _filters.isAuctionable,
+      );
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[PostsBloc] _filters after update → '
+        'categoryId=${_filters.categoryId}  '
+        'categorySlug=${_filters.categorySlug}',
+      );
+    }
+
     await _loadFirstPage(emit);
   }
 
@@ -130,7 +166,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     if (kDebugMode) {
       debugPrint(
         '[PostsBloc] load #$myId  '
-        'category=${filtersSnapshot.categorySlug}  '
+        'categoryId=${filtersSnapshot.categoryId}  '
+        'categorySlug=${filtersSnapshot.categorySlug}  '
         'search=${filtersSnapshot.search}  '
         'type=${filtersSnapshot.type}  '
         'sort=${filtersSnapshot.sort}',
@@ -236,6 +273,17 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       (p) => p.id == event.updatedPost.id ? event.updatedPost : p,
     ).toList();
     emit(current.copyWith(posts: updated));
+  }
+
+  void _onRemovePost(RemovePostEvent event, Emitter<PostsState> emit) {
+    final current = state;
+    if (current is! PostsLoaded) return;
+    final remaining = current.posts.where((p) => p.id != event.postId).toList();
+    if (remaining.isEmpty) {
+      emit(PostsEmpty(_filters));
+    } else {
+      emit(current.copyWith(posts: remaining));
+    }
   }
 
   String _messageFrom(Object e) =>

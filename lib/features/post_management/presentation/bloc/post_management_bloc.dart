@@ -253,7 +253,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         current.draft.id,
         ManagedPostUpdateData(
           description: current.draft.description,
-          category: current.draft.category,
+          categoryId: current.draft.categoryEntity?.id,
           privacyStatus: current.draft.privacyStatus,
           status: current.draft.status,
           allowComments: current.draft.allowComments,

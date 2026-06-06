@@ -16,6 +16,7 @@ abstract class GiftsRemoteDataSource {
     required String thumbnailUrl,
     required double priceUsd,
     bool isActive = true,
+    DateTime? publishedAt,
   });
 
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data);
@@ -96,15 +97,21 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     required String thumbnailUrl,
     required double priceUsd,
     bool isActive = true,
+    DateTime? publishedAt,
   }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'thumbnailUrl': thumbnailUrl,
+      'priceUsd': priceUsd,
+      'isActive': isActive,
+      // Always send publishedAt; use provided value or default to now.
+      'publishedAt':
+          (publishedAt ?? DateTime.now()).toUtc().toIso8601String(),
+    };
+
     final response = await _dio.post(
       '/gifts/admin',
-      data: {
-        'name': name,
-        'thumbnailUrl': thumbnailUrl,
-        'priceUsd': priceUsd,
-        'isActive': isActive,
-      },
+      data: body,
       options: Options(contentType: Headers.jsonContentType),
     );
     return _parse(response.data);
@@ -120,6 +127,9 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     if (data.animationUrl != null) body['animationUrl'] = data.animationUrl;
     if (data.priceUsd != null) body['priceUsd'] = data.priceUsd;
     if (data.isActive != null) body['isActive'] = data.isActive;
+    if (data.publishedAt != null) {
+      body['publishedAt'] = data.publishedAt!.toUtc().toIso8601String();
+    }
 
     final response = await _dio.patch(
       '/gifts/admin/$giftId',

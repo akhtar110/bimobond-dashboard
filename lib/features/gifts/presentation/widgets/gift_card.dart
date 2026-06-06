@@ -155,7 +155,7 @@ class _PublishedDate extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
-    final date = gift.createdAt;
+    final date = gift.publishedAt;
 
     return Row(
       children: [

@@ -102,6 +102,14 @@ import 'features/auctions/domain/usecases/resolve_auction_usecase.dart';
 import 'features/auctions/presentation/bloc/auction_detail_bloc.dart';
 import 'features/auctions/presentation/bloc/auctions_bloc.dart';
 
+import 'features/reports/data/datasources/reports_remote_datasource.dart';
+import 'features/reports/data/repositories/reports_repository_impl.dart';
+import 'features/reports/domain/repositories/reports_repository.dart';
+import 'features/reports/domain/usecases/get_reports_usecase.dart';
+import 'features/reports/domain/usecases/get_report_details_usecase.dart';
+import 'features/reports/domain/usecases/update_report_status_usecase.dart';
+import 'features/reports/presentation/bloc/reports_bloc.dart';
+
 import 'features/gifts/data/datasources/gifts_remote_datasource.dart';
 import 'features/gifts/data/repositories/gifts_repository_impl.dart';
 import 'features/gifts/domain/repositories/gifts_repository.dart';
@@ -535,6 +543,31 @@ Future<void> init() async {
       createGift: sl<CreateGift>(),
       updateGift: sl<UpdateGift>(),
       deleteGift: sl<DeleteGift>(),
+    ),
+  );
+
+  // =========================================================
+  // REPORTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<ReportsRemoteDataSource>(
+    () => ReportsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<ReportsRepository>(
+    () => ReportsRepositoryImpl(sl<ReportsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(() => GetReports(sl<ReportsRepository>()));
+  sl.registerLazySingleton(
+      () => GetReportDetails(sl<ReportsRepository>()));
+  sl.registerLazySingleton(
+      () => UpdateReportStatus(sl<ReportsRepository>()));
+
+  sl.registerFactory(
+    () => ReportsBloc(
+      getReports: sl<GetReports>(),
+      updateReportStatus: sl<UpdateReportStatus>(),
     ),
   );
 }

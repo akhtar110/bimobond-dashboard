@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/localization/localization.dart';
 import '../../../domain/entities/managed_post_entity.dart';
-import '../../bloc/post_management_bloc.dart';
-import '../../utils/post_detail_labels.dart';
+import 'investigation_theme.dart';
 import 'post_surface_card.dart';
 
 class ModerationSidebar extends StatelessWidget {
@@ -14,201 +12,128 @@ class ModerationSidebar extends StatelessWidget {
     required this.draft,
     required this.isBusy,
     required this.isSaving,
-    required this.onChangeStatus,
+    required this.isDeleting,
     required this.onDraftToggle,
+    required this.onDelete,
+    required this.onSave,
   });
 
   final ManagedPostEntity post;
   final ManagedPostEntity draft;
   final bool isBusy;
   final bool isSaving;
-  final VoidCallback onChangeStatus;
+  final bool isDeleting;
   final void Function(ManagedPostEntity Function(ManagedPostEntity) updater)
       onDraftToggle;
+  final VoidCallback onDelete;
+  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
-    final bloc = context.read<PostManagementBloc>();
     final l10n = context.l10n;
+    final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        PostSurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return PostSurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
+              Icon(Icons.shield_outlined, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
               Text(
-                l10n.t('postStatistics'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              _StatsGrid(post: post),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        PostSurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.t('moderationSettings'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              _ToggleRow(
-                label: l10n.t('allowComments'),
-                value: draft.allowComments,
-                isBusy: isBusy,
-                onChanged: (v) =>
-                    onDraftToggle((d) => d.copyWith(allowComments: v)),
-              ),
-              const SizedBox(height: 8),
-              _ToggleRow(
-                label: l10n.t('allowDuets'),
-                value: draft.allowDuets,
-                isBusy: isBusy,
-                onChanged: (v) => onDraftToggle((d) => d.copyWith(allowDuets: v)),
-              ),
-              const SizedBox(height: 8),
-              _ToggleRow(
-                label: l10n.t('allowStitch'),
-                value: draft.allowStitch,
-                isBusy: isBusy,
-                onChanged: (v) =>
-                    onDraftToggle((d) => d.copyWith(allowStitch: v)),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        PostSurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.t('adminActions'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _ActionButton(
-                    icon: Icons.visibility_off_outlined,
-                    label: l10n.t('hidePost'),
-                    color: Colors.orange.shade700,
-                    disabled: isBusy,
-                    onPressed: () => bloc.add(HidePostEvent()),
-                  ),
-                  _ActionButton(
-                    icon: Icons.block_outlined,
-                    label: l10n.t('banPost'),
-                    color: Colors.red.shade700,
-                    disabled: isBusy,
-                    onPressed: () => bloc.add(BanPostEvent()),
-                  ),
-                  _ActionButton(
-                    icon: Icons.swap_horiz_outlined,
-                    label: l10n.t('changeStatus'),
-                    color: Colors.purple.shade700,
-                    disabled: isBusy,
-                    onPressed: onChangeStatus,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: isBusy ? null : () => bloc.add(UpdateManagedPostEvent()),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(44),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                l10n.t('moderation'),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
-                child: isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(l10n.t('saveChangesPost')),
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.post});
-  final ManagedPostEntity post;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final items = <({String k, int v})>[
-      (k: l10n.t('views'), v: post.viewCount),
-      (k: l10n.t('likes'), v: post.likeCount),
-      (k: l10n.t('comments'), v: post.commentCount),
-      (k: l10n.t('shares'), v: post.shareCount),
-      (k: l10n.t('saves'), v: post.saveCount),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 1.72,
+          const SizedBox(height: InvestigationTheme.s12),
+          Text(
+            l10n.t('moderationSettings'),
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: InvestigationTheme.mutedText(
+                context,
+                theme.brightness == Brightness.dark,
+              ),
+            ),
+          ),
+          const SizedBox(height: InvestigationTheme.s8),
+          _ToggleRow(
+            label: l10n.t('allowComments'),
+            value: draft.allowComments,
+            isBusy: isBusy,
+            onChanged: (v) => onDraftToggle((d) => d.copyWith(allowComments: v)),
+          ),
+          const SizedBox(height: InvestigationTheme.s8),
+          _ToggleRow(
+            label: l10n.t('allowDuets'),
+            value: draft.allowDuets,
+            isBusy: isBusy,
+            onChanged: (v) => onDraftToggle((d) => d.copyWith(allowDuets: v)),
+          ),
+          const SizedBox(height: InvestigationTheme.s8),
+          _ToggleRow(
+            label: l10n.t('allowStitch'),
+            value: draft.allowStitch,
+            isBusy: isBusy,
+            onChanged: (v) => onDraftToggle((d) => d.copyWith(allowStitch: v)),
+          ),
+          const SizedBox(height: InvestigationTheme.s16),
+          Divider(
+            height: 1,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+          ),
+          const SizedBox(height: InvestigationTheme.s12),
+          FilledButton.icon(
+            onPressed: isBusy ? null : onSave,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+              ),
+            ),
+            icon: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.save_rounded, size: 18),
+            label: Text(l10n.t('saveChangesPost')),
+          ),
+          const SizedBox(height: InvestigationTheme.s8),
+          OutlinedButton.icon(
+            onPressed: isBusy ? null : onDelete,
+            icon: isDeleting
+                ? SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.red.shade700),
+                    ),
+                  )
+                : const Icon(Icons.delete_forever_outlined, size: 16),
+            label: Text(l10n.t('deletePost')),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              foregroundColor: Colors.red.shade700,
+              side: BorderSide(
+                color: isBusy ? Colors.grey.shade300 : Colors.red.shade300,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+              ),
+            ),
+          ),
+        ],
       ),
-      itemBuilder: (context, i) {
-        final it = items[i];
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                compactNumber(it.v),
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              Text(
-                it.k,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -228,56 +153,30 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: InvestigationTheme.animMs),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(12),
+        color: isDark ? const Color(0xFF0F1421) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
           ),
-          Switch.adaptive(value: value, onChanged: isBusy ? null : onChanged),
+          Switch.adaptive(
+            value: value,
+            onChanged: isBusy ? null : onChanged,
+          ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.disabled,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool disabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: disabled ? null : onPressed,
-      icon: Icon(icon, size: 15),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(
-          color: disabled ? Colors.grey.shade300 : color.withValues(alpha: 0.45),
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
       ),
     );
   }

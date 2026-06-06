@@ -11,6 +11,7 @@ class CreatePostDto {
     this.animatedCoverUrl,
     this.description,
     this.category,
+    this.categoryId,
     this.status,
     this.duration,
     this.videoWidth,
@@ -37,6 +38,9 @@ class CreatePostDto {
   final String? animatedCoverUrl;
   final String? description;
   final String? category;
+  /// UUID of the selected category — the primary key the backend uses for
+  /// category association and for `GET /posts/feed?categoryId=` filtering.
+  final String? categoryId;
   final String? status;
   final int? duration;
   final int? videoWidth;
@@ -65,6 +69,7 @@ class CreatePostDto {
       animatedCoverUrl: entity.animatedCoverUrl,
       description: entity.description,
       category: entity.category,
+      categoryId: entity.categoryId,
       status: entity.status,
       duration: entity.duration,
       videoWidth: entity.videoWidth,
@@ -118,7 +123,9 @@ class CreatePostDto {
     putStr('description', description);
 
     // ── Optional string fields ────────────────────────────────────────────────
-    putStr('category', category);
+    // NOTE: `category` (free-text name) is NOT sent — the backend rejects
+    // unknown properties.  Only `categoryId` (UUID) is accepted by POST /posts.
+    putStr('categoryId', categoryId);
     putStr('videoUrl', videoUrl);
     putStr('thumbnailUrl', thumbnailUrl);
     putStr('hlsUrl', hlsUrl);

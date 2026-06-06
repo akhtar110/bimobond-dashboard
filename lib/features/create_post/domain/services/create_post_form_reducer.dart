@@ -23,6 +23,15 @@ class CreatePostFormReducer {
           category: slug,
           clearCategory: slug == null,
         );
+      case CreatePostField.categoryId:
+        final id = value as String?;
+        // Clearing the UUID also clears the display name so both fields stay
+        // in sync.  Setting a new UUID keeps the existing display name until
+        // the next UpdateField(category, …) event sets it.
+        return form.copyWith(
+          categoryId: id,
+          clearCategory: id == null,
+        );
       case CreatePostField.type:
         return form.copyWith(type: value as String);
       case CreatePostField.privacyStatus:

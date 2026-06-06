@@ -9,7 +9,7 @@ class GiftModel extends GiftEntity {
     super.animationUrl,
     required super.priceUsd,
     required super.isActive,
-    super.createdAt,
+    super.publishedAt,
   });
 
   factory GiftModel.fromJson(Map<String, dynamic> json) {
@@ -18,14 +18,25 @@ class GiftModel extends GiftEntity {
       name: json['name']?.toString() ?? '',
       thumbnailUrl:
           resolveMediaUrl(json['thumbnailUrl']?.toString()) ?? '',
-      animationUrl:
-          resolveMediaUrl(json['animationUrl'] as String?),
+      animationUrl: resolveMediaUrl(json['animationUrl'] as String?),
       priceUsd: _d(json['priceUsd']),
       isActive: json['isActive'] as bool? ?? true,
-      createdAt: _parseDate(
+      publishedAt: _parseDate(
         json['publishedAt'] ?? json['published_at'] ?? json['createdAt'],
       ),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'thumbnailUrl': thumbnailUrl,
+      if (animationUrl != null) 'animationUrl': animationUrl,
+      'priceUsd': priceUsd,
+      'isActive': isActive,
+      if (publishedAt != null) 'publishedAt': publishedAt!.toUtc().toIso8601String(),
+    };
   }
 
   static DateTime? _parseDate(dynamic v) {

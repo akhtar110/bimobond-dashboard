@@ -7,6 +7,7 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../../domain/entities/gift_transaction_entity.dart';
 import '../bloc/auction_detail_bloc.dart';
+import '../bloc/auctions_bloc.dart';
 
 class AuctionDetailPage extends StatefulWidget {
   const AuctionDetailPage({super.key, required this.auctionId});
@@ -17,12 +18,26 @@ class AuctionDetailPage extends StatefulWidget {
 }
 
 class _AuctionDetailPageState extends State<AuctionDetailPage> {
+  String? _lastKnownStatus;
+
   @override
   void initState() {
     super.initState();
     context.read<AuctionDetailBloc>().add(
           LoadAuctionDetailsEvent(widget.auctionId),
         );
+  }
+
+  /// Propagates a status change to the app-level [AuctionsBloc] so the list
+  /// page recalculates tabs/counts without a full reload.
+  void _syncToListBloc(BuildContext context, AuctionEntity auction) {
+    try {
+      context
+          .read<AuctionsBloc>()
+          .add(AuctionStatusUpdatedEvent(auction));
+    } catch (_) {
+      // AuctionsBloc may not be in the tree in edge-case navigation paths.
+    }
   }
 
   @override
@@ -43,6 +58,14 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       body: BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
         listener: (context, state) {
           if (state is AuctionDetailLoaded) {
+            // ── Forward any status change to the app-level list bloc ────────
+            final newStatus = state.auction.status;
+            if (newStatus != _lastKnownStatus &&
+                (state.auction.isCancelled || state.auction.isCompleted)) {
+              _syncToListBloc(context, state.auction);
+            }
+            _lastKnownStatus = newStatus;
+
             if (state.successMessage != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

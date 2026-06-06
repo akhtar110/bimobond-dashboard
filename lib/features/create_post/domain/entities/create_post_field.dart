@@ -2,6 +2,7 @@
 enum CreatePostField {
   description,
   category,
+  categoryId,
   type,
   privacyStatus,
   allowComments,

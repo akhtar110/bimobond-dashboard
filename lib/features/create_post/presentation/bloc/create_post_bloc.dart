@@ -183,10 +183,6 @@ class CreatePostBloc extends Bloc<CreatePostEvent, CreatePostState> {
       emit(state.copyWith(errorMessage: 'description_required'));
       return;
     }
-    if (!state.form.hasCategory) {
-      emit(state.copyWith(errorMessage: 'category_required'));
-      return;
-    }
     if (state.form.isAuctionable && !(state.form.auction?.isComplete ?? false)) {
       emit(state.copyWith(errorMessage: 'auction_incomplete'));
       return;

@@ -72,10 +72,15 @@ class _PostDetailsSectionState extends State<PostDetailsSection> {
         const SizedBox(height: 16),
         CreatePostCategorySelector(
           form: widget.form,
-          onChanged: (slug) => widget.onFieldUpdate(
-            CreatePostField.category,
-            slug,
-          ),
+          onCategorySelected: (id, name) {
+            // Update UUID first (also clears display name when id == null).
+            widget.onFieldUpdate(CreatePostField.categoryId, id);
+            // Then update the display name (no-op when id == null because
+            // the previous call already cleared it via clearCategory).
+            if (id != null) {
+              widget.onFieldUpdate(CreatePostField.category, name);
+            }
+          },
         ),
         const SizedBox(height: 16),
         InputDecorator(

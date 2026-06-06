@@ -14,6 +14,7 @@ import 'features/videos/presentation/bloc/videos_bloc.dart';
 import 'features/auctions/presentation/bloc/auctions_bloc.dart';
 import 'features/categories/presentation/bloc/categories_bloc.dart';
 import 'features/gifts/presentation/bloc/gifts_bloc.dart';
+import 'features/reports/presentation/bloc/reports_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
@@ -41,6 +42,7 @@ class AdminDashboardApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<UserDetailBloc>()),
         BlocProvider(create: (_) => di.sl<AuctionsBloc>()),
         BlocProvider(create: (_) => di.sl<GiftsBloc>()),
+        BlocProvider(create: (_) => di.sl<ReportsBloc>()),
         BlocProvider(
           create: (_) =>
               di.sl<CategoriesBloc>()..add(LoadCategoriesEvent()),

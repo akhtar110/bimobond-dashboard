@@ -6,6 +6,7 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/managed_post_entity.dart';
+import 'investigation/investigation_theme.dart';
 
 /// A card that shows the post author's profile and navigates to
 /// [UserDetailScreen] when tapped.
@@ -176,6 +177,39 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                     isDark: isDark,
                   ),
                 ],
+                const SizedBox(height: InvestigationTheme.s12),
+                Wrap(
+                  spacing: InvestigationTheme.s8,
+                  runSpacing: InvestigationTheme.s8,
+                  children: [
+                    _AuthorActionButton(
+                      icon: Icons.person_outline_rounded,
+                      label: l10n.t('viewProfile'),
+                      onTap: () => _navigate(context),
+                      isDark: isDark,
+                    ),
+                    _AuthorActionButton(
+                      icon: Icons.timeline_outlined,
+                      label: l10n.t('userActivityNav'),
+                      onTap: () => _navigate(context),
+                      isDark: isDark,
+                    ),
+                    _AuthorActionButton(
+                      icon: Icons.history_rounded,
+                      label: l10n.t('moderationHistory'),
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.t('banUserComingSoon')),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      isDark: isDark,
+                      outlined: true,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -198,7 +232,7 @@ class _WideProfile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AuthorAvatar(post: post, radius: 28),
+        _AuthorAvatar(post: post, radius: 32),
         const SizedBox(width: 14),
         Expanded(child: _AuthorDetails(post: post, isDark: isDark)),
       ],
@@ -482,8 +516,6 @@ class _AccountStatusBadge extends StatelessWidget {
   }
 }
 
-// ── Meta info row ─────────────────────────────────────────────────────────────
-
 class _MetaRow extends StatelessWidget {
   const _MetaRow({
     required this.icon,
@@ -529,6 +561,55 @@ class _MetaRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AuthorActionButton extends StatelessWidget {
+  const _AuthorActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.isDark,
+    this.outlined = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDark;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    if (outlined) {
+      return OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 14),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+          ),
+        ),
+      );
+    }
+    return FilledButton.tonalIcon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        backgroundColor: primary.withValues(alpha: isDark ? 0.15 : 0.08),
+        foregroundColor: primary,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+        ),
+      ),
     );
   }
 }

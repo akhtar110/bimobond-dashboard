@@ -29,10 +29,12 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       'sort': filters.sort ?? PostFilters.defaultSort,
     };
 
-    // The API expects a category slug/label (e.g. "music"), not a UUID.
-    final categorySlug = filters.categorySlug?.trim();
-    if (categorySlug != null && categorySlug.isNotEmpty) {
-      params['category'] = categorySlug;
+    // Send the category UUID so the backend filters by a stable ID instead
+    // of a mutable slug string.
+    final categoryId = filters.categoryId?.trim();
+    if (categoryId != null && categoryId.isNotEmpty) {
+      print('categoryId: $categoryId');
+      params['categoryId'] = categoryId;
     }
 
     final search = filters.search?.trim();
@@ -55,7 +57,7 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
     // "status" (per the Admin section of the README) — all other params sent
     // to that endpoint are silently ignored by the backend.
     final response = await _dio.get(
-      '/posts/feed',
+      '/posts/admin/all',
       queryParameters: params,
     );
 
