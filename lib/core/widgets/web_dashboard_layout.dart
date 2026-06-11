@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../localization/localization.dart';
-import '../../features/auth/presentation/bloc/auth_bloc.dart';
-import '../../features/auth/presentation/bloc/auth_event.dart';
 
 class DashboardNavItem {
   const DashboardNavItem({
@@ -16,226 +14,196 @@ class DashboardNavItem {
   final IconData selectedIcon;
 }
 
-class WebDashboardLayout extends StatelessWidget {
+class WebDashboardLayout extends StatefulWidget {
   const WebDashboardLayout({
     super.key,
     required this.items,
     required this.currentIndex,
     required this.currentPage,
-    required this.title,
     required this.onDestinationSelected,
   });
 
   final List<DashboardNavItem> items;
   final int currentIndex;
   final Widget currentPage;
-  final String title;
   final ValueChanged<int> onDestinationSelected;
 
-  static const _desktopBreakpoint = 1000.0;
-  static const _sidebarWidth = 260.0;
-  static const _topbarHeight = 64.0;
+  static const desktopBreakpoint = 1000.0;
+  static const sidebarExpandedWidth = 260.0;
+  static const sidebarCollapsedWidth = 84.0;
+  static const mobileDrawerBarHeight = 44.0;
+
+  @override
+  State<WebDashboardLayout> createState() => _WebDashboardLayoutState();
+}
+
+class _WebDashboardLayoutState extends State<WebDashboardLayout> {
+  /// `false` = full menu (icons + labels); `true` = compact rail (icons only).
+  bool _sidebarCollapsed = false;
+
+  void _onDesktopDestinationSelected(int index) {
+    widget.onDestinationSelected(index);
+  }
+
+  void _onMobileDestinationSelected(int index) {
+    Navigator.of(context).maybePop();
+    widget.onDestinationSelected(index);
+  }
+
+  void _toggleSidebar() {
+    setState(() => _sidebarCollapsed = !_sidebarCollapsed);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width > _desktopBreakpoint;
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-    final content = _DashboardContent(
-      showTopbar: isDesktop,
-      topbarHeight: _topbarHeight,
-      title: title,
-      child: currentPage,
-    );
-
-    if (!isDesktop) {
-      return Scaffold(
-        drawer: _Sidebar(
-          width: _sidebarWidth,
-          items: items,
-          currentIndex: currentIndex,
-          isRtl: isRtl,
-          onDestinationSelected: (index) {
-            Navigator.of(context).maybePop();
-            onDestinationSelected(index);
-          },
-        ),
-        appBar: AppBar(
-          toolbarHeight: _topbarHeight,
-          title: Text(title),
-          actions: const [_AdminAvatar()],
-        ),
-        body: content,
-      );
-    }
+    final isDesktop =
+        MediaQuery.sizeOf(context).width > WebDashboardLayout.desktopBreakpoint;
+    final railWidth = _sidebarCollapsed
+        ? WebDashboardLayout.sidebarCollapsedWidth
+        : WebDashboardLayout.sidebarExpandedWidth;
 
     return Scaffold(
+      drawer: isDesktop
+          ? null
+          : Drawer(
+              child: _Sidebar(
+                compact: false,
+                items: widget.items,
+                currentIndex: widget.currentIndex,
+                onDestinationSelected: _onMobileDestinationSelected,
+              ),
+            ),
+      appBar: isDesktop
+          ? null
+          : AppBar(
+              toolbarHeight: WebDashboardLayout.mobileDrawerBarHeight,
+              title: const SizedBox.shrink(),
+              scrolledUnderElevation: 0,
+            ),
       body: Row(
-        children: isRtl
-            ? [
-                Expanded(child: content),
-                _Sidebar(
-                  width: _sidebarWidth,
-                  items: items,
-                  currentIndex: currentIndex,
-                  isRtl: isRtl,
-                  onDestinationSelected: onDestinationSelected,
+        children: [
+          if (isDesktop)
+            SizedBox(
+              width: railWidth,
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: AlignmentDirectional.topStart,
+                  minWidth: WebDashboardLayout.sidebarExpandedWidth,
+                  maxWidth: WebDashboardLayout.sidebarExpandedWidth,
+                  child: _Sidebar(
+                    compact: _sidebarCollapsed,
+                    items: widget.items,
+                    currentIndex: widget.currentIndex,
+                    onDestinationSelected: _onDesktopDestinationSelected,
+                    onToggleCollapse: _toggleSidebar,
+                  ),
                 ),
-              ]
-            : [
-                _Sidebar(
-                  width: _sidebarWidth,
-                  items: items,
-                  currentIndex: currentIndex,
-                  isRtl: isRtl,
-                  onDestinationSelected: onDestinationSelected,
-                ),
-                Expanded(child: content),
-              ],
+              ),
+            ),
+          Expanded(
+            child: _DashboardContent(child: widget.currentPage),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _DashboardContent extends StatelessWidget {
-  const _DashboardContent({
-    required this.showTopbar,
-    required this.topbarHeight,
-    required this.title,
-    required this.child,
-  });
+  const _DashboardContent({required this.child});
 
-  final bool showTopbar;
-  final double topbarHeight;
-  final String title;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (showTopbar)
-          Container(
-            height: topbarHeight,
-            padding: const EdgeInsetsDirectional.symmetric(horizontal: 24),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(
-                  color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const _AdminAvatar(),
-              ],
-            ),
+    final width = MediaQuery.sizeOf(context).width;
+    final horizontal = width < 600 ? 12.0 : width < 1000 ? 16.0 : 20.0;
+    final vertical = width < 600 ? 10.0 : 14.0;
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1680),
+        child: Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(
+            horizontal,
+            vertical,
+            horizontal,
+            vertical,
           ),
-        Expanded(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1480),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(28, 24, 28, 24),
-                child: child,
-              ),
-            ),
-          ),
+          child: child,
         ),
-      ],
+      ),
     );
   }
 }
 
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
-    required this.width,
+    required this.compact,
     required this.items,
     required this.currentIndex,
-    required this.isRtl,
     required this.onDestinationSelected,
+    this.onToggleCollapse,
   });
 
-  final double width;
+  final bool compact;
   final List<DashboardNavItem> items;
   final int currentIndex;
-  final bool isRtl;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback? onToggleCollapse;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      width: width,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.32),
-        border: BorderDirectional(
-          end: BorderSide(
-            color: theme.dividerColor.withValues(alpha: 0.22),
+    final scheme = theme.colorScheme;
+
+    return SizedBox(
+      width: WebDashboardLayout.sidebarExpandedWidth,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.32),
+          border: BorderDirectional(
+            end: BorderSide(
+              color: theme.dividerColor.withValues(alpha: 0.22),
+            ),
           ),
         ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(14, 16, 14, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 18),
-                child: Text(
-                  context.l10n.t('bimoBondAdmin'),
-                  textAlign: isRtl ? TextAlign.right : TextAlign.left,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              compact ? 10 : 14,
+              16,
+              compact ? 10 : 14,
+              16,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SidebarHeader(
+                  compact: compact,
+                  onToggleCollapse: onToggleCollapse,
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.separated(
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return _SidebarNavItem(
+                        key: ValueKey(item.label),
+                        item: item,
+                        selected: index == currentIndex,
+                        compact: compact,
+                        onTap: () => onDestinationSelected(index),
+                      );
+                    },
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 4),
+                    itemCount: items.length,
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final selected = index == currentIndex;
-                    return MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.primaryContainer
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: ListTile(
-                          leading: Icon(selected ? item.selectedIcon : item.icon),
-                          title: Text(
-                            item.label,
-                            style: TextStyle(
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          onTap: () => onDestinationSelected(index),
-                        ),
-                      ),
-                    );
-                  },
-                  separatorBuilder: (context, index) => const SizedBox(height: 4),
-                  itemCount: items.length,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -243,51 +211,163 @@ class _Sidebar extends StatelessWidget {
   }
 }
 
-class _AdminAvatar extends StatelessWidget {
-  const _AdminAvatar();
+class _SidebarHeader extends StatelessWidget {
+  const _SidebarHeader({
+    required this.compact,
+    this.onToggleCollapse,
+  });
+
+  final bool compact;
+  final VoidCallback? onToggleCollapse;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 8),
-      child: PopupMenuButton<String>(
-        onSelected: (value) {
-          if (value == 'logout') {
-            context.read<AuthBloc>().add(AuthLogoutRequested());
-          }
-        },
-        itemBuilder: (context) {
-          final l10n = context.l10n;
-          return [
-            PopupMenuItem(
-              value: 'profile',
-              child: Row(
-                children: [
-                  const Icon(Icons.person_outline, size: 20),
-                  const SizedBox(width: 12),
-                  Text(l10n.t('profile')),
-                ],
-              ),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+
+    final logo = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        Icons.admin_panel_settings_rounded,
+        color: scheme.onPrimaryContainer,
+        size: 22,
+      ),
+    );
+
+    final title = Text(
+      l10n.t('bimoBondAdmin'),
+      textAlign: TextAlign.start,
+      maxLines: compact ? 3 : 2,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w800,
+        fontSize: compact ? 11 : 18,
+        height: compact ? 1.25 : 1.2,
+      ),
+    );
+
+    final toggle = onToggleCollapse == null
+        ? null
+        : _CollapseToggle(
+            compact: compact,
+            onPressed: onToggleCollapse!,
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        logo,
+        const SizedBox(height: 8),
+        title,
+        if (toggle != null) ...[
+          const SizedBox(height: 10),
+          toggle,
+        ],
+      ],
+    );
+  }
+}
+
+class _CollapseToggle extends StatelessWidget {
+  const _CollapseToggle({
+    required this.compact,
+    required this.onPressed,
+  });
+
+  final bool compact;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: compact ? 'Expand menu' : 'Collapse menu',
+      child: Material(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(
+              compact ? Icons.last_page_rounded : Icons.first_page_rounded,
+              size: 18,
+              color: scheme.onSurfaceVariant,
             ),
-            const PopupMenuDivider(),
-            PopupMenuItem(
-              value: 'logout',
-              child: Row(
-                children: [
-                  const Icon(Icons.logout, size: 20, color: Colors.red),
-                  const SizedBox(width: 12),
-                  Text(
-                    l10n.t('logout'),
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarNavItem extends StatelessWidget {
+  const _SidebarNavItem({
+    super.key,
+    required this.item,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final DashboardNavItem item;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final icon = selected ? item.selectedIcon : item.icon;
+    final bg = selected ? scheme.primaryContainer : Colors.transparent;
+    final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          height: 48,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 48,
+                child: Center(
+                  child: Icon(icon, color: fg, size: 22),
+                ),
               ),
-            ),
-          ];
-        },
-        child: const CircleAvatar(
-          radius: 17,
-          child: Icon(Icons.admin_panel_settings, size: 19),
+              Expanded(
+                child: compact
+                    ? const SizedBox.shrink()
+                    : Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                          color: selected
+                              ? scheme.onPrimaryContainer
+                              : scheme.onSurface,
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

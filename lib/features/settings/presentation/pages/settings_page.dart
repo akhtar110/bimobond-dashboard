@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_event.dart';
 import '../widgets/language_selector_card.dart';
 import '../widgets/logout_section.dart';
 import '../widgets/profile_card.dart';
@@ -8,6 +11,63 @@ import '../widgets/theme_selector_card.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (dialogContext) {
+        final danger =
+            isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.logout_rounded, color: danger, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                l10n.t('logout'),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            l10n.t('logoutConfirmMessage'),
+            style: theme.textTheme.bodyMedium,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: danger,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.t('logout')),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<AuthBloc>().add(AuthLogoutRequested());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +127,7 @@ class SettingsPage extends StatelessWidget {
                     const SizedBox(height: 28),
                     const LanguageSelectorCard(),
                     const SizedBox(height: 28),
-                    LogoutSection(onLogout: () {}),
+                    LogoutSection(onLogout: () => _confirmLogout(context)),
                   ],
                 ),
               ),

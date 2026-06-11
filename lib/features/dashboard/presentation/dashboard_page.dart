@@ -9,18 +9,27 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final horizontal = width < 600 ? 12.0 : 16.0;
+    final sectionGap = width < 900 ? 16.0 : 20.0;
 
     return Container(
-      color: isDark ? Theme.of(context).scaffoldBackgroundColor : const Color(0xFFF7F9FC),
-      child: Center(
+      color: scheme.surfaceContainerLowest,
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1400),
+          constraints: const BoxConstraints(maxWidth: 1680),
           child: ListView(
-            padding: const EdgeInsetsDirectional.all(32),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              horizontal,
+              12,
+              horizontal,
+              16,
+            ),
             children: [
               _buildStatsGrid(context),
-              const SizedBox(height: 32),
+              SizedBox(height: sectionGap),
               _ChartCard(
                 title: l10n.t('userGrowth'),
                 icon: Icons.trending_up_rounded,
@@ -33,7 +42,6 @@ class DashboardPage extends StatelessWidget {
                 title: l10n.t('reportsTrend'),
                 icon: Icons.report_rounded,
               ),
-              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -53,28 +61,36 @@ class DashboardPage extends StatelessWidget {
       _StatItem(l10n.t('bannedUsers'), '1,206', Icons.block_rounded),
     ];
 
-    final width = MediaQuery.of(context).size.width;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final compact = width < 600;
 
-    int crossAxisCount = 2;
-    if (width > 1600) {
-      crossAxisCount = 6;
-    } else if (width > 1200) {
-      crossAxisCount = 4;
-    } else if (width > 900) {
-      crossAxisCount = 3;
-    }
+        int crossAxisCount = 2;
+        if (width > 1400) {
+          crossAxisCount = 6;
+        } else if (width > 1100) {
+          crossAxisCount = 4;
+        } else if (width > 720) {
+          crossAxisCount = 3;
+        }
 
-    return GridView.builder(
-      itemCount: stats.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 24,
-        crossAxisSpacing: 24,
-        mainAxisExtent: 156,
-      ),
-      itemBuilder: (_, index) => _StatCard(item: stats[index]),
+        return GridView.builder(
+          itemCount: stats.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: compact ? 10 : 12,
+            crossAxisSpacing: compact ? 10 : 12,
+            mainAxisExtent: compact ? 132 : 148,
+          ),
+          itemBuilder: (_, index) => _StatCard(
+            item: stats[index],
+            compact: compact,
+          ),
+        );
+      },
     );
   }
 }
@@ -88,29 +104,30 @@ class _StatItem {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.item});
+  const _StatCard({required this.item, this.compact = false});
 
   final _StatItem item;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? theme.dividerColor : const Color(0xFFE6E8EC)),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsetsDirectional.all(24),
+      padding: EdgeInsetsDirectional.all(compact ? 14 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -120,30 +137,30 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                  color: scheme.primaryContainer.withValues(alpha: 0.65),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   item.icon,
-                  size: 20,
-                  color: const Color(0xFF6C63FF),
+                  size: compact ? 18 : 20,
+                  color: scheme.primary,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   item.title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: compact ? 12 : 14),
           Row(
             children: [
               Expanded(
@@ -152,9 +169,9 @@ class _StatCard extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   child: Text(
                     item.value,
-                    style: theme.textTheme.headlineMedium?.copyWith(
+                    style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                      color: scheme.onSurface,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -202,77 +219,101 @@ class _ChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+    final compact = MediaQuery.sizeOf(context).width < 900;
 
     return Container(
-      margin: const EdgeInsetsDirectional.only(bottom: 24),
+      margin: EdgeInsetsDirectional.only(bottom: compact ? 12 : 16),
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? theme.dividerColor : const Color(0xFFE6E8EC)),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsetsDirectional.all(32),
+      padding: EdgeInsetsDirectional.all(compact ? 16 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 560;
+              final periodChip = Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 24,
-                  color: const Color(0xFF6C63FF),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : const Color(0xFF1E293B),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade200),
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: scheme.outlineVariant),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Last 7 days',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
-                        fontWeight: FontWeight.w500,
+                      l10n.tOr('analyticsLast7Days', 'Last 7 days'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        size: 18, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ],
                 ),
-              ),
-            ],
+              );
+
+              final titleRow = Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, size: 22, color: scheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (!stacked) periodChip,
+                ],
+              );
+
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    titleRow,
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: periodChip,
+                    ),
+                  ],
+                );
+              }
+              return titleRow;
+            },
           ),
-          const SizedBox(height: 32),
+          SizedBox(height: compact ? 16 : 20),
           SizedBox(
-            height: 300,
+            height: compact ? 220 : 260,
             child: LineChart(
               LineChartData(
                 lineTouchData: LineTouchData(
@@ -293,7 +334,7 @@ class _ChartCard extends StatelessWidget {
                   show: true,
                   horizontalInterval: 1,
                   getDrawingHorizontalLine: (_) => FlLine(
-                    color: isDark ? theme.dividerColor : const Color(0xFFE5E7EB),
+                    color: scheme.outlineVariant,
                     strokeWidth: 1,
                   ),
                 ),
@@ -309,18 +350,15 @@ class _ChartCard extends StatelessWidget {
                     curveSmoothness: 0.35,
                     barWidth: 4,
                     isStrokeCapRound: true,
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xff6C63FF),
-                        Color(0xff00C9A7),
-                      ],
+                    gradient: LinearGradient(
+                      colors: [scheme.primary, scheme.tertiary],
                     ),
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xff6C63FF).withValues(alpha: 0.25),
-                          const Color(0xff00C9A7).withValues(alpha: 0.05),
+                          scheme.primary.withValues(alpha: 0.22),
+                          scheme.tertiary.withValues(alpha: 0.04),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -330,9 +368,9 @@ class _ChartCard extends StatelessWidget {
                       show: true,
                       getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
                         radius: 4,
-                        color: Colors.white,
+                        color: scheme.surface,
                         strokeWidth: 3,
-                        strokeColor: const Color(0xff6C63FF),
+                        strokeColor: scheme.primary,
                       ),
                     ),
                     spots: const [

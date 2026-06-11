@@ -9,15 +9,14 @@ class ReportReporterInfo extends StatelessWidget {
   const ReportReporterInfo({
     super.key,
     required this.reporter,
-    required this.isDark,
   });
 
   final ReportActorEntity reporter;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     final name = reporter.displayName;
     final initials = _initials(name);
 
@@ -30,15 +29,13 @@ class ReportReporterInfo extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: ReportCardTheme.mutedText(isDark),
+              color: ReportCardTheme.mutedText(scheme),
             ),
           ),
           const SizedBox(width: 6),
           CircleAvatar(
             radius: 12,
-            backgroundColor: isDark
-                ? const Color(0xFF334155)
-                : const Color(0xFFE2E8F0),
+            backgroundColor: scheme.surfaceContainerHighest,
             backgroundImage: reporter.avatarUrl?.isNotEmpty == true
                 ? NetworkImage(reporter.avatarUrl!)
                 : null,
@@ -49,7 +46,7 @@ class ReportReporterInfo extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
           ),
@@ -62,7 +59,7 @@ class ReportReporterInfo extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.grey.shade200 : const Color(0xFF334155),
+                color: scheme.onSurface,
               ),
             ),
           ),

@@ -18,6 +18,7 @@ import 'features/reports/presentation/bloc/reports_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
+import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'firebase_options.dart';
 import 'injection_container.dart' as di;
 
@@ -50,14 +51,15 @@ class AdminDashboardApp extends StatelessWidget {
         BlocProvider(
           create: (_) => di.sl<AuthBloc>()..add(AuthCheckRequested()),
         ),
+        BlocProvider(create: (_) => di.sl<NotificationsBloc>()),
       ],
       child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (_, settings) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             onGenerateTitle: (context) => context.l10n.t('appTitle'),
-            theme: AppTheme.lightTheme(),
-            darkTheme: AppTheme.darkTheme(),
+            theme: AppTheme.lightTheme(settings.locale),
+            darkTheme: AppTheme.darkTheme(settings.locale),
             themeMode: settings.themeMode,
             locale: settings.locale,
             supportedLocales: AppLocalizations.supportedLocales,

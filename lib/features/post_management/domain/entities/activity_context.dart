@@ -70,6 +70,8 @@ class ActivityContext {
     String? mentionSource,
     List<String> mentionedUserNames = const [],
     String? postOwnerName,
+    String? commentId,
+    String? commentText,
   }) =>
       ActivityContext(
         type: ActivityType.mention,
@@ -78,6 +80,8 @@ class ActivityContext {
         mentionSource: mentionSource,
         mentionedUserNames: mentionedUserNames,
         postOwnerName: postOwnerName,
+        commentId: commentId,
+        commentText: commentText,
       );
 
   static ActivityContext post({DateTime? activityDate}) => ActivityContext(

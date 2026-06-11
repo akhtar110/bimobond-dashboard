@@ -1,14 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../features/categories/presentation/bloc/categories_bloc.dart';
+import '../../../../features/categories/presentation/widgets/category_icon.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
+import '../../domain/enums/posts_view_type.dart';
 import '../bloc/posts_bloc.dart';
-import '../widgets/post_card.dart';
+import '../widgets/bulk_selection_toolbar.dart';
 import '../widgets/posts_filter_bar.dart';
+import '../widgets/posts_table_view.dart';
+import '../widgets/posts_view_toggle.dart';
+import '../widgets/selectable_post_card_wrapper.dart';
 
 // ── Grid column count ─────────────────────────────────────────────────────────
 int postsGridColumnCount(double width) {
@@ -38,7 +44,7 @@ class _PostsPageState extends State<PostsPage> {
   void initState() {
     super.initState();
     context.read<PostsBloc>().add(GetAllPostsEvent());
-    context.read<CategoriesBloc>().add(LoadCategoriesEvent());
+    context.read<CategoriesBloc>().add(LoadCategoriesEvent(forCatalog: true));
     _scrollController.addListener(_onScroll);
   }
 
@@ -65,7 +71,6 @@ class _PostsPageState extends State<PostsPage> {
       if (result is ManagedPostEntity) {
         context.read<PostsBloc>().add(PatchPostEvent(result));
       } else if (result == true) {
-        // Post was deleted in the detail screen — remove it from the list instantly.
         context.read<PostsBloc>().add(RemovePostEvent(post.id));
       }
     });
@@ -73,49 +78,114 @@ class _PostsPageState extends State<PostsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Container(
-      color: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF7F9FC),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1680),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _PageHeader(isDark: isDark),
-                const SizedBox(height: 10),
-                _CategoryFilter(isDark: isDark),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: BlocBuilder<PostsBloc, PostsState>(
-                    builder: (context, state) => switch (state) {
-                      PostsInitial() || PostsLoading() => LayoutBuilder(
-                          builder: (ctx, c) =>
-                              _SkeletonGrid(width: c.maxWidth),
+    return Shortcuts(
+      shortcuts: {
+        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyA):
+            const _SelectAllPostsIntent(),
+        LogicalKeySet(LogicalKeyboardKey.escape): const _ClearSelectionIntent(),
+      },
+      child: Actions(
+        actions: {
+          _SelectAllPostsIntent: CallbackAction<_SelectAllPostsIntent>(
+            onInvoke: (_) {
+              context.read<PostsBloc>().add(SelectAllPostsEvent());
+              return null;
+            },
+          ),
+          _ClearSelectionIntent: CallbackAction<_ClearSelectionIntent>(
+            onInvoke: (_) {
+              context.read<PostsBloc>().add(ClearSelectionEvent());
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: BlocListener<PostsBloc, PostsState>(
+            listenWhen: (prev, next) =>
+                next is PostsLoaded &&
+                next.bulkActionMessage != null &&
+                (prev is! PostsLoaded ||
+                    prev.bulkActionMessage != next.bulkActionMessage),
+            listener: (context, state) {
+              if (state is! PostsLoaded || state.bulkActionMessage == null) {
+                return;
+              }
+              final messenger = ScaffoldMessenger.of(context);
+              messenger.hideCurrentSnackBar();
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(state.bulkActionMessage!),
+                  backgroundColor:
+                      state.bulkActionIsError ? Colors.red.shade700 : null,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              context.read<PostsBloc>().add(ClearBulkActionFeedbackEvent());
+            },
+            child: Container(
+              color: scheme.surfaceContainerLowest,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1680),
+                  child: Padding(
+                    padding:
+                        const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _PageHeader(),
+                        const SizedBox(height: 10),
+                        const _CategoryFilter(),
+                        const SizedBox(height: 10),
+                        const BulkSelectionToolbar(),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: BlocBuilder<PostsBloc, PostsState>(
+                            buildWhen: (prev, next) =>
+                                prev.runtimeType != next.runtimeType ||
+                                (prev is PostsLoaded &&
+                                    next is PostsLoaded &&
+                                    (prev.posts != next.posts ||
+                                        prev.viewType != next.viewType ||
+                                        prev.selectedPostIds !=
+                                            next.selectedPostIds ||
+                                        prev.isLoadingMore !=
+                                            next.isLoadingMore ||
+                                        prev.isPerformingBulkAction !=
+                                            next.isPerformingBulkAction)),
+                            builder: (context, state) => switch (state) {
+                              PostsInitial() || PostsLoading() =>
+                                LayoutBuilder(
+                                  builder: (ctx, c) =>
+                                      _SkeletonGrid(width: c.maxWidth),
+                                ),
+                              PostsEmpty() => _EmptyView(
+                                  onClearFilters: () => context
+                                      .read<PostsBloc>()
+                                      .add(ClearPostFiltersEvent()),
+                                ),
+                              PostsError(:final message) => _ErrorView(
+                                  message: message,
+                                  onRetry: () => context
+                                      .read<PostsBloc>()
+                                      .add(GetAllPostsEvent()),
+                                ),
+                              PostsLoaded() => _PostsContent(
+                                  state: state,
+                                  scrollController: _scrollController,
+                                  onPostTap: _openPostManagement,
+                                ),
+                            },
+                          ),
                         ),
-                      PostsEmpty() => _EmptyView(
-                          onClearFilters: () => context
-                              .read<PostsBloc>()
-                              .add(ClearPostFiltersEvent()),
-                        ),
-                      PostsError(:final message) => _ErrorView(
-                          message: message,
-                          onRetry: () =>
-                              context.read<PostsBloc>().add(GetAllPostsEvent()),
-                        ),
-                      PostsLoaded() => _PostsGrid(
-                          state: state,
-                          scrollController: _scrollController,
-                          onPostTap: _openPostManagement,
-                        ),
-                    },
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -124,53 +194,53 @@ class _PostsPageState extends State<PostsPage> {
   }
 }
 
+class _SelectAllPostsIntent extends Intent {
+  const _SelectAllPostsIntent();
+}
+
+class _ClearSelectionIntent extends Intent {
+  const _ClearSelectionIntent();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Page header
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.isDark});
-
-  final bool isDark;
+  const _PageHeader();
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151B28) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A3344) : const Color(0xFFE8ECF0),
-        ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+        border: Border.all(color: scheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final desktop = constraints.maxWidth >= 1180;
-          final title = _HeaderTitle(isDark: isDark, l10n: l10n, theme: theme);
-          final toolbar = _HeaderFilterToolbar(isDark: isDark);
+          final title = _HeaderTitle(l10n: l10n, theme: theme);
+          final toolbar = const _HeaderFilterToolbar();
 
           if (desktop) {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Title takes only the space it needs on the left.
                 title,
                 const SizedBox(width: 16),
-                // Toolbar expands to fill all remaining space so the Create Post
-                // button is always anchored to the far right edge of the header.
                 Expanded(child: toolbar),
               ],
             );
@@ -191,18 +261,14 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _HeaderTitle extends StatelessWidget {
-  const _HeaderTitle({
-    required this.isDark,
-    required this.l10n,
-    required this.theme,
-  });
+  const _HeaderTitle({required this.l10n, required this.theme});
 
-  final bool isDark;
   final AppLocalizations l10n;
   final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -212,24 +278,18 @@ class _HeaderTitle extends StatelessWidget {
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
             letterSpacing: -0.45,
-            color: isDark ? Colors.white : const Color(0xFF111827),
+            color: scheme.onSurface,
             height: 1.05,
           ),
         ),
         const SizedBox(height: 4),
-        // Use BlocSelector to rebuild only when the selected category name
-        // changes.  Fall back to bloc.activeFilters during loading/error so
-        // the subtitle stays correct while an API call is in-flight.
         BlocSelector<PostsBloc, PostsState, String?>(
           selector: (state) => switch (state) {
             PostsLoaded(:final filters) => filters.categoryName,
             PostsEmpty(:final filters) => filters.categoryName,
-            _ => null, // resolved below from activeFilters
+            _ => null,
           },
           builder: (ctx, categoryNameFromState) {
-            // Prefer the state value; fall back to the bloc's live activeFilters
-            // so the subtitle updates immediately when a chip is tapped, even
-            // before the API call completes.
             final catName = categoryNameFromState ??
                 ctx.read<PostsBloc>().activeFilters.categoryName;
             return Text(
@@ -239,7 +299,7 @@ class _HeaderTitle extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: isDark ? Colors.grey.shade500 : const Color(0xFF6B7280),
+                color: scheme.onSurfaceVariant,
                 height: 1.2,
               ),
             );
@@ -251,25 +311,36 @@ class _HeaderTitle extends StatelessWidget {
 }
 
 class _HeaderFilterToolbar extends StatelessWidget {
-  const _HeaderFilterToolbar({required this.isDark});
-
-  final bool isDark;
+  const _HeaderFilterToolbar();
 
   void _openCreatePost(BuildContext context) {
-    Navigator.pushNamed(context, AppRoutes.createPost).then((created) {
-      if (created == true && context.mounted) {
+    final l10n = context.l10n;
+    Navigator.pushNamed(context, AppRoutes.createPost).then((result) {
+      if (!context.mounted) return;
+      if (result == 'published' || result == 'draft') {
         context.read<PostsBloc>().add(GetAllPostsEvent());
+        final msg = result == 'draft'
+            ? l10n.t('postDraftSaved')
+            : l10n.t('postCreatedSuccess');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 760;
         final createButton = _CreatePostButton(
-          isDark: isDark,
           iconOnly: narrow,
           onPressed: () => _openCreatePost(context),
         );
@@ -280,9 +351,12 @@ class _HeaderFilterToolbar extends StatelessWidget {
             children: [
               PostsFilterBar(isDark: isDark, compact: true),
               const SizedBox(height: 8),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: createButton,
+              Row(
+                children: [
+                  const PostsViewToggle(),
+                  const Spacer(),
+                  createButton,
+                ],
               ),
             ],
           );
@@ -291,9 +365,9 @@ class _HeaderFilterToolbar extends StatelessWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Filter bar expands to fill the available toolbar width,
-            // which naturally pushes the Create Post button to the far right.
             Expanded(child: PostsFilterBar(isDark: isDark, compact: true)),
+            const SizedBox(width: 8),
+            const PostsViewToggle(),
             const SizedBox(width: 8),
             createButton,
           ],
@@ -305,12 +379,10 @@ class _HeaderFilterToolbar extends StatelessWidget {
 
 class _CreatePostButton extends StatefulWidget {
   const _CreatePostButton({
-    required this.isDark,
     required this.onPressed,
     this.iconOnly = false,
   });
 
-  final bool isDark;
   final VoidCallback onPressed;
   final bool iconOnly;
 
@@ -324,6 +396,7 @@ class _CreatePostButtonState extends State<_CreatePostButton> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
 
     if (widget.iconOnly) {
       return IconButton.filled(
@@ -334,8 +407,8 @@ class _CreatePostButtonState extends State<_CreatePostButton> {
     }
 
     final bg = _hovered
-        ? const Color(0xFF4F46E5)
-        : const Color(0xFF6366F1);
+        ? scheme.primary.withValues(alpha: 0.85)
+        : scheme.primary;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -346,6 +419,7 @@ class _CreatePostButtonState extends State<_CreatePostButton> {
           onPressed: widget.onPressed,
           style: FilledButton.styleFrom(
             backgroundColor: bg,
+            foregroundColor: scheme.onPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -367,17 +441,15 @@ class _CreatePostButtonState extends State<_CreatePostButton> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CategoryFilter extends StatelessWidget {
-  const _CategoryFilter({required this.isDark});
+  const _CategoryFilter();
 
-  final bool isDark;
-
-  /// Reads the active category ID from whichever state/bloc is available.
   static String? _activeCategoryId(PostsState state, BuildContext context) {
     if (state is PostsLoaded) return state.filters.categoryId;
-    // For loading/error states fall back to the bloc's live activeFilters.
     return context.read<PostsBloc>().activeFilters.categoryId;
   }
 
+  // Brand accent palette — intentionally not from ColorScheme so categories
+  // remain visually distinct regardless of the active theme.
   static const _palette = [
     Color(0xFF6366F1),
     Color(0xFF0EA5E9),
@@ -401,51 +473,42 @@ class _CategoryFilter extends StatelessWidget {
 
     return BlocBuilder<CategoriesBloc, CategoriesState>(
       builder: (context, catState) {
-        if (catState is! CategoriesLoaded || catState.categories.isEmpty) {
+        if (catState is! CategoriesLoaded ||
+            catState.catalogCategories.isEmpty) {
           return const SizedBox.shrink();
         }
 
-        // ── Read selected category from PostsBloc filters ────────────────
-        // We use BlocBuilder (not BlocSelector) so chips rebuild whenever
-        // filters change — including optimistic updates from the bloc.
         return BlocBuilder<PostsBloc, PostsState>(
           buildWhen: (prev, next) {
-            // Rebuild whenever the selected category ID changes in the bloc's
-            // active filters (covers both the optimistic update and the final
-            // loaded state), or whenever the state type changes.
             final prevId = _activeCategoryId(prev, context);
             final nextId = _activeCategoryId(next, context);
             return prevId != nextId || prev.runtimeType != next.runtimeType;
           },
           builder: (context, postsState) {
-            // Always read selectedId from bloc.activeFilters — it is updated
-            // synchronously in the event handler before any async work, so it
-            // reflects the user's latest selection even while an API call is
-            // in-flight.
-            final selectedId = context.read<PostsBloc>().activeFilters.categoryId;
+            final selectedId =
+                context.read<PostsBloc>().activeFilters.categoryId;
 
             return SizedBox(
               height: 36,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: catState.categories.length + 1,
+                itemCount: catState.catalogCategories.length + 1,
                 separatorBuilder: (context, idx) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return _CategoryChip(
                       label: l10n.t('all'),
                       isSelected: selectedId == null,
-                      isDark: isDark,
                       onTap: () => context
                           .read<PostsBloc>()
                           .add(FilterPostsByCategoryEvent()),
                     );
                   }
-                  final cat = catState.categories[index - 1];
+                  final cat = catState.catalogCategories[index - 1];
                   return _CategoryChip(
                     label: cat.name,
+                    category: cat,
                     isSelected: cat.id.isNotEmpty && selectedId == cat.id,
-                    isDark: isDark,
                     accentColor: _colorForCategory(cat),
                     onTap: () {
                       if (kDebugMode) {
@@ -481,16 +544,16 @@ class _CategoryChip extends StatefulWidget {
   const _CategoryChip({
     required this.label,
     required this.isSelected,
-    required this.isDark,
     required this.onTap,
     this.accentColor,
+    this.category,
   });
 
   final String label;
   final bool isSelected;
-  final bool isDark;
   final VoidCallback onTap;
   final Color? accentColor;
+  final CategoryEntity? category;
 
   @override
   State<_CategoryChip> createState() => _CategoryChipState();
@@ -501,28 +564,21 @@ class _CategoryChipState extends State<_CategoryChip> {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        widget.accentColor ?? Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final color = widget.accentColor ?? scheme.primary;
     final selected = widget.isSelected;
-    final isDark = widget.isDark;
 
     final bg = selected
         ? color
         : _hovered
-            ? (isDark ? const Color(0xFF252B3B) : const Color(0xFFF8FAFC))
-            : (isDark ? const Color(0xFF151B28) : Colors.white);
+            ? scheme.surfaceContainerHigh
+            : scheme.surface;
 
     final fg = selected
         ? Colors.white
-        : isDark
-            ? Colors.grey.shade300
-            : const Color(0xFF374151);
+        : scheme.onSurface;
 
-    final borderColor = selected
-        ? color
-        : isDark
-            ? const Color(0xFF334155)
-            : const Color(0xFFE2E8F0);
+    final borderColor = selected ? color : scheme.outlineVariant;
 
     final scale = _hovered && !selected ? 1.025 : 1.0;
 
@@ -556,9 +612,7 @@ class _CategoryChipState extends State<_CategoryChip> {
                   : _hovered
                       ? [
                           BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: isDark ? 0.2 : 0.06,
-                            ),
+                            color: scheme.shadow.withValues(alpha: 0.06),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -566,15 +620,32 @@ class _CategoryChipState extends State<_CategoryChip> {
                       : null,
             ),
             child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 160),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: fg,
-                  letterSpacing: selected ? -0.1 : 0,
-                ),
-                child: Text(widget.label),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.category != null) ...[
+                    CategoryIcon(
+                      category: widget.category,
+                      size: 18,
+                      borderRadius: BorderRadius.circular(5),
+                      backgroundColor: selected
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : scheme.surfaceContainerHighest,
+                      iconColor: fg,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 160),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: fg,
+                      letterSpacing: selected ? -0.1 : 0,
+                    ),
+                    child: Text(widget.label),
+                  ),
+                ],
               ),
             ),
           ),
@@ -585,11 +656,50 @@ class _CategoryChipState extends State<_CategoryChip> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Posts content (grid / list with shared pagination)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PostsContent extends StatelessWidget {
+  const _PostsContent({
+    required this.state,
+    required this.scrollController,
+    required this.onPostTap,
+  });
+
+  final PostsLoaded state;
+  final ScrollController scrollController;
+  final void Function(ManagedPostEntity) onPostTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: state.viewType == PostsViewType.grid
+          ? _PostsGrid(
+              key: const ValueKey('posts_grid'),
+              state: state,
+              scrollController: scrollController,
+              onPostTap: onPostTap,
+            )
+          : _PostsList(
+              key: const ValueKey('posts_list'),
+              state: state,
+              scrollController: scrollController,
+              onPostTap: onPostTap,
+            ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Posts grid (responsive rows, content-driven card height)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _PostsGrid extends StatelessWidget {
   const _PostsGrid({
+    super.key,
     required this.state,
     required this.scrollController,
     required this.onPostTap,
@@ -631,8 +741,16 @@ class _PostsGrid extends StatelessWidget {
                             if (i > 0) const SizedBox(width: gap),
                             Expanded(
                               child: i < rowPosts.length
-                                  ? PostCard(
+                                  ? SelectablePostCard(
                                       post: rowPosts[i],
+                                      isSelected: state.selectedPostIds
+                                          .contains(rowPosts[i].id),
+                                      onSelectionChanged: (selected) =>
+                                          togglePostSelection(
+                                        context,
+                                        rowPosts[i].id,
+                                        selected ?? false,
+                                      ),
                                       onTap: () => onPostTap(rowPosts[i]),
                                     )
                                   : const SizedBox.shrink(),
@@ -650,12 +768,154 @@ class _PostsGrid extends StatelessWidget {
               const SliverToBoxAdapter(child: _LoadMoreIndicator()),
             if (state.hasReachedMax && posts.isNotEmpty)
               SliverToBoxAdapter(child: _EndOfListLabel()),
-            // Bottom breathing room
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
         );
       },
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Posts list view
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PostsList extends StatelessWidget {
+  const _PostsList({
+    super.key,
+    required this.state,
+    required this.scrollController,
+    required this.onPostTap,
+  });
+
+  final PostsLoaded state;
+  final ScrollController scrollController;
+  final void Function(ManagedPostEntity) onPostTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final posts = state.posts;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final density = postsTableDensityForWidth(constraints.maxWidth);
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: CustomScrollView(
+              controller: scrollController,
+              slivers: [
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PostsTableHeaderDelegate(
+                    l10n: l10n,
+                    scheme: scheme,
+                    density: density,
+                    allVisibleSelected: state.allVisibleSelected,
+                    someVisibleSelected: state.someVisibleSelected,
+                  ),
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final post = posts[index];
+                      final isLast = index == posts.length - 1;
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: isLast
+                              ? null
+                              : Border(
+                                  bottom: BorderSide(
+                                    color: scheme.outlineVariant
+                                        .withValues(alpha: 0.45),
+                                  ),
+                                ),
+                        ),
+                        child: PostsTableRow(
+                          post: post,
+                          density: density,
+                          isSelected:
+                              state.selectedPostIds.contains(post.id),
+                          onSelectionChanged: (selected) =>
+                              togglePostSelection(
+                            context,
+                            post.id,
+                            selected ?? false,
+                          ),
+                          onTap: () => onPostTap(post),
+                        ),
+                      );
+                    },
+                    childCount: posts.length,
+                  ),
+                ),
+                if (state.isLoadingMore)
+                  const SliverToBoxAdapter(child: _LoadMoreIndicator()),
+                if (state.hasReachedMax && posts.isNotEmpty)
+                  SliverToBoxAdapter(child: _EndOfListLabel()),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PostsTableHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _PostsTableHeaderDelegate({
+    required this.l10n,
+    required this.scheme,
+    required this.density,
+    required this.allVisibleSelected,
+    required this.someVisibleSelected,
+  });
+
+  final AppLocalizations l10n;
+  final ColorScheme scheme;
+  final PostsTableDensity density;
+  final bool allVisibleSelected;
+  final bool someVisibleSelected;
+
+  @override
+  double get minExtent => kPostsTableHeaderHeight;
+
+  @override
+  double get maxExtent => kPostsTableHeaderHeight;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Material(
+      color: scheme.surfaceContainerLow,
+      elevation: overlapsContent ? 1 : 0,
+      shadowColor: scheme.shadow.withValues(alpha: 0.08),
+      child: PostsTableHeader(
+        l10n: l10n,
+        density: density,
+        allVisibleSelected: allVisibleSelected,
+        someVisibleSelected: someVisibleSelected,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _PostsTableHeaderDelegate oldDelegate) {
+    return oldDelegate.allVisibleSelected != allVisibleSelected ||
+        oldDelegate.someVisibleSelected != someVisibleSelected ||
+        oldDelegate.density != density;
   }
 }
 
@@ -734,26 +994,21 @@ class _ShimmerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
-    final highlight =
-        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerLow;
+    final highlight = scheme.surfaceContainerHighest;
     final shimmerColor = Color.lerp(base, highlight, shimmerValue)!;
-    final strongerBase =
-        isDark ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0);
+    final strongerBase = scheme.surfaceContainerHighest;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Thumbnail
           Container(
             height: 176,
             decoration: BoxDecoration(
@@ -813,12 +1068,8 @@ class _EmptyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
-
-    // hasAnyFilters covers both the category chip and advanced filters
-    // (search / type / sort / auction) — the button should appear in any
-    // situation where clearing filters might reveal more posts.
+    final scheme = theme.colorScheme;
     final hasFilters =
         context.read<PostsBloc>().activeFilters.hasAnyFilters;
 
@@ -832,16 +1083,13 @@ class _EmptyView extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFFF1F5F9),
+                color: scheme.surfaceContainerLow,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.photo_library_outlined,
                 size: 34,
-                color:
-                    isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                color: scheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 18),
@@ -849,7 +1097,7 @@ class _EmptyView extends StatelessWidget {
               l10n.t('noPostsFound'),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF111827),
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -857,9 +1105,7 @@ class _EmptyView extends StatelessWidget {
               l10n.t('tryDifferentCategory'),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: isDark
-                    ? Colors.grey.shade500
-                    : const Color(0xFF6B7280),
+                color: scheme.onSurfaceVariant,
               ),
             ),
             if (hasFilters) ...[
@@ -874,7 +1120,6 @@ class _EmptyView extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-
                 ),
                 child: Text(l10n.t('clearAllFilters')),
               ),
@@ -899,8 +1144,8 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Center(
       child: Padding(
@@ -909,22 +1154,16 @@ class _ErrorView extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 420),
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? const Color(0xFF2E3440)
-                  : const Color(0xFFE8ECF0),
-            ),
-            boxShadow: isDark
-                ? null
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+            border: Border.all(color: scheme.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -933,13 +1172,13 @@ class _ErrorView extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: scheme.errorContainer,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.error_outline_rounded,
                   size: 28,
-                  color: Colors.red.shade500,
+                  color: scheme.error,
                 ),
               ),
               const SizedBox(height: 16),
@@ -947,7 +1186,7 @@ class _ErrorView extends StatelessWidget {
                 l10n.t('errorOccurred'),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF111827),
+                  color: scheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -957,9 +1196,7 @@ class _ErrorView extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isDark
-                      ? Colors.grey.shade400
-                      : const Color(0xFF6B7280),
+                  color: scheme.onSurfaceVariant,
                   height: 1.5,
                 ),
               ),
@@ -1012,33 +1249,26 @@ class _EndOfListLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final dividerColor = scheme.outlineVariant;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 22),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 32,
-            height: 1,
-            color: isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0),
-          ),
+          Container(width: 32, height: 1, color: dividerColor),
           const SizedBox(width: 12),
           Text(
             l10n.t('allPostsLoaded'),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+              color: scheme.onSurfaceVariant,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            width: 32,
-            height: 1,
-            color: isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0),
-          ),
+          Container(width: 32, height: 1, color: dividerColor),
         ],
       ),
     );

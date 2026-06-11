@@ -1,54 +1,152 @@
 part of 'posts_bloc.dart';
 
-sealed class PostsEvent {}
+sealed class PostsEvent extends Equatable {
+  const PostsEvent();
 
-/// Load the first page with no filters (or refresh after a post is created).
+  @override
+  List<Object?> get props => [];
+}
+
 class GetAllPostsEvent extends PostsEvent {}
 
-/// Append the next page using the currently active filters.
 class LoadMorePostsEvent extends PostsEvent {}
 
-/// Select a category chip — pass no arguments to clear the category filter.
 class FilterPostsByCategoryEvent extends PostsEvent {
   FilterPostsByCategoryEvent({
     this.categoryId,
     this.categoryName,
     this.categorySlug,
   });
+
   final String? categoryId;
   final String? categoryName;
-
-  /// Slug sent to the API `?category=` param (e.g. `"music"`).
   final String? categorySlug;
+
+  @override
+  List<Object?> get props => [categoryId, categoryName, categorySlug];
 }
 
-/// Dedicated search event.  Pass an empty string to clear the search filter.
-/// Preserves all currently active filters (category, type, sort, etc.).
 class SearchPostsEvent extends PostsEvent {
-  SearchPostsEvent(this.query);
+  const SearchPostsEvent(this.query);
   final String query;
+
+  @override
+  List<Object?> get props => [query];
 }
 
-/// Bulk-replace all advanced filters at once (type, sort, isAuctionable).
-/// Must be constructed from [PostsBloc.activeFilters] so category is preserved.
+class FilterPostsByTypeEvent extends PostsEvent {
+  FilterPostsByTypeEvent({
+    this.isAuctionable,
+    this.isStory,
+    this.isAd,
+  });
+
+  final bool? isAuctionable;
+  final bool? isStory;
+  final bool? isAd;
+
+  @override
+  List<Object?> get props => [isAuctionable, isStory, isAd];
+}
+
 class UpdatePostFiltersEvent extends PostsEvent {
-  UpdatePostFiltersEvent(this.filters);
+  const UpdatePostFiltersEvent(this.filters);
   final PostFilters filters;
+
+  @override
+  List<Object?> get props => [filters];
 }
 
-/// Reset search, type, sort, and isAuctionable — keep the selected category.
 class ClearPostFiltersEvent extends PostsEvent {}
 
-/// Patch a single post in the loaded list without re-fetching the entire page.
-/// Dispatched by PostsPage after a successful save in PostManagementDetailScreen.
 class PatchPostEvent extends PostsEvent {
-  PatchPostEvent(this.updatedPost);
+  const PatchPostEvent(this.updatedPost);
   final ManagedPostEntity updatedPost;
+
+  @override
+  List<Object?> get props => [updatedPost];
 }
 
-/// Remove a single post from the loaded list without re-fetching.
-/// Dispatched by PostsPage after a successful deletion in PostManagementDetailScreen.
 class RemovePostEvent extends PostsEvent {
-  RemovePostEvent(this.postId);
+  const RemovePostEvent(this.postId);
   final String postId;
+
+  @override
+  List<Object?> get props => [postId];
 }
+
+// ── View ────────────────────────────────────────────────────────────────────
+
+class ChangePostsViewEvent extends PostsEvent {
+  const ChangePostsViewEvent(this.viewType);
+  final PostsViewType viewType;
+
+  @override
+  List<Object?> get props => [viewType];
+}
+
+// ── Selection ───────────────────────────────────────────────────────────────
+
+class SelectPostEvent extends PostsEvent {
+  const SelectPostEvent(this.postId);
+  final String postId;
+
+  @override
+  List<Object?> get props => [postId];
+}
+
+class DeselectPostEvent extends PostsEvent {
+  const DeselectPostEvent(this.postId);
+  final String postId;
+
+  @override
+  List<Object?> get props => [postId];
+}
+
+class SelectAllPostsEvent extends PostsEvent {}
+
+class ClearSelectionEvent extends PostsEvent {}
+
+class ClearBulkActionFeedbackEvent extends PostsEvent {}
+
+// ── Bulk actions ────────────────────────────────────────────────────────────
+
+class PublishSelectedPostsEvent extends PostsEvent {}
+
+class DraftSelectedPostsEvent extends PostsEvent {}
+
+class HideSelectedPostsEvent extends PostsEvent {}
+
+class UnderReviewSelectedPostsEvent extends PostsEvent {}
+
+class ArchiveSelectedPostsEvent extends PostsEvent {}
+
+class BanSelectedPostsEvent extends PostsEvent {}
+
+class UnbanSelectedPostsEvent extends PostsEvent {}
+
+class DeleteSelectedPostsEvent extends PostsEvent {}
+
+class PermanentlyDeleteSelectedPostsEvent extends PostsEvent {}
+
+class EnableCommentsSelectedPostsEvent extends PostsEvent {}
+
+class DisableCommentsSelectedPostsEvent extends PostsEvent {}
+
+class EnableDuetsSelectedPostsEvent extends PostsEvent {}
+
+class DisableDuetsSelectedPostsEvent extends PostsEvent {}
+
+class EnableStitchSelectedPostsEvent extends PostsEvent {}
+
+class DisableStitchSelectedPostsEvent extends PostsEvent {}
+
+class FeatureSelectedPostsEvent extends PostsEvent {}
+
+class UnfeatureSelectedPostsEvent extends PostsEvent {}
+
+class SetPublicSelectedPostsEvent extends PostsEvent {}
+
+class SetPrivateSelectedPostsEvent extends PostsEvent {}
+
+class SetFollowersOnlySelectedPostsEvent extends PostsEvent {}

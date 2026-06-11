@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/bloc/categories_bloc.dart';
+import '../../../categories/presentation/widgets/category_icon.dart';
 import '../../domain/entities/create_post_entity.dart';
 
 class CreatePostCategorySelector extends StatelessWidget {
@@ -30,7 +31,7 @@ class CreatePostCategorySelector extends StatelessWidget {
           return const LinearProgressIndicator();
         }
 
-        final items = state.categories;
+        final items = state.catalogCategories;
 
         return DropdownButtonFormField<String?>(
           // Key off categoryId so the dropdown resets when the form resets.
@@ -61,7 +62,7 @@ class CreatePostCategorySelector extends StatelessWidget {
               DropdownMenuItem<String?>(
                 // value = UUID (categoryId) — the real foreign key.
                 value: cat.id.isNotEmpty ? cat.id : null,
-                child: Text(cat.name),
+                child: CategoryIconLabel(category: cat),
               ),
           ],
           onChanged: (selectedId) {

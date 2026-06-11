@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
+import '../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../post_management/data/mappers/managed_post_mapper.dart';
 import '../../../post_management/domain/entities/activity_context.dart';
 import '../../../users/domain/entities/user_entity.dart';
@@ -35,6 +37,10 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CategoriesBloc>().add(LoadCategoriesEvent(forCatalog: true));
+    });
   }
 
   @override
@@ -58,7 +64,7 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
     await openPostInvestigation(
       context,
       postId: post.id,
-      post: managedPostFromUserPost(post),
+      post: managedPostFromUserPost(post, author: widget.sourceUser),
       sourceUser: widget.sourceUser,
       activityContext: ActivityContext.post(activityDate: post.createdAt),
     );
@@ -220,11 +226,24 @@ class _PostGridTileState extends State<_PostGridTile> {
   bool _hovered = false;
 
   String get _mediaUrl {
-    final thumb = widget.post.thumbnailUrl;
+    // 1. Check the media list for the first IMAGE item (covers IMAGE/CAROUSEL posts).
+    final mediaList = widget.post.media;
+    if (mediaList != null) {
+      for (final item in mediaList) {
+        final type = (item['mediaType'] as String? ?? '').toUpperCase();
+        if (type == 'IMAGE') {
+          final url = resolveMediaUrl(item['url']?.toString());
+          if (url != null && url.isNotEmpty) return url;
+        }
+      }
+    }
+
+    // 2. Fall back to thumbnailUrl → animatedCoverUrl → videoUrl.
+    final thumb = resolveMediaUrl(widget.post.thumbnailUrl);
     if (thumb != null && thumb.isNotEmpty) return thumb;
-    final animated = widget.post.animatedCoverUrl;
+    final animated = resolveMediaUrl(widget.post.animatedCoverUrl);
     if (animated != null && animated.isNotEmpty) return animated;
-    return widget.post.videoUrl ?? '';
+    return resolveMediaUrl(widget.post.videoUrl) ?? '';
   }
 
   String _formatCount(int value) {
@@ -240,10 +259,11 @@ class _PostGridTileState extends State<_PostGridTile> {
     final l10n = context.l10n;
     final post = widget.post;
     final mediaUrl = _mediaUrl;
+    final resolvedVideoUrl = resolveMediaUrl(post.videoUrl);
     final useVideoPlayer =
         (post.thumbnailUrl == null || post.thumbnailUrl!.isEmpty) &&
-        post.videoUrl != null &&
-        post.videoUrl!.isNotEmpty;
+        resolvedVideoUrl != null &&
+        resolvedVideoUrl.isNotEmpty;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -258,7 +278,7 @@ class _PostGridTileState extends State<_PostGridTile> {
             children: [
               Positioned.fill(
                 child: useVideoPlayer
-                    ? _VideoThumbnailWidget(videoUrl: post.videoUrl!)
+                    ? _VideoThumbnailWidget(videoUrl: resolvedVideoUrl!)
                     : (mediaUrl.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: mediaUrl,

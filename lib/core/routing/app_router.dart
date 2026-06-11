@@ -7,8 +7,8 @@ import 'package:bimo_bond_dashboard/features/users/domain/entities/user_entity.d
 import 'package:bimo_bond_dashboard/features/user_activity/presentation/bloc/user_activity_bloc.dart';
 import 'package:bimo_bond_dashboard/features/user_activity/presentation/bloc/user_comments_bloc.dart';
 import 'package:bimo_bond_dashboard/features/user_activity/presentation/bloc/user_likes_bloc.dart';
-import 'package:bimo_bond_dashboard/features/user_activity/presentation/bloc/user_mentions_bloc.dart';
 import 'package:bimo_bond_dashboard/features/user_activity/presentation/bloc/user_unified_activity_bloc.dart';
+import 'package:bimo_bond_dashboard/features/notifications/presentation/bloc/user_notifications_bloc.dart';
 import 'package:bimo_bond_dashboard/features/users/presentation/bloc/user_detail_bloc.dart';
 import 'package:bimo_bond_dashboard/features/users/presentation/pages/user_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +30,14 @@ import '../../features/categories/presentation/bloc/categories_bloc.dart';
 import '../../features/posts/presentation/pages/posts_page.dart';
 import '../../features/auctions/presentation/pages/auctions_page.dart';
 import '../../features/gifts/presentation/pages/gifts_page.dart';
+import '../../features/gift_reports/presentation/pages/gift_report_detail_page.dart';
+import '../../features/category_reports/presentation/pages/category_report_detail_page.dart';
+import '../../features/post_reports/presentation/bloc/post_report_detail_bloc.dart';
+import '../../features/post_reports/presentation/pages/post_report_detail_page.dart';
+import '../../features/auction_reports/presentation/bloc/auction_report_detail_bloc.dart';
+import '../../features/auction_reports/presentation/pages/auction_report_detail_page.dart';
+import '../../features/user_reports/presentation/bloc/user_reports_bloc.dart';
+import '../../features/user_reports/presentation/pages/user_report_detail_page.dart';
 import '../../injection_container.dart' as di;
 
 class AppRoutes {
@@ -42,6 +50,11 @@ class AppRoutes {
   static const postManagementDetail = '/post-management-detail';
   static const auctionDetail = '/auction-detail';
   static const createPost = '/create-post';
+  static const giftReportDetail = '/gift-report-detail';
+  static const categoryReportDetail = '/category-report-detail';
+  static const userReportDetail = '/user-report-detail';
+  static const postReportDetail = '/post-report-detail';
+  static const auctionReportDetail = '/auction-report-detail';
 }
 
 class AppRouter {
@@ -88,17 +101,13 @@ class AppRouter {
               ),
               BlocProvider(
                 create: (ctx) {
-                  final bloc = di.sl<UserMentionsBloc>();
-                  bloc.add(SetUserMentionsUserId(user.id));
-                  return bloc;
-                },
-              ),
-              BlocProvider(
-                create: (ctx) {
                   final bloc = di.sl<UserUnifiedActivityBloc>();
                   bloc.add(SetUserUnifiedActivityUserId(user.id));
                   return bloc;
                 },
+              ),
+              BlocProvider(
+                create: (ctx) => di.sl<UserNotificationsBloc>(),
               ),
             ],
             child: UserDetailScreen(user: user),
@@ -138,6 +147,40 @@ class AppRouter {
             child: const CreatePostPage(),
           ),
         );
+      case AppRoutes.giftReportDetail:
+        final giftId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => GiftReportDetailPage(giftId: giftId),
+        );
+      case AppRoutes.categoryReportDetail:
+        final categoryId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => CategoryReportDetailPage(categoryId: categoryId),
+        );
+      case AppRoutes.userReportDetail:
+        final userId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => di.sl<UserReportsBloc>(),
+            child: UserReportDetailPage(userId: userId),
+          ),
+        );
+      case AppRoutes.postReportDetail:
+        final postId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => di.sl<PostReportDetailBloc>(),
+            child: PostReportDetailPage(postId: postId),
+          ),
+        );
+      case AppRoutes.auctionReportDetail:
+        final auctionId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => di.sl<AuctionReportDetailBloc>(),
+            child: AuctionReportDetailPage(auctionId: auctionId),
+          ),
+        );
       case AppRoutes.root:
       default:
         return MaterialPageRoute(builder: (_) => const HomeShell());
@@ -171,20 +214,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final labels = [
-      l10n.t('dashboard'),
-      l10n.t('users'),
-      l10n.t('posts'),
-      l10n.t('categories'),
-      l10n.t('auctions'),
-      l10n.t('gifts'),
-      l10n.t('reports'),
-      l10n.t('analytics'),
-      l10n.t('notifications'),
-      l10n.t('settings'),
-    ];
     return WebDashboardLayout(
-      title: labels[_index],
       currentIndex: _index,
       currentPage: AnimatedSwitcher(
         duration: const Duration(milliseconds: 220),

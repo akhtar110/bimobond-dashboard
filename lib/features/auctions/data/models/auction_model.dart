@@ -1,3 +1,5 @@
+import '../../../../core/utils/media_url_resolver.dart';
+import '../../../post_management/domain/entities/post_media_entity.dart';
 import '../../domain/entities/auction_entity.dart';
 import 'gift_transaction_model.dart';
 
@@ -19,30 +21,89 @@ class AuctionModel extends AuctionEntity {
     super.host,
     super.winner,
     super.giftTransactions,
+    super.post,
   });
 
   factory AuctionModel.fromJson(Map<String, dynamic> json) {
-    final rawTx = json['giftTransactions'] as List?;
+    final map = Map<String, dynamic>.from(json);
+    final rawTx = map['giftTransactions'] as List?;
+    final postSummary =
+        _parsePostSummary(map['post']) ?? _parsePostSummaryFromRoot(map);
+
+    var itemImageUrl = _resolveItemImageUrl(map);
+    if ((itemImageUrl == null || itemImageUrl.isEmpty) && postSummary != null) {
+      itemImageUrl = resolvePostDisplayThumbnailUrl(
+        media: postSummary.media,
+        thumbnailUrl: postSummary.thumbnailUrl,
+      );
+    }
 
     return AuctionModel(
-      id: json['id']?.toString() ?? '',
-      postId: json['postId'] as String?,
-      liveId: json['liveId'] as String?,
-      hostId: json['hostId']?.toString() ?? '',
-      itemName: json['itemName'] as String?,
-      itemImageUrl: json['itemImageUrl'] as String?,
-      startingPriceUsd: _d(json['startingPriceUsd']),
-      targetPriceUsd: _d(json['targetPriceUsd']),
-      currentTotalUsd: _d(json['currentTotalUsd']),
-      status: json['status']?.toString() ?? 'ACTIVE',
-      winnerId: json['winnerId'] as String?,
-      startedAt: _date(json['startedAt']),
-      endedAt: json['endedAt'] != null ? _date(json['endedAt']) : null,
-      host: json['host'] as Map<String, dynamic>?,
-      winner: json['winner'] as Map<String, dynamic>?,
+      id: map['id']?.toString() ?? '',
+      postId: map['postId']?.toString(),
+      liveId: map['liveId']?.toString(),
+      hostId: map['hostId']?.toString() ?? '',
+      itemName: map['itemName']?.toString(),
+      itemImageUrl: itemImageUrl,
+      startingPriceUsd: _d(map['startingPriceUsd']),
+      targetPriceUsd: _d(map['targetPriceUsd']),
+      currentTotalUsd: _d(map['currentTotalUsd']),
+      status: map['status']?.toString() ?? 'ACTIVE',
+      winnerId: map['winnerId']?.toString(),
+      startedAt: _date(map['startedAt']),
+      endedAt: map['endedAt'] != null ? _date(map['endedAt']) : null,
+      host: map['host'] is Map
+          ? Map<String, dynamic>.from(map['host'] as Map)
+          : null,
+      winner: map['winner'] is Map
+          ? Map<String, dynamic>.from(map['winner'] as Map)
+          : null,
       giftTransactions: rawTx
-          ?.map((e) => GiftTransactionModel.fromJson(e as Map<String, dynamic>))
+          ?.map((e) => GiftTransactionModel.fromJson(
+                Map<String, dynamic>.from(e as Map),
+              ))
           .toList(),
+      post: postSummary,
+    );
+  }
+
+  static String? _resolveItemImageUrl(Map<String, dynamic> json) {
+    for (final key in ['itemImageUrl', 'itemImage', 'imageUrl', 'image']) {
+      final resolved = resolveMediaUrl(json[key]?.toString());
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+    }
+    return null;
+  }
+
+  static AuctionPostSummary? _parsePostSummaryFromRoot(
+    Map<String, dynamic> json,
+  ) {
+    final thumb = resolveMediaUrl(
+      json['postThumbnailUrl']?.toString() ?? json['thumbnailUrl']?.toString(),
+    );
+    final media = PostMediaEntity.listFromJson(
+      json['postMedia'] ?? json['media'],
+    );
+    if ((thumb == null || thumb.isEmpty) && media.isEmpty) return null;
+    return AuctionPostSummary(
+      thumbnailUrl: thumb,
+      media: media,
+    );
+  }
+
+  static AuctionPostSummary? _parsePostSummary(dynamic raw) {
+    if (raw is! Map) return null;
+    final m = Map<String, dynamic>.from(raw);
+    final thumbnail = resolveMediaUrl(
+      m['thumbnailUrl']?.toString() ?? m['thumbnail']?.toString(),
+    );
+    final media = PostMediaEntity.listFromJson(m['media']);
+    if ((thumbnail == null || thumbnail.isEmpty) && media.isEmpty) {
+      return null;
+    }
+    return AuctionPostSummary(
+      thumbnailUrl: thumbnail,
+      media: media,
     );
   }
 

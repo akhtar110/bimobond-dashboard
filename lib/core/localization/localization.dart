@@ -33,6 +33,10 @@ class AppLocalizations {
 
   String t(String key) => _localizedValues[key] as String? ?? key;
 
+  /// Returns [fallback] when [key] is missing from the loaded bundle.
+  String tOr(String key, String fallback) =>
+      _localizedValues[key] as String? ?? fallback;
+
   /// Replaces `{name}`-style placeholders in localized strings.
   String tArgs(String key, Map<String, String> args) {
     var value = t(key);
@@ -60,7 +64,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool shouldReload(_AppLocalizationsDelegate old) => false;
+  bool shouldReload(_AppLocalizationsDelegate old) => true;
 }
 
 extension LocalizationX on BuildContext {
@@ -70,6 +74,8 @@ extension LocalizationX on BuildContext {
     if (args.isEmpty) return l10n.t(key);
     return l10n.tArgs(key, args);
   }
+
+  String trOr(String key, String fallback) => l10n.tOr(key, fallback);
 
   bool get isRtl => Localizations.localeOf(this).languageCode == 'ar';
 }

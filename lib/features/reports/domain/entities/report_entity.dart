@@ -22,11 +22,19 @@ class ReportPostEntity {
     required this.id,
     this.description,
     this.videoUrl,
+    this.userId,
+    this.author,
   });
 
   final String id;
   final String? description;
   final String? videoUrl;
+
+  /// Post owner id when nested on the report payload.
+  final String? userId;
+
+  /// Nested post author profile when provided by the API.
+  final ReportActorEntity? author;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,11 +73,36 @@ class ReportEntity {
   // ── Computed helpers ────────────────────────────────────────────────────────
 
   /// Which kind of content was reported: `post`, `user`, or `comment`.
+  ///
+  /// Post-linked reports take precedence — [reportedUserId] on a post report
+  /// is the post author, not a standalone user report.
   String get targetType {
-    if (postId != null) return 'post';
-    if (reportedUserId != null) return 'user';
     if (commentId != null) return 'comment';
+    if (postId != null || post?.id != null) return 'post';
+    if (reportedUserId != null) return 'user';
     return 'unknown';
+  }
+
+  /// Post author id when the report targets a post (or comment on a post).
+  String? get postAuthorUserId {
+    final direct = reportedUserId ?? reportedUser?.id;
+    if (direct != null && direct.isNotEmpty) return direct;
+    final fromPost = post?.userId ?? post?.author?.id;
+    if (fromPost != null && fromPost.isNotEmpty) return fromPost;
+    return null;
+  }
+
+  /// Best available author profile for post-linked reports.
+  ReportActorEntity? get postAuthor {
+    if (reportedUser != null && reportedUser!.id.isNotEmpty) {
+      return reportedUser;
+    }
+    if (post?.author != null && post!.author!.id.isNotEmpty) {
+      return post!.author;
+    }
+    final id = postAuthorUserId;
+    if (id == null || id.isEmpty) return null;
+    return ReportActorEntity(id: id);
   }
 
   bool get isPending => status == 'PENDING';

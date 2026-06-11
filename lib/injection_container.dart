@@ -15,6 +15,35 @@ import 'features/auth/data/datasource/auth_local_data_source.dart';
 
 import 'features/settings/presentation/bloc/settings_cubit.dart';
 
+import 'features/user_reports/data/datasources/user_reports_remote_data_source.dart';
+import 'features/user_reports/data/repositories/user_reports_repository_impl.dart';
+import 'features/user_reports/domain/repositories/user_reports_repository.dart';
+import 'features/user_reports/domain/usecases/get_user_report_detail.dart';
+import 'features/user_reports/domain/usecases/get_user_reports_list.dart';
+import 'features/user_reports/domain/usecases/get_user_reports_overview.dart';
+import 'features/user_reports/presentation/bloc/user_reports_bloc.dart';
+
+import 'features/post_reports/data/datasources/post_reports_remote_datasource.dart';
+import 'features/post_reports/data/repositories/post_reports_repository_impl.dart';
+import 'features/post_reports/domain/repositories/post_reports_repository.dart';
+import 'features/post_reports/domain/usecases/get_post_report_detail.dart';
+import 'features/post_reports/domain/usecases/get_post_reports_list.dart';
+import 'features/post_reports/domain/usecases/get_post_reports_overview.dart';
+import 'features/post_reports/presentation/bloc/post_report_detail_bloc.dart';
+import 'features/post_reports/presentation/bloc/post_reports_bloc.dart';
+import 'features/post_reports/presentation/services/post_report_media_lookup.dart';
+
+import 'features/auction_reports/data/datasources/auction_reports_remote_datasource.dart';
+import 'features/auction_reports/data/repositories/auction_reports_repository_impl.dart';
+import 'features/auction_reports/domain/repositories/auction_reports_repository.dart';
+import 'features/auction_reports/domain/usecases/get_auction_report_detail.dart';
+import 'features/auction_reports/domain/usecases/get_auction_reports_list.dart';
+import 'features/auction_reports/domain/usecases/get_auction_reports_overview.dart';
+import 'features/auction_reports/presentation/bloc/auction_report_detail_bloc.dart';
+import 'features/auction_reports/presentation/bloc/auction_reports_bloc.dart';
+
+import 'features/reports/presentation/bloc/reports_center_overview_cubit.dart';
+
 import 'features/users/data/datasources/users_remote_data_source.dart';
 import 'features/users/data/repositories/users_repository_impl.dart';
 import 'features/users/domain/repositories/users_repository.dart';
@@ -37,6 +66,8 @@ import 'features/user_activity/domain/usecases/get_user_activity_devices.dart';
 import 'features/user_activity/domain/usecases/get_user_activity_feed.dart';
 import 'features/user_activity/domain/usecases/get_user_activity_gifts.dart';
 import 'features/user_activity/domain/usecases/get_user_activity_posts.dart';
+import 'features/user_activity/domain/usecases/delete_repost_admin.dart';
+import 'features/user_activity/domain/usecases/get_user_activity_reposts.dart';
 import 'features/user_activity/domain/usecases/get_user_comments.dart';
 import 'features/user_activity/domain/usecases/get_user_likes.dart';
 import 'features/user_activity/domain/usecases/get_user_mentions.dart';
@@ -69,10 +100,17 @@ import 'features/categories/domain/usecases/get_all_categories_usecase.dart';
 import 'features/categories/domain/usecases/update_category_usecase.dart';
 import 'features/categories/presentation/bloc/categories_bloc.dart';
 
+import 'features/posts/data/datasources/bulk_posts_remote_datasource.dart';
+import 'features/posts/data/datasources/bulk_posts_remote_datasource_impl.dart';
 import 'features/posts/data/datasources/posts_remote_data_source.dart';
+import 'features/posts/data/repositories/bulk_post_repository_impl.dart';
 import 'features/posts/data/repositories/post_repository_impl.dart';
+import 'features/posts/domain/repositories/bulk_post_repository.dart';
 import 'features/posts/domain/repositories/post_repository.dart';
+import 'features/posts/domain/usecases/bulk_post_action_usecase.dart';
 import 'features/posts/domain/usecases/get_all_posts_usecase.dart';
+import 'features/posts/domain/usecases/update_posts_status_usecase.dart';
+import 'features/posts/domain/usecases/update_posts_visibility_usecase.dart';
 import 'features/posts/presentation/bloc/posts_bloc.dart';
 
 import 'features/create_post/data/datasources/create_post_remote_data_source.dart';
@@ -101,6 +139,7 @@ import 'features/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'features/auctions/domain/usecases/resolve_auction_usecase.dart';
 import 'features/auctions/presentation/bloc/auction_detail_bloc.dart';
 import 'features/auctions/presentation/bloc/auctions_bloc.dart';
+import 'features/auctions/presentation/services/auction_image_lookup.dart';
 
 import 'features/reports/data/datasources/reports_remote_datasource.dart';
 import 'features/reports/data/repositories/reports_repository_impl.dart';
@@ -110,6 +149,12 @@ import 'features/reports/domain/usecases/get_report_details_usecase.dart';
 import 'features/reports/domain/usecases/update_report_status_usecase.dart';
 import 'features/reports/presentation/bloc/reports_bloc.dart';
 
+import 'features/analytics/data/datasources/analytics_remote_datasource.dart';
+import 'features/analytics/data/repositories/analytics_repository_impl.dart';
+import 'features/analytics/domain/repositories/analytics_repository.dart';
+import 'features/analytics/domain/usecases/analytics_usecases.dart';
+import 'features/analytics/presentation/bloc/analytics_bloc.dart';
+
 import 'features/gifts/data/datasources/gifts_remote_datasource.dart';
 import 'features/gifts/data/repositories/gifts_repository_impl.dart';
 import 'features/gifts/domain/repositories/gifts_repository.dart';
@@ -118,6 +163,32 @@ import 'features/gifts/domain/usecases/delete_gift_usecase.dart';
 import 'features/gifts/domain/usecases/get_admin_gifts_usecase.dart';
 import 'features/gifts/domain/usecases/update_gift_usecase.dart';
 import 'features/gifts/presentation/bloc/gifts_bloc.dart';
+
+import 'features/gift_reports/data/datasources/gift_reports_remote_datasource.dart';
+import 'features/gift_reports/data/repositories/gift_reports_repository_impl.dart';
+import 'features/gift_reports/domain/repositories/gift_reports_repository.dart';
+import 'features/gift_reports/domain/usecases/get_gift_report_detail_usecase.dart';
+import 'features/gift_reports/domain/usecases/get_gift_reports_list_usecase.dart';
+import 'features/gift_reports/domain/usecases/get_gift_reports_overview_usecase.dart';
+import 'features/gift_reports/presentation/bloc/gift_report_detail_bloc.dart';
+import 'features/gift_reports/presentation/bloc/gift_reports_bloc.dart';
+
+import 'features/category_reports/data/datasources/category_reports_remote_datasource.dart';
+import 'features/category_reports/data/repositories/category_reports_repository_impl.dart';
+import 'features/category_reports/domain/repositories/category_reports_repository.dart';
+import 'features/category_reports/domain/usecases/get_category_report_detail_usecase.dart';
+import 'features/category_reports/domain/usecases/get_category_reports_list_usecase.dart';
+import 'features/category_reports/domain/usecases/get_category_reports_overview_usecase.dart';
+import 'features/category_reports/presentation/bloc/category_report_detail_bloc.dart';
+import 'features/category_reports/presentation/bloc/category_reports_bloc.dart';
+
+import 'features/notifications/data/datasources/notifications_remote_datasource.dart';
+import 'features/notifications/data/datasources/notifications_socket_service.dart';
+import 'features/notifications/data/repositories/notifications_repository_impl.dart';
+import 'features/notifications/domain/repositories/notifications_repository.dart';
+import 'features/notifications/domain/usecases/notifications_usecases.dart';
+import 'features/notifications/presentation/bloc/notifications_bloc.dart';
+import 'features/notifications/presentation/bloc/user_notifications_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -295,6 +366,12 @@ Future<void> init() async {
         () => GetUserActivityPosts(sl<UserActivityRepository>()),
   );
   sl.registerLazySingleton(
+        () => GetUserActivityReposts(sl<UserActivityRepository>()),
+  );
+  sl.registerLazySingleton(
+        () => DeleteRepostAdmin(sl<UserActivityRepository>()),
+  );
+  sl.registerLazySingleton(
         () => GetUserActivityAuctions(sl<UserActivityRepository>()),
   );
   sl.registerLazySingleton(
@@ -319,9 +396,11 @@ Future<void> init() async {
   sl.registerFactory(
         () => UserActivityBloc(
       getPosts: sl<GetUserActivityPosts>(),
+      getReposts: sl<GetUserActivityReposts>(),
       getAuctions: sl<GetUserActivityAuctions>(),
       getGifts: sl<GetUserActivityGifts>(),
       getDevices: sl<GetUserActivityDevices>(),
+      deleteRepostAdmin: sl<DeleteRepostAdmin>(),
     ),
   );
   sl.registerFactory(
@@ -420,14 +499,34 @@ Future<void> init() async {
     () => PostsRemoteDataSourceImpl(sl<Dio>()),
   );
 
+  sl.registerLazySingleton<BulkPostsRemoteDataSource>(
+    () => BulkPostsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<BulkPostRepository>(
+    () => BulkPostRepositoryImpl(sl<BulkPostsRemoteDataSource>()),
+  );
+
   sl.registerLazySingleton<PostListRepository>(
     () => PostListRepositoryImpl(sl<PostsRemoteDataSource>()),
   );
 
   sl.registerLazySingleton(() => GetAllPosts(sl<PostListRepository>()));
+  sl.registerLazySingleton(
+    () => BulkPostActionUseCase(sl<BulkPostRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdatePostsStatusUseCase(sl<BulkPostActionUseCase>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdatePostsVisibilityUseCase(sl<BulkPostActionUseCase>()),
+  );
 
   sl.registerFactory(
-    () => PostsBloc(getAllPosts: sl<GetAllPosts>()),
+    () => PostsBloc(
+      getAllPosts: sl<GetAllPosts>(),
+      bulkPostAction: sl<BulkPostActionUseCase>(),
+    ),
   );
 
   // =========================================================
@@ -504,6 +603,10 @@ Future<void> init() async {
   sl.registerLazySingleton(() => AdminCancelAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminResolveAuction(sl<AuctionsRepository>()));
 
+  sl.registerLazySingleton(
+    () => AuctionImageLookup(sl<GetManagedPostById>(), sl<Dio>()),
+  );
+
   sl.registerFactory(
     () => AuctionsBloc(
       getAllAuctions: sl<GetAllAuctions>(),
@@ -547,6 +650,72 @@ Future<void> init() async {
   );
 
   // =========================================================
+  // GIFT REPORTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<GiftReportsRemoteDataSource>(
+    () => GiftReportsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<GiftReportsRepository>(
+    () => GiftReportsRepositoryImpl(sl<GiftReportsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(
+    () => GetGiftReportsOverview(sl<GiftReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetGiftReportsList(sl<GiftReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetGiftReportDetail(sl<GiftReportsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => GiftReportsBloc(
+      getOverview: sl<GetGiftReportsOverview>(),
+      getList: sl<GetGiftReportsList>(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => GiftReportDetailBloc(getDetail: sl<GetGiftReportDetail>()),
+  );
+
+  // =========================================================
+  // CATEGORY REPORTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<CategoryReportsRemoteDataSource>(
+    () => CategoryReportsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<CategoryReportsRepository>(
+    () => CategoryReportsRepositoryImpl(sl<CategoryReportsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(
+    () => GetCategoryReportsOverview(sl<CategoryReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCategoryReportsList(sl<CategoryReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCategoryReportDetail(sl<CategoryReportsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => CategoryReportsBloc(
+      getOverview: sl<GetCategoryReportsOverview>(),
+      getList: sl<GetCategoryReportsList>(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => CategoryReportDetailBloc(getDetail: sl<GetCategoryReportDetail>()),
+  );
+
+  // =========================================================
   // REPORTS MODULE
   // =========================================================
 
@@ -568,6 +737,233 @@ Future<void> init() async {
     () => ReportsBloc(
       getReports: sl<GetReports>(),
       updateReportStatus: sl<UpdateReportStatus>(),
+    ),
+  );
+
+  // =========================================================
+  // ANALYTICS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<AnalyticsRemoteDataSource>(
+    () => AnalyticsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<AnalyticsRepository>(
+    () => AnalyticsRepositoryImpl(sl<AnalyticsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(() => GetAdminOverview(sl<AnalyticsRepository>()));
+  sl.registerLazySingleton(
+    () => GetAdminUsersAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminPostsAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminEngagementAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminMonetizationAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminAuctionsAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminReportsAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminCategoriesAnalytics(sl<AnalyticsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminGrowthAnalytics(sl<AnalyticsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => AnalyticsBloc(
+      getAdminOverview: sl<GetAdminOverview>(),
+      getAdminUsersAnalytics: sl<GetAdminUsersAnalytics>(),
+      getAdminPostsAnalytics: sl<GetAdminPostsAnalytics>(),
+      getAdminEngagementAnalytics: sl<GetAdminEngagementAnalytics>(),
+      getAdminMonetizationAnalytics: sl<GetAdminMonetizationAnalytics>(),
+      getAdminAuctionsAnalytics: sl<GetAdminAuctionsAnalytics>(),
+      getAdminReportsAnalytics: sl<GetAdminReportsAnalytics>(),
+      getAdminCategoriesAnalytics: sl<GetAdminCategoriesAnalytics>(),
+      getAdminGrowthAnalytics: sl<GetAdminGrowthAnalytics>(),
+    ),
+  );
+
+  // =========================================================
+  // NOTIFICATIONS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton(
+    () => NotificationsSocketService(_resolveApiBaseUrl()),
+  );
+
+  sl.registerLazySingleton<NotificationsRemoteDataSource>(
+    () => NotificationsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<NotificationsRepository>(
+    () => NotificationsRepositoryImpl(
+      remoteDataSource: sl<NotificationsRemoteDataSource>(),
+      socketService: sl<NotificationsSocketService>(),
+    ),
+  );
+
+  sl.registerLazySingleton(
+    () => SendNotification(sl<NotificationsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => SendBulkNotification(sl<NotificationsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => BroadcastNotification(sl<NotificationsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => BroadcastAdminsNotification(sl<NotificationsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAllNotifications(sl<NotificationsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => NotificationsBloc(
+      sendNotification: sl<SendNotification>(),
+      sendBulkNotification: sl<SendBulkNotification>(),
+      broadcastNotification: sl<BroadcastNotification>(),
+      broadcastAdminsNotification: sl<BroadcastAdminsNotification>(),
+      repository: sl<NotificationsRepository>(),
+      getUsers: sl<GetUsers>(),
+      getAllNotifications: sl<GetAllNotifications>(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => UserNotificationsBloc(
+      getAllNotifications: sl<GetAllNotifications>(),
+    ),
+  );
+
+  // =========================================================
+  // USER REPORTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<UserReportsRemoteDataSource>(
+    () => UserReportsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<UserReportsRepository>(
+    () => UserReportsRepositoryImpl(sl<UserReportsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(
+    () => GetUserReportsOverview(sl<UserReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetUserReportsList(sl<UserReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetUserReportDetail(sl<UserReportsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => UserReportsBloc(
+      getOverview: sl<GetUserReportsOverview>(),
+      getList: sl<GetUserReportsList>(),
+      getDetail: sl<GetUserReportDetail>(),
+    ),
+  );
+
+  // =========================================================
+  // POST REPORTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<PostReportsRemoteDataSource>(
+    () => PostReportsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<PostReportsRepository>(
+    () => PostReportsRepositoryImpl(sl<PostReportsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(
+    () => GetPostReportsOverview(sl<PostReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPostReportsList(sl<PostReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPostReportDetail(sl<PostReportsRepository>()),
+  );
+
+  sl.registerLazySingleton(
+    () => PostReportMediaLookup(
+      sl<GetPostReportDetail>(),
+      sl<Dio>(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => PostReportsBloc(
+      getPostReportsList: sl<GetPostReportsList>(),
+      getPostReportsOverview: sl<GetPostReportsOverview>(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => PostReportDetailBloc(
+      getPostReportDetail: sl<GetPostReportDetail>(),
+    ),
+  );
+
+  // =========================================================
+  // AUCTION REPORTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<AuctionReportsRemoteDataSource>(
+    () => AuctionReportsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<AuctionReportsRepository>(
+    () => AuctionReportsRepositoryImpl(sl<AuctionReportsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(
+    () => GetAuctionReportsOverview(sl<AuctionReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAuctionReportsList(sl<AuctionReportsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAuctionReportDetail(sl<AuctionReportsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => AuctionReportsBloc(
+      getAuctionReportsList: sl<GetAuctionReportsList>(),
+      getAuctionReportsOverview: sl<GetAuctionReportsOverview>(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => AuctionReportDetailBloc(
+      getAuctionReportDetail: sl<GetAuctionReportDetail>(),
+    ),
+  );
+
+  // =========================================================
+  // REPORTS CENTER OVERVIEW
+  // =========================================================
+
+  sl.registerFactory(
+    () => ReportsCenterOverviewCubit(
+      getUserReportsOverview: sl<GetUserReportsOverview>(),
+      getPostReportsOverview: sl<GetPostReportsOverview>(),
+      getAuctionReportsOverview: sl<GetAuctionReportsOverview>(),
+      getGiftReportsOverview: sl<GetGiftReportsOverview>(),
+      getCategoryReportsOverview: sl<GetCategoryReportsOverview>(),
+      getAdminReportsAnalytics: sl<GetAdminReportsAnalytics>(),
     ),
   );
 }

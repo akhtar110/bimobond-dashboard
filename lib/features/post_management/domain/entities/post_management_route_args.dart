@@ -1,5 +1,6 @@
 import '../../../users/domain/entities/user_entity.dart';
 import 'activity_context.dart';
+import 'managed_post_author_enrichment.dart';
 import 'managed_post_entity.dart';
 
 /// Navigation bundle for post moderation / investigation.
@@ -34,28 +35,8 @@ class PostManagementRouteArgs {
   /// Map keys: `postId`, `userId`, `commentId`, `activity`, optional stub post fields.
   static PostManagementRouteArgs fromMap(Map<dynamic, dynamic> map) {
     final postId = map['postId']?.toString() ?? map['id']?.toString() ?? '';
+    final post = managedPostSeed(postId);
     final now = DateTime.now();
-    final post = ManagedPostEntity(
-      id: postId,
-      userId: map['postUserId']?.toString() ?? '',
-      type: map['type']?.toString() ?? 'VIDEO',
-      status: map['status']?.toString() ?? 'PUBLISHED',
-      viewCount: 0,
-      shareCount: 0,
-      downloadCount: 0,
-      likeCount: 0,
-      commentCount: 0,
-      saveCount: 0,
-      isAd: false,
-      privacyStatus: 'PUBLIC',
-      allowComments: true,
-      allowDuets: true,
-      allowStitch: true,
-      isStory: false,
-      isAuctionable: false,
-      createdAt: now,
-      updatedAt: now,
-    );
 
     final activityType = ActivityContext.typeFromQuery(
       map['activity']?.toString(),

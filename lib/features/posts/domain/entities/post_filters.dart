@@ -8,6 +8,8 @@ class PostFilters {
     this.type,
     this.sort = 'LATEST',
     this.isAuctionable,
+    this.isStory,
+    this.isAd,
   });
 
   final String? categoryId;
@@ -21,8 +23,18 @@ class PostFilters {
   /// `LATEST` or `POPULAR`.
   final String? sort;
   final bool? isAuctionable;
+  final bool? isStory;
+  final bool? isAd;
 
   static const defaultSort = 'LATEST';
+
+  /// Which post-type chip is active (All / Auction / Stories / Ads).
+  PostTypeFilter get postTypeFilter {
+    if (isStory == true) return PostTypeFilter.stories;
+    if (isAd == true) return PostTypeFilter.ads;
+    if (isAuctionable == true) return PostTypeFilter.auction;
+    return PostTypeFilter.all;
+  }
 
   PostFilters copyWith({
     String? categoryId,
@@ -32,11 +44,15 @@ class PostFilters {
     String? type,
     String? sort,
     bool? isAuctionable,
+    bool? isStory,
+    bool? isAd,
     bool clearCategory = false,
     bool clearSearch = false,
     bool clearType = false,
     bool clearSort = false,
     bool clearAuction = false,
+    bool clearStory = false,
+    bool clearAd = false,
   }) {
     return PostFilters(
       categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
@@ -49,6 +65,8 @@ class PostFilters {
       sort: clearSort ? defaultSort : (sort ?? this.sort),
       isAuctionable:
           clearAuction ? null : (isAuctionable ?? this.isAuctionable),
+      isStory: clearStory ? null : (isStory ?? this.isStory),
+      isAd: clearAd ? null : (isAd ?? this.isAd),
     );
   }
 
@@ -58,6 +76,8 @@ class PostFilters {
     if (type != null && type!.isNotEmpty) count++;
     if (sort != null && sort != defaultSort) count++;
     if (isAuctionable == true) count++;
+    if (isStory == true) count++;
+    if (isAd == true) count++;
     return count;
   }
 
@@ -78,7 +98,9 @@ class PostFilters {
         other.search == search &&
         other.type == type &&
         other.sort == sort &&
-        other.isAuctionable == isAuctionable;
+        other.isAuctionable == isAuctionable &&
+        other.isStory == isStory &&
+        other.isAd == isAd;
   }
 
   @override
@@ -90,5 +112,10 @@ class PostFilters {
         type,
         sort,
         isAuctionable,
+        isStory,
+        isAd,
       );
 }
+
+/// Mutually exclusive post-type filter selection.
+enum PostTypeFilter { all, auction, stories, ads }

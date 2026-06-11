@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../../../core/localization/localization.dart';
 import '../bloc/create_post_bloc.dart';
 import '../widgets/create_post_bottom_bar.dart';
@@ -44,18 +43,11 @@ class _CreatePostView extends StatelessWidget {
           if (!context.mounted) return;
 
           if (state.status == CreatePostStatus.success) {
-            final msg = state.wasDraft
-                ? l10n.t('postDraftSaved')
-                : l10n.t('postCreatedSuccess');
-            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-              SnackBar(content: Text(msg), backgroundColor: Colors.green),
-            );
-            if (context.mounted) {
-              Navigator.of(context).pop(true);
-            }
+            // Pass the draft flag back so PostsPage can show the right message.
+            Navigator.of(context).pop(state.wasDraft ? 'draft' : 'published');
           } else if (state.errorMessage != null) {
             final message = _localizedError(l10n, state.errorMessage!);
-            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(message)),
             );
           }

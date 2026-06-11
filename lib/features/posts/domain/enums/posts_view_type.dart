@@ -1,0 +1,4 @@
+enum PostsViewType {
+  grid,
+  list,
+}

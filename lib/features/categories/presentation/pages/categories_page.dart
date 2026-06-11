@@ -1,19 +1,16 @@
+﻿import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/l10n_message.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/category_entity.dart';
 import '../bloc/categories_bloc.dart';
-
-// ─── Layout helpers ───────────────────────────────────────────────────────────
-
-int categoriesGridColumnCount(double width) {
-  if (width > 1600) return 4;
-  if (width > 1200) return 3;
-  if (width > 700) return 2;
-  return 1;
-}
+import '../utils/category_icon_picker.dart';
+import '../widgets/category_icon.dart';
+import '../widgets/category_tree_view.dart';
 
 double _pageHorizontalPadding(double width) {
   if (width >= 1600) return 32;
@@ -21,13 +18,7 @@ double _pageHorizontalPadding(double width) {
   return 16;
 }
 
-double _gridGap(double width) {
-  if (width >= 1200) return 20;
-  if (width >= 768) return 16;
-  return 12;
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// --- Page ---
 
 class CategoriesPage extends StatelessWidget {
   const CategoriesPage({super.key});
@@ -35,7 +26,7 @@ class CategoriesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<CategoriesBloc, CategoriesState>(
-      // Only invoke listener when a NEW message actually arrives — i.e. the
+      // Only invoke listener when a NEW message actually arrives â€” i.e. the
       // message in the incoming state differs from the one in the previous state.
       // This prevents filter changes or rebuilds from re-showing stale snackbars.
       listenWhen: (previous, current) {
@@ -49,13 +40,14 @@ class CategoriesPage extends StatelessWidget {
       },
       listener: (context, state) {
         if (state is! CategoriesLoaded) return;
+        final scheme = Theme.of(context).colorScheme;
         final messenger = ScaffoldMessenger.of(context);
         if (state.successMessage != null) {
           messenger
             ..hideCurrentSnackBar()
             ..showSnackBar(SnackBar(
               content: Text(localizeMessage(context, state.successMessage!)),
-              backgroundColor: Colors.green.shade700,
+              backgroundColor: scheme.primary,
               behavior: SnackBarBehavior.floating,
             ));
         } else if (state.failureMessage != null) {
@@ -63,7 +55,7 @@ class CategoriesPage extends StatelessWidget {
             ..hideCurrentSnackBar()
             ..showSnackBar(SnackBar(
               content: Text(state.failureMessage!),
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: scheme.error,
               behavior: SnackBarBehavior.floating,
             ));
         }
@@ -71,30 +63,61 @@ class CategoriesPage extends StatelessWidget {
       builder: (context, state) {
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
+        final scheme = theme.colorScheme;
 
-        return Container(
-          color: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF7F9FC),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final hPad = _pageHorizontalPadding(constraints.maxWidth);
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1680),
-                  child: Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(hPad, 28, hPad, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _PageHeader(isDark: isDark, state: state),
-                        const SizedBox(height: 24),
-                        Expanded(child: _buildBody(context, state, isDark)),
-                      ],
-                    ),
-                  ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final hPad = _pageHorizontalPadding(constraints.maxWidth);
+            final hasTree = state is CategoriesLoaded &&
+                state.catalogCategories.isNotEmpty &&
+                (state.displayRoots.isNotEmpty ||
+                    state.searchQuery.trim().isNotEmpty ||
+                    state.filter != CategoryFilter.all ||
+                    state.typeFilter != CategoryTypeFilter.all);
+
+            return ColoredBox(
+              color: scheme.surfaceContainerLowest,
+              child: Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  hPad,
+                  hasTree ? 16 : 20,
+                  hPad,
+                  hasTree ? 12 : 20,
                 ),
-              );
-            },
-          ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _PageHeader(isDark: isDark, state: state, compact: hasTree),
+                    SizedBox(height: hasTree ? 12 : 16),
+                    Expanded(
+                      child: hasTree
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: scheme.outlineVariant,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: scheme.shadow
+                                          .withValues(alpha: 0.04),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: _buildBody(context, state, isDark),
+                              ),
+                            )
+                          : _buildBody(context, state, isDark),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -109,33 +132,57 @@ class CategoriesPage extends StatelessWidget {
       );
     }
     if (state is CategoriesLoaded) {
-      if (state.categories.isEmpty) {
+      final hasCatalog = state.catalogCategories.isNotEmpty;
+      final noFiltersApplied = state.searchQuery.trim().isEmpty &&
+          state.filter == CategoryFilter.all &&
+          state.typeFilter == CategoryTypeFilter.all;
+
+      if (!hasCatalog && noFiltersApplied) {
         return _EmptyView(isDark: isDark);
       }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _FilterBar(state: state, isDark: isDark),
-          const SizedBox(height: 20),
-          Expanded(
-            child: state.filteredRoots.isEmpty
-                ? _FilteredEmptyState(filter: state.filter, isDark: isDark)
-                : _HierarchyGrid(state: state, isDark: isDark),
+
+      if (state.isFetching && state.filteredRoots.isEmpty) {
+        return Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
           ),
-        ],
+        );
+      }
+      if (state.displayRoots.isEmpty) {
+        return _FilteredEmptyState(
+          filter: state.filter,
+          typeFilter: state.typeFilter,
+          isDark: isDark,
+        );
+      }
+
+      return CategoryTreeView(
+        state: state,
+        onFormRequest: ({editing, parentForNew}) => _showCategoryForm(
+          context,
+          editing: editing,
+          parentForNew: parentForNew,
+        ),
+        onDeleteRequest: (category) =>
+            _confirmDeleteCategory(context, category),
       );
     }
     return const SizedBox.shrink();
   }
 }
 
-// ─── Page header ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.isDark, required this.state});
+  const _PageHeader({
+    required this.isDark,
+    required this.state,
+    this.compact = false,
+  });
 
   final bool isDark;
   final CategoriesState state;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -146,9 +193,10 @@ class _PageHeader extends StatelessWidget {
     final rootCount = loaded?.roots.length ?? 0;
     final subCount = total - rootCount;
     final active = loaded?.categories.where((c) => c.isActive).length ?? 0;
-    final titleColor = isDark ? Colors.white : const Color(0xFF111827);
-    final subtitleColor = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = theme.colorScheme;
+    final titleColor = scheme.onSurface;
+    final subtitleColor = scheme.onSurfaceVariant;
+    final outlineBorder = scheme.outlineVariant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -193,13 +241,13 @@ class _PageHeader extends StatelessWidget {
                         icon: Icons.account_tree_outlined,
                         label: '$subCount subcategories',
                         isDark: isDark,
-                        accent: Colors.indigo,
+                        accent: theme.colorScheme.secondary,
                       ),
                     _HeaderBadge(
                       icon: Icons.check_circle_outline_rounded,
                       label: '$active ${l10n.t('active').toLowerCase()}',
                       isDark: isDark,
-                      accent: const Color(0xFF16A34A),
+                      accent: theme.colorScheme.tertiary,
                     ),
                   ],
                 ),
@@ -253,188 +301,117 @@ class _PageHeader extends StatelessWidget {
             children: [Expanded(child: titleBlock), actions],
           );
         }),
-        const SizedBox(height: 24),
-        Divider(height: 1, thickness: 1, color: outlineBorder),
+        SizedBox(height: compact ? 12 : 24),
+        if (!compact) Divider(height: 1, thickness: 1, color: outlineBorder),
       ],
     );
   }
 
   void _showDialog(BuildContext context, {CategoryEntity? parent}) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => BlocProvider.value(
-        value: context.read<CategoriesBloc>(),
-        child: _CategoryFormDialog(parentForNew: parent),
-      ),
-    );
+    _showCategoryForm(context, parentForNew: parent);
   }
 }
 
-// ─── Filter bar ───────────────────────────────────────────────────────────────
-
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({required this.state, required this.isDark});
-
-  final CategoriesLoaded state;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final l10n = context.l10n;
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
-
-    final allCount = state.roots.length;
-    final activeCount = state.roots.where((c) => c.isActive).length;
-    final inactiveCount = allCount - activeCount;
-
-    final tabs = [
-      (filter: CategoryFilter.all, label: l10n.t('filterAll'), count: allCount),
-      (filter: CategoryFilter.active, label: l10n.t('active'), count: activeCount),
-      (filter: CategoryFilter.inactive, label: l10n.t('inactive'), count: inactiveCount),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: outlineBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+void _showCategoryForm(
+  BuildContext context, {
+  CategoryEntity? editing,
+  CategoryEntity? parentForNew,
+}) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => BlocProvider.value(
+      value: context.read<CategoriesBloc>(),
+      child: _CategoryFormDialog(
+        editing: editing,
+        parentForNew: parentForNew,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(
-            Icons.filter_list_rounded,
-            size: 16,
-            color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: tabs.map((tab) {
-                final isSelected = state.filter == tab.filter;
-                return MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: () => context
-                        .read<CategoriesBloc>()
-                        .add(ChangeCategoryFilterEvent(tab.filter)),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? primary
-                            : (isDark
-                                ? const Color(0xFF252B3B)
-                                : const Color(0xFFF3F4F6)),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected
-                              ? primary
-                              : outlineBorder,
-                          width: isSelected ? 1.5 : 1,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: primary.withValues(alpha: 0.25),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            tab.label,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : (isDark
-                                      ? Colors.grey.shade300
-                                      : const Color(0xFF374151)),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Colors.white.withValues(alpha: 0.25)
-                                  : (isDark
-                                      ? const Color(0xFF1E293B)
-                                      : Colors.grey.shade200),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '${tab.count}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected
-                                    ? Colors.white
-                                    : (isDark
-                                        ? Colors.grey.shade300
-                                        : const Color(0xFF374151)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+    ),
+  );
+}
+
+void _confirmDeleteCategory(BuildContext context, CategoryEntity category) {
+  final l10n = context.l10n;
+  final scheme = Theme.of(context).colorScheme;
+  final bloc = context.read<CategoriesBloc>();
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(children: [
+        Icon(Icons.warning_amber_rounded, color: scheme.error),
+        const SizedBox(width: 10),
+        Expanded(child: Text(l10n.t('deleteCategoryTitle'))),
+      ]),
+      content: Text(
+        context.tr('deleteCategoryMessage', {'name': category.name}),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(l10n.t('cancel')),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-        ],
-      ),
-    );
-  }
+          onPressed: () {
+            Navigator.of(ctx).pop();
+            bloc.add(DeleteCategoryEvent(category.id));
+          },
+          child: Text(l10n.t('delete')),
+        ),
+      ],
+    ),
+  );
 }
 
-// ─── Filtered empty state ─────────────────────────────────────────────────────
+// â”€â”€â”€ Filtered empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _FilteredEmptyState extends StatelessWidget {
-  const _FilteredEmptyState({required this.filter, required this.isDark});
+  const _FilteredEmptyState({
+    required this.filter,
+    required this.typeFilter,
+    required this.isDark,
+  });
 
   final CategoryFilter filter;
+  final CategoryTypeFilter typeFilter;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    final primary = theme.colorScheme.primary;
+    final primary = scheme.primary;
 
-    final (icon, message) = switch (filter) {
-      CategoryFilter.active => (
-          Icons.visibility_outlined,
-          l10n.t('noActiveCategories'),
+    final (icon, message) = switch (typeFilter) {
+      CategoryTypeFilter.subOnly => (
+          Icons.account_tree_outlined,
+          l10n.tOr('noSubcategoriesFound', 'No subcategories match your filters'),
         ),
-      CategoryFilter.inactive => (
-          Icons.visibility_off_outlined,
-          l10n.t('noInactiveCategories'),
+      CategoryTypeFilter.rootOnly => (
+          Icons.layers_outlined,
+          l10n.tOr('noRootCategoriesFound', 'No root categories match your filters'),
         ),
-      CategoryFilter.all => (Icons.category_outlined, l10n.t('noCategoriesYet')),
+      CategoryTypeFilter.all => switch (filter) {
+          CategoryFilter.active => (
+              Icons.visibility_outlined,
+              l10n.t('noActiveCategories'),
+            ),
+          CategoryFilter.inactive => (
+              Icons.visibility_off_outlined,
+              l10n.t('noInactiveCategories'),
+            ),
+          CategoryFilter.all => (
+              Icons.category_outlined,
+              l10n.t('noCategoriesYet'),
+            ),
+        },
     };
 
     return Center(
@@ -445,7 +422,7 @@ class _FilteredEmptyState extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: primary.withValues(alpha: isDark ? 0.12 : 0.08),
+              color: primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 32, color: primary),
@@ -456,14 +433,17 @@ class _FilteredEmptyState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : const Color(0xFF111827),
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 10),
           TextButton.icon(
-            onPressed: () => context
-                .read<CategoriesBloc>()
-                .add(ChangeCategoryFilterEvent(CategoryFilter.all)),
+            onPressed: () {
+              final bloc = context.read<CategoriesBloc>();
+              bloc.add(ChangeCategoryFilterEvent(CategoryFilter.all));
+              bloc.add(UpdateCategoryTypeFilterEvent(CategoryTypeFilter.all));
+              bloc.add(UpdateCategorySearchEvent(''));
+            },
             icon: const Icon(Icons.clear_rounded, size: 16),
             label: Text(l10n.t('showAllCategories')),
           ),
@@ -473,693 +453,8 @@ class _FilteredEmptyState extends StatelessWidget {
   }
 }
 
-// ─── Hierarchy grid ───────────────────────────────────────────────────────────
 
-class _HierarchyGrid extends StatelessWidget {
-  const _HierarchyGrid({required this.state, required this.isDark});
-
-  final CategoriesLoaded state;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final roots = state.filteredRoots;
-
-    return LayoutBuilder(builder: (context, constraints) {
-      final columns = categoriesGridColumnCount(constraints.maxWidth);
-      final gap = _gridGap(constraints.maxWidth);
-      final rowCount = (roots.length / columns).ceil();
-
-      return ListView.separated(
-        itemCount: rowCount,
-        separatorBuilder: (_, __) => SizedBox(height: gap),
-        itemBuilder: (context, rowIndex) {
-          final start = rowIndex * columns;
-          final end = (start + columns).clamp(0, roots.length);
-          final rowItems = roots.sublist(start, end);
-
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < columns; i++) ...[
-                  if (i > 0) SizedBox(width: gap),
-                  Expanded(
-                    child: i < rowItems.length
-                        ? _RootCategoryCard(
-                            category: rowItems[i],
-                            subcategories: state.childrenOf(rowItems[i].id),
-                            allRoots: roots,
-                            isDark: isDark,
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      );
-    });
-  }
-}
-
-// ─── Root category card ───────────────────────────────────────────────────────
-
-class _RootCategoryCard extends StatefulWidget {
-  const _RootCategoryCard({
-    required this.category,
-    required this.subcategories,
-    required this.allRoots,
-    required this.isDark,
-  });
-
-  final CategoryEntity category;
-  final List<CategoryEntity> subcategories;
-  final List<CategoryEntity> allRoots;
-  final bool isDark;
-
-  @override
-  State<_RootCategoryCard> createState() => _RootCategoryCardState();
-}
-
-class _RootCategoryCardState extends State<_RootCategoryCard> {
-  bool _hovered = false;
-  bool _expanded = false;
-
-  CategoryEntity get cat => widget.category;
-  bool get isDark => widget.isDark;
-
-  static const _palette = [
-    Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF10B981),
-    Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899),
-    Color(0xFF8B5CF6), Color(0xFF14B8A6),
-  ];
-
-  Color get _color {
-    final key = cat.slug.isNotEmpty ? cat.slug : cat.name.toLowerCase();
-    final idx = key.codeUnits.fold(0, (a, b) => a + b) % _palette.length;
-    return _palette[idx];
-  }
-
-  String get _initial =>
-      cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?';
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = _color;
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
-    final metaColor = isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF);
-    final hasDesc = cat.description != null && cat.description!.isNotEmpty;
-    final hasSubs = widget.subcategories.isNotEmpty;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        constraints: const BoxConstraints(minHeight: 200),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _hovered ? color.withValues(alpha: 0.45) : outlineBorder,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: isDark
-                    ? (_hovered ? 0.28 : 0.12)
-                    : (_hovered ? 0.08 : 0.04),
-              ),
-              blurRadius: _hovered ? 20 : 10,
-              offset: Offset(0, _hovered ? 6 : 2),
-            ),
-            if (_hovered)
-              BoxShadow(
-                color: color.withValues(alpha: 0.12),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Accent bar ──────────────────────────────────────────────
-            Container(
-              height: 4,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color, color.withValues(alpha: 0.55)],
-                ),
-              ),
-            ),
-
-            // ── Card body ───────────────────────────────────────────────
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Avatar + name + status
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                color.withValues(alpha: 0.9),
-                                color.withValues(alpha: 0.65),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: color.withValues(alpha: 0.25),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            _initial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                cat.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
-                                  letterSpacing: -0.2,
-                                  color: isDark
-                                      ? Colors.white
-                                      : const Color(0xFF111827),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              _StatusBadge(isActive: cat.isActive),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Description
-                    Expanded(
-                      child: hasDesc
-                          ? Text(
-                              cat.description!,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 13,
-                                height: 1.45,
-                                color: isDark
-                                    ? Colors.grey.shade400
-                                    : const Color(0xFF6B7280),
-                              ),
-                            )
-                          : Text(
-                              context.l10n.t('categoryDescriptionHint'),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 13,
-                                height: 1.45,
-                                fontStyle: FontStyle.italic,
-                                color: metaColor.withValues(alpha: 0.85),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Meta chips
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _MetaChip(
-                          icon: Icons.tag_rounded,
-                          label: cat.slug,
-                          isDark: isDark,
-                        ),
-                        if (hasSubs)
-                          _MetaChip(
-                            icon: Icons.account_tree_outlined,
-                            label:
-                                '${widget.subcategories.length} sub',
-                            isDark: isDark,
-                            accent: color,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Subcategories expand section ────────────────────────────
-            if (hasSubs) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                child: InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 8, horizontal: 4),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _expanded
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.keyboard_arrow_down_rounded,
-                          size: 18,
-                          color: color,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _expanded
-                              ? context.l10n.t('hideSubcategories')
-                              : context.tr('showSubcategories', {
-                                  'count':
-                                      '${widget.subcategories.length}',
-                                }),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              AnimatedCrossFade(
-                firstChild: const SizedBox.shrink(),
-                secondChild: _SubcategoryList(
-                  subcategories: widget.subcategories,
-                  allRoots: widget.allRoots,
-                  isDark: isDark,
-                  accentColor: color,
-                ),
-                crossFadeState: _expanded
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 200),
-              ),
-            ],
-
-            // ── Card actions ────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: _CardActions(
-                category: cat,
-                allRoots: widget.allRoots,
-                isDark: isDark,
-                hasChildren: hasSubs,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Subcategory list (inside expanded card section) ──────────────────────────
-
-class _SubcategoryList extends StatelessWidget {
-  const _SubcategoryList({
-    required this.subcategories,
-    required this.allRoots,
-    required this.isDark,
-    required this.accentColor,
-  });
-
-  final List<CategoryEntity> subcategories;
-  final List<CategoryEntity> allRoots;
-  final bool isDark;
-  final Color accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final bloc = context.read<CategoriesBloc>();
-    final l10n = context.l10n;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF252B3B)
-            : accentColor.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: accentColor.withValues(alpha: 0.18),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final sub in subcategories) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.subdirectory_arrow_right_rounded,
-                    size: 14,
-                    color: accentColor.withValues(alpha: 0.7),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          sub.name,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? Colors.white
-                                : const Color(0xFF111827),
-                          ),
-                        ),
-                        if (sub.slug.isNotEmpty)
-                          Text(
-                            sub.slug,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? Colors.grey.shade500
-                                  : const Color(0xFF9CA3AF),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  _StatusDot(isActive: sub.isActive),
-                  const SizedBox(width: 8),
-                  // Edit subcategory
-                  _MiniActionBtn(
-                    icon: Icons.edit_outlined,
-                    color: isDark
-                        ? Colors.grey.shade300
-                        : const Color(0xFF4B5563),
-                    tooltip: l10n.t('edit'),
-                    onTap: () => showDialog<void>(
-                      context: context,
-                      builder: (ctx) => BlocProvider.value(
-                        value: bloc,
-                        child: _CategoryFormDialog(editing: sub),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  // Delete subcategory
-                  _MiniActionBtn(
-                    icon: Icons.delete_outline_rounded,
-                    color: isDark
-                        ? const Color(0xFFFCA5A5)
-                        : Colors.red.shade600,
-                    tooltip: l10n.t('delete'),
-                    onTap: () => _confirmDelete(context, bloc, sub),
-                  ),
-                ],
-              ),
-            ),
-            if (sub != subcategories.last)
-              Divider(
-                height: 1,
-                indent: 12,
-                endIndent: 12,
-                color: accentColor.withValues(alpha: 0.12),
-              ),
-          ],
-          // "Add subcategory" row
-          Divider(
-            height: 1,
-            color: accentColor.withValues(alpha: 0.12),
-          ),
-          InkWell(
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (ctx) => BlocProvider.value(
-                value: bloc,
-                child: _CategoryFormDialog(
-                  parentForNew: subcategories.first.parentId != null
-                      ? allRoots.where((r) =>
-                          r.id == subcategories.first.parentId).firstOrNull
-                      : null,
-                ),
-              ),
-            ),
-            borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.add_rounded,
-                      size: 14,
-                      color: accentColor.withValues(alpha: 0.7)),
-                  const SizedBox(width: 6),
-                  Text(
-                    l10n.t('addSubcategory'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: accentColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDelete(
-    BuildContext context,
-    CategoriesBloc bloc,
-    CategoryEntity sub,
-  ) {
-    final l10n = context.l10n;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.red.shade400),
-          const SizedBox(width: 10),
-          Expanded(child: Text(l10n.t('deleteCategoryTitle'))),
-        ]),
-        content: Text(
-          context.tr('deleteCategoryMessage', {'name': sub.name}),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              bloc.add(DeleteCategoryEvent(sub.id));
-            },
-            child: Text(l10n.t('delete')),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Card actions ─────────────────────────────────────────────────────────────
-
-class _CardActions extends StatelessWidget {
-  const _CardActions({
-    required this.category,
-    required this.allRoots,
-    required this.isDark,
-    required this.hasChildren,
-  });
-
-  final CategoryEntity category;
-  final List<CategoryEntity> allRoots;
-  final bool isDark;
-  final bool hasChildren;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final bloc = context.read<CategoriesBloc>();
-
-    return Row(
-      children: [
-        // Toggle active
-        Expanded(
-          child: _ActionToolButton(
-            tooltip: category.isActive
-                ? l10n.t('deactivate')
-                : l10n.t('activate'),
-            onTap: () => bloc.add(UpdateCategoryEvent(
-              id: category.id,
-              data: UpdateCategoryData(isActive: !category.isActive),
-            )),
-            backgroundColor: category.isActive
-                ? (isDark
-                    ? const Color(0xFF422006)
-                    : Colors.orange.shade50)
-                : (isDark
-                    ? const Color(0xFF14532D)
-                    : Colors.green.shade50),
-            icon: category.isActive
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-            iconColor: category.isActive
-                ? (isDark ? Colors.orange.shade300 : Colors.orange.shade700)
-                : (isDark ? Colors.green.shade300 : Colors.green.shade700),
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Edit
-        Expanded(
-          child: _ActionToolButton(
-            tooltip: l10n.t('edit'),
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (ctx) => BlocProvider.value(
-                value: bloc,
-                child: _CategoryFormDialog(editing: category),
-              ),
-            ),
-            backgroundColor:
-                isDark ? const Color(0xFF252B3B) : const Color(0xFFF3F4F6),
-            icon: Icons.edit_outlined,
-            iconColor: isDark ? Colors.grey.shade300 : const Color(0xFF4B5563),
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Add subcategory (root cards only)
-        Expanded(
-          child: _ActionToolButton(
-            tooltip: l10n.t('addSubcategory'),
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (ctx) => BlocProvider.value(
-                value: bloc,
-                child: _CategoryFormDialog(parentForNew: category),
-              ),
-            ),
-            backgroundColor: isDark
-                ? const Color(0xFF1C2637)
-                : const Color(0xFFEFF6FF),
-            icon: Icons.add_rounded,
-            iconColor:
-                isDark ? Colors.blue.shade300 : Colors.blue.shade600,
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Delete
-        Expanded(
-          child: _ActionToolButton(
-            tooltip: hasChildren
-                ? l10n.t('deleteSubcategoriesFirst')
-                : l10n.t('delete'),
-            onTap: hasChildren ? null : () => _confirmDelete(context, bloc),
-            backgroundColor:
-                isDark ? const Color(0xFF3B1D1D) : Colors.red.shade50,
-            icon: Icons.delete_outline_rounded,
-            iconColor: hasChildren
-                ? (isDark ? Colors.grey.shade600 : Colors.grey.shade400)
-                : (isDark ? const Color(0xFFFCA5A5) : Colors.red.shade600),
-            isDark: isDark,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _confirmDelete(BuildContext context, CategoriesBloc bloc) {
-    final l10n = context.l10n;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.red.shade400),
-          const SizedBox(width: 10),
-          Expanded(child: Text(l10n.t('deleteCategoryTitle'))),
-        ]),
-        content: Text(
-          context.tr('deleteCategoryMessage', {'name': category.name}),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.t('cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              bloc.add(DeleteCategoryEvent(category.id));
-            },
-            child: Text(l10n.t('delete')),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Create / Edit dialog ─────────────────────────────────────────────────────
+// â”€â”€â”€ Create / Edit dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _CategoryFormDialog extends StatefulWidget {
   const _CategoryFormDialog({this.editing, this.parentForNew});
@@ -1178,10 +473,23 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descCtrl;
+  late final TextEditingController _iconUrlCtrl;
+  late final TextEditingController _orderCtrl;
   late bool _isActive;
   String? _selectedParentId; // null = root category
+  Uint8List? _pendingIconBytes;
+  String? _pendingIconFilename;
+  bool _clearIcon = false;
 
   bool get _isEditing => widget.editing != null;
+
+  String? get _displayIconUrl {
+    if (_clearIcon) return null;
+    if (_pendingIconBytes != null) return null;
+    final typed = _iconUrlCtrl.text.trim();
+    if (typed.isNotEmpty) return typed;
+    return widget.editing?.iconUrl;
+  }
 
   @override
   void initState() {
@@ -1189,6 +497,8 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
     final cat = widget.editing;
     _nameCtrl = TextEditingController(text: cat?.name ?? '');
     _descCtrl = TextEditingController(text: cat?.description ?? '');
+    _iconUrlCtrl = TextEditingController(text: cat?.iconUrl ?? '');
+    _orderCtrl = TextEditingController(text: '${cat?.order ?? 0}');
     _isActive = cat?.isActive ?? true;
 
     if (_isEditing) {
@@ -1202,16 +512,50 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
+    _iconUrlCtrl.dispose();
+    _orderCtrl.dispose();
     super.dispose();
+  }
+
+  int? _parseOrder(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return 0;
+    return int.tryParse(trimmed);
+  }
+
+  String? _validateOrder(String? value, String invalidMessage) {
+    if (value == null || value.trim().isEmpty) return null;
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null || parsed < 0) return invalidMessage;
+    return null;
+  }
+
+  Future<void> _pickIconFile() async {
+    final picked = await pickCategoryIcon();
+    if (!mounted || picked == null) return;
+    setState(() {
+      _pendingIconBytes = picked.bytes;
+      _pendingIconFilename = picked.name;
+      _clearIcon = false;
+    });
   }
 
   void _submit(List<CategoryEntity> roots) {
     if (!_formKey.currentState!.validate()) return;
     final bloc = context.read<CategoriesBloc>();
+    final iconUrlText = _iconUrlCtrl.text.trim();
+    final hasUrl = iconUrlText.isNotEmpty;
+    final hasFile = _pendingIconBytes != null;
+    final order = _parseOrder(_orderCtrl.text) ?? 0;
 
     if (_isEditing) {
       final cat = widget.editing!;
       final parentChanged = _selectedParentId != cat.parentId;
+      final iconChanged = hasFile ||
+          _clearIcon ||
+          (hasUrl && iconUrlText != (cat.iconUrl ?? '')) ||
+          (!hasUrl && !_clearIcon && cat.iconUrl != null && !hasFile);
+
       bloc.add(UpdateCategoryEvent(
         id: cat.id,
         data: UpdateCategoryData(
@@ -1219,8 +563,15 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
           description:
               _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           isActive: _isActive,
+          order: order,
           parentId: _selectedParentId,
           setParentId: parentChanged,
+          iconBytes: _pendingIconBytes,
+          iconFilename: _pendingIconFilename,
+          iconUrl: _clearIcon
+              ? null
+              : (hasUrl ? iconUrlText : null),
+          setIconUrl: _clearIcon || (iconChanged && !hasFile),
         ),
       ));
     } else {
@@ -1230,7 +581,11 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
           description:
               _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           isActive: _isActive,
+          order: order,
           parentId: _selectedParentId,
+          iconBytes: _pendingIconBytes,
+          iconFilename: _pendingIconFilename,
+          iconUrl: hasFile ? null : (hasUrl ? iconUrlText : null),
         ),
       ));
     }
@@ -1241,8 +596,9 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
+    final outlineBorder = scheme.outlineVariant;
 
     return BlocListener<CategoriesBloc, CategoriesState>(
       listener: (context, state) {
@@ -1279,7 +635,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ── Dialog header ─────────────────────────────────
+                      // â”€â”€ Dialog header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       Row(children: [
                         Container(
                           width: 44,
@@ -1314,9 +670,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                               Text(
                                 l10n.t('categoriesSubtitle'),
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: isDark
-                                      ? Colors.grey.shade500
-                                      : const Color(0xFF6B7280),
+                                  color: scheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -1327,7 +681,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                       Divider(height: 1, color: outlineBorder),
                       const SizedBox(height: 20),
 
-                      // ── Name field ────────────────────────────────────
+                      // â”€â”€ Name field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       _FormField(
                         controller: _nameCtrl,
                         label: l10n.t('categoryName'),
@@ -1340,7 +694,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                       ),
                       const SizedBox(height: 18),
 
-                      // ── Description field ─────────────────────────────
+                      // â”€â”€ Description field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       _FormField(
                         controller: _descCtrl,
                         label: l10n.t('categoryDescription'),
@@ -1350,7 +704,49 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                       ),
                       const SizedBox(height: 18),
 
-                      // ── Parent category dropdown ───────────────────────
+                      // â”€â”€ Display order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      _FormField(
+                        controller: _orderCtrl,
+                        label: l10n.t('categoryDisplayOrder'),
+                        hint: l10n.t('categoryDisplayOrderHint'),
+                        keyboardType: TextInputType.number,
+                        enabled: !isSubmitting,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) => _validateOrder(v, l10n.t('categoryOrderInvalid')),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // â”€â”€ Category icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      _CategoryIconField(
+                        isDark: isDark,
+                        enabled: !isSubmitting,
+                        previewCategory: CategoryEntity(
+                          id: widget.editing?.id ?? '',
+                          name: _nameCtrl.text.trim().isEmpty
+                              ? (widget.editing?.name ?? '')
+                              : _nameCtrl.text.trim(),
+                          slug: widget.editing?.slug ?? '',
+                          iconUrl: _displayIconUrl,
+                          isActive: _isActive,
+                          createdAt:
+                              widget.editing?.createdAt ?? DateTime.now(),
+                          updatedAt:
+                              widget.editing?.updatedAt ?? DateTime.now(),
+                        ),
+                        pendingBytes: _pendingIconBytes,
+                        iconUrlController: _iconUrlCtrl,
+                        onPickFile: _pickIconFile,
+                        onClear: () => setState(() {
+                          _pendingIconBytes = null;
+                          _pendingIconFilename = null;
+                          _iconUrlCtrl.clear();
+                          _clearIcon = true;
+                        }),
+                        onUrlChanged: () => setState(() => _clearIcon = false),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // â”€â”€ Parent category dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       if (!editedHasChildren) ...[
                         _ParentDropdown(
                           roots: roots,
@@ -1367,22 +763,24 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.1),
+                            color: scheme.tertiaryContainer,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Colors.amber.withValues(alpha: 0.3)),
+                                color: scheme.onTertiaryContainer
+                                    .withValues(alpha: 0.2)),
                           ),
                           child: Row(
                             children: [
                               Icon(Icons.info_outline,
-                                  size: 16, color: Colors.amber.shade700),
+                                  size: 16,
+                                  color: scheme.onTertiaryContainer),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   l10n.t('cannotChangeParentWithChildren'),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.amber.shade800,
+                                    color: scheme.onTertiaryContainer,
                                   ),
                                 ),
                               ),
@@ -1392,14 +790,12 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                         const SizedBox(height: 18),
                       ],
 
-                      // ── Active toggle ─────────────────────────────────
+                      // â”€â”€ Active toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF252B3B)
-                              : const Color(0xFFF8FAFC),
+                          color: scheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: outlineBorder),
                         ),
@@ -1414,9 +810,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                           subtitle: Text(
                             l10n.t('visibleToPublic'),
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: isDark
-                                  ? Colors.grey.shade500
-                                  : const Color(0xFF6B7280),
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                           value: _isActive,
@@ -1427,7 +821,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                       ),
                       const SizedBox(height: 24),
 
-                      // ── Dialog actions ────────────────────────────────
+                      // â”€â”€ Dialog actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -1454,12 +848,12 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                                   borderRadius: BorderRadius.circular(12)),
                             ),
                             child: isSubmitting
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 18,
                                     height: 18,
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white),
+                                        color: scheme.onPrimary),
                                   )
                                 : Text(
                                     _isEditing
@@ -1481,7 +875,117 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   }
 }
 
-// ─── Parent category dropdown ─────────────────────────────────────────────────
+// â”€â”€â”€ Parent category dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class _CategoryIconField extends StatelessWidget {
+  const _CategoryIconField({
+    required this.isDark,
+    required this.enabled,
+    required this.previewCategory,
+    required this.pendingBytes,
+    required this.iconUrlController,
+    required this.onPickFile,
+    required this.onClear,
+    required this.onUrlChanged,
+  });
+
+  final bool isDark;
+  final bool enabled;
+  final CategoryEntity previewCategory;
+  final Uint8List? pendingBytes;
+  final TextEditingController iconUrlController;
+  final VoidCallback onPickFile;
+  final VoidCallback onClear;
+  final VoidCallback onUrlChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.t('categoryIcon'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (pendingBytes != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(
+                  pendingBytes!,
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => CategoryIcon(
+                    category: previewCategory,
+                    size: 56,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            else
+              CategoryIcon(
+                category: previewCategory,
+                size: 56,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: enabled ? onPickFile : null,
+                    icon: const Icon(Icons.upload_rounded, size: 16),
+                    label: Text(l10n.t('uploadCategoryIcon')),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: iconUrlController,
+                    enabled: enabled,
+                    onChanged: (_) => onUrlChanged(),
+                    decoration: InputDecoration(
+                      labelText: l10n.t('categoryIconUrl'),
+                      hintText: l10n.t('categoryIconUrlHint'),
+                      filled: true,
+                      fillColor: scheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  if (previewCategory.iconUrl != null ||
+                      pendingBytes != null ||
+                      iconUrlController.text.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: enabled ? onClear : null,
+                        icon: const Icon(Icons.clear_rounded, size: 16),
+                        label: Text(l10n.t('removeCategoryIcon')),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 class _ParentDropdown extends StatelessWidget {
   const _ParentDropdown({
@@ -1501,10 +1005,10 @@ class _ParentDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
-    final fillColor =
-        isDark ? const Color(0xFF252B3B) : const Color(0xFFF8FAFC);
+    final outlineBorder = scheme.outlineVariant;
+    final fillColor = scheme.surfaceContainerLow;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1542,7 +1046,7 @@ class _ParentDropdown extends StatelessWidget {
           hint: Text(
             l10n.t('noParentCategory'),
             style: TextStyle(
-              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+              color: scheme.onSurfaceVariant,
             ),
           ),
           items: [
@@ -1550,7 +1054,7 @@ class _ParentDropdown extends StatelessWidget {
               value: null,
               child: Row(children: [
                 Icon(Icons.layers_outlined,
-                    size: 16, color: theme.colorScheme.primary),
+                    size: 16, color: scheme.primary),
                 const SizedBox(width: 8),
                 Text(l10n.t('noParentCategory')),
               ]),
@@ -1558,20 +1062,7 @@ class _ParentDropdown extends StatelessWidget {
             ...roots.map(
               (r) => DropdownMenuItem<String?>(
                 value: r.id,
-                child: Row(children: [
-                  Icon(Icons.folder_outlined,
-                      size: 16,
-                      color: isDark
-                          ? Colors.grey.shade400
-                          : const Color(0xFF6B7280)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      r.name,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ]),
+                child: CategoryIconLabel(category: r),
               ),
             ),
           ],
@@ -1582,146 +1073,6 @@ class _ParentDropdown extends StatelessWidget {
   }
 }
 
-// ─── Shared small widgets ─────────────────────────────────────────────────────
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.isActive});
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isActive
-        ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D))
-        : (isDark ? Colors.grey.shade400 : const Color(0xFF6B7280));
-    final bg = isActive
-        ? (isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7))
-        : (isDark ? const Color(0xFF252B3B) : const Color(0xFFF3F4F6));
-    final dot = isActive ? const Color(0xFF22C55E) : Colors.grey.shade500;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: fg.withValues(alpha: 0.25)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          isActive ? l10n.t('active') : l10n.t('inactive'),
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: fg),
-        ),
-      ]),
-    );
-  }
-}
-
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.isActive});
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF22C55E) : Colors.grey.shade400,
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({
-    required this.icon,
-    required this.label,
-    required this.isDark,
-    this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool isDark;
-  final Color? accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = accent ??
-        (isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF));
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: accent != null
-            ? accent!.withValues(alpha: isDark ? 0.18 : 0.08)
-            : (isDark ? const Color(0xFF252B3B) : const Color(0xFFF3F4F6)),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.15)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: color),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: accent != null
-                  ? accent!
-                  : (isDark
-                      ? Colors.grey.shade400
-                      : const Color(0xFF6B7280)),
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-class _MiniActionBtn extends StatelessWidget {
-  const _MiniActionBtn({
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 16, color: color),
-        ),
-      ),
-    );
-  }
-}
 
 class _ActionToolButton extends StatefulWidget {
   const _ActionToolButton({
@@ -1750,7 +1101,7 @@ class _ActionToolButtonState extends State<_ActionToolButton> {
   @override
   Widget build(BuildContext context) {
     final outlineBorder =
-        Theme.of(context).colorScheme.outline.withValues(alpha: 0.2);
+        Theme.of(context).colorScheme.outlineVariant;
     final disabled = widget.onTap == null;
 
     return Tooltip(
@@ -1821,12 +1172,13 @@ class _HeaderBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = accent ?? theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final color = accent ?? scheme.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
@@ -1838,7 +1190,7 @@ class _HeaderBadge extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: isDark ? Colors.grey.shade200 : const Color(0xFF374151),
+            color: scheme.onSurface,
           ),
         ),
       ]),
@@ -1869,7 +1221,8 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = theme.colorScheme;
+    final outlineBorder = scheme.outlineVariant;
 
     return Tooltip(
       message: widget.tooltip,
@@ -1884,17 +1237,13 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: widget.isDark
-                  ? (_hovered
-                      ? const Color(0xFF252B3B)
-                      : const Color(0xFF1E293B))
-                  : (_hovered
-                      ? const Color(0xFFE5E7EB)
-                      : const Color(0xFFF3F4F6)),
+              color: _hovered
+                  ? scheme.surfaceContainerHigh
+                  : scheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: _hovered
-                    ? theme.colorScheme.primary.withValues(alpha: 0.35)
+                    ? scheme.primary.withValues(alpha: 0.35)
                     : outlineBorder,
               ),
             ),
@@ -1902,9 +1251,7 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
             child: Icon(
               widget.icon,
               size: 20,
-              color: widget.isDark
-                  ? Colors.grey.shade200
-                  : const Color(0xFF4B5563),
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -1913,7 +1260,7 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
   }
 }
 
-// ─── Form field ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Form field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _FormField extends StatelessWidget {
   const _FormField({
@@ -1923,6 +1270,7 @@ class _FormField extends StatelessWidget {
     this.validator,
     this.maxLines = 1,
     this.keyboardType,
+    this.inputFormatters,
     this.enabled = true,
   });
 
@@ -1932,15 +1280,15 @@ class _FormField extends StatelessWidget {
   final FormFieldValidator<String>? validator;
   final int maxLines;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final fillColor =
-        isDark ? const Color(0xFF252B3B) : const Color(0xFFF8FAFC);
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = theme.colorScheme;
+    final fillColor = scheme.surfaceContainerLow;
+    final outlineBorder = scheme.outlineVariant;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1955,6 +1303,7 @@ class _FormField extends StatelessWidget {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           enabled: enabled,
           validator: validator,
           style: theme.textTheme.bodyMedium,
@@ -1978,12 +1327,12 @@ class _FormField extends StatelessWidget {
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide:
-                  BorderSide(color: Colors.red.shade400, width: 1.5),
+                  BorderSide(color: scheme.error, width: 1.5),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide:
-                  BorderSide(color: Colors.red.shade400, width: 1.5),
+                  BorderSide(color: scheme.error, width: 1.5),
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1994,7 +1343,7 @@ class _FormField extends StatelessWidget {
   }
 }
 
-// ─── Empty / Error / Loading states ──────────────────────────────────────────
+// â”€â”€â”€ Empty / Error / Loading states â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _LoadingView extends StatelessWidget {
   const _LoadingView({required this.isDark});
@@ -2003,19 +1352,20 @@ class _LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         SizedBox(
           width: 36,
           height: 36,
           child: CircularProgressIndicator(
-              strokeWidth: 2.5, color: theme.colorScheme.primary),
+              strokeWidth: 2.5, color: scheme.primary),
         ),
         const SizedBox(height: 16),
         Text(
           context.l10n.t('loading'),
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: isDark ? Colors.grey.shade500 : const Color(0xFF6B7280),
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ]),
@@ -2031,8 +1381,9 @@ class _EmptyView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = theme.colorScheme;
+    final primary = scheme.primary;
+    final outlineBorder = scheme.outlineVariant;
     final bloc = context.read<CategoriesBloc>();
 
     return Center(
@@ -2041,13 +1392,12 @@ class _EmptyView extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: outlineBorder),
             boxShadow: [
               BoxShadow(
-                color:
-                    Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+                color: scheme.shadow.withValues(alpha: 0.04),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
@@ -2079,7 +1429,7 @@ class _EmptyView extends StatelessWidget {
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
-                color: isDark ? Colors.white : const Color(0xFF111827),
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 10),
@@ -2088,9 +1438,7 @@ class _EmptyView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.5,
-                color: isDark
-                    ? Colors.grey.shade500
-                    : const Color(0xFF6B7280),
+                color: scheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 28),
@@ -2129,10 +1477,9 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final danger =
-        isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
-    final outlineBorder = theme.colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = theme.colorScheme;
+    final danger = scheme.error;
+    final outlineBorder = scheme.outlineVariant;
 
     return Center(
       child: ConstrainedBox(
@@ -2141,13 +1488,12 @@ class _ErrorView extends StatelessWidget {
           padding:
               const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: danger.withValues(alpha: 0.35)),
             boxShadow: [
               BoxShadow(
-                color:
-                    Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+                color: scheme.shadow.withValues(alpha: 0.04),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
@@ -2158,7 +1504,7 @@ class _ErrorView extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: danger.withValues(alpha: 0.12),
+                color: scheme.errorContainer,
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.error_outline_rounded,
@@ -2170,7 +1516,7 @@ class _ErrorView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF111827),
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 10),
@@ -2179,9 +1525,7 @@ class _ErrorView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.45,
-                color: isDark
-                    ? Colors.grey.shade500
-                    : const Color(0xFF6B7280),
+                color: scheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 28),
@@ -2190,7 +1534,7 @@ class _ErrorView extends StatelessWidget {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: Text(l10n.t('tryAgain')),
               style: OutlinedButton.styleFrom(
-                foregroundColor: theme.colorScheme.primary,
+                foregroundColor: scheme.primary,
                 padding: const EdgeInsets.symmetric(
                     horizontal: 22, vertical: 14),
                 shape: RoundedRectangleBorder(

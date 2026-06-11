@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../../core/localization/localization.dart';
 import '../../../../categories/presentation/bloc/categories_bloc.dart';
+import '../../../../categories/presentation/widgets/category_icon.dart';
 import '../../../domain/entities/managed_post_entity.dart';
 import '../../utils/post_detail_labels.dart';
 import '../post_media_carousel.dart';
@@ -41,25 +42,30 @@ class PostContentSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Wrap(
-              spacing: InvestigationTheme.s8,
-              runSpacing: InvestigationTheme.s8,
-              children: [
-                if (draft.category != null && draft.category!.isNotEmpty)
-                  _Badge(
-                    icon: Icons.category_outlined,
-                    label: draft.category!,
-                    color: const Color(0xFF6366F1),
-                    isDark: isDark,
-                  ),
-                _Badge(
-                  icon: Icons.lock_outline_rounded,
-                  label: privacyLabel(l10n, draft.privacyStatus),
-                  color: const Color(0xFF64748B),
-                  isDark: isDark,
-                ),
-                _StatusBadge(status: draft.status, l10n: l10n),
-              ],
+            child: BlocBuilder<CategoriesBloc, CategoriesState>(
+              builder: (context, catState) {
+                final categoryLabel = _resolveCategoryLabel(draft, catState);
+                return Wrap(
+                  spacing: InvestigationTheme.s8,
+                  runSpacing: InvestigationTheme.s8,
+                  children: [
+                    if (categoryLabel != null && categoryLabel.isNotEmpty)
+                      _Badge(
+                        icon: Icons.category_outlined,
+                        label: categoryLabel,
+                        color: const Color(0xFF6366F1),
+                        isDark: isDark,
+                      ),
+                    _Badge(
+                      icon: Icons.lock_outline_rounded,
+                      label: privacyLabel(l10n, draft.privacyStatus),
+                      color: const Color(0xFF64748B),
+                      isDark: isDark,
+                    ),
+                    _StatusBadge(status: draft.status, l10n: l10n),
+                  ],
+                );
+              },
             ),
           ),
           ClipRRect(
@@ -321,6 +327,23 @@ class _EngagementStat extends StatelessWidget {
   }
 }
 
+String? _resolveCategoryLabel(ManagedPostEntity draft, CategoriesState catState) {
+  if (draft.category != null && draft.category!.trim().isNotEmpty) {
+    return draft.category;
+  }
+
+  final entityId = draft.categoryEntity?.id;
+  if (entityId != null &&
+      entityId.isNotEmpty &&
+      catState is CategoriesLoaded) {
+    for (final cat in catState.catalogCategories) {
+      if (cat.id == entityId) return cat.name;
+    }
+  }
+
+  return null;
+}
+
 class _CategoryDropdown extends StatelessWidget {
   const _CategoryDropdown({
     required this.draft,
@@ -364,7 +387,7 @@ class _CategoryDropdown extends StatelessWidget {
 
         if (catState is! CategoriesLoaded) return const SizedBox.shrink();
 
-        final cats = catState.categories;
+        final cats = catState.catalogCategories;
         String? resolvedId = draft.categoryEntity?.id;
         if (resolvedId == null || !cats.any((c) => c.id == resolvedId)) {
           resolvedId = cats
@@ -392,9 +415,9 @@ class _CategoryDropdown extends StatelessWidget {
               .map(
                 (cat) => DropdownMenuItem<String?>(
                   value: cat.id,
-                  child: Text(
-                    cat.isRoot ? cat.name : '  ↳ ${cat.name}',
-                    overflow: TextOverflow.ellipsis,
+                  child: CategoryIconLabel(
+                    category: cat,
+                    prefix: cat.isRoot ? null : '  ↳ ',
                   ),
                 ),
               )

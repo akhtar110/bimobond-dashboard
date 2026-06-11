@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/activity_context.dart';
 import '../../domain/entities/comment_entity.dart';
+import '../../domain/entities/managed_post_author_enrichment.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/usecases/ban_post_usecase.dart';
 import '../../domain/usecases/delete_comment_admin.dart';
@@ -205,10 +206,15 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
     try {
       final fresh = await getManagedPostById(event.post.id);
+      final hydrated = enrichManagedPostAuthor(
+        fresh,
+        fallback: event.post,
+        author: _authorHint(event.post, event.sourceUser),
+      );
       emit(
         PostManagementLoaded(
-          post: fresh,
-          draft: fresh,
+          post: hydrated,
+          draft: hydrated,
           sourceUser: event.sourceUser,
           activityContext: event.activityContext,
           isCommentsLoading: true,
@@ -216,10 +222,14 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       );
       add(LoadPostCommentsEvent());
     } catch (_) {
+      final hydrated = enrichManagedPostAuthor(
+        event.post,
+        author: _authorHint(event.post, event.sourceUser),
+      );
       emit(
         PostManagementLoaded(
-          post: event.post,
-          draft: event.post,
+          post: hydrated,
+          draft: hydrated,
           sourceUser: event.sourceUser,
           activityContext: event.activityContext,
           isCommentsLoading: true,
@@ -227,6 +237,35 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       );
       add(LoadPostCommentsEvent());
     }
+  }
+
+  /// Uses route [sourceUser] or author fields already on the navigation stub.
+  UserEntity? _authorHint(ManagedPostEntity post, UserEntity? sourceUser) {
+    if (sourceUser != null &&
+        (post.userId.isEmpty || post.userId == sourceUser.id)) {
+      return sourceUser;
+    }
+    if (post.userId.isEmpty) return null;
+    return UserEntity(
+      id: post.userId,
+      username: post.userName ?? post.userId,
+      fullName: post.userFullName,
+      email: post.userEmail,
+      avatarUrl: post.userProfileImage,
+      isVerified: post.userIsVerified,
+      isPrivate: false,
+      allowComments: true,
+      allowDirectMsgs: true,
+      language: 'en',
+      theme: 'light',
+      followerCount: post.userFollowersCount,
+      followingCount: post.userFollowingCount,
+      postCount: post.userPostsCount,
+      totalLikes: 0,
+      isBanned: post.userIsBanned,
+      roles: const [UserRole.user],
+      createdAt: post.userJoinedAt,
+    );
   }
 
   void _onChangeField(

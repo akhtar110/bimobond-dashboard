@@ -1,0 +1,23 @@
+/// Admin bulk actions supported on the posts listing page.
+enum BulkPostActionType {
+  publish,
+  draft,
+  underReview,
+  hide,
+  archive,
+  ban,
+  unban,
+  softDelete,
+  permanentDelete,
+  enableComments,
+  disableComments,
+  enableDuets,
+  disableDuets,
+  enableStitch,
+  disableStitch,
+  setPublic,
+  setPrivate,
+  setFollowersOnly,
+  feature,
+  unfeature,
+}

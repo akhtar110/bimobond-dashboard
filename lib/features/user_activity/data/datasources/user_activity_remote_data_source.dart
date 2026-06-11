@@ -16,6 +16,8 @@ import '../models/user_device_model.dart';
 import '../models/user_gift_transaction_model.dart';
 import '../models/user_like_model.dart';
 import '../models/user_mention_model.dart';
+import '../models/user_repost_model.dart';
+import '../../domain/entities/user_repost_entity.dart';
 
 abstract class UserActivityRemoteDataSource {
   Future<PaginatedPage<UserPostEntity>> getUserPosts(
@@ -62,10 +64,12 @@ abstract class UserActivityRemoteDataSource {
     String type = 'received',
   });
 
+  /// [type] must be `'made'`, `'received'`, or `'all'`. Defaults to `'received'`.
   Future<PaginatedPage<UserMentionEntity>> getUserMentions(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserActivityItemEntity>> getUserActivityFeed(
@@ -73,6 +77,14 @@ abstract class UserActivityRemoteDataSource {
     required int page,
     required int limit,
   });
+
+  Future<PaginatedPage<UserRepostEntity>> getUserReposts(
+    String userId, {
+    required int page,
+    required int limit,
+  });
+
+  Future<void> deleteRepostAsAdmin(String repostId);
 }
 
 class UserActivityRemoteDataSourceImpl implements UserActivityRemoteDataSource {
@@ -199,10 +211,15 @@ class UserActivityRemoteDataSourceImpl implements UserActivityRemoteDataSource {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) async {
     final response = await _dio.get(
       '/users/$userId/mentions',
-      queryParameters: {'page': page, 'limit': limit},
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+        'type': type,
+      },
     );
     final data = response.data as Map<String, dynamic>;
     final items = (data['mentions'] as List? ?? [])
@@ -228,6 +245,25 @@ class UserActivityRemoteDataSourceImpl implements UserActivityRemoteDataSource {
     return _pageFromMeta(items, data['meta'] as Map<String, dynamic>?);
   }
 
+  @override
+  Future<PaginatedPage<UserRepostEntity>> getUserReposts(
+    String userId, {
+    required int page,
+    required int limit,
+  }) async {
+    final response = await _dio.get(
+      '/users/admin/$userId/reposts',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    final data = response.data as Map<String, dynamic>? ?? {};
+    return UserRepostFeedResponse.fromJson(data).toPaginatedPage();
+  }
+
+  @override
+  Future<void> deleteRepostAsAdmin(String repostId) async {
+    await _dio.delete('/posts/admin/reposts/$repostId');
+  }
+
   PaginatedPage<T> _pageFromMeta<T>(
     List<T> items,
     Map<String, dynamic>? meta,
@@ -236,7 +272,8 @@ class UserActivityRemoteDataSourceImpl implements UserActivityRemoteDataSource {
     return PaginatedPage<T>(
       items: items,
       page: _int(m['page']) ?? 1,
-      lastPage: _int(m['lastPage']) ?? 1,
+      // API may return either "lastPage" or "totalPages" — accept both.
+      lastPage: _int(m['lastPage']) ?? _int(m['totalPages']) ?? 1,
       total: _int(m['total']) ?? items.length,
     );
   }

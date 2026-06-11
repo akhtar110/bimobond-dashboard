@@ -15,6 +15,7 @@ class PostsFilterBar extends StatefulWidget {
     this.compact = false,
   });
 
+  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
   final bool compact;
 
@@ -78,34 +79,35 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     _lastAppliedSearch = text;
   }
 
-  InputDecoration _fieldDecoration({
+  InputDecoration _fieldDecoration(
+    BuildContext context, {
     required String hint,
     Widget? prefixIcon,
     Widget? suffixIcon,
   }) {
-    final isDark = widget.isDark;
+    final scheme = Theme.of(context).colorScheme;
     return InputDecoration(
       hintText: hint,
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       isDense: true,
       filled: true,
-      fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF9FAFB),
+      fillColor: scheme.surfaceContainerLow,
       contentPadding: EdgeInsets.symmetric(
         horizontal: 12,
         vertical: widget.compact ? 10 : 12,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(
-          color: isDark ? const Color(0xFF3D4654) : const Color(0xFFE5E7EB),
-        ),
+        borderSide: BorderSide(color: scheme.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(
-          color: isDark ? const Color(0xFF3D4654) : const Color(0xFFE5E7EB),
-        ),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.primary),
       ),
     );
   }
@@ -114,7 +116,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = widget.isDark;
+    final scheme = theme.colorScheme;
 
     return BlocListener<PostsBloc, PostsState>(
       listenWhen: (prev, next) {
@@ -139,9 +141,9 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
           final content = _FilterContent(
             searchField: _searchField(l10n, theme, isApplying),
             dropdowns: [
+              _postTypeDropdown(l10n, filters, isApplying),
               _typeDropdown(l10n, filters, isApplying),
               _sortDropdown(l10n, filters, isApplying),
-              _auctionDropdown(l10n, filters, isApplying),
             ],
             activeFilters: _activeFilters(l10n, theme, filters, isApplying),
             compact: widget.compact,
@@ -152,13 +154,9 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
           return Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+              color: scheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark
-                    ? const Color(0xFF2E3440)
-                    : const Color(0xFFE8ECF0),
-              ),
+              border: Border.all(color: scheme.outlineVariant),
             ),
             child: content,
           );
@@ -172,7 +170,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     ThemeData theme,
     bool isApplying,
   ) {
-    final isDark = widget.isDark;
+    final scheme = theme.colorScheme;
     return TextField(
       controller: _searchController,
       focusNode: _searchFocusNode,
@@ -181,11 +179,12 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
       textInputAction: TextInputAction.search,
       style: TextStyle(fontSize: widget.compact ? 13 : 14),
       decoration: _fieldDecoration(
+        context,
         hint: l10n.t('postFilterSearch'),
         prefixIcon: Icon(
           Icons.search_rounded,
           size: widget.compact ? 18 : 20,
-          color: isDark ? Colors.grey.shade400 : const Color(0xFF9CA3AF),
+          color: scheme.onSurfaceVariant,
         ),
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
@@ -198,7 +197,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: theme.colorScheme.primary,
+                    color: scheme.primary,
                   ),
                 ),
               ),
@@ -226,7 +225,6 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
   ) {
     if (!filters.hasAdvancedFilters) return const [];
 
-    final isDark = widget.isDark;
     return [
       const SizedBox(height: 8),
       Row(
@@ -237,7 +235,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
             }),
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const Spacer(),
@@ -266,8 +264,6 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
         onClearSearch: () {
           _searchController.clear();
           _lastAppliedSearch = '';
-          // Use SearchPostsEvent('') to clear search while preserving all
-          // other active filters (category, type, sort, isAuctionable).
           context.read<PostsBloc>().add(SearchPostsEvent(''));
         },
       ),
@@ -286,18 +282,64 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     };
   }
 
+  Widget _postTypeDropdown(
+    AppLocalizations l10n,
+    PostFilters filters,
+    bool loading,
+  ) {
+    final selected = filters.postTypeFilter;
+    return DropdownButtonFormField<PostTypeFilter>(
+      key: ValueKey('postType_$selected'),
+      initialValue: selected,
+      isExpanded: true,
+      decoration: _fieldDecoration(context, hint: l10n.t('postFilterPostType')),
+      items: [
+        DropdownMenuItem(
+          value: PostTypeFilter.all,
+          child: Text(l10n.t('postFilterAuctionAll')),
+        ),
+        DropdownMenuItem(
+          value: PostTypeFilter.auction,
+          child: Text(l10n.t('postFilterAuctionOnly')),
+        ),
+        DropdownMenuItem(
+          value: PostTypeFilter.stories,
+          child: Text(context.trOr('postFilterStoriesOnly', 'Stories Only')),
+        ),
+        DropdownMenuItem(
+          value: PostTypeFilter.ads,
+          child: Text(context.trOr('postFilterAdsOnly', 'Ads only')),
+        ),
+      ],
+      onChanged: loading
+          ? null
+          : (v) {
+              if (v == null) return;
+              final bloc = context.read<PostsBloc>();
+              switch (v) {
+                case PostTypeFilter.all:
+                  bloc.add(FilterPostsByTypeEvent());
+                case PostTypeFilter.auction:
+                  bloc.add(FilterPostsByTypeEvent(isAuctionable: true));
+                case PostTypeFilter.stories:
+                  bloc.add(FilterPostsByTypeEvent(isStory: true));
+                case PostTypeFilter.ads:
+                  bloc.add(FilterPostsByTypeEvent(isAd: true));
+              }
+            },
+    );
+  }
+
   Widget _typeDropdown(
     AppLocalizations l10n,
     PostFilters filters,
     bool loading,
   ) {
-    // ValueKey forces the FormField to recreate (and apply the new initialValue)
-    // whenever the type filter changes externally (e.g. ClearPostFiltersEvent).
     return DropdownButtonFormField<String?>(
       key: ValueKey('type_${filters.type}'),
       initialValue: filters.type,
       isExpanded: true,
-      decoration: _fieldDecoration(hint: l10n.t('postFilterType')),
+      decoration: _fieldDecoration(context, hint: l10n.t('postFilterType')),
       items: [
         DropdownMenuItem(value: null, child: Text(l10n.t('postFilterTypeAll'))),
         DropdownMenuItem(
@@ -334,7 +376,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
       key: ValueKey('sort_$sortValue'),
       initialValue: sortValue,
       isExpanded: true,
-      decoration: _fieldDecoration(hint: l10n.t('postFilterSort')),
+      decoration: _fieldDecoration(context, hint: l10n.t('postFilterSort')),
       items: [
         DropdownMenuItem(
           value: 'LATEST',
@@ -350,42 +392,6 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
           : (v) {
               if (v == null) return;
               _apply(context.read<PostsBloc>().activeFilters.copyWith(sort: v));
-            },
-    );
-  }
-
-  Widget _auctionDropdown(
-    AppLocalizations l10n,
-    PostFilters filters,
-    bool loading,
-  ) {
-    final auctionOnly = filters.isAuctionable == true;
-    return DropdownButtonFormField<bool>(
-      key: ValueKey('auction_$auctionOnly'),
-      initialValue: auctionOnly,
-      isExpanded: true,
-      decoration: _fieldDecoration(hint: l10n.t('postFilterAuction')),
-      items: [
-        DropdownMenuItem(
-          value: false,
-          child: Text(l10n.t('postFilterAuctionAll')),
-        ),
-        DropdownMenuItem(
-          value: true,
-          child: Text(l10n.t('postFilterAuctionOnly')),
-        ),
-      ],
-      onChanged: loading
-          ? null
-          : (v) {
-              if (v == null) return;
-              final bloc = context.read<PostsBloc>();
-              _apply(
-                bloc.activeFilters.copyWith(
-                  isAuctionable: v ? true : null,
-                  clearAuction: !v,
-                ),
-              );
             },
     );
   }
@@ -453,7 +459,21 @@ class _ActiveFilterChips extends StatelessWidget {
     if (filters.isAuctionable == true) {
       addChip(
         l10n.t('postFilterAuctionOnly'),
-        () => _remove(context, (f) => f.copyWith(clearAuction: true)),
+        () => context.read<PostsBloc>().add(FilterPostsByTypeEvent()),
+      );
+    }
+
+    if (filters.isStory == true) {
+      addChip(
+        context.trOr('postFilterStoriesOnly', 'Stories Only'),
+        () => context.read<PostsBloc>().add(FilterPostsByTypeEvent()),
+      );
+    }
+
+    if (filters.isAd == true) {
+      addChip(
+        context.trOr('postFilterAdsOnly', 'Ads only'),
+        () => context.read<PostsBloc>().add(FilterPostsByTypeEvent()),
       );
     }
 
@@ -515,9 +535,9 @@ class _FilterContent extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   SizedBox(width: 220, child: searchField),
-                  SizedBox(width: 128, child: dropdowns[0]),
-                  SizedBox(width: 128, child: dropdowns[1]),
-                  SizedBox(width: 142, child: dropdowns[2]),
+                  SizedBox(width: 158, child: dropdowns[0]),
+                  SizedBox(width: 120, child: dropdowns[1]),
+                  SizedBox(width: 120, child: dropdowns[2]),
                 ],
               ),
               ...activeFilters,

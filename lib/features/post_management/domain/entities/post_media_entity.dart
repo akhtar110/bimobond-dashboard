@@ -67,3 +67,11 @@ String? resolvePostDisplayThumbnailUrl({
 
   return null;
 }
+
+bool isLikelyVideoFileUrl(String url) {
+  final path = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
+  return path.endsWith('.mp4') ||
+      path.endsWith('.webm') ||
+      path.endsWith('.mov') ||
+      path.endsWith('.m3u8');
+}

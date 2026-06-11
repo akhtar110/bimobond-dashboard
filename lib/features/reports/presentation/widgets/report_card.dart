@@ -33,7 +33,7 @@ class _ReportCardState extends State<ReportCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isDesktop = screenWidth >= ReportCardTheme.desktopBreakpoint;
     final isTablet = screenWidth >= ReportCardTheme.tabletBreakpoint &&
@@ -58,15 +58,15 @@ class _ReportCardState extends State<ReportCard> {
               duration: ReportCardTheme.animDuration,
               curve: Curves.easeOut,
               decoration: BoxDecoration(
-                color: ReportCardTheme.cardBackground(isDark),
+                color: ReportCardTheme.cardBackground(scheme),
                 borderRadius: BorderRadius.circular(ReportCardTheme.radius),
                 border: Border.all(
                   color: widget.selected
-                      ? theme.colorScheme.primary
-                      : ReportCardTheme.cardBorder(isDark, hovered: hovered),
+                      ? scheme.primary
+                      : ReportCardTheme.cardBorder(scheme, hovered: hovered),
                   width: widget.selected ? 1.5 : 1,
                 ),
-                boxShadow: ReportCardTheme.cardShadow(isDark, hovered: hovered),
+                boxShadow: ReportCardTheme.cardShadow(scheme, hovered: hovered),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(ReportCardTheme.radius),
@@ -74,33 +74,30 @@ class _ReportCardState extends State<ReportCard> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _PriorityStripe(status: widget.report.status),
+                      _PriorityStripe(
+                        status: widget.report.status,
+                        scheme: scheme,
+                      ),
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.all(isDesktop ? 14 : 12),
                           child: isDesktop
                               ? _DesktopLayout(
                                   report: widget.report,
-                                  isDark: isDark,
                                   theme: theme,
                                   isUpdating: widget.isUpdating,
-                                  onViewTarget: widget.onTap,
                                 )
                               : isTablet
                                   ? _StackedLayout(
                                       report: widget.report,
-                                      isDark: isDark,
                                       theme: theme,
                                       isUpdating: widget.isUpdating,
-                                      onViewTarget: widget.onTap,
                                       compact: false,
                                     )
                                   : _StackedLayout(
                                       report: widget.report,
-                                      isDark: isDark,
                                       theme: theme,
                                       isUpdating: widget.isUpdating,
-                                      onViewTarget: widget.onTap,
                                       compact: true,
                                     ),
                         ),
@@ -118,14 +115,18 @@ class _ReportCardState extends State<ReportCard> {
 }
 
 class _PriorityStripe extends StatelessWidget {
-  const _PriorityStripe({required this.status});
+  const _PriorityStripe({
+    required this.status,
+    required this.scheme,
+  });
   final String status;
+  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 4,
-      color: ReportCardTheme.priorityStripe(status),
+      color: ReportCardTheme.priorityStripe(scheme, status),
     );
   }
 }
@@ -133,17 +134,13 @@ class _PriorityStripe extends StatelessWidget {
 class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({
     required this.report,
-    required this.isDark,
     required this.theme,
     required this.isUpdating,
-    required this.onViewTarget,
   });
 
   final ReportEntity report;
-  final bool isDark;
   final ThemeData theme;
   final bool isUpdating;
-  final VoidCallback onViewTarget;
 
   @override
   Widget build(BuildContext context) {
@@ -152,14 +149,13 @@ class _DesktopLayout extends StatelessWidget {
       children: [
         _ReportInfoSection(
           report: report,
-          isDark: isDark,
           theme: theme,
           showTypeIcon: true,
         ),
         const SizedBox(width: 16),
         Expanded(
           flex: 3,
-          child: ReportTargetPreview(report: report, isDark: isDark),
+          child: ReportTargetPreview(report: report),
         ),
         const SizedBox(width: 16),
         SizedBox(
@@ -172,7 +168,6 @@ class _DesktopLayout extends StatelessWidget {
               ReportActionBar(
                 report: report,
                 isUpdating: isUpdating,
-                onViewTarget: onViewTarget,
               ),
             ],
           ),
@@ -185,18 +180,14 @@ class _DesktopLayout extends StatelessWidget {
 class _StackedLayout extends StatelessWidget {
   const _StackedLayout({
     required this.report,
-    required this.isDark,
     required this.theme,
     required this.isUpdating,
-    required this.onViewTarget,
     required this.compact,
   });
 
   final ReportEntity report;
-  final bool isDark;
   final ThemeData theme;
   final bool isUpdating;
-  final VoidCallback onViewTarget;
   final bool compact;
 
   @override
@@ -210,7 +201,6 @@ class _StackedLayout extends StatelessWidget {
             Expanded(
               child: _ReportInfoSection(
                 report: report,
-                isDark: isDark,
                 theme: theme,
                 showTypeIcon: true,
               ),
@@ -220,12 +210,11 @@ class _StackedLayout extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        ReportTargetPreview(report: report, isDark: isDark),
+        ReportTargetPreview(report: report),
         const SizedBox(height: 10),
         ReportActionBar(
           report: report,
           isUpdating: isUpdating,
-          onViewTarget: onViewTarget,
           compact: compact,
         ),
       ],
@@ -236,20 +225,19 @@ class _StackedLayout extends StatelessWidget {
 class _ReportInfoSection extends StatelessWidget {
   const _ReportInfoSection({
     required this.report,
-    required this.isDark,
     required this.theme,
     required this.showTypeIcon,
   });
 
   final ReportEntity report;
-  final bool isDark;
   final ThemeData theme;
   final bool showTypeIcon;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = theme.colorScheme;
     final (typeIcon, typeColor) =
-        ReportCardTheme.targetTypeVisual(report.targetType);
+        ReportCardTheme.targetTypeVisual(scheme, report.targetType);
     final dateText =
         DateFormat('dd MMM yyyy, HH:mm').format(report.createdAt);
 
@@ -265,9 +253,9 @@ class _ReportInfoSection extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: typeColor.withValues(alpha: isDark ? 0.18 : 0.1),
+                  color: typeColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: typeColor.withValues(alpha: 0.25)),
+                  border: Border.all(color: typeColor.withValues(alpha: 0.28)),
                 ),
                 child: Icon(typeIcon, size: 18, color: typeColor),
               ),
@@ -285,15 +273,12 @@ class _ReportInfoSection extends StatelessWidget {
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     height: 1.25,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
+                    color: scheme.onSurface,
                   ),
                 ),
                 if (report.reporter != null) ...[
                   const SizedBox(height: 6),
-                  ReportReporterInfo(
-                    reporter: report.reporter!,
-                    isDark: isDark,
-                  ),
+                  ReportReporterInfo(reporter: report.reporter!),
                 ],
                 const SizedBox(height: 4),
                 Tooltip(
@@ -302,7 +287,7 @@ class _ReportInfoSection extends StatelessWidget {
                     dateText,
                     style: TextStyle(
                       fontSize: 11,
-                      color: ReportCardTheme.mutedText(isDark),
+                      color: ReportCardTheme.mutedText(scheme),
                     ),
                   ),
                 ),

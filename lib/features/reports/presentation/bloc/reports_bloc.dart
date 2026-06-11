@@ -129,19 +129,22 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
     final report = event.report;
     ReportsNavigation? nav;
 
-    if (report.reportedUserId != null) {
-      // User report → navigate to user profile
+    final postId = report.postId ?? report.post?.id;
+    if (postId != null && postId.isNotEmpty) {
+      nav = NavigateToPost(
+        postId: postId,
+        commentId: report.commentId,
+        authorUserId: report.postAuthorUserId,
+        authorUsername: report.postAuthor?.username,
+        authorFullName: report.postAuthor?.fullName,
+        authorAvatarUrl: report.postAuthor?.avatarUrl,
+      );
+    } else if (report.reportedUserId != null) {
       nav = NavigateToUser(
         userId: report.reportedUserId!,
         username: report.reportedUser?.username,
         fullName: report.reportedUser?.fullName,
         avatarUrl: report.reportedUser?.avatarUrl,
-      );
-    } else if (report.postId != null || report.commentId != null) {
-      // Post or comment report → navigate to post management detail
-      nav = NavigateToPost(
-        postId: report.postId ?? '',
-        commentId: report.commentId,
       );
     }
 

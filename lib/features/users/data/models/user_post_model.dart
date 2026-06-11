@@ -1,3 +1,4 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/user_post_entity.dart';
 
 class UserPostModel extends UserPostEntity {
@@ -11,6 +12,7 @@ class UserPostModel extends UserPostEntity {
     super.animatedCoverUrl,
     super.description,
     super.category,
+    super.categoryId,
     required super.status,
     required super.viewCount,
     required super.shareCount,
@@ -18,6 +20,7 @@ class UserPostModel extends UserPostEntity {
     required super.likeCount,
     required super.commentCount,
     required super.saveCount,
+    super.repostCount,
     super.duration,
     super.videoWidth,
     super.videoHeight,
@@ -28,8 +31,12 @@ class UserPostModel extends UserPostEntity {
     required super.allowStitch,
     required super.isStory,
     required super.isAuctionable,
+    super.isLiked,
+    super.isSaved,
+    super.isReposted,
     required super.createdAt,
     required super.updatedAt,
+    super.storyExpiresAt,
     super.locationId,
     super.playlistId,
     super.soundId,
@@ -39,56 +46,91 @@ class UserPostModel extends UserPostEntity {
     super.hashtags,
     super.sound,
     super.counts,
+    super.recentReposts,
   });
 
   factory UserPostModel.fromJson(Map<String, dynamic> json) {
+    final userMap = json['user'] as Map<String, dynamic>?;
+
+    String? parsedCategory;
+    String? parsedCategoryId;
+    final rawCategory = json['category'];
+    if (rawCategory is Map<String, dynamic>) {
+      parsedCategory = rawCategory['name']?.toString();
+      parsedCategoryId = rawCategory['id']?.toString();
+    } else if (rawCategory is String && rawCategory.trim().isNotEmpty) {
+      parsedCategory = rawCategory;
+    }
+    parsedCategoryId ??= json['categoryId']?.toString();
+
     return UserPostModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      type: json['type'] ?? 'VIDEO',
-      videoUrl: json['videoUrl'],
-      hlsUrl: json['hlsUrl'],
-      thumbnailUrl: json['thumbnailUrl'],
-      animatedCoverUrl: json['animatedCoverUrl'],
-      description: json['description'],
-      category: json['category'],
-      status: json['status'] ?? 'PUBLISHED',
-      viewCount: json['viewCount'] ?? 0,
-      shareCount: json['shareCount'] ?? 0,
-      downloadCount: json['downloadCount'] ?? 0,
-      likeCount: json['likeCount'] ?? 0,
-      commentCount: json['commentCount'] ?? 0,
-      saveCount: json['saveCount'] ?? 0,
-      duration: json['duration'],
-      videoWidth: json['videoWidth'],
-      videoHeight: json['videoHeight'],
-      isAd: json['isAd'] ?? false,
-      privacyStatus: json['privacyStatus'] ?? 'PUBLIC',
-      allowComments: json['allowComments'] ?? true,
-      allowDuets: json['allowDuets'] ?? true,
-      allowStitch: json['allowStitch'] ?? true,
-      isStory: json['isStory'] ?? false,
-      isAuctionable: json['isAuctionable'] ?? false,
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
-      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : DateTime.now(),
-      locationId: json['locationId'],
-      playlistId: json['playlistId'],
-      soundId: json['soundId'],
-      originalPostId: json['originalPostId'],
-      user: json['user'] as Map<String, dynamic>?,
-      media: (json['media'] as List?)?.map((e) => e as Map<String, dynamic>).toList(),
-      hashtags: (json['hashtags'] as List?)?.map((e) => e as Map<String, dynamic>).toList(),
+      id: json['id']?.toString() ?? '',
+      userId:
+          json['userId']?.toString() ?? userMap?['id']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'VIDEO',
+      videoUrl: resolveMediaUrl(json['videoUrl'] as String?),
+      hlsUrl: resolveMediaUrl(json['hlsUrl'] as String?),
+      thumbnailUrl: resolveMediaUrl(json['thumbnailUrl'] as String?),
+      animatedCoverUrl:
+          resolveMediaUrl(json['animatedCoverUrl'] as String?),
+      description: _readDescription(json),
+      category: parsedCategory,
+      categoryId: parsedCategoryId,
+      status: json['status']?.toString() ?? 'PUBLISHED',
+      viewCount: _int(json['viewCount']) ?? 0,
+      shareCount: _int(json['shareCount']) ?? 0,
+      downloadCount: _int(json['downloadCount']) ?? 0,
+      likeCount: _int(json['likeCount']) ?? 0,
+      commentCount: _int(json['commentCount']) ?? 0,
+      saveCount: _int(json['saveCount']) ?? 0,
+      repostCount: _int(json['repostCount']) ?? 0,
+      duration: _int(json['duration']),
+      videoWidth: _int(json['videoWidth']),
+      videoHeight: _int(json['videoHeight']),
+      isAd: json['isAd'] as bool? ?? false,
+      privacyStatus:
+          json['privacyStatus']?.toString() ?? 'PUBLIC',
+      allowComments: json['allowComments'] as bool? ?? true,
+      allowDuets: json['allowDuets'] as bool? ?? true,
+      allowStitch: json['allowStitch'] as bool? ?? true,
+      isStory: json['isStory'] as bool? ?? false,
+      isAuctionable: json['isAuctionable'] as bool? ?? false,
+      isLiked: json['isLiked'] as bool? ?? false,
+      isSaved: json['isSaved'] as bool? ?? false,
+      isReposted: json['isReposted'] as bool? ?? false,
+      createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
+      updatedAt: _parseDate(json['updatedAt']) ?? DateTime.now(),
+      storyExpiresAt: _parseDate(json['storyExpiresAt']),
+      locationId: json['locationId']?.toString(),
+      playlistId: json['playlistId']?.toString(),
+      soundId: json['soundId']?.toString(),
+      originalPostId: json['originalPostId']?.toString(),
+      user: userMap,
+      media: (json['media'] as List?)?.map((e) {
+        final item = e as Map<String, dynamic>;
+        final rawUrl = item['url']?.toString() ?? '';
+        return <String, dynamic>{
+          ...item,
+          'url': resolveMediaUrl(rawUrl) ?? rawUrl,
+        };
+      }).toList(),
+      hashtags: (json['hashtags'] as List?)
+          ?.map((e) => e as Map<String, dynamic>)
+          .toList(),
       sound: json['sound'] as Map<String, dynamic>?,
       counts: json['_count'] as Map<String, dynamic>?,
+      recentReposts: (json['recentReposts'] as List?)
+          ?.map((e) => e as Map<String, dynamic>)
+          .toList(),
     );
   }
 }
 
 class UserPostsResponseModel extends UserPostsResponseEntity {
   UserPostsResponseModel({
-    required List<UserPostModel> data,
-    required Map<String, dynamic> meta,
-  }) : super(data: data, meta: meta);
+    required List<UserPostModel> super.data,
+    required super.meta,
+  });
 
   factory UserPostsResponseModel.fromJson(Map<String, dynamic> json) {
     final rawData = json['data'];
@@ -105,7 +147,8 @@ class UserPostsResponseModel extends UserPostsResponseEntity {
     final Map<String, dynamic> meta;
     if (rawMeta is Map<String, dynamic>) {
       meta = rawMeta;
-    } else if (rawData is Map<String, dynamic> && rawData['meta'] is Map) {
+    } else if (rawData is Map<String, dynamic> &&
+        rawData['meta'] is Map) {
       meta = Map<String, dynamic>.from(rawData['meta'] as Map);
     } else {
       meta = {};
@@ -117,5 +160,33 @@ class UserPostsResponseModel extends UserPostsResponseEntity {
           .toList(),
       meta: meta,
     );
+  }
+}
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+String? _readDescription(Map<String, dynamic> json) {
+  for (final key in ['description', 'caption']) {
+    final value = json[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value;
+    }
+  }
+  return null;
+}
+
+int? _int(dynamic v) {
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v);
+  return null;
+}
+
+DateTime? _parseDate(dynamic v) {
+  if (v == null) return null;
+  try {
+    return DateTime.parse(v.toString());
+  } catch (_) {
+    return null;
   }
 }

@@ -34,6 +34,16 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
   bool get isDark => widget.isDark;
 
   void _navigate(BuildContext context) {
+    if (post.userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.t('errorOccurred')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final user = UserEntity(
       id: post.userId,
       username: post.userName ?? post.userId,

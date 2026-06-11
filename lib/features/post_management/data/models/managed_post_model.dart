@@ -53,15 +53,27 @@ class ManagedPostModel extends ManagedPostEntity {
   factory ManagedPostModel.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>?;
 
-    // category can be a nested object or a plain string
+    // category can be a nested object, a plain string, or only categoryId.
     CategoryModel? parsedCategoryEntity;
     String? parsedCategory;
     final rawCategory = json['category'];
     if (rawCategory is Map<String, dynamic>) {
       parsedCategoryEntity = CategoryModel.fromJson(rawCategory);
       parsedCategory = parsedCategoryEntity.name;
-    } else if (rawCategory is String) {
+    } else if (rawCategory is String && rawCategory.isNotEmpty) {
       parsedCategory = rawCategory;
+    } else {
+      final categoryId = json['categoryId']?.toString();
+      if (categoryId != null && categoryId.isNotEmpty) {
+        parsedCategoryEntity = CategoryModel(
+          id: categoryId,
+          name: '',
+          slug: '',
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
     }
 
     // Resolve user avatar — API field is "avatarUrl" (also accept legacy names).
@@ -72,7 +84,9 @@ class ManagedPostModel extends ManagedPostEntity {
 
     return ManagedPostModel(
       id: json['id']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
+      userId: json['userId']?.toString() ??
+          user?['id']?.toString() ??
+          '',
       type: json['type']?.toString() ?? 'VIDEO',
       userName: user?['username'] as String? ?? user?['name'] as String?,
       userFullName: user?['fullName'] as String?,
@@ -93,7 +107,7 @@ class ManagedPostModel extends ManagedPostEntity {
       // PostMediaEntity.fromJson already resolves each item's URL internally.
       media: PostMediaEntity.listFromJson(json['media']),
       animatedCoverUrl: resolveMediaUrl(json['animatedCoverUrl'] as String?),
-      description: json['description'] as String?,
+      description: _readDescription(json),
       category: parsedCategory,
       categoryEntity: parsedCategoryEntity,
       status: json['status']?.toString() ?? 'PUBLISHED',
@@ -132,6 +146,16 @@ class ManagedPostModel extends ManagedPostEntity {
       if (data.allowDuets != null) 'allowDuets': data.allowDuets,
       if (data.allowStitch != null) 'allowStitch': data.allowStitch,
     };
+  }
+
+  static String? _readDescription(Map<String, dynamic> json) {
+    for (final key in ['description', 'caption']) {
+      final value = json[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
   }
 
   static int? _readInt(dynamic value) {

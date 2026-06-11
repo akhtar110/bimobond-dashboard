@@ -5,34 +5,69 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/auction_entity.dart';
 
+/// Status badge colors derived from the active [ColorScheme].
+({Color fg, Color bg, String label}) auctionStatusStyle(
+  ColorScheme scheme,
+  AppLocalizations l10n,
+  String status,
+) {
+  return switch (status) {
+    'ACTIVE' => (
+        fg: scheme.primary,
+        bg: scheme.primaryContainer,
+        label: l10n.t('active'),
+      ),
+    'COMPLETED' => (
+        fg: scheme.secondary,
+        bg: scheme.secondaryContainer,
+        label: l10n.t('completed'),
+      ),
+    'CANCELLED' => (
+        fg: scheme.error,
+        bg: scheme.errorContainer,
+        label: l10n.t('cancelled'),
+      ),
+    _ => (
+        fg: scheme.onSurfaceVariant,
+        bg: scheme.surfaceContainerHigh,
+        label: status,
+      ),
+  };
+}
+
+Color auctionProgressColor(ColorScheme scheme, AuctionEntity auction) {
+  if (auction.isCancelled) return scheme.outline;
+  if (auction.isCompleted) return scheme.primary;
+  return scheme.primary;
+}
+
 class AuctionCard extends StatelessWidget {
   const AuctionCard({
     super.key,
     required this.auction,
+    this.previewImageUrl,
     this.onViewDetails,
     this.onCancel,
   });
 
   final AuctionEntity auction;
+  final String? previewImageUrl;
   final VoidCallback? onViewDetails;
   final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+            color: scheme.shadow.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 3),
           ),
@@ -42,7 +77,10 @@ class AuctionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ItemImage(auction: auction),
+          _ItemImage(
+            auction: auction,
+            previewImageUrl: previewImageUrl,
+          ),
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -50,11 +88,11 @@ class AuctionCard extends StatelessWidget {
               children: [
                 _HeaderRow(auction: auction, onCancel: onCancel),
                 const SizedBox(height: 8),
-                _HostRow(auction: auction, isDark: isDark, theme: theme),
+                _HostRow(auction: auction),
                 const SizedBox(height: 12),
-                _ProgressSection(auction: auction, theme: theme, isDark: isDark),
+                _ProgressSection(auction: auction),
                 const SizedBox(height: 12),
-                _TimestampRow(auction: auction, theme: theme),
+                _TimestampRow(auction: auction),
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: onViewDetails,
@@ -78,12 +116,16 @@ class AuctionCard extends StatelessWidget {
 // ─── Item Image ───────────────────────────────────────────────────────────────
 
 class _ItemImage extends StatelessWidget {
-  const _ItemImage({required this.auction});
+  const _ItemImage({
+    required this.auction,
+    this.previewImageUrl,
+  });
   final AuctionEntity auction;
+  final String? previewImageUrl;
 
   @override
   Widget build(BuildContext context) {
-    final url = auction.itemImageUrl;
+    final url = previewImageUrl ?? auction.displayImageUrl;
     return SizedBox(
       height: 160,
       child: url != null && url.isNotEmpty
@@ -98,11 +140,15 @@ class _ItemImage extends StatelessWidget {
   }
 
   Widget _placeholder(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF4F5F7),
-      child: const Center(
-        child: Icon(Icons.gavel_rounded, size: 48, color: Color(0xFF9CA3AF)),
+      color: scheme.surfaceContainerLow,
+      child: Center(
+        child: Icon(
+          Icons.gavel_rounded,
+          size: 48,
+          color: scheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -118,6 +164,7 @@ class _HeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
@@ -125,9 +172,10 @@ class _HeaderRow extends StatelessWidget {
             auction.itemName?.isNotEmpty == true
                 ? auction.itemName!
                 : l10n.t('noData'),
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 15,
+              color: scheme.onSurface,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -148,11 +196,16 @@ class _HeaderRow extends StatelessWidget {
                   value: 'cancel',
                   child: Row(
                     children: [
-                      const Icon(Icons.cancel_outlined,
-                          size: 16, color: Colors.orange),
+                      Icon(
+                        Icons.cancel_outlined,
+                        size: 16,
+                        color: scheme.tertiary,
+                      ),
                       const SizedBox(width: 8),
-                      Text(l10n.t('forceCancel'),
-                          style: const TextStyle(fontSize: 13)),
+                      Text(
+                        l10n.t('forceCancel'),
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                 ),
@@ -171,26 +224,27 @@ class _HeaderRow extends StatelessWidget {
 // ─── Host row ─────────────────────────────────────────────────────────────────
 
 class _HostRow extends StatelessWidget {
-  const _HostRow(
-      {required this.auction, required this.isDark, required this.theme});
+  const _HostRow({required this.auction});
   final AuctionEntity auction;
-  final bool isDark;
-  final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         CircleAvatar(
           radius: 12,
-          backgroundColor:
-              isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF0F0F0),
+          backgroundColor: scheme.surfaceContainerHighest,
           backgroundImage: auction.hostAvatar != null
               ? NetworkImage(auction.hostAvatar!)
               : null,
           child: auction.hostAvatar == null
-              ? const Icon(Icons.person_rounded, size: 14, color: Colors.grey)
+              ? Icon(
+                  Icons.person_rounded,
+                  size: 14,
+                  color: scheme.onSurfaceVariant,
+                )
               : null,
         ),
         const SizedBox(width: 6),
@@ -199,7 +253,7 @@ class _HostRow extends StatelessWidget {
             '${l10n.t('owner')}: ${auction.hostName}',
             style: TextStyle(
               fontSize: 12,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              color: scheme.onSurfaceVariant,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -213,20 +267,14 @@ class _HostRow extends StatelessWidget {
 // ─── Progress ─────────────────────────────────────────────────────────────────
 
 class _ProgressSection extends StatelessWidget {
-  const _ProgressSection(
-      {required this.auction, required this.theme, required this.isDark});
+  const _ProgressSection({required this.auction});
   final AuctionEntity auction;
-  final ThemeData theme;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final pct = auction.progressPercent;
-    final color = auction.isCompleted
-        ? Colors.green
-        : auction.isCancelled
-            ? Colors.grey
-            : theme.colorScheme.primary;
+    final color = auctionProgressColor(scheme, auction);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,7 +294,7 @@ class _ProgressSection extends StatelessWidget {
               'of \$${auction.targetPriceUsd.toStringAsFixed(2)}',
               style: TextStyle(
                 fontSize: 12,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -257,8 +305,7 @@ class _ProgressSection extends StatelessWidget {
           child: LinearProgressIndicator(
             value: pct,
             minHeight: 6,
-            backgroundColor:
-                isDark ? const Color(0xFF2A2A3A) : const Color(0xFFE8E9EB),
+            backgroundColor: scheme.surfaceContainerHighest,
             color: color,
           ),
         ),
@@ -267,7 +314,7 @@ class _ProgressSection extends StatelessWidget {
           '${(pct * 100).toStringAsFixed(1)}% funded',
           style: TextStyle(
             fontSize: 11,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -278,33 +325,29 @@ class _ProgressSection extends StatelessWidget {
 // ─── Timestamp ────────────────────────────────────────────────────────────────
 
 class _TimestampRow extends StatelessWidget {
-  const _TimestampRow({required this.auction, required this.theme});
+  const _TimestampRow({required this.auction});
   final AuctionEntity auction;
-  final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final fmt = DateFormat('MMM d, yyyy');
     return Row(
       children: [
-        Icon(Icons.access_time_rounded,
-            size: 12,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+        Icon(
+          Icons.access_time_rounded,
+          size: 12,
+          color: scheme.onSurfaceVariant,
+        ),
         const SizedBox(width: 4),
         Text(
           fmt.format(auction.startedAt.toLocal()),
-          style: TextStyle(
-            fontSize: 11,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
+          style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
         ),
         if (auction.endedAt != null) ...[
           Text(
             ' → ${fmt.format(auction.endedAt!.toLocal())}',
-            style: TextStyle(
-              fontSize: 11,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
           ),
         ],
       ],
@@ -320,36 +363,19 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final (color, bg, label) = switch (status) {
-      'ACTIVE' => (
-          const Color(0xFF16A34A),
-          const Color(0xFFDCFCE7),
-          l10n.t('active')
-        ),
-      'COMPLETED' => (
-          const Color(0xFF2563EB),
-          const Color(0xFFDBEAFE),
-          l10n.t('completed')
-        ),
-      'CANCELLED' => (
-          const Color(0xFFDC2626),
-          const Color(0xFFFEE2E2),
-          l10n.t('cancelled')
-        ),
-      _ => (const Color(0xFF6B7280), const Color(0xFFF3F4F6), status),
-    };
+    final scheme = Theme.of(context).colorScheme;
+    final style = auctionStatusStyle(scheme, context.l10n, status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: bg,
+        color: style.bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        label,
+        style.label,
         style: TextStyle(
-          color: color,
+          color: style.fg,
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
@@ -376,9 +402,10 @@ class _AuctionCardSkeletonState extends State<AuctionCardSkeleton>
   @override
   void initState() {
     super.initState();
-    _ctrl =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-          ..repeat(reverse: true);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
@@ -390,10 +417,9 @@ class _AuctionCardSkeletonState extends State<AuctionCardSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFEEEEF0);
-    final highlight =
-        isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF8F8FA);
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerLow;
+    final highlight = scheme.surfaceContainerHighest;
 
     return AnimatedBuilder(
       animation: _anim,
@@ -401,11 +427,9 @@ class _AuctionCardSkeletonState extends State<AuctionCardSkeleton>
         final color = Color.lerp(base, highlight, _anim.value)!;
         return Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF161622) : Colors.white,
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-            ),
+            border: Border.all(color: scheme.outlineVariant),
           ),
           clipBehavior: Clip.hardEdge,
           child: Column(

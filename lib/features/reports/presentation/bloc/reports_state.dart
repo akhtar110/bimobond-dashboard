@@ -29,9 +29,21 @@ class NavigateToUser extends ReportsNavigation {
 /// Navigate to PostManagementDetailScreen for the reported post.
 /// Optionally carries a commentId when the report targets a comment.
 class NavigateToPost extends ReportsNavigation {
-  NavigateToPost({required this.postId, this.commentId});
+  NavigateToPost({
+    required this.postId,
+    this.commentId,
+    this.authorUserId,
+    this.authorUsername,
+    this.authorFullName,
+    this.authorAvatarUrl,
+  });
+
   final String postId;
   final String? commentId;
+  final String? authorUserId;
+  final String? authorUsername;
+  final String? authorFullName;
+  final String? authorAvatarUrl;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

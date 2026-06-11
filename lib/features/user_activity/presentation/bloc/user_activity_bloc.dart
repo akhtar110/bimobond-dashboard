@@ -3,10 +3,13 @@ import '../../../auctions/domain/entities/auction_entity.dart';
 import '../../../users/domain/entities/user_post_entity.dart';
 import '../../domain/entities/user_device_entity.dart';
 import '../../domain/entities/user_gift_transaction_entity.dart';
+import '../../domain/entities/user_repost_entity.dart';
+import '../../domain/usecases/delete_repost_admin.dart';
 import '../../domain/usecases/get_user_activity_auctions.dart';
 import '../../domain/usecases/get_user_activity_devices.dart';
 import '../../domain/usecases/get_user_activity_gifts.dart';
 import '../../domain/usecases/get_user_activity_posts.dart';
+import '../../domain/usecases/get_user_activity_reposts.dart';
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +30,10 @@ class LoadDevices extends UserActivityEvent {}
 
 class LoadMorePosts extends UserActivityEvent {}
 
+class LoadReposts extends UserActivityEvent {}
+
+class LoadMoreReposts extends UserActivityEvent {}
+
 class LoadMoreAuctions extends UserActivityEvent {}
 
 class LoadMoreGifts extends UserActivityEvent {}
@@ -43,6 +50,16 @@ class ChangeGiftFilter extends UserActivityEvent {
   final String filter;
 }
 
+class DeleteRepost extends UserActivityEvent {
+  DeleteRepost(this.repostId);
+  final String repostId;
+}
+
+class RemoveRepostLocally extends UserActivityEvent {
+  RemoveRepostLocally(this.repostId);
+  final String repostId;
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 class UserActivityState {
@@ -55,6 +72,14 @@ class UserActivityState {
     this.postsLoadingMore = false,
     this.postsHasReachedMax = false,
     this.postsError,
+    this.reposts = const [],
+    this.repostsPage = 0,
+    this.repostsTotal = 0,
+    this.repostsLoading = false,
+    this.repostsLoadingMore = false,
+    this.repostsHasReachedMax = false,
+    this.repostsError,
+    this.repostsLoaded = false,
     this.auctions = const [],
     this.auctionFilter = 'all',
     this.auctionsPage = 0,
@@ -81,6 +106,7 @@ class UserActivityState {
     this.devicesHasReachedMax = false,
     this.devicesError,
     this.devicesLoaded = false,
+    this.deletingRepostId,
   });
 
   final String userId;
@@ -92,6 +118,15 @@ class UserActivityState {
   final bool postsLoadingMore;
   final bool postsHasReachedMax;
   final String? postsError;
+
+  final List<UserRepostEntity> reposts;
+  final int repostsPage;
+  final int repostsTotal;
+  final bool repostsLoading;
+  final bool repostsLoadingMore;
+  final bool repostsHasReachedMax;
+  final String? repostsError;
+  final bool repostsLoaded;
 
   final List<AuctionEntity> auctions;
   final String auctionFilter;
@@ -121,6 +156,7 @@ class UserActivityState {
   final bool devicesHasReachedMax;
   final String? devicesError;
   final bool devicesLoaded;
+  final String? deletingRepostId;
 
   static const int _limit = 10;
 
@@ -134,6 +170,15 @@ class UserActivityState {
     bool? postsHasReachedMax,
     String? postsError,
     bool clearPostsError = false,
+    List<UserRepostEntity>? reposts,
+    int? repostsPage,
+    int? repostsTotal,
+    bool? repostsLoading,
+    bool? repostsLoadingMore,
+    bool? repostsHasReachedMax,
+    String? repostsError,
+    bool clearRepostsError = false,
+    bool? repostsLoaded,
     List<AuctionEntity>? auctions,
     String? auctionFilter,
     int? auctionsPage,
@@ -163,6 +208,8 @@ class UserActivityState {
     String? devicesError,
     bool clearDevicesError = false,
     bool? devicesLoaded,
+    String? deletingRepostId,
+    bool clearDeletingRepostId = false,
   }) {
     return UserActivityState(
       userId: userId ?? this.userId,
@@ -173,6 +220,15 @@ class UserActivityState {
       postsLoadingMore: postsLoadingMore ?? this.postsLoadingMore,
       postsHasReachedMax: postsHasReachedMax ?? this.postsHasReachedMax,
       postsError: clearPostsError ? null : (postsError ?? this.postsError),
+      reposts: reposts ?? this.reposts,
+      repostsPage: repostsPage ?? this.repostsPage,
+      repostsTotal: repostsTotal ?? this.repostsTotal,
+      repostsLoading: repostsLoading ?? this.repostsLoading,
+      repostsLoadingMore: repostsLoadingMore ?? this.repostsLoadingMore,
+      repostsHasReachedMax: repostsHasReachedMax ?? this.repostsHasReachedMax,
+      repostsError:
+          clearRepostsError ? null : (repostsError ?? this.repostsError),
+      repostsLoaded: repostsLoaded ?? this.repostsLoaded,
       auctions: auctions ?? this.auctions,
       auctionFilter: auctionFilter ?? this.auctionFilter,
       auctionsPage: auctionsPage ?? this.auctionsPage,
@@ -204,6 +260,8 @@ class UserActivityState {
       devicesError:
           clearDevicesError ? null : (devicesError ?? this.devicesError),
       devicesLoaded: devicesLoaded ?? this.devicesLoaded,
+      deletingRepostId:
+          clearDeletingRepostId ? null : (deletingRepostId ?? this.deletingRepostId),
     );
   }
 }
@@ -213,17 +271,23 @@ class UserActivityState {
 class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
   UserActivityBloc({
     required GetUserActivityPosts getPosts,
+    required GetUserActivityReposts getReposts,
     required GetUserActivityAuctions getAuctions,
     required GetUserActivityGifts getGifts,
     required GetUserActivityDevices getDevices,
+    required DeleteRepostAdmin deleteRepostAdmin,
   })  : _getPosts = getPosts,
+        _getReposts = getReposts,
         _getAuctions = getAuctions,
         _getGifts = getGifts,
         _getDevices = getDevices,
+        _deleteRepostAdmin = deleteRepostAdmin,
         super(const UserActivityState()) {
     on<SetUserActivityUserId>(_onSetUserId);
     on<LoadPosts>(_onLoadPosts);
     on<LoadMorePosts>(_onLoadMorePosts);
+    on<LoadReposts>(_onLoadReposts);
+    on<LoadMoreReposts>(_onLoadMoreReposts);
     on<LoadAuctions>(_onLoadAuctions);
     on<LoadMoreAuctions>(_onLoadMoreAuctions);
     on<ChangeAuctionFilter>(_onChangeAuctionFilter);
@@ -232,12 +296,16 @@ class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
     on<ChangeGiftFilter>(_onChangeGiftFilter);
     on<LoadDevices>(_onLoadDevices);
     on<LoadMoreDevices>(_onLoadMoreDevices);
+    on<DeleteRepost>(_onDeleteRepost);
+    on<RemoveRepostLocally>(_onRemoveRepostLocally);
   }
 
   final GetUserActivityPosts _getPosts;
+  final GetUserActivityReposts _getReposts;
   final GetUserActivityAuctions _getAuctions;
   final GetUserActivityGifts _getGifts;
   final GetUserActivityDevices _getDevices;
+  final DeleteRepostAdmin _deleteRepostAdmin;
 
   static const int _postsLimit = 20;
   static const int _limit = UserActivityState._limit;
@@ -311,6 +379,75 @@ class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
       );
     } catch (e) {
       emit(state.copyWith(postsLoadingMore: false));
+    }
+  }
+
+  Future<void> _onLoadReposts(
+    LoadReposts event,
+    Emitter<UserActivityState> emit,
+  ) async {
+    if (state.userId.isEmpty) return;
+    emit(
+      state.copyWith(
+        repostsLoading: true,
+        reposts: [],
+        repostsPage: 0,
+        repostsHasReachedMax: false,
+        repostsLoaded: true,
+        clearRepostsError: true,
+      ),
+    );
+    try {
+      final page = await _getReposts(
+        state.userId,
+        page: 1,
+        limit: _postsLimit,
+      );
+      emit(
+        state.copyWith(
+          reposts: page.items,
+          repostsPage: page.page,
+          repostsTotal: page.total,
+          repostsHasReachedMax: page.hasReachedMax,
+          repostsLoading: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(
+        repostsLoading: false,
+        repostsError: e.toString(),
+      ));
+    }
+  }
+
+  Future<void> _onLoadMoreReposts(
+    LoadMoreReposts event,
+    Emitter<UserActivityState> emit,
+  ) async {
+    if (state.userId.isEmpty ||
+        state.repostsHasReachedMax ||
+        state.repostsLoadingMore) {
+      return;
+    }
+    emit(state.copyWith(repostsLoadingMore: true));
+    try {
+      final nextPage = state.repostsPage + 1;
+      final page = await _getReposts(
+        state.userId,
+        page: nextPage,
+        limit: _postsLimit,
+      );
+      emit(
+        state.copyWith(
+          reposts: [...state.reposts, ...page.items],
+          repostsPage: page.page,
+          repostsTotal: page.total,
+          repostsHasReachedMax: page.hasReachedMax,
+          repostsLoadingMore: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(repostsLoadingMore: false));
     }
   }
 
@@ -536,5 +673,59 @@ class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
     } catch (e) {
       emit(state.copyWith(devicesLoadingMore: false));
     }
+  }
+
+  Future<void> _onDeleteRepost(
+    DeleteRepost event,
+    Emitter<UserActivityState> emit,
+  ) async {
+    final repostId = event.repostId.trim();
+    if (repostId.isEmpty || state.deletingRepostId == repostId) return;
+
+    emit(state.copyWith(deletingRepostId: repostId, clearRepostsError: true));
+    try {
+      await _deleteRepostAdmin(repostId);
+      emit(
+        _removeRepostFromState(state, repostId).copyWith(
+          clearDeletingRepostId: true,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          clearDeletingRepostId: true,
+          repostsError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  void _onRemoveRepostLocally(
+    RemoveRepostLocally event,
+    Emitter<UserActivityState> emit,
+  ) {
+    final repostId = event.repostId.trim();
+    if (repostId.isEmpty) return;
+    emit(_removeRepostFromState(state, repostId));
+  }
+
+  UserActivityState _removeRepostFromState(
+    UserActivityState current,
+    String repostId,
+  ) {
+    final updated = current.reposts
+        .where((repost) => repost.repostId != repostId)
+        .toList(growable: false);
+    if (updated.length == current.reposts.length) return current;
+
+    final removedCount = current.reposts.length - updated.length;
+    final nextTotal = current.repostsTotal > 0
+        ? (current.repostsTotal - removedCount).clamp(0, current.repostsTotal)
+        : updated.length;
+
+    return current.copyWith(
+      reposts: updated,
+      repostsTotal: nextTotal,
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
@@ -54,27 +55,31 @@ class _GiftsPageState extends State<GiftsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF8F9FC),
+      backgroundColor: scheme.surfaceContainerLowest,
       body: BlocConsumer<GiftsBloc, GiftsState>(
         listener: (ctx, state) {
           if (state is GiftsLoaded) {
+            final messenger = ScaffoldMessenger.of(ctx);
             if (state.successMessage != null) {
-              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                content: Text(state.successMessage!),
-                backgroundColor: Colors.green.shade700,
-                behavior: SnackBarBehavior.floating,
-              ));
+              messenger
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text(state.successMessage!),
+                  backgroundColor: scheme.primary,
+                  behavior: SnackBarBehavior.floating,
+                ));
             }
             if (state.errorMessage != null) {
-              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                content: Text(state.errorMessage!),
-                backgroundColor: Colors.red.shade700,
-                behavior: SnackBarBehavior.floating,
-              ));
+              messenger
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text(state.errorMessage!),
+                  backgroundColor: scheme.error,
+                  behavior: SnackBarBehavior.floating,
+                ));
             }
           }
         },
@@ -84,7 +89,6 @@ class _GiftsPageState extends State<GiftsPage> {
               // ── Header ────────────────────────────────────────────────────
               _SliverHeader(
                 theme: theme,
-                isDark: isDark,
                 isLoading: state is GiftsLoading,
                 canAdd: state is GiftsLoaded,
                 onAdd: _showCreateDialog,
@@ -102,14 +106,16 @@ class _GiftsPageState extends State<GiftsPage> {
                     searchQuery: state.searchQuery,
                     fromDate: state.fromDate,
                     toDate: state.toDate,
-                    isDark: isDark,
+                    minPrice: state.minPriceFilter,
+                    maxPrice: state.maxPriceFilter,
                     theme: theme,
                     displayedCount: state.displayed.length,
+                    totalCount: state.gifts.length,
                     hasActiveFilters: state.hasActiveFilters,
                   ),
                 ),
                 // ── Grid ──────────────────────────────────────────────────
-                _SliverGrid(loaded: state),
+                _GiftsGridSliver(),
               ] else if (state is GiftsLoading) ...[
                 const _SliverSkeletons(),
               ] else if (state is GiftsError) ...[
@@ -130,7 +136,6 @@ class _GiftsPageState extends State<GiftsPage> {
 class _SliverHeader extends StatelessWidget {
   const _SliverHeader({
     required this.theme,
-    required this.isDark,
     required this.isLoading,
     required this.canAdd,
     required this.onAdd,
@@ -138,7 +143,6 @@ class _SliverHeader extends StatelessWidget {
   });
 
   final ThemeData theme;
-  final bool isDark;
   final bool isLoading;
   final bool canAdd;
   final VoidCallback onAdd;
@@ -147,11 +151,7 @@ class _SliverHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final titleColor = isDark ? Colors.white : const Color(0xFF111827);
-    final subtitleColor =
-        isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
-    final dividerColor =
-        isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0);
+    final scheme = theme.colorScheme;
 
     return SliverToBoxAdapter(
       child: LayoutBuilder(
@@ -161,7 +161,7 @@ class _SliverHeader extends StatelessWidget {
           final narrow = width < 560;
 
           final refreshBtn = Material(
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+            color: scheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: isLoading ? null : onRefresh,
@@ -176,17 +176,13 @@ class _SliverHeader extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: isDark
-                                ? Colors.grey.shade300
-                                : const Color(0xFF4B5563),
+                            color: scheme.onSurfaceVariant,
                           ),
                         )
                       : Icon(
                           Icons.refresh_rounded,
                           size: 20,
-                          color: isDark
-                              ? Colors.grey.shade300
-                              : const Color(0xFF4B5563),
+                          color: scheme.onSurfaceVariant,
                         ),
                 ),
               ),
@@ -228,15 +224,15 @@ class _SliverHeader extends StatelessWidget {
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: -0.35,
-                                  color: titleColor,
+                                  color: scheme.onSurface,
                                   height: 1.15,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Manage virtual gift catalog for auctions',
+                                l10n.t('giftsSubtitle'),
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: subtitleColor,
+                                  color: scheme.onSurfaceVariant,
                                   fontSize: 13,
                                   height: 1.35,
                                 ),
@@ -250,7 +246,8 @@ class _SliverHeader extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Divider(height: 1, thickness: 1, color: dividerColor),
+                    Divider(
+                        height: 1, thickness: 1, color: scheme.outlineVariant),
                   ],
                 ),
               ),
@@ -271,9 +268,11 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
     required this.searchQuery,
     required this.fromDate,
     required this.toDate,
-    required this.isDark,
+    required this.minPrice,
+    required this.maxPrice,
     required this.theme,
     required this.displayedCount,
+    required this.totalCount,
     required this.hasActiveFilters,
   });
 
@@ -282,9 +281,11 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
   final String searchQuery;
   final DateTime? fromDate;
   final DateTime? toDate;
-  final bool isDark;
+  final double? minPrice;
+  final double? maxPrice;
   final ThemeData theme;
   final int displayedCount;
+  final int totalCount;
   final bool hasActiveFilters;
 
   // tab row(44) + sp(6) + search+date row(46) + sp(6) + sort row(42) + divider(1) + top pad(8)
@@ -302,49 +303,66 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
       old.searchQuery != searchQuery ||
       old.fromDate != fromDate ||
       old.toDate != toDate ||
-      old.isDark != isDark ||
+      old.minPrice != minPrice ||
+      old.maxPrice != maxPrice ||
       old.displayedCount != displayedCount ||
+      old.totalCount != totalCount ||
       old.hasActiveFilters != hasActiveFilters;
 
   @override
   Widget build(BuildContext ctx, double shrinkOffset, bool overlapsContent) {
-    final bg = isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF8F9FC);
-    final divider = isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0);
-    final metaColor = isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
+    final scheme = theme.colorScheme;
     final bloc = ctx.read<GiftsBloc>();
     final l10n = ctx.l10n;
     final width = MediaQuery.sizeOf(ctx).width;
     final pad = _hPad(width);
 
     String tabLabel(GiftFilterTab t) => switch (t) {
-          GiftFilterTab.all => 'Show All',
-          GiftFilterTab.active => 'Active Only',
-          GiftFilterTab.inactive => 'Inactive Only',
+          GiftFilterTab.all => l10n.t('giftFilterAll'),
+          GiftFilterTab.active => l10n.t('giftFilterActive'),
+          GiftFilterTab.inactive => l10n.t('giftFilterInactive'),
         };
 
     String sortLabel(GiftSortType s) => switch (s) {
-          GiftSortType.priceLowToHigh => 'Price: Low → High',
-          GiftSortType.priceHighToLow => 'Price: High → Low',
-          GiftSortType.dateOldToNew => 'Date: Oldest first',
-          GiftSortType.dateNewToOld => 'Date: Newest first',
+          GiftSortType.priceLowToHigh => l10n.t('priceLowToHigh'),
+          GiftSortType.priceHighToLow => l10n.t('priceHighToLow'),
+          GiftSortType.dateOldToNew => l10n.t('dateOldToNew'),
+          GiftSortType.dateNewToOld => l10n.t('dateNewToOld'),
         };
 
     // ── Date range label ──────────────────────────────────────────────────
     String dateRangeLabel() {
-      if (fromDate == null && toDate == null) return 'Date Range';
+      if (fromDate == null && toDate == null) return l10n.t('dateRange');
       final fmt = (DateTime d) =>
           '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
       if (fromDate != null && toDate != null) {
         return '${fmt(fromDate!)} – ${fmt(toDate!)}';
       }
-      if (fromDate != null) return 'From ${fmt(fromDate!)}';
-      return 'Until ${fmt(toDate!)}';
+      if (fromDate != null) {
+        return ctx.tr('dateFrom', {'date': fmt(fromDate!)});
+      }
+      return ctx.tr('dateUntil', {'date': fmt(toDate!)});
     }
 
     final hasDateRange = fromDate != null || toDate != null;
 
+    // ── Price range label ─────────────────────────────────────────────────
+    String priceRangeLabel() {
+      if (minPrice == null && maxPrice == null) return l10n.t('priceRange');
+      String fmt(double v) => v.truncateToDouble() == v
+          ? '\$${v.toInt()}'
+          : '\$${v.toStringAsFixed(2)}';
+      if (minPrice != null && maxPrice != null) {
+        return '${fmt(minPrice!)} – ${fmt(maxPrice!)}';
+      }
+      if (minPrice != null) return '${fmt(minPrice!)}+';
+      return ctx.tr('priceUpTo', {'amount': fmt(maxPrice!)});
+    }
+
+    final hasPriceRange = minPrice != null || maxPrice != null;
+
     return Container(
-      color: bg,
+      color: scheme.surfaceContainerLowest,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1680),
@@ -371,7 +389,6 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                                   child: _TabChip(
                                     label: tabLabel(tab),
                                     selected: selectedTab == tab,
-                                    isDark: isDark,
                                     theme: theme,
                                     onTap: () =>
                                         bloc.add(ChangeGiftTabFilterEvent(tab)),
@@ -383,11 +400,14 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        '$displayedCount gift${displayedCount == 1 ? '' : 's'}',
+                        ctx.tr('showingResultsCount', {
+                          'shown': '$displayedCount',
+                          'total': '$totalCount',
+                        }),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: metaColor,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -396,7 +416,7 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
 
                 const SizedBox(height: 6),
 
-                // ── Row 2: search + date range picker ─────────────────────
+                // ── Row 2: search + price range + date range picker ───────
                 SizedBox(
                   height: 46,
                   child: Row(
@@ -405,10 +425,37 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                       Expanded(
                         flex: 3,
                         child: _SearchField(
-                          isDark: isDark,
                           searchQuery: searchQuery,
                           onChanged: (q) =>
                               bloc.add(SearchGiftsEvent(q)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Price range picker button
+                      Expanded(
+                        flex: 2,
+                        child: _DateRangeButton(
+                          icon: Icons.attach_money_rounded,
+                          label: priceRangeLabel(),
+                          hasRange: hasPriceRange,
+                          theme: theme,
+                          onTap: () {
+                            showDialog<void>(
+                              context: ctx,
+                              builder: (dialogCtx) => _PriceRangeDialog(
+                                theme: theme,
+                                initialMin: minPrice,
+                                initialMax: maxPrice,
+                              ),
+                            );
+                          },
+                          onClear: hasPriceRange
+                              ? () => bloc.add(UpdatePriceRangeFilterEvent(
+                                    minPrice: null,
+                                    maxPrice: null,
+                                  ))
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -419,7 +466,6 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                         child: _DateRangeButton(
                           label: dateRangeLabel(),
                           hasRange: hasDateRange,
-                          isDark: isDark,
                           theme: theme,
                           onTap: () async {
                             final result = await showDateRangePicker(
@@ -475,7 +521,6 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                             GiftSortType.priceHighToLow,
                           ],
                           itemLabel: sortLabel,
-                          isDark: isDark,
                           onChanged: (v) {
                             if (v != null) bloc.add(ChangeGiftSortEvent(v));
                           },
@@ -494,7 +539,6 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                             GiftSortType.dateOldToNew,
                           ],
                           itemLabel: sortLabel,
-                          isDark: isDark,
                           onChanged: (v) {
                             if (v != null) bloc.add(ChangeGiftSortEvent(v));
                           },
@@ -504,7 +548,7 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
                   ),
                 ),
 
-                Divider(height: 1, thickness: 1, color: divider),
+                Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
               ],
             ),
           ),
@@ -518,12 +562,10 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
 
 class _SearchField extends StatefulWidget {
   const _SearchField({
-    required this.isDark,
     required this.searchQuery,
     required this.onChanged,
   });
 
-  final bool isDark;
   final String searchQuery;
   final ValueChanged<String> onChanged;
 
@@ -560,41 +602,30 @@ class _SearchFieldState extends State<_SearchField> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(
-        color: widget.isDark
-            ? const Color(0xFF2E3440)
-            : const Color(0xFFE8ECF0),
-      ),
+      borderSide: BorderSide(color: scheme.outlineVariant),
     );
     return TextField(
       controller: _ctrl,
       onChanged: widget.onChanged,
-      style: TextStyle(
-        fontSize: 13,
-        color: widget.isDark ? Colors.white : const Color(0xFF111827),
-      ),
+      style: TextStyle(fontSize: 13, color: scheme.onSurface),
       decoration: InputDecoration(
-        hintText: 'Search gifts…',
-        hintStyle: TextStyle(
-          fontSize: 13,
-          color: widget.isDark ? Colors.grey.shade600 : const Color(0xFF9CA3AF),
-        ),
+        hintText: l10n.t('searchGifts'),
+        hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
         prefixIcon: Icon(
           Icons.search_rounded,
           size: 18,
-          color:
-              widget.isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF),
+          color: scheme.onSurfaceVariant,
         ),
         suffixIcon: _ctrl.text.isNotEmpty
             ? IconButton(
                 icon: Icon(
                   Icons.close_rounded,
                   size: 16,
-                  color: widget.isDark
-                      ? Colors.grey.shade400
-                      : const Color(0xFF6B7280),
+                  color: scheme.onSurfaceVariant,
                 ),
                 onPressed: () {
                   _ctrl.clear();
@@ -605,8 +636,7 @@ class _SearchFieldState extends State<_SearchField> {
               )
             : null,
         filled: true,
-        fillColor:
-            widget.isDark ? const Color(0xFF1A1F2E) : Colors.white,
+        fillColor: scheme.surfaceContainerLow,
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -614,10 +644,7 @@ class _SearchFieldState extends State<_SearchField> {
         enabledBorder: border,
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
       ),
     );
@@ -630,70 +657,199 @@ class _DateRangeButton extends StatelessWidget {
   const _DateRangeButton({
     required this.label,
     required this.hasRange,
-    required this.isDark,
     required this.theme,
     required this.onTap,
+    this.icon = Icons.date_range_rounded,
     this.onClear,
   });
 
   final String label;
   final bool hasRange;
-  final bool isDark;
   final ThemeData theme;
+  final IconData icon;
   final VoidCallback onTap;
   final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
-    final primary = theme.colorScheme.primary;
-    final borderColor = hasRange
-        ? primary
-        : (isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0));
+    final scheme = theme.colorScheme;
+    final borderColor =
+        hasRange ? scheme.primary : scheme.outlineVariant;
     final bgColor = hasRange
-        ? primary.withValues(alpha: 0.08)
-        : (isDark ? const Color(0xFF1A1F2E) : Colors.white);
-    final textColor = hasRange
-        ? primary
-        : (isDark ? Colors.grey.shade300 : const Color(0xFF4B5563));
+        ? scheme.primaryContainer.withValues(alpha: 0.35)
+        : scheme.surfaceContainerLow;
+    final textColor =
+        hasRange ? scheme.primary : scheme.onSurfaceVariant;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.date_range_rounded, size: 16, color: textColor),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: textColor,
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: textColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: textColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              ),
+              if (onClear != null)
+                IconButton(
+                  onPressed: onClear,
+                  icon: Icon(Icons.close_rounded, size: 14, color: textColor),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: context.l10n.t('clear'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Price range picker dialog ────────────────────────────────────────────────
+
+class _PriceRangeDialog extends StatefulWidget {
+  const _PriceRangeDialog({
+    required this.theme,
+    this.initialMin,
+    this.initialMax,
+  });
+
+  final ThemeData theme;
+  final double? initialMin;
+  final double? initialMax;
+
+  @override
+  State<_PriceRangeDialog> createState() => _PriceRangeDialogState();
+}
+
+class _PriceRangeDialogState extends State<_PriceRangeDialog> {
+  late final TextEditingController _minCtrl;
+  late final TextEditingController _maxCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _minCtrl = TextEditingController(text: _format(widget.initialMin));
+    _maxCtrl = TextEditingController(text: _format(widget.initialMax));
+  }
+
+  @override
+  void dispose() {
+    _minCtrl.dispose();
+    _maxCtrl.dispose();
+    super.dispose();
+  }
+
+  String _format(double? value) => value == null
+      ? ''
+      : value.truncateToDouble() == value
+          ? value.toStringAsFixed(0)
+          : value.toStringAsFixed(2);
+
+  double? _parse(String text) {
+    final cleaned = text.trim().replaceAll(RegExp(r'[^\d.]'), '');
+    if (cleaned.isEmpty) return null;
+    return double.tryParse(cleaned);
+  }
+
+  void _apply() {
+    var min = _parse(_minCtrl.text);
+    var max = _parse(_maxCtrl.text);
+    if (min != null && max != null && min > max) {
+      final swapped = min;
+      min = max;
+      max = swapped;
+    }
+    if (min == null && max == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    context.read<GiftsBloc>().add(
+          UpdatePriceRangeFilterEvent(minPrice: min, maxPrice: max),
+        );
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = widget.theme.colorScheme;
+    final l10n = context.l10n;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: scheme.outlineVariant),
+    );
+
+    return AlertDialog(
+      title: Text(l10n.t('priceRange')),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _minCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              ],
+              decoration: InputDecoration(
+                labelText: l10n.t('minPriceLabel'),
+                hintText: l10n.t('priceExample'),
+                border: border,
+                enabledBorder: border,
               ),
             ),
-            if (onClear != null)
-              GestureDetector(
-                onTap: onClear,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Icon(Icons.close_rounded, size: 14, color: textColor),
-                ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _maxCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              ],
+              decoration: InputDecoration(
+                labelText: l10n.t('maxPriceLabel'),
+                hintText: l10n.t('priceExampleMax'),
+                border: border,
+                enabledBorder: border,
               ),
+            ),
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.t('cancel')),
+        ),
+        FilledButton(
+          onPressed: _apply,
+          child: Text(l10n.t('apply')),
+        ),
+      ],
     );
   }
 }
@@ -704,20 +860,18 @@ class _TabChip extends StatelessWidget {
   const _TabChip({
     required this.label,
     required this.selected,
-    required this.isDark,
     required this.theme,
     required this.onTap,
   });
 
   final String label;
   final bool selected;
-  final bool isDark;
   final ThemeData theme;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -725,15 +879,11 @@ class _TabChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: selected
-              ? primary.withValues(alpha: 0.12)
-              : (isDark ? const Color(0xFF1A1F2E) : Colors.white),
+              ? scheme.primaryContainer
+              : scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected
-                ? primary
-                : (isDark
-                    ? const Color(0xFF2E3440)
-                    : const Color(0xFFE8ECF0)),
+            color: selected ? scheme.primary : scheme.outlineVariant,
           ),
         ),
         child: Text(
@@ -741,11 +891,7 @@ class _TabChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected
-                ? primary
-                : (isDark
-                    ? Colors.grey.shade300
-                    : const Color(0xFF4B5563)),
+            color: selected ? scheme.primary : scheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -762,7 +908,6 @@ class _SortDropdown extends StatelessWidget {
     required this.value,
     required this.items,
     required this.itemLabel,
-    required this.isDark,
     required this.onChanged,
   });
 
@@ -770,11 +915,11 @@ class _SortDropdown extends StatelessWidget {
   final GiftSortType value;
   final List<GiftSortType> items;
   final String Function(GiftSortType) itemLabel;
-  final bool isDark;
   final ValueChanged<GiftSortType?> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return DropdownButtonFormField<GiftSortType>(
       value: value,
       isExpanded: true,
@@ -783,12 +928,14 @@ class _SortDropdown extends StatelessWidget {
         labelText: label,
         isDense: true,
         filled: true,
-        fillColor: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+        fillColor: scheme.surfaceContainerLow,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0),
-          ),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -806,8 +953,48 @@ class _SortDropdown extends StatelessWidget {
 
 // ─── Grid ─────────────────────────────────────────────────────────────────────
 
+/// Rebuilds when any filter/sort input affecting [GiftsLoaded.displayed] changes.
+class _GiftsGridSliver extends StatelessWidget {
+  const _GiftsGridSliver();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<GiftsBloc, GiftsState>(
+      buildWhen: (prev, curr) {
+        if (prev is! GiftsLoaded || curr is! GiftsLoaded) {
+          return prev.runtimeType != curr.runtimeType;
+        }
+        return prev.gifts != curr.gifts ||
+            prev.selectedTab != curr.selectedTab ||
+            prev.selectedSort != curr.selectedSort ||
+            prev.searchQuery != curr.searchQuery ||
+            prev.fromDate != curr.fromDate ||
+            prev.toDate != curr.toDate ||
+            prev.minPriceFilter != curr.minPriceFilter ||
+            prev.maxPriceFilter != curr.maxPriceFilter;
+      },
+      builder: (context, state) {
+        if (state is! GiftsLoaded) return const SliverToBoxAdapter();
+        return _SliverGrid(
+          key: ValueKey(
+            'gifts-grid-${state.selectedTab.name}-'
+            '${state.searchQuery}-'
+            '${state.fromDate?.millisecondsSinceEpoch}-'
+            '${state.toDate?.millisecondsSinceEpoch}-'
+            '${state.minPriceFilter}-'
+            '${state.maxPriceFilter}-'
+            '${state.selectedSort.name}-'
+            '${state.displayed.length}',
+          ),
+          loaded: state,
+        );
+      },
+    );
+  }
+}
+
 class _SliverGrid extends StatelessWidget {
-  const _SliverGrid({required this.loaded});
+  const _SliverGrid({super.key, required this.loaded});
   final GiftsLoaded loaded;
 
   @override
@@ -886,6 +1073,7 @@ class _SliverGrid extends StatelessWidget {
 
   void _confirmDelete(BuildContext context, String id, String name) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -902,7 +1090,10 @@ class _SliverGrid extends StatelessWidget {
               Navigator.pop(ctx);
               context.read<GiftsBloc>().add(DeleteGiftEvent(id));
             },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
+            ),
             child: Text(l10n.t('delete')),
           ),
         ],
@@ -973,7 +1164,7 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
 
   void _submit(GiftsLoaded state) {
     if (state.pendingImageBytes == null) {
-      setState(() => _imageError = 'Please select an image');
+      setState(() => _imageError = context.l10n.t('pleaseSelectImage'));
       return;
     }
     if (!_formKey.currentState!.validate()) return;
@@ -1031,7 +1222,7 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
                     TextFormField(
                       controller: _nameCtrl,
                       decoration: InputDecoration(
-                        labelText: 'Gift Name *',
+                        labelText: l10n.t('giftNameLabel'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -1047,7 +1238,9 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
                       onPressed: state.isActioning ? null : _pickImage,
                       icon: const Icon(Icons.upload_file_outlined, size: 18),
                       label: Text(
-                        hasImage ? 'Change Image' : 'Upload Image *',
+                        hasImage
+                            ? l10n.t('changeImage')
+                            : l10n.t('uploadImageRequired'),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1079,10 +1272,17 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
                           child: Image.memory(
                             state.pendingImageBytes!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const ColoredBox(
-                              color: Color(0xFFF1F5F9),
+                            errorBuilder: (_, __, ___) => ColoredBox(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
                               child: Center(
-                                child: Icon(Icons.broken_image_outlined),
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                               ),
                             ),
                           ),
@@ -1114,7 +1314,7 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        labelText: 'Price (USD) *',
+                        labelText: l10n.t('giftPriceLabel'),
                         prefixText: '\$',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -1134,15 +1334,15 @@ class _CreateGiftDialogState extends State<_CreateGiftDialog> {
                     // Uploading indicator
                     if (state.isActioning) ...[
                       const SizedBox(height: 14),
-                      const Row(
+                      Row(
                         children: [
-                          SizedBox(
+                          const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          SizedBox(width: 10),
-                          Text('Uploading image & creating gift…'),
+                          const SizedBox(width: 10),
+                          Text(l10n.t('uploadingCreatingGift')),
                         ],
                       ),
                     ],
@@ -1301,7 +1501,7 @@ class _EditGiftDialogState extends State<_EditGiftDialog> {
                       TextFormField(
                         controller: _nameCtrl,
                         decoration: InputDecoration(
-                          labelText: 'Gift Name *',
+                          labelText: l10n.t('giftNameLabel'),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1318,8 +1518,8 @@ class _EditGiftDialogState extends State<_EditGiftDialog> {
                         icon: const Icon(Icons.upload_file_outlined, size: 18),
                         label: Text(
                           hasNewImage
-                              ? 'Change Image'
-                              : 'Upload New Image',
+                              ? l10n.t('changeImage')
+                              : l10n.t('uploadNewImage'),
                         ),
                         style: OutlinedButton.styleFrom(
                           padding:
@@ -1359,7 +1559,7 @@ class _EditGiftDialogState extends State<_EditGiftDialog> {
                       Text(
                         hasNewImage
                             ? _newImageName ?? ''
-                            : 'Current image (tap button to replace)',
+                            : l10n.t('currentImageHint'),
                         style: theme.textTheme.bodySmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1373,7 +1573,7 @@ class _EditGiftDialogState extends State<_EditGiftDialog> {
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         decoration: InputDecoration(
-                          labelText: 'Price (USD) *',
+                          labelText: l10n.t('giftPriceLabel'),
                           prefixText: '\$',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -1403,16 +1603,15 @@ class _EditGiftDialogState extends State<_EditGiftDialog> {
                       // ── Uploading indicator ──────────────────────────
                       if (isActioning) ...[
                         const SizedBox(height: 14),
-                        const Row(
+                        Row(
                           children: [
-                            SizedBox(
+                            const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             ),
-                            SizedBox(width: 10),
-                            Text('Saving changes…'),
+                            const SizedBox(width: 10),
+                            Text(l10n.t('savingChanges')),
                           ],
                         ),
                       ],
@@ -1437,13 +1636,16 @@ class _EditGiftDialogState extends State<_EditGiftDialog> {
     );
   }
 
-  Widget _imagePlaceholder() => Container(
-        color: const Color(0xFFF4F5F7),
-        child: const Center(
-          child: Icon(Icons.card_giftcard_rounded,
-              size: 40, color: Color(0xFF9CA3AF)),
-        ),
-      );
+  Widget _imagePlaceholder() {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: scheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(Icons.card_giftcard_rounded,
+            size: 40, color: scheme.onSurfaceVariant),
+      ),
+    );
+  }
 }
 
 // ─── Published-at picker widget (used in both create & edit dialogs) ──────────
@@ -1459,24 +1661,20 @@ class _PublishedAtPicker extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onClear;
 
-  static final _fmt = DateFormat('MMM d, yyyy  HH:mm');
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final hasValue = value != null;
+    final locale = Localizations.localeOf(context).languageCode;
+    final dateFmt = DateFormat('MMM d, yyyy  HH:mm', locale);
 
-    final borderColor = hasValue
-        ? primary
-        : (isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0));
+    final borderColor = hasValue ? scheme.primary : scheme.outlineVariant;
     final bgColor = hasValue
-        ? primary.withValues(alpha: 0.07)
-        : (isDark ? const Color(0xFF1A1F2E) : Colors.white);
-    final textColor = hasValue
-        ? primary
-        : (isDark ? Colors.grey.shade300 : const Color(0xFF4B5563));
+        ? scheme.primaryContainer.withValues(alpha: 0.35)
+        : scheme.surfaceContainerLow;
+    final textColor =
+        hasValue ? scheme.primary : scheme.onSurfaceVariant;
 
     return GestureDetector(
       onTap: onTap,
@@ -1498,7 +1696,7 @@ class _PublishedAtPicker extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Published At',
+                    l10n.t('publishedAt'),
                     style: TextStyle(
                       fontSize: 10,
                       color: textColor.withValues(alpha: 0.7),
@@ -1506,7 +1704,9 @@ class _PublishedAtPicker extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    hasValue ? _fmt.format(value!.toLocal()) : 'Defaults to now',
+                    hasValue
+                        ? dateFmt.format(value!.toLocal())
+                        : l10n.t('defaultsToNow'),
                     style: TextStyle(
                       fontSize: 13,
                       color: textColor,
@@ -1584,7 +1784,7 @@ class _SliverEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return SliverFillRemaining(
       hasScrollBody: false,
       child: Center(
@@ -1593,19 +1793,13 @@ class _SliverEmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon,
-                  size: 52,
-                  color: isDark
-                      ? Colors.grey.shade600
-                      : const Color(0xFF9CA3AF)),
+              Icon(icon, size: 52, color: scheme.onSurfaceVariant),
               const SizedBox(height: 14),
               Text(
                 l10n.t(messageKey),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? Colors.grey.shade400
-                          : const Color(0xFF6B7280),
+                      color: scheme.onSurfaceVariant,
                     ),
               ),
             ],
@@ -1623,7 +1817,7 @@ class _SliverError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return SliverFillRemaining(
       hasScrollBody: false,
       child: Center(
@@ -1633,13 +1827,13 @@ class _SliverError extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.error_outline_rounded,
-                  size: 48, color: Colors.red.shade400),
+                  size: 48, color: scheme.error),
               const SizedBox(height: 14),
               Text(
                 l10n.t('failedToLoadGifts'),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : Colors.black87,
+                      color: scheme.onSurface,
                     ),
               ),
               const SizedBox(height: 8),
@@ -1647,9 +1841,7 @@ class _SliverError extends StatelessWidget {
                 message,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? Colors.grey.shade500
-                          : const Color(0xFF9CA3AF),
+                      color: scheme.onSurfaceVariant,
                     ),
               ),
               const SizedBox(height: 16),

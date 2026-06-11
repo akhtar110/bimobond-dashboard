@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../user_activity/presentation/widgets/user_activity_auctions_tab.dart';
 import '../../../user_activity/presentation/widgets/user_activity_comments_subtabs.dart';
 import '../../../user_activity/presentation/widgets/user_activity_devices_tab.dart';
 import '../../../user_activity/presentation/widgets/user_activity_gifts_tab.dart';
 import '../../../user_activity/presentation/widgets/user_activity_likes_subtabs.dart';
-import '../../../user_activity/presentation/widgets/user_activity_mentions_tab.dart';
-import '../../../user_activity/presentation/widgets/user_activity_posts_tab.dart';
+import '../../../user_activity/presentation/widgets/user_activity_mentions_subtabs.dart';
+import '../../../notifications/presentation/bloc/user_notifications_bloc.dart';
+import '../../../user_activity/presentation/widgets/user_activity_notifications_tab.dart';
+import '../../../user_activity/presentation/widgets/user_activity_posts_subtabs.dart';
 import '../../../user_activity/presentation/widgets/user_activity_tab.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/user_detail_bloc.dart';
@@ -25,6 +28,15 @@ class UserDetailScreen extends StatefulWidget {
 }
 
 class _UserDetailScreenState extends State<UserDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CategoriesBloc>().add(LoadCategoriesEvent(forCatalog: true));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -67,14 +79,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
           if (state is UserDetailLoaded) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeader(context, state.userDetail.user, isDark),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
                   _buildStatsGrid(context, state.userDetail.user, isDark),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
                   _buildInfoAndActivityTabs(
                     context,
                     state.userDetail.user,
@@ -144,33 +156,28 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           ],
         );
 
-        final content = Expanded(
-          flex: isCompact ? 0 : 1,
-          child: Column(
-            crossAxisAlignment: isCompact
-                ? CrossAxisAlignment.center
-                : CrossAxisAlignment.start,
+        Widget contentColumn(CrossAxisAlignment align, WrapAlignment wrapAlign) {
+          return Column(
+            crossAxisAlignment: align,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Wrap(
                 spacing: 12,
                 runSpacing: 8,
-                alignment: isCompact
-                    ? WrapAlignment.center
-                    : WrapAlignment.start,
+                alignment: wrapAlign,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     user.fullName ?? user.username,
-                    style:
-                        (isCompact
-                                ? theme.textTheme.headlineSmall
-                                : theme.textTheme.displaySmall)
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF0F172A),
-                            ),
+                    style: (isCompact
+                            ? theme.textTheme.headlineSmall
+                            : theme.textTheme.displaySmall)
+                        ?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
+                        ),
                   ),
                   _buildRoleChip(user, isDark),
                 ],
@@ -187,7 +194,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               if (user.bio != null)
                 Text(
                   user.bio!,
-                  textAlign: isCompact ? TextAlign.center : TextAlign.start,
+                  textAlign:
+                      isCompact ? TextAlign.center : TextAlign.start,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: isDark
                         ? Colors.grey.shade300
@@ -201,9 +209,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                alignment: isCompact
-                    ? WrapAlignment.center
-                    : WrapAlignment.start,
+                alignment: wrapAlign,
                 children: [
                   _buildActionBtn(
                     context,
@@ -211,9 +217,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         ? context.l10n.t('unban')
                         : context.l10n.t('ban'),
                     user.isBanned ? Colors.green : Colors.red,
-                    () => context.read<UsersBloc>().add(
-                      ToggleBanUserEvent(user.id),
-                    ),
+                    () => context
+                        .read<UsersBloc>()
+                        .add(ToggleBanUserEvent(user.id)),
                   ),
                   _buildActionBtn(
                     context,
@@ -222,22 +228,22 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         : context.l10n.t('promote'),
                     theme.colorScheme.primary,
                     () => user.roles.contains(UserRole.admin)
-                        ? context.read<UsersBloc>().add(
-                            DemoteUserEvent(user.id),
-                          )
-                        : context.read<UsersBloc>().add(
-                            PromoteUserEvent(user.id),
-                          ),
+                        ? context
+                            .read<UsersBloc>()
+                            .add(DemoteUserEvent(user.id))
+                        : context
+                            .read<UsersBloc>()
+                            .add(PromoteUserEvent(user.id)),
                   ),
                 ],
               ),
             ],
-          ),
-        );
+          );
+        }
 
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: isDark ? theme.colorScheme.surface : Colors.white,
             borderRadius: BorderRadius.circular(24),
@@ -250,8 +256,29 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             ],
           ),
           child: isCompact
-              ? Column(children: [avatar, const SizedBox(height: 24), content])
-              : Row(children: [avatar, const SizedBox(width: 32), content]),
+              ? Column(
+                  children: [
+                    avatar,
+                    const SizedBox(height: 16),
+                    contentColumn(
+                      CrossAxisAlignment.center,
+                      WrapAlignment.center,
+                    ),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    avatar,
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: contentColumn(
+                        CrossAxisAlignment.start,
+                        WrapAlignment.start,
+                      ),
+                    ),
+                  ],
+                ),
         );
       },
     );
@@ -305,55 +332,56 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   Widget _buildStatsGrid(BuildContext context, UserEntity user, bool isDark) {
     final l10n = context.l10n;
+
+    final stats = [
+      (l10n.t('followers'), user.followerCount.toString(),
+          Icons.people_alt_rounded, Colors.blue),
+      (l10n.t('following'), user.followingCount.toString(),
+          Icons.person_add_alt_1_rounded, Colors.purple),
+      (l10n.t('posts'), user.postCount.toString(),
+          Icons.video_collection_rounded, Colors.orange),
+      (l10n.t('totalLikes'), user.totalLikes.toString(),
+          Icons.favorite_rounded, Colors.pink),
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        int crossAxisCount = 4;
-        if (constraints.maxWidth < 600) {
-          crossAxisCount = 1;
-        } else if (constraints.maxWidth < 1000) {
-          crossAxisCount = 2;
+        // On very narrow screens stack vertically, otherwise flow as a row.
+        if (constraints.maxWidth < 480) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int i = 0; i < stats.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _buildStatCard(
+                  context,
+                  stats[i].$1,
+                  stats[i].$2,
+                  stats[i].$3,
+                  stats[i].$4,
+                  isDark,
+                ),
+              ],
+            ],
+          );
         }
 
-        return GridView.count(
-          shrinkWrap: true,
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 24,
-          mainAxisSpacing: 24,
-          childAspectRatio: crossAxisCount == 1 ? 4.0 : 2.5,
-          physics: const NeverScrollableScrollPhysics(),
+        // Wrap so cards use their natural (intrinsic) width and stay clustered.
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            _buildStatCard(
-              context,
-              l10n.t('followers'),
-              user.followerCount.toString(),
-              Icons.people_alt_rounded,
-              Colors.blue,
-              isDark,
-            ),
-            _buildStatCard(
-              context,
-              l10n.t('following'),
-              user.followingCount.toString(),
-              Icons.person_add_alt_1_rounded,
-              Colors.purple,
-              isDark,
-            ),
-            _buildStatCard(
-              context,
-              l10n.t('posts'),
-              user.postCount.toString(),
-              Icons.video_collection_rounded,
-              Colors.orange,
-              isDark,
-            ),
-            _buildStatCard(
-              context,
-              l10n.t('totalLikes'),
-              user.totalLikes.toString(),
-              Icons.favorite_rounded,
-              Colors.pink,
-              isDark,
-            ),
+            for (final s in stats)
+              IntrinsicWidth(
+                child: _buildStatCard(
+                  context,
+                  s.$1,
+                  s.$2,
+                  s.$3,
+                  s.$4,
+                  isDark,
+                ),
+              ),
           ],
         );
       },
@@ -370,7 +398,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   ) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -385,38 +413,37 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: color, size: 28),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                  overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 12),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ],
       ),
@@ -432,7 +459,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     final theme = Theme.of(context);
 
     final tabsSection = DefaultTabController(
-      length: 8,
+      length: 9,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -467,12 +494,13 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 Tab(text: l10n.t('auctions')),
                 Tab(text: l10n.t('gifts')),
                 Tab(text: l10n.t('devices')),
+                Tab(text: l10n.t('notifications')),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           SizedBox(
-            height: 900,
+            height: 860,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -487,7 +515,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 borderRadius: BorderRadius.circular(20),
                 child: TabBarView(
                   children: [
-                    UserActivityPostsTab(
+                    UserActivityPostsSubtabs(
                       userId: user.id,
                       isDark: isDark,
                       sourceUser: user,
@@ -502,7 +530,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       isDark: isDark,
                       sourceUser: user,
                     ),
-                    UserActivityMentionsTab(
+                    UserActivityMentionsSubtabs(
+                      userId: user.id,
                       isDark: isDark,
                       sourceUser: user,
                     ),
@@ -513,6 +542,15 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     UserActivityAuctionsTab(isDark: isDark),
                     UserActivityGiftsTab(isDark: isDark),
                     UserActivityDevicesTab(isDark: isDark),
+                    BlocProvider(
+                      create: (_) =>
+                          context.read<UserNotificationsBloc>(),
+                      child: UserActivityNotificationsTab(
+                        userId: user.id,
+                        isDark: isDark,
+                        sourceUser: user,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -529,7 +567,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildPersonalInfo(context, user, isDark),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
               tabsSection,
             ],
           );
@@ -542,7 +580,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               flex: 1,
               child: _buildPersonalInfo(context, user, isDark),
             ),
-            const SizedBox(width: 32),
+            const SizedBox(width: 12),
             Expanded(flex: 2, child: tabsSection),
           ],
         );
@@ -560,7 +598,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -575,7 +613,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           _buildInfoItem(
             context,
             l10n.t('emailAddress'),
@@ -607,9 +645,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             isDark,
           ),
 
-          const Divider(height: 48),
+          const Divider(height: 20),
           _buildSectionTitle(context, l10n.t('personalDetails'), isDark),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           _buildInfoItem(
             context,
             l10n.t('gender'),
@@ -634,9 +672,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             isDark,
           ),
 
-          const Divider(height: 48),
+          const Divider(height: 20),
           _buildSectionTitle(context, l10n.t('socialProfiles'), isDark),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           _buildInfoItem(
             context,
             l10n.t('instagram'),
@@ -652,9 +690,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             isDark,
           ),
 
-          const Divider(height: 48),
+          const Divider(height: 20),
           _buildSectionTitle(context, l10n.t('privacyAndSettings'), isDark),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           _buildInfoItem(
             context,
             l10n.t('accountPrivacy'),
@@ -687,14 +725,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           ),
 
           if (user.isBanned) ...[
-            const Divider(height: 48),
+            const Divider(height: 20),
             _buildSectionTitle(
               context,
               l10n.t('moderationStatus'),
               isDark,
               color: Colors.red,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             _buildInfoItem(
               context,
               l10n.t('banStatus'),
@@ -762,7 +800,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   }) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
           Icon(
@@ -770,7 +808,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             size: 20,
             color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -782,7 +820,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 0),
                 Text(
                   value,
                   style: theme.textTheme.bodyMedium?.copyWith(

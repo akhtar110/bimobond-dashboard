@@ -24,21 +24,16 @@ class GiftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark
-              ? const Color(0xFF2E3440)
-              : const Color(0xFFE8ECF0),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
+            color: scheme.shadow.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -54,17 +49,16 @@ class GiftCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name + badge row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
                         gift.name,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                            ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -74,29 +68,22 @@ class GiftCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-
-                // Published date
                 _PublishedDate(gift: gift),
                 const SizedBox(height: 8),
-
-                // Price chip + animated badge
                 Wrap(
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    _PriceChip(theme: theme, priceUsd: gift.priceUsd),
+                    _PriceChip(priceUsd: gift.priceUsd),
                     if (gift.animationUrl != null &&
                         gift.animationUrl!.isNotEmpty)
-                      _MiniChip(
+                      const _MiniChip(
                         icon: Icons.animation_rounded,
                         label: 'Animated',
-                        isDark: isDark,
                       ),
                   ],
                 ),
                 const SizedBox(height: 12),
-
-                // Action row
                 Row(
                   children: [
                     Expanded(
@@ -122,8 +109,8 @@ class GiftCard extends StatelessWidget {
                       height: 36,
                       child: IconButton.outlined(
                         onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline_rounded,
-                            size: 16, color: Colors.red),
+                        icon: Icon(Icons.delete_outline_rounded,
+                            size: 16, color: scheme.error),
                         padding: EdgeInsets.zero,
                         style: IconButton.styleFrom(
                           shape: RoundedRectangleBorder(
@@ -153,13 +140,13 @@ class _PublishedDate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
+    final scheme = Theme.of(context).colorScheme;
     final date = gift.publishedAt;
 
     return Row(
       children: [
-        Icon(Icons.calendar_today_outlined, size: 12, color: muted),
+        Icon(Icons.calendar_today_outlined,
+            size: 12, color: scheme.onSurfaceVariant),
         const SizedBox(width: 5),
         Expanded(
           child: Text(
@@ -168,7 +155,7 @@ class _PublishedDate extends StatelessWidget {
                 : 'Publish date unavailable',
             style: TextStyle(
               fontSize: 11,
-              color: muted,
+              color: scheme.onSurfaceVariant,
               height: 1.3,
             ),
             maxLines: 2,
@@ -183,16 +170,16 @@ class _PublishedDate extends StatelessWidget {
 // ─── Price chip ───────────────────────────────────────────────────────────────
 
 class _PriceChip extends StatelessWidget {
-  const _PriceChip({required this.theme, required this.priceUsd});
-  final ThemeData theme;
+  const _PriceChip({required this.priceUsd});
   final double priceUsd;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        color: scheme.primaryContainer,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -200,7 +187,7 @@ class _PriceChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: theme.colorScheme.primary,
+          color: scheme.onPrimaryContainer,
         ),
       ),
     );
@@ -213,31 +200,29 @@ class _MiniChip extends StatelessWidget {
   const _MiniChip({
     required this.icon,
     required this.label,
-    required this.isDark,
   });
   final IconData icon;
   final String label;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final color = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+        color: scheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          Icon(icon, size: 12, color: scheme.onSurfaceVariant),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
-              color: color,
+              color: scheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -255,25 +240,25 @@ class _GiftThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return AspectRatio(
       aspectRatio: 4 / 3,
       child: gift.thumbnailUrl.isNotEmpty
           ? CachedNetworkImage(
               imageUrl: gift.thumbnailUrl,
               fit: BoxFit.cover,
-              placeholder: (_, __) => _placeholder(isDark),
-              errorWidget: (_, __, ___) => _placeholder(isDark),
+              placeholder: (_, __) => _placeholder(scheme),
+              errorWidget: (_, __, ___) => _placeholder(scheme),
             )
-          : _placeholder(isDark),
+          : _placeholder(scheme),
     );
   }
 
-  Widget _placeholder(bool isDark) => Container(
-        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF4F5F7),
-        child: const Center(
+  Widget _placeholder(ColorScheme scheme) => ColoredBox(
+        color: scheme.surfaceContainerHighest,
+        child: Center(
           child: Icon(Icons.card_giftcard_rounded,
-              size: 40, color: Color(0xFF9CA3AF)),
+              size: 40, color: scheme.onSurfaceVariant),
         ),
       );
 }
@@ -287,16 +272,21 @@ class _ActiveBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final fg = isActive ? scheme.primary : scheme.onSurfaceVariant;
+    final bg =
+        isActive ? scheme.primaryContainer : scheme.surfaceContainerHigh;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         isActive ? l10n.t('activeLabel') : l10n.t('inactive'),
         style: TextStyle(
-          color: isActive ? const Color(0xFF16A34A) : const Color(0xFF6B7280),
+          color: fg,
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
@@ -315,6 +305,7 @@ class _ToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       width: 36,
       height: 36,
@@ -326,10 +317,10 @@ class _ToggleButton extends StatelessWidget {
               .add(ToggleGiftActiveEvent(gift.id, !gift.isActive)),
           icon: Icon(
             gift.isActive
-                ? Icons.visibility_off_rounded
-                : Icons.visibility_rounded,
+                ? Icons.visibility_rounded
+                : Icons.visibility_off_rounded,
             size: 16,
-            color: gift.isActive ? Colors.orange : Colors.green,
+            color: gift.isActive ? scheme.tertiary : scheme.primary,
           ),
           padding: EdgeInsets.zero,
           style: IconButton.styleFrom(
@@ -375,9 +366,9 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFEEEEF0);
-    final hi = isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF8F8FA);
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerHigh;
+    final hi = scheme.surfaceContainerLow;
 
     return AnimatedBuilder(
       animation: _anim,
@@ -385,13 +376,9 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
         final c = Color.lerp(base, hi, _anim.value)!;
         return Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF161622) : Colors.white,
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isDark
-                  ? const Color(0xFF2E3440)
-                  : const Color(0xFFE8ECF0),
-            ),
+            border: Border.all(color: scheme.outlineVariant),
           ),
           clipBehavior: Clip.hardEdge,
           child: Column(

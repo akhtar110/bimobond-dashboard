@@ -21,17 +21,15 @@ class PostAuctionSection extends StatefulWidget {
 }
 
 class _PostAuctionSectionState extends State<PostAuctionSection> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _imageUrlController;
-  late final TextEditingController _startPriceController;
-  late final TextEditingController _targetPriceController;
+  late TextEditingController _nameController;
+  late TextEditingController _startPriceController;
+  late TextEditingController _targetPriceController;
 
   @override
   void initState() {
     super.initState();
     final a = widget.form.auction;
     _nameController = TextEditingController(text: a?.itemName ?? '');
-    _imageUrlController = TextEditingController(text: a?.itemImageUrl ?? '');
     _startPriceController = TextEditingController(
       text: a?.startingPriceUsd?.toString() ?? '',
     );
@@ -43,19 +41,17 @@ class _PostAuctionSectionState extends State<PostAuctionSection> {
   @override
   void didUpdateWidget(covariant PostAuctionSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final a = widget.form.auction;
-    if (oldWidget.form.auction?.itemName != a?.itemName) {
+    if (oldWidget.form.isAuctionable != widget.form.isAuctionable) {
+      final a = widget.form.auction;
       _nameController.text = a?.itemName ?? '';
-    }
-    if (oldWidget.form.auction?.itemImageUrl != a?.itemImageUrl) {
-      _imageUrlController.text = a?.itemImageUrl ?? '';
+      _startPriceController.text = a?.startingPriceUsd?.toString() ?? '';
+      _targetPriceController.text = a?.targetPriceUsd?.toString() ?? '';
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _imageUrlController.dispose();
     _startPriceController.dispose();
     _targetPriceController.dispose();
     super.dispose();
@@ -75,8 +71,8 @@ class _PostAuctionSectionState extends State<PostAuctionSection> {
         Text(
           l10n.t('auctionDetails'),
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+                fontWeight: FontWeight.w600,
+              ),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -87,17 +83,6 @@ class _PostAuctionSectionState extends State<PostAuctionSection> {
           ),
           onChanged: (v) =>
               widget.onFieldUpdate(CreatePostField.auctionItemName, v),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _imageUrlController,
-          decoration: InputDecoration(
-            labelText: l10n.t('auctionItemImageUrl'),
-            hintText: l10n.t('auctionItemImageUrlHint'),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onChanged: (v) =>
-              widget.onFieldUpdate(CreatePostField.auctionItemImageUrl, v),
         ),
         const SizedBox(height: 12),
         Row(

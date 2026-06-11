@@ -8,14 +8,13 @@ class ReportTargetPreview extends StatelessWidget {
   const ReportTargetPreview({
     super.key,
     required this.report,
-    required this.isDark,
   });
 
   final ReportEntity report;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final preview = _previewData();
     if (preview == null) return const SizedBox.shrink();
 
@@ -27,13 +26,9 @@ class ReportTargetPreview extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: ReportCardTheme.previewSurface(isDark),
+          color: ReportCardTheme.previewSurface(scheme),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isDark
-                ? const Color(0xFF1E293B)
-                : const Color(0xFFE8ECF0),
-          ),
+          border: Border.all(color: scheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +38,7 @@ class ReportTargetPreview extends StatelessWidget {
                 Icon(
                   icon,
                   size: 13,
-                  color: ReportCardTheme.mutedText(isDark),
+                  color: ReportCardTheme.mutedText(scheme),
                 ),
                 const SizedBox(width: 5),
                 Text(
@@ -51,7 +46,7 @@ class ReportTargetPreview extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: ReportCardTheme.mutedText(isDark),
+                    color: ReportCardTheme.mutedText(scheme),
                   ),
                 ),
               ],
@@ -65,7 +60,7 @@ class ReportTargetPreview extends StatelessWidget {
                 fontSize: 13,
                 height: 1.35,
                 fontWeight: FontWeight.w500,
-                color: isDark ? Colors.grey.shade300 : const Color(0xFF374151),
+                color: scheme.onSurface,
               ),
             ),
           ],

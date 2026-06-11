@@ -18,7 +18,6 @@ class CreatePostAuctionEntity {
 
   bool get isComplete =>
       itemName.trim().isNotEmpty &&
-      itemImageUrl.trim().isNotEmpty &&
       startingPriceUsd != null &&
       startingPriceUsd! > 0 &&
       targetPriceUsd != null &&

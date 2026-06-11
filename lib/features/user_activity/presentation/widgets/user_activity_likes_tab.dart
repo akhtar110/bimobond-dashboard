@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart';
+import '../../../post_management/data/mappers/managed_post_mapper.dart';
 import '../../../post_management/domain/entities/activity_context.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/user_like_entity.dart';
@@ -132,6 +133,11 @@ class _UserActivityLikesTabState extends State<UserActivityLikesTab> {
                     openPostInvestigation(
                       context,
                       postId: like.postId,
+                      post: managedPostFromLike(
+                        like,
+                        profileUser: widget.sourceUser,
+                        type: widget.type,
+                      ),
                       sourceUser: widget.sourceUser,
                       activityContext: ActivityContext.like(
                         likeId: like.id,

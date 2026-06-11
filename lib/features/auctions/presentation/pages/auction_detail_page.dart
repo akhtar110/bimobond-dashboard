@@ -4,10 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../injection_container.dart';
+import '../../../users/domain/entities/user_entity.dart';
+import '../../../users/domain/usecases/get_user_by_id.dart';
+import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../../domain/entities/gift_transaction_entity.dart';
 import '../bloc/auction_detail_bloc.dart';
 import '../bloc/auctions_bloc.dart';
+import '../widgets/auction_card.dart';
 
 class AuctionDetailPage extends StatefulWidget {
   const AuctionDetailPage({super.key, required this.auctionId});
@@ -43,14 +48,13 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF8F9FC),
+      backgroundColor: scheme.surfaceContainerLowest,
       appBar: AppBar(
         title: Text(context.l10n.t('auctionDetails')),
-        backgroundColor: isDark ? const Color(0xFF161622) : Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -58,7 +62,6 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       body: BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
         listener: (context, state) {
           if (state is AuctionDetailLoaded) {
-            // ── Forward any status change to the app-level list bloc ────────
             final newStatus = state.auction.status;
             if (newStatus != _lastKnownStatus &&
                 (state.auction.isCancelled || state.auction.isCompleted)) {
@@ -70,7 +73,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.successMessage!),
-                  backgroundColor: Colors.green,
+                  backgroundColor: scheme.primary,
                 ),
               );
             }
@@ -78,7 +81,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.errorMessage!),
-                  backgroundColor: Colors.red,
+                  backgroundColor: scheme.error,
                 ),
               );
             }
@@ -111,7 +114,6 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final auction = state.auction;
 
     return CustomScrollView(
@@ -127,11 +129,11 @@ class _DetailBody extends StatelessWidget {
                   _LiveIndicator(
                       isLive: state.isLive, auction: auction),
                   const SizedBox(height: 20),
-                  _ItemSection(
-                      auction: auction, isDark: isDark, theme: theme),
+                  _ItemSection(auction: auction, theme: theme),
                   const SizedBox(height: 20),
                   _ProgressSection(
-                      auction: auction, theme: theme, isDark: isDark,
+                      auction: auction,
+                      theme: theme,
                       lastGiftName: state.lastGiftName),
                   const SizedBox(height: 20),
                   Row(
@@ -139,28 +141,23 @@ class _DetailBody extends StatelessWidget {
                     children: [
                       Expanded(
                           child: _InfoCard(
-                              auction: auction,
-                              isDark: isDark,
-                              theme: theme)),
+                              auction: auction, theme: theme)),
                       const SizedBox(width: 16),
                       if (auction.winner != null ||
                           auction.isCompleted)
                         Expanded(
                             child: _WinnerCard(
-                                auction: auction,
-                                isDark: isDark,
-                                theme: theme)),
+                                auction: auction, theme: theme)),
                     ],
                   ),
                   const SizedBox(height: 20),
                   if (auction.isActive || auction.isCompleted)
-                    _AdminActionsCard(
-                        state: state, isDark: isDark, theme: theme),
+                    _AdminActionsCard(state: state, theme: theme),
                   if (auction.giftTransactions?.isNotEmpty == true) ...[
                     const SizedBox(height: 20),
                     _GiftTransactionsCard(
+                        auction: auction,
                         transactions: auction.giftTransactions!,
-                        isDark: isDark,
                         theme: theme),
                   ],
                   const SizedBox(height: 32),
@@ -184,6 +181,7 @@ class _LiveIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         if (isLive) ...[
@@ -191,10 +189,10 @@ class _LiveIndicator extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             l10n.t('live').toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF16A34A),
+              color: scheme.primary,
               letterSpacing: 1.2,
             ),
           ),
@@ -203,15 +201,19 @@ class _LiveIndicator extends StatelessWidget {
             '• Real-time updates active',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade500,
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ] else if (auction.isActive) ...[
-          const Icon(Icons.wifi_off_rounded, size: 14, color: Colors.grey),
+          Icon(Icons.wifi_off_rounded,
+              size: 14, color: scheme.onSurfaceVariant),
           const SizedBox(width: 6),
-          const Text(
+          Text(
             'Connecting to live updates...',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],
@@ -246,6 +248,7 @@ class _PulsingDotState extends State<_PulsingDot>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: _anim,
       builder: (context, child) => Container(
@@ -254,8 +257,8 @@ class _PulsingDotState extends State<_PulsingDot>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Color.lerp(
-            const Color(0xFF16A34A),
-            const Color(0xFF4ADE80),
+            scheme.primary,
+            scheme.primaryContainer,
             _anim.value,
           ),
         ),
@@ -267,10 +270,8 @@ class _PulsingDotState extends State<_PulsingDot>
 // ─── Item Section ─────────────────────────────────────────────────────────────
 
 class _ItemSection extends StatelessWidget {
-  const _ItemSection(
-      {required this.auction, required this.isDark, required this.theme});
+  const _ItemSection({required this.auction, required this.theme});
   final AuctionEntity auction;
-  final bool isDark;
   final ThemeData theme;
 
   @override
@@ -286,10 +287,10 @@ class _ItemSection extends StatelessWidget {
                 ? CachedNetworkImage(
                     imageUrl: auction.itemImageUrl!,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => _ph(isDark),
-                    errorWidget: (context, url, error) => _ph(isDark),
+                    placeholder: (context, url) => _ph(context),
+                    errorWidget: (context, url, error) => _ph(context),
                   )
-                : _ph(isDark),
+                : _ph(context),
           ),
         ),
         const SizedBox(width: 16),
@@ -336,12 +337,19 @@ class _ItemSection extends StatelessWidget {
     );
   }
 
-  Widget _ph(bool isDark) => Container(
-        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF4F5F7),
-        child: const Center(
-          child: Icon(Icons.gavel_rounded, size: 36, color: Color(0xFF9CA3AF)),
+  Widget _ph(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      color: scheme.surfaceContainerLow,
+      child: Center(
+        child: Icon(
+          Icons.gavel_rounded,
+          size: 36,
+          color: scheme.onSurfaceVariant,
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ─── Progress Section ─────────────────────────────────────────────────────────
@@ -350,31 +358,24 @@ class _ProgressSection extends StatelessWidget {
   const _ProgressSection({
     required this.auction,
     required this.theme,
-    required this.isDark,
     this.lastGiftName,
   });
   final AuctionEntity auction;
   final ThemeData theme;
-  final bool isDark;
   final String? lastGiftName;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = theme.colorScheme;
     final pct = auction.progressPercent;
-    final color = auction.isCompleted
-        ? Colors.green
-        : auction.isCancelled
-            ? Colors.grey
-            : theme.colorScheme.primary;
+    final color = auctionProgressColor(scheme, auction);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161622) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A3A) : const Color(0xFFE6E8EC),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,8 +432,7 @@ class _ProgressSection extends StatelessWidget {
                 return LinearProgressIndicator(
                   value: value,
                   minHeight: 10,
-                  backgroundColor:
-                      isDark ? const Color(0xFF2A2A3A) : const Color(0xFFE8E9EB),
+                  backgroundColor: scheme.surfaceContainerHighest,
                   color: color,
                 );
               },
@@ -442,14 +442,14 @@ class _ProgressSection extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.card_giftcard_rounded,
-                    size: 14, color: Color(0xFF16A34A)),
+                Icon(Icons.card_giftcard_rounded,
+                    size: 14, color: scheme.primary),
                 const SizedBox(width: 6),
                 Text(
                   'Latest: $lastGiftName',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF16A34A),
+                    color: scheme.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -465,23 +465,35 @@ class _ProgressSection extends StatelessWidget {
 // ─── Info Card (Host) ─────────────────────────────────────────────────────────
 
 class _InfoCard extends StatelessWidget {
-  const _InfoCard(
-      {required this.auction, required this.isDark, required this.theme});
+  const _InfoCard({required this.auction, required this.theme});
   final AuctionEntity auction;
-  final bool isDark;
   final ThemeData theme;
+
+  String? _hostField(String key) {
+    final value = auction.host?[key];
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = theme.colorScheme;
+    final dateFmt = DateFormat('MMM d, yyyy · h:mm a');
+
+    final fullName = _hostField('fullName');
+    final username = _hostField('username');
+    final email = _hostField('email');
+    final displayName = fullName ?? auction.hostName;
+    final giftCount = auction.giftTransactions?.length ?? 0;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161622) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A3A) : const Color(0xFFE6E8EC),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,14 +510,13 @@ class _InfoCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: isDark
-                    ? const Color(0xFF2A2A3A)
-                    : const Color(0xFFF0F0F0),
+                backgroundColor: scheme.surfaceContainerHighest,
                 backgroundImage: auction.hostAvatar != null
                     ? NetworkImage(auction.hostAvatar!)
                     : null,
                 child: auction.hostAvatar == null
-                    ? const Icon(Icons.person_rounded, color: Colors.grey)
+                    ? Icon(Icons.person_rounded,
+                        color: scheme.onSurfaceVariant)
                     : null,
               ),
               const SizedBox(width: 10),
@@ -514,40 +525,113 @@ class _InfoCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      auction.hostName,
+                      displayName,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 14),
-                    ),
-                    Text(
-                      auction.hostId,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.4),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
+                    if (username != null)
+                      Text(
+                        '@$username',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.55),
+                        ),
+                      ),
+                    if (email != null)
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.45),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
               ),
             ],
           ),
-          if (auction.postId != null) ...[
-            const Divider(height: 24),
+          const Divider(height: 24),
+          Text(
+            l10n.t('auctionDetails'),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _InfoRow(
+            icon: Icons.tag_rounded,
+            label: l10n.tOr('auctionId', 'Auction ID'),
+            value: auction.id,
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _InfoRow(
+            icon: Icons.info_outline_rounded,
+            label: l10n.t('status'),
+            value: auctionStatusStyle(scheme, l10n, auction.status).label,
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _InfoRow(
+            icon: Icons.attach_money_rounded,
+            label: l10n.t('startingPrice'),
+            value: '\$${auction.startingPriceUsd.toStringAsFixed(2)}',
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _InfoRow(
+            icon: Icons.flag_rounded,
+            label: l10n.t('auctionTargetPrice'),
+            value: '\$${auction.targetPriceUsd.toStringAsFixed(2)}',
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _InfoRow(
+            icon: Icons.calendar_today_outlined,
+            label: l10n.t('auctionStartDate'),
+            value: dateFmt.format(auction.startedAt.toLocal()),
+            theme: theme,
+          ),
+          if (auction.endedAt != null) ...[
+            const SizedBox(height: 8),
             _InfoRow(
-              icon: Icons.link_rounded,
-              label: l10n.t('postId'),
-              value: auction.postId!,
+              icon: Icons.event_busy_outlined,
+              label: l10n.t('auctionEndDate'),
+              value: dateFmt.format(auction.endedAt!.toLocal()),
               theme: theme,
             ),
           ],
-          if (auction.startingPriceUsd > 0) ...[
-            const Divider(height: 24),
+          if (giftCount > 0) ...[
+            const SizedBox(height: 8),
             _InfoRow(
-              icon: Icons.attach_money_rounded,
-              label: l10n.t('startingPrice'),
-              value: '\$${auction.startingPriceUsd.toStringAsFixed(2)}',
+              icon: Icons.card_giftcard_outlined,
+              label: l10n.t('giftTransactions'),
+              value: '$giftCount',
+              theme: theme,
+            ),
+          ],
+          if (auction.postId != null || auction.post != null) ...[
+            const SizedBox(height: 8),
+            _InfoRow(
+              icon: Icons.image_outlined,
+              label: l10n.tOr('linkedPost', 'Linked post'),
+              value: l10n.tOr('yes', 'Yes'),
+              theme: theme,
+            ),
+          ],
+          if (auction.liveId != null && auction.liveId!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _InfoRow(
+              icon: Icons.live_tv_outlined,
+              label: l10n.tOr('liveSession', 'Live session'),
+              value: l10n.tOr('yes', 'Yes'),
               theme: theme,
             ),
           ],
@@ -596,23 +680,22 @@ class _InfoRow extends StatelessWidget {
 // ─── Winner Card ──────────────────────────────────────────────────────────────
 
 class _WinnerCard extends StatelessWidget {
-  const _WinnerCard(
-      {required this.auction, required this.isDark, required this.theme});
+  const _WinnerCard({required this.auction, required this.theme});
   final AuctionEntity auction;
-  final bool isDark;
   final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = theme.colorScheme;
     final winner = auction.winner;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161622) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF16A34A).withValues(alpha: 0.5),
+          color: scheme.tertiary.withValues(alpha: 0.5),
         ),
       ),
       child: Column(
@@ -620,13 +703,13 @@ class _WinnerCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.emoji_events_rounded,
-                  size: 16, color: Color(0xFFD97706)),
+              Icon(Icons.emoji_events_rounded,
+                  size: 16, color: scheme.tertiary),
               const SizedBox(width: 6),
               Text(
                 'Winner',
                 style: theme.textTheme.labelMedium?.copyWith(
-                  color: const Color(0xFFD97706),
+                  color: scheme.onTertiaryContainer,
                   letterSpacing: 0.5,
                   fontWeight: FontWeight.w700,
                 ),
@@ -639,15 +722,14 @@ class _WinnerCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: isDark
-                      ? const Color(0xFF2A2A3A)
-                      : const Color(0xFFF0F0F0),
+                  backgroundColor: scheme.surfaceContainerHighest,
                   backgroundImage:
                       winner['avatarUrl'] != null
                           ? NetworkImage(winner['avatarUrl'] as String)
                           : null,
                   child: winner['avatarUrl'] == null
-                      ? const Icon(Icons.person_rounded, color: Colors.grey)
+                      ? Icon(Icons.person_rounded,
+                          color: scheme.onSurfaceVariant)
                       : null,
                 ),
                 const SizedBox(width: 10),
@@ -693,24 +775,21 @@ class _WinnerCard extends StatelessWidget {
 // ─── Admin Actions Card ───────────────────────────────────────────────────────
 
 class _AdminActionsCard extends StatelessWidget {
-  const _AdminActionsCard(
-      {required this.state, required this.isDark, required this.theme});
+  const _AdminActionsCard({required this.state, required this.theme});
   final AuctionDetailLoaded state;
-  final bool isDark;
   final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = theme.colorScheme;
     final auction = state.auction;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161622) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A3A) : const Color(0xFFE6E8EC),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -731,12 +810,12 @@ class _AdminActionsCard extends StatelessWidget {
                 if (auction.isActive) ...[
                   OutlinedButton.icon(
                     onPressed: () => _confirmCancel(context),
-                    icon: const Icon(Icons.cancel_outlined,
-                        size: 16, color: Colors.orange),
+                    icon: Icon(Icons.cancel_outlined,
+                        size: 16, color: scheme.tertiary),
                     label: Text(l10n.t('forceCancel')),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange,
-                      side: const BorderSide(color: Colors.orange),
+                      foregroundColor: scheme.tertiary,
+                      side: BorderSide(color: scheme.tertiary),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -746,7 +825,8 @@ class _AdminActionsCard extends StatelessWidget {
                     icon: const Icon(Icons.check_circle_rounded, size: 16),
                     label: Text(l10n.t('manuallyResolve')),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -757,20 +837,20 @@ class _AdminActionsCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
+                      color: scheme.primaryContainer,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.check_circle_rounded,
-                            size: 14, color: Color(0xFF16A34A)),
+                        Icon(Icons.check_circle_rounded,
+                            size: 14, color: scheme.primary),
                         const SizedBox(width: 6),
                         Text(
                           l10n.t('completed'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF16A34A),
+                            color: scheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -787,6 +867,7 @@ class _AdminActionsCard extends StatelessWidget {
 
   void _confirmCancel(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -805,7 +886,10 @@ class _AdminActionsCard extends StatelessWidget {
                   .read<AuctionDetailBloc>()
                   .add(AdminCancelDetailAuctionEvent());
             },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
+            ),
             child: Text(l10n.t('cancelAuction')),
           ),
         ],
@@ -814,74 +898,166 @@ class _AdminActionsCard extends StatelessWidget {
   }
 
   void _showResolveDialog(BuildContext context) {
-    final l10n = context.l10n;
-    final ctrl = TextEditingController();
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.t('manuallyResolveAuctionTitle')),
-        content: Column(
+      builder: (ctx) => _ResolveAuctionDialog(
+        onResolve: (winnerId) {
+          context.read<AuctionDetailBloc>().add(AdminResolveAuctionEvent(winnerId));
+        },
+      ),
+    );
+  }
+}
+
+class _ResolveAuctionDialog extends StatefulWidget {
+  const _ResolveAuctionDialog({required this.onResolve});
+
+  final ValueChanged<String> onResolve;
+
+  @override
+  State<_ResolveAuctionDialog> createState() => _ResolveAuctionDialogState();
+}
+
+class _ResolveAuctionDialogState extends State<_ResolveAuctionDialog> {
+  UserEntity? _selectedUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(l10n.t('manuallyResolveAuctionTitle')),
+      content: SizedBox(
+        width: 420,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(l10n.t('manuallyResolveAuctionHint')),
-            const SizedBox(height: 14),
-            TextField(
-              controller: ctrl,
-              decoration: InputDecoration(
-                labelText: l10n.t('winnerUserId'),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
+            const SizedBox(height: 16),
+            AdminUserSearchField(
+              selectedUser: _selectedUser,
+              label: l10n.t('selectWinner'),
+              onUserSelected: (user) => setState(() => _selectedUser = user),
             ),
+            if (_selectedUser == null) ...[
+              const SizedBox(height: 10),
+              Text(
+                l10n.t('pleaseSelectWinner'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.t('cancel'))),
-          FilledButton(
-            onPressed: () {
-              final winnerId = ctrl.text.trim();
-              if (winnerId.isEmpty) return;
-              Navigator.pop(ctx);
-              context
-                  .read<AuctionDetailBloc>()
-                  .add(AdminResolveAuctionEvent(winnerId));
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            child: Text(l10n.t('resolve')),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.t('cancel')),
+        ),
+        FilledButton(
+          onPressed: _selectedUser == null
+              ? null
+              : () {
+                  Navigator.pop(context);
+                  widget.onResolve(_selectedUser!.id);
+                },
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.primary,
+            foregroundColor: scheme.onPrimary,
+          ),
+          child: Text(l10n.t('resolve')),
+        ),
+      ],
     );
   }
 }
 
 // ─── Gift Transactions ────────────────────────────────────────────────────────
 
-class _GiftTransactionsCard extends StatelessWidget {
+class _GiftTransactionsCard extends StatefulWidget {
   const _GiftTransactionsCard({
+    required this.auction,
     required this.transactions,
-    required this.isDark,
     required this.theme,
   });
+  final AuctionEntity auction;
   final List<GiftTransactionEntity> transactions;
-  final bool isDark;
   final ThemeData theme;
 
   @override
+  State<_GiftTransactionsCard> createState() => _GiftTransactionsCardState();
+}
+
+class _GiftTransactionsCardState extends State<_GiftTransactionsCard> {
+  final Map<String, String> _resolvedSenderNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSenderNames();
+  }
+
+  Future<void> _loadSenderNames() async {
+    final txBySenderId = <String, GiftTransactionEntity>{};
+    for (final tx in widget.transactions) {
+      final id = tx.senderId.trim();
+      if (id.isNotEmpty) txBySenderId.putIfAbsent(id, () => tx);
+    }
+
+    final getUserById = sl<GetUserById>();
+    final resolved = <String, String>{};
+
+    for (final entry in txBySenderId.entries) {
+      final id = entry.key;
+      final tx = entry.value;
+      final fallback = _giftSenderDisplayName(tx, widget.auction);
+
+      if (!_looksLikeUsername(fallback)) {
+        resolved[id] = fallback;
+        continue;
+      }
+
+      final lookupId =
+          tx.sender?['id']?.toString().trim().isNotEmpty == true
+              ? tx.sender!['id']!.toString().trim()
+              : id;
+
+      try {
+        final detail = await getUserById(lookupId);
+        final fullName = detail.user.fullName?.trim();
+        resolved[id] = (fullName != null && fullName.isNotEmpty)
+            ? fullName
+            : fallback;
+      } catch (_) {
+        resolved[id] = fallback;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _resolvedSenderNames
+        ..clear()
+        ..addAll(resolved);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final transactions = widget.transactions;
+    final theme = widget.theme;
     final l10n = context.l10n;
+    final scheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161622) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A3A) : const Color(0xFFE6E8EC),
-        ),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,23 +1094,24 @@ class _GiftTransactionsCard extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: transactions.length,
             separatorBuilder: (context, index) =>
-                Divider(height: 1, color: isDark ? const Color(0xFF2A2A3A) : const Color(0xFFEEEEF0)),
+                Divider(height: 1, color: scheme.outlineVariant),
             itemBuilder: (context, index) {
               final tx = transactions[index];
+              final senderDisplayName = _resolvedSenderNames[tx.senderId] ??
+                  _giftSenderDisplayName(tx, widget.auction);
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
                   children: [
                     CircleAvatar(
                       radius: 16,
-                      backgroundColor:
-                          isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF0F0F0),
+                      backgroundColor: scheme.surfaceContainerHighest,
                       backgroundImage: tx.senderAvatar != null
                           ? NetworkImage(tx.senderAvatar!)
                           : null,
                       child: tx.senderAvatar == null
-                          ? const Icon(Icons.person_rounded,
-                              size: 14, color: Colors.grey)
+                          ? Icon(Icons.person_rounded,
+                              size: 14, color: scheme.onSurfaceVariant)
                           : null,
                     ),
                     const SizedBox(width: 10),
@@ -943,7 +1120,7 @@ class _GiftTransactionsCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            tx.senderName,
+                            senderDisplayName,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 13),
                           ),
@@ -979,10 +1156,10 @@ class _GiftTransactionsCard extends StatelessWidget {
                       children: [
                         Text(
                           '+\$${tx.contributionUsd.toStringAsFixed(2)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
-                            color: Color(0xFF16A34A),
+                            color: scheme.primary,
                           ),
                         ),
                         Text(
@@ -1007,6 +1184,59 @@ class _GiftTransactionsCard extends StatelessWidget {
   }
 }
 
+bool _looksLikeUsername(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return true;
+  return trimmed.startsWith('user_') || !trimmed.contains(' ');
+}
+
+String? _displayNameFromUserMap(Map<String, dynamic>? user) {
+  if (user == null) return null;
+
+  final nested = user['user'];
+  if (nested is Map) {
+    final nestedName = _displayNameFromUserMap(
+      Map<String, dynamic>.from(nested),
+    );
+    if (nestedName != null) return nestedName;
+  }
+
+  final username = user['username']?.toString().trim();
+  for (final key in ['fullName', 'full_name', 'displayName', 'name']) {
+    final value = user[key]?.toString().trim();
+    if (value != null &&
+        value.isNotEmpty &&
+        value != username &&
+        !_looksLikeUsername(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+String _giftSenderDisplayName(
+  GiftTransactionEntity tx,
+  AuctionEntity auction,
+) {
+  final fromSender = _displayNameFromUserMap(tx.sender);
+  if (fromSender != null) return fromSender;
+
+  if (tx.senderId == auction.hostId) {
+    final hostName = _displayNameFromUserMap(auction.host);
+    if (hostName != null) return hostName;
+  }
+  if (tx.senderId == auction.winnerId) {
+    final winnerName = _displayNameFromUserMap(auction.winner);
+    if (winnerName != null) return winnerName;
+  }
+
+  final username = tx.sender?['username']?.toString().trim();
+  if (username != null && username.isNotEmpty) return username;
+
+  return tx.senderId;
+}
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 class _StatusBadge extends StatelessWidget {
@@ -1015,34 +1245,17 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final (color, bg, label) = switch (status) {
-      'ACTIVE' => (
-          const Color(0xFF16A34A),
-          const Color(0xFFDCFCE7),
-          l10n.t('active')
-        ),
-      'COMPLETED' => (
-          const Color(0xFF2563EB),
-          const Color(0xFFDBEAFE),
-          l10n.t('completed')
-        ),
-      'CANCELLED' => (
-          const Color(0xFFDC2626),
-          const Color(0xFFFEE2E2),
-          l10n.t('cancelled')
-        ),
-      _ => (const Color(0xFF6B7280), const Color(0xFFF3F4F6), status),
-    };
+    final scheme = Theme.of(context).colorScheme;
+    final style = auctionStatusStyle(scheme, context.l10n, status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(20)),
+          color: style.bg, borderRadius: BorderRadius.circular(20)),
       child: Text(
-        label,
+        style.label,
         style: TextStyle(
-            color: color, fontSize: 11, fontWeight: FontWeight.w700),
+            color: style.fg, fontSize: 11, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1058,23 +1271,26 @@ class _ErrorBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 56, color: Color(0xFFEF4444)),
+            Icon(Icons.error_outline_rounded,
+                size: 56, color: scheme.error),
             const SizedBox(height: 16),
             Text(l10n.t('failedToLoadAuction'),
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700)),
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface)),
             const SizedBox(height: 8),
             Text(message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF9CA3AF))),
+                style: TextStyle(
+                    fontSize: 13, color: scheme.onSurfaceVariant)),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: () => context

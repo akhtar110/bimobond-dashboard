@@ -50,6 +50,13 @@ class SetDateRangeFilterEvent extends GiftsEvent {
   final DateTime? toDate;
 }
 
+/// Filter gifts by USD price range (inclusive). Pass null to clear a bound.
+class UpdatePriceRangeFilterEvent extends GiftsEvent {
+  UpdatePriceRangeFilterEvent({required this.minPrice, required this.maxPrice});
+  final double? minPrice;
+  final double? maxPrice;
+}
+
 /// Hold image bytes in BLoC state so the create dialog can preview it.
 class SetGiftImageEvent extends GiftsEvent {
   SetGiftImageEvent({required this.bytes, required this.name});
@@ -97,6 +104,8 @@ class GiftsLoaded extends GiftsState {
     this.searchQuery = '',
     this.fromDate,
     this.toDate,
+    this.minPriceFilter,
+    this.maxPriceFilter,
     this.pendingImageBytes,
     this.pendingImageName,
     this.isActioning = false,
@@ -114,6 +123,10 @@ class GiftsLoaded extends GiftsState {
   /// Inclusive date-range filter on [GiftEntity.createdAt].
   final DateTime? fromDate;
   final DateTime? toDate;
+
+  /// Inclusive USD price-range filter on [GiftEntity.priceUsd].
+  final double? minPriceFilter;
+  final double? maxPriceFilter;
 
   /// Image selected by the admin before submitting the create form.
   final Uint8List? pendingImageBytes;
@@ -165,7 +178,10 @@ class GiftsLoaded extends GiftsState {
       });
     }
 
-    // 4. Sort
+    // 4. Price-range filter
+    list = _applyPriceFilter(list, minPriceFilter, maxPriceFilter);
+
+    // 5. Sort
     final sorted = list.toList();
     switch (selectedSort) {
       case GiftSortType.priceLowToHigh:
@@ -192,12 +208,34 @@ class GiftsLoaded extends GiftsState {
     return sorted;
   }
 
+  static Iterable<GiftEntity> _applyPriceFilter(
+    Iterable<GiftEntity> list,
+    double? minPrice,
+    double? maxPrice,
+  ) {
+    if (minPrice == null && maxPrice == null) return list;
+    return list.where((g) => _matchesPriceRange(g, minPrice, maxPrice));
+  }
+
+  static bool _matchesPriceRange(
+    GiftEntity gift,
+    double? minPrice,
+    double? maxPrice,
+  ) {
+    final price = gift.priceUsd;
+    if (minPrice != null && price + 1e-9 < minPrice) return false;
+    if (maxPrice != null && price - 1e-9 > maxPrice) return false;
+    return true;
+  }
+
   /// Whether any filter other than the default is active.
   bool get hasActiveFilters =>
       selectedTab != GiftFilterTab.all ||
       searchQuery.isNotEmpty ||
       fromDate != null ||
-      toDate != null;
+      toDate != null ||
+      minPriceFilter != null ||
+      maxPriceFilter != null;
 
   GiftsLoaded copyWith({
     List<GiftEntity>? gifts,
@@ -209,6 +247,9 @@ class GiftsLoaded extends GiftsState {
     bool setDateRange = false,
     DateTime? fromDate,
     DateTime? toDate,
+    bool setPriceRange = false,
+    double? minPriceFilter,
+    double? maxPriceFilter,
     Uint8List? pendingImageBytes,
     String? pendingImageName,
     bool clearPendingImage = false,
@@ -224,6 +265,12 @@ class GiftsLoaded extends GiftsState {
       searchQuery: searchQuery ?? this.searchQuery,
       fromDate: setDateRange ? fromDate : (fromDate ?? this.fromDate),
       toDate: setDateRange ? toDate : (toDate ?? this.toDate),
+      minPriceFilter: setPriceRange
+          ? minPriceFilter
+          : (minPriceFilter ?? this.minPriceFilter),
+      maxPriceFilter: setPriceRange
+          ? maxPriceFilter
+          : (maxPriceFilter ?? this.maxPriceFilter),
       pendingImageBytes: clearPendingImage
           ? null
           : (pendingImageBytes ?? this.pendingImageBytes),
@@ -262,6 +309,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     on<ChangeGiftSortEvent>(_onChangeSort);
     on<SearchGiftsEvent>(_onSearch);
     on<SetDateRangeFilterEvent>(_onSetDateRange);
+    on<UpdatePriceRangeFilterEvent>(_onUpdatePriceRange);
     on<SetGiftImageEvent>(_onSetImage);
     on<ClearGiftImageEvent>(_onClearImage);
     on<CreateGiftEvent>(_onCreate);
@@ -337,6 +385,30 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         clearMessages: true,
       ));
     }
+  }
+
+  void _onUpdatePriceRange(
+    UpdatePriceRangeFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+
+    final normalized = _normalizePriceRange(event.minPrice, event.maxPrice);
+    emit(c.copyWith(
+      setPriceRange: true,
+      minPriceFilter: normalized.$1,
+      maxPriceFilter: normalized.$2,
+      clearMessages: true,
+    ));
+  }
+
+  /// Swaps min/max when min > max so filtering never breaks.
+  (double?, double?) _normalizePriceRange(double? min, double? max) {
+    if (min != null && max != null && min > max) {
+      return (max, min);
+    }
+    return (min, max);
   }
 
   // ── Pending image ─────────────────────────────────────────────────────────

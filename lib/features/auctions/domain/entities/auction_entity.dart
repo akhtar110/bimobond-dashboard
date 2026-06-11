@@ -1,4 +1,34 @@
+import '../../../post_management/domain/entities/post_media_entity.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import 'gift_transaction_entity.dart';
+
+/// Lightweight post snapshot returned with auction list/detail APIs.
+class AuctionPostSummary {
+  const AuctionPostSummary({
+    this.thumbnailUrl,
+    this.media = const [],
+  });
+
+  final String? thumbnailUrl;
+  final List<PostMediaEntity> media;
+}
+
+String? resolveAuctionDisplayImageUrl({
+  String? itemImageUrl,
+  AuctionPostSummary? post,
+}) {
+  if (post != null) {
+    final fromPost = resolvePostDisplayThumbnailUrl(
+      media: post.media,
+      thumbnailUrl: post.thumbnailUrl,
+    );
+    if (fromPost != null && fromPost.isNotEmpty) return fromPost;
+  }
+
+  final resolvedItem = resolveMediaUrl(itemImageUrl);
+  if (resolvedItem != null && resolvedItem.isNotEmpty) return resolvedItem;
+  return null;
+}
 
 class AuctionEntity {
   const AuctionEntity({
@@ -18,6 +48,7 @@ class AuctionEntity {
     this.host,
     this.winner,
     this.giftTransactions,
+    this.post,
   });
 
   final String id;
@@ -36,6 +67,11 @@ class AuctionEntity {
   final Map<String, dynamic>? host;
   final Map<String, dynamic>? winner;
   final List<GiftTransactionEntity>? giftTransactions;
+  final AuctionPostSummary? post;
+
+  /// Post-attached media from the linked post, then [itemImageUrl] fallback.
+  String? get displayImageUrl =>
+      resolveAuctionDisplayImageUrl(itemImageUrl: itemImageUrl, post: post);
 
   // Convenience getters
   String get hostName =>
@@ -77,6 +113,7 @@ class AuctionEntity {
       host: host,
       winner: winner ?? this.winner,
       giftTransactions: giftTransactions ?? this.giftTransactions,
+      post: post,
     );
   }
 }

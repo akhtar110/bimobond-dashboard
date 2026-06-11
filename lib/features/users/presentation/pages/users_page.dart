@@ -57,15 +57,16 @@ class _UsersPageState extends State<UsersPage> {
                 ],
         ),
       ),
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1480),
+          constraints: const BoxConstraints(maxWidth: 1680),
           child: Padding(
             padding: EdgeInsetsDirectional.fromSTEB(
-              MediaQuery.sizeOf(context).width < 600 ? 16 : 24,
-              20,
-              MediaQuery.sizeOf(context).width < 600 ? 16 : 24,
-              24,
+              MediaQuery.sizeOf(context).width < 600 ? 12 : 16,
+              12,
+              MediaQuery.sizeOf(context).width < 600 ? 12 : 16,
+              16,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -75,7 +76,7 @@ class _UsersPageState extends State<UsersPage> {
                         LoadUsersEvent(refresh: true),
                       ),
                 ),
-                SizedBox(height: MediaQuery.sizeOf(context).width < 600 ? 20 : 28),
+                SizedBox(height: MediaQuery.sizeOf(context).width < 600 ? 14 : 16),
 
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -113,7 +114,7 @@ class _UsersPageState extends State<UsersPage> {
                     );
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 Expanded(
                   child: UsersTablePanel(

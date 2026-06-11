@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart';
 import '../../../users/domain/entities/user_entity.dart';
@@ -262,6 +261,10 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
           }
         },
         builder: (context, state) {
+          if (state is PostManagementLoaded) {
+            _syncDraftControllers(state.draft);
+          }
+
           final loaded = state is PostManagementLoaded ? state : null;
           final isBusy = loaded != null &&
               (loaded.isSaving ||

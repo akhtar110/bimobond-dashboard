@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../features/categories/presentation/widgets/category_icon.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
+import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 
 /// Fixed thumbnail height — card body grows with content below.
 const double kPostCardThumbnailHeight = 176;
@@ -23,9 +25,8 @@ class _PostCardState extends State<PostCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final borderColor = isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0);
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -39,19 +40,17 @@ class _PostCardState extends State<PostCard> {
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _hovered
-                  ? theme.colorScheme.primary.withValues(alpha: 0.35)
-                  : borderColor,
+                  ? scheme.primary.withValues(alpha: 0.35)
+                  : scheme.outlineVariant,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: isDark
-                      ? (_hovered ? 0.28 : 0.12)
-                      : (_hovered ? 0.08 : 0.03),
+                color: scheme.shadow.withValues(
+                  alpha: _hovered ? 0.08 : 0.03,
                 ),
                 blurRadius: _hovered ? 14 : 8,
                 offset: Offset(0, _hovered ? 4 : 2),
@@ -78,10 +77,8 @@ class _PostCardState extends State<PostCard> {
                         widget.post.description!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? Colors.grey.shade300
-                              : const Color(0xFF374151),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurface,
                           height: 1.35,
                           fontSize: 12.5,
                         ),
@@ -137,35 +134,46 @@ class _MediaPreview extends StatelessWidget {
             _MediaPlaceholder(isDark: isDark),
           if (_isVideo)
             Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
+              child: Builder(
+                builder: (context) {
+                  final scheme = Theme.of(context).colorScheme;
+                  return Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: scheme.scrim.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      color: scheme.onPrimary,
+                      size: 22,
+                    ),
+                  );
+                },
               ),
             ),
           if (_isCarousel)
             Positioned(
               top: 6,
               right: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(
-                  Icons.collections_outlined,
-                  color: Colors.white,
-                  size: 12,
-                ),
+              child: Builder(
+                builder: (context) {
+                  final scheme = Theme.of(context).colorScheme;
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: scheme.scrim.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Icons.collections_outlined,
+                      color: scheme.onPrimary,
+                      size: 12,
+                    ),
+                  );
+                },
               ),
             ),
         ],
@@ -177,17 +185,19 @@ class _MediaPreview extends StatelessWidget {
 class _MediaPlaceholder extends StatelessWidget {
   const _MediaPlaceholder({required this.isDark});
 
+  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return ColoredBox(
-      color: isDark ? const Color(0xFF252B3B) : const Color(0xFFF3F4F6),
+      color: scheme.surfaceContainerLow,
       child: Center(
         child: Icon(
           Icons.image_outlined,
           size: 32,
-          color: isDark ? Colors.grey.shade700 : Colors.grey.shade400,
+          color: scheme.onSurfaceVariant,
         ),
       ),
     );
@@ -202,14 +212,15 @@ class _UserDateRow extends StatelessWidget {
   const _UserDateRow({required this.post, required this.isDark});
 
   final ManagedPostEntity post;
+
+  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final name = post.userName ?? post.userId;
     final dateStr = DateFormat('MMM d, yyyy').format(post.createdAt);
-    final metaColor =
-        isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF);
 
     return Row(
       children: [
@@ -223,14 +234,14 @@ class _UserDateRow extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: isDark ? Colors.grey.shade200 : const Color(0xFF111827),
+              color: scheme.onSurface,
             ),
           ),
         ),
         const SizedBox(width: 4),
         Text(
           dateStr,
-          style: TextStyle(fontSize: 10.5, color: metaColor),
+          style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -238,31 +249,37 @@ class _UserDateRow extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.url, required this.name, required this.isDark});
+  const _Avatar({
+    required this.url,
+    required this.name,
+    required this.isDark,
+  });
 
   final String? url;
   final String name;
+
+  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     if (url != null && url!.isNotEmpty) {
       return CircleAvatar(
         radius: 14,
         backgroundImage: CachedNetworkImageProvider(url!),
-        backgroundColor:
-            isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F2F5),
+        backgroundColor: scheme.surfaceContainerHighest,
       );
     }
     return CircleAvatar(
       radius: 14,
-      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      backgroundColor: scheme.primaryContainer,
       child: Text(
         name.isNotEmpty ? name[0].toUpperCase() : '?',
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
+          color: scheme.onPrimaryContainer,
         ),
       ),
     );
@@ -304,43 +321,13 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final (bg, fg, label) = switch (status.toUpperCase()) {
-      'PUBLISHED' => (
-        const Color(0xFFE8F5E9),
-        const Color(0xFF2E7D32),
-        l10n.t('postStatusPublished'),
-      ),
-      'BANNED' => (
-        const Color(0xFFFFEBEE),
-        const Color(0xFFC62828),
-        l10n.t('postStatusBanned'),
-      ),
-      'DRAFT' => (
-        const Color(0xFFFFF8E1),
-        const Color(0xFFF9A825),
-        l10n.t('postStatusDraft'),
-      ),
-      'HIDDEN' => (
-        const Color(0xFFF3F4F6),
-        const Color(0xFF6B7280),
-        l10n.t('postStatusHidden'),
-      ),
-      'UNDER_REVIEW' => (
-        const Color(0xFFE3F2FD),
-        const Color(0xFF1565C0),
-        l10n.t('postStatusUnderReview'),
-      ),
-      _ => (
-        const Color(0xFFF3F4F6),
-        const Color(0xFF6B7280),
-        status,
-      ),
-    };
+    final fg = postStatusColor(status);
+    final label = postStatusLabel(l10n, status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: bg,
+        color: fg.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -361,6 +348,8 @@ class _CategoryBadge extends StatelessWidget {
   final CategoryEntity? category;
   final String? fallbackName;
 
+  // Brand accent palette — intentionally not from ColorScheme so categories
+  // remain visually distinct regardless of the active theme.
   static const _palette = [
     Color(0xFF6366F1),
     Color(0xFF0EA5E9),
@@ -394,8 +383,17 @@ class _CategoryBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.label_outline_rounded, size: 10, color: color),
-          const SizedBox(width: 3),
+          CategoryIcon(
+            category: category,
+            iconUrl: category?.iconUrl,
+            name: name,
+            size: 14,
+            borderRadius: BorderRadius.circular(4),
+            backgroundColor: color.withValues(alpha: 0.15),
+            iconColor: color,
+            fallbackIcon: Icons.label_outline_rounded,
+          ),
+          const SizedBox(width: 4),
           Text(
             name,
             style: TextStyle(
@@ -418,17 +416,19 @@ class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.post, required this.isDark});
 
   final ManagedPostEntity post;
+
+  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final color = isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF);
-    final divider = isDark ? Colors.grey.shade800 : const Color(0xFFE5E7EB);
+    final scheme = Theme.of(context).colorScheme;
+    final color = scheme.onSurfaceVariant;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: divider)),
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -493,7 +493,11 @@ class _Stat extends StatelessWidget {
         const SizedBox(width: 2),
         Text(
           _format(value),
-          style: TextStyle(fontSize: 10.5, color: color, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 10.5,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
@@ -507,6 +511,7 @@ class _Stat extends StatelessWidget {
 class _ShimmerBox extends StatefulWidget {
   const _ShimmerBox({required this.isDark});
 
+  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
 
   @override
@@ -536,10 +541,9 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 
   @override
   Widget build(BuildContext context) {
-    final base =
-        widget.isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F2F5);
-    final highlight =
-        widget.isDark ? const Color(0xFF3A3A3A) : const Color(0xFFE0E0E0);
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerLow;
+    final highlight = scheme.surfaceContainerHighest;
 
     return AnimatedBuilder(
       animation: _anim,
@@ -561,16 +565,15 @@ class PostCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFEEEEEE);
-    final borderColor =
-        isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0);
+    final base = scheme.surfaceContainerLow;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

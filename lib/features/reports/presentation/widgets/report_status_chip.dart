@@ -1,57 +1,65 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/localization.dart';
+import 'report_card_theme.dart';
+
 /// Compact status pill for report cards (Stripe / Linear style).
 class ReportStatusChip extends StatelessWidget {
-  const ReportStatusChip({super.key, required this.status});
+  const ReportStatusChip({
+    super.key,
+    required this.status,
+    this.compact = false,
+  });
 
   final String status;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final (color, label, icon) = switch (status) {
-      'PENDING' => (
-          const Color(0xFFF59E0B),
-          'Pending',
-          Icons.schedule_rounded,
-        ),
-      'RESOLVED' => (
-          const Color(0xFF10B981),
-          'Resolved',
-          Icons.check_circle_outline_rounded,
-        ),
-      'DISMISSED' => (
-          const Color(0xFF6B7280),
-          'Dismissed',
-          Icons.remove_circle_outline_rounded,
-        ),
-      _ => (const Color(0xFF6366F1), status, Icons.flag_outlined),
-    };
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final style = ReportCardTheme.reportStatusStyle(
+      scheme,
+      status,
+      l10n: l10n,
+    );
 
     return Semantics(
-      label: 'Report status: $label',
+      label: context.tr('reportStatusSemantic', {'status': style.label}),
       child: Tooltip(
-        message: label,
+        message: style.label,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 6 : 8,
+            vertical: compact ? 3 : 4,
+          ),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
+            color: style.bg,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.28)),
+            border: Border.all(
+              color: style.fg.withValues(alpha: 0.35),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 12, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                  height: 1,
+              Icon(style.icon, size: compact ? 11 : 12, color: style.fg),
+              if (!compact) ...[
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    style.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: style.fg,
+                      height: 1,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
