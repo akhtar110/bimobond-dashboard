@@ -48,7 +48,11 @@ dependencies:
   package_info_plus: ^10.1.0
   flutter_secure_storage: ^10.2.0
   video_player: ^2.11.1
+  video_thumbnail: ^0.5.6
+  path_provider: ^2.1.5
   socket_io_client: ^3.0.0
+  flutter_map: 8.3.0
+  latlong2: 0.9.1
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +76,8 @@ flutter:
   assets:
     - lib/core/localization/app_en.arb
     - lib/core/localization/app_ar.arb
+    - assets/images/google.png
+    - assets/images/auth_illustration.png
     - assets/images/
 
   fonts:

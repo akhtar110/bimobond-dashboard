@@ -1,6 +1,22 @@
 import 'package:equatable/equatable.dart';
 
-/// Shared date range returned by analytics endpoints.
+import 'period_engagement_entity.dart';
+import 'post_status_count_entity.dart';
+import 'post_type_count_entity.dart';
+
+export 'period_engagement_entity.dart';
+export 'post_status_count_entity.dart';
+export 'post_type_count_entity.dart';
+
+/// Alias for API docs / repository naming.
+typedef DailyCountEntity = DailyCount;
+typedef AdminOverviewEntity = AnalyticsOverviewEntity;
+typedef AdminGrowthEntity = AnalyticsGrowthEntity;
+typedef AdminEngagementEntity = AnalyticsEngagementEntity;
+typedef AdminReportsEntity = AnalyticsReportsEntity;
+typedef AdminCategoriesEntity = AnalyticsCategoriesEntity;
+typedef AdminAuctionsEntity = AnalyticsAuctionsEntity;
+typedef AdminMonetizationEntity = AnalyticsMonetizationEntity;
 class AnalyticsPeriod extends Equatable {
   const AnalyticsPeriod({required this.from, required this.to});
 
@@ -108,37 +124,71 @@ class AnalyticsPostsEntity extends Equatable {
     required this.period,
     required this.total,
     required this.inPeriod,
+    required this.published,
+    required this.hidden,
+    required this.banned,
+    required this.expired,
     required this.stories,
+    required this.storiesInPeriod,
     required this.ads,
     required this.auctionable,
     required this.byType,
     required this.byStatus,
+    required this.byTypeInPeriod,
+    required this.byStatusInPeriod,
+    required this.periodEngagement,
     required this.dailyNewPosts,
   });
 
   final AnalyticsPeriod period;
   final int total;
   final int inPeriod;
+  final int published;
+  final int hidden;
+  final int banned;
+  final int expired;
   final int stories;
+  final int storiesInPeriod;
   final int ads;
   final int auctionable;
-  final Map<String, int> byType;
-  final Map<String, int> byStatus;
+  final List<PostTypeCountEntity> byType;
+  final List<PostStatusCountEntity> byStatus;
+  final List<PostTypeCountEntity> byTypeInPeriod;
+  final List<PostStatusCountEntity> byStatusInPeriod;
+  final PeriodEngagementEntity periodEngagement;
   final List<DailyCount> dailyNewPosts;
+
+  int get typeTotal => byType.fold(0, (sum, item) => sum + item.count);
+  int get typeInPeriodTotal =>
+      byTypeInPeriod.fold(0, (sum, item) => sum + item.count);
+  int get statusTotal => byStatus.fold(0, (sum, item) => sum + item.count);
+  int get statusInPeriodTotal =>
+      byStatusInPeriod.fold(0, (sum, item) => sum + item.count);
 
   @override
   List<Object?> get props => [
         period,
         total,
         inPeriod,
+        published,
+        hidden,
+        banned,
+        expired,
         stories,
+        storiesInPeriod,
         ads,
         auctionable,
         byType,
         byStatus,
+        byTypeInPeriod,
+        byStatusInPeriod,
+        periodEngagement,
         dailyNewPosts,
       ];
 }
+
+/// Admin posts analytics (June 2026 API).
+typedef AdminPostsAnalyticsEntity = AnalyticsPostsEntity;
 
 class AnalyticsEngagementEntity extends Equatable {
   const AnalyticsEngagementEntity({
@@ -187,38 +237,38 @@ class AnalyticsMonetizationEntity extends Equatable {
   const AnalyticsMonetizationEntity({
     required this.period,
     required this.giftTransactionCount,
-    required this.giftGrossUsd,
-    required this.giftContributionUsd,
+    required this.giftGrossCoins,
+    required this.giftContributionCoins,
     required this.fiatPurchaseCount,
-    required this.fiatCompletedVolumeUsd,
+    required this.completedPurchaseVolume,
     required this.withdrawalRequestsInPeriod,
     required this.pendingWithdrawals,
-    required this.totalWalletBalanceUsd,
+    required this.totalBalanceCoins,
     required this.accountingByType,
   });
 
   final AnalyticsPeriod period;
   final int giftTransactionCount;
-  final double giftGrossUsd;
-  final double giftContributionUsd;
+  final double giftGrossCoins;
+  final double giftContributionCoins;
   final int fiatPurchaseCount;
-  final double fiatCompletedVolumeUsd;
+  final double completedPurchaseVolume;
   final int withdrawalRequestsInPeriod;
   final int pendingWithdrawals;
-  final double totalWalletBalanceUsd;
+  final double totalBalanceCoins;
   final Map<String, double> accountingByType;
 
   @override
   List<Object?> get props => [
         period,
         giftTransactionCount,
-        giftGrossUsd,
-        giftContributionUsd,
+        giftGrossCoins,
+        giftContributionCoins,
         fiatPurchaseCount,
-        fiatCompletedVolumeUsd,
+        completedPurchaseVolume,
         withdrawalRequestsInPeriod,
         pendingWithdrawals,
-        totalWalletBalanceUsd,
+        totalBalanceCoins,
         accountingByType,
       ];
 }

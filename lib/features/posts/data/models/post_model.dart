@@ -1,4 +1,5 @@
 import '../../../post_management/data/models/managed_post_model.dart';
+import '../../../post_management/domain/entities/managed_post_author_enrichment.dart';
 import '../../../post_management/domain/entities/managed_post_entity.dart';
 
 /// Pagination envelope returned by GET /posts/feed (FeedQueryDto).
@@ -25,8 +26,14 @@ class PostsPageModel {
         (json['data'] ?? json['posts'] ?? json['videos']) as List?;
 
     final posts = (rawList ?? [])
-        .map((e) => ManagedPostModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+        .map(
+          (e) => hydrateManagedPostMedia(
+            normalizeManagedPostMediaFields(
+              ManagedPostModel.fromJson(e as Map<String, dynamic>),
+            ),
+          ),
+        )
+        .toList(growable: false);
 
     final meta = json['meta'] as Map<String, dynamic>? ?? {};
     final currentPage = (meta['page'] as num?)?.toInt() ?? 1;

@@ -20,6 +20,7 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
     on<LoadGiftReportsOverviewEvent>(_onLoadOverview);
     on<LoadGiftReportsListEvent>(_onLoadList);
     on<GoToGiftReportsPageEvent>(_onGoToPage);
+    on<LoadMoreGiftReportsEvent>(_onLoadMore);
     on<UpdateGiftReportsSearchEvent>(_onUpdateSearch);
     on<UpdateGiftReportsSortEvent>(_onUpdateSort);
     on<UpdateGiftReportsActiveFilterEvent>(_onUpdateActiveFilter);
@@ -155,7 +156,7 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
     if (_minPriceFilter != null || _maxPriceFilter != null) {
       list = list.where(
         (item) => _matchesPriceRange(
-          item.priceUsd,
+          item.priceCoins,
           _minPriceFilter,
           _maxPriceFilter,
         ),
@@ -177,16 +178,16 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
           return aDate.compareTo(bDate);
         });
       case GiftReportsSort.priceAsc:
-        sorted.sort((a, b) => a.priceUsd.compareTo(b.priceUsd));
+        sorted.sort((a, b) => a.priceCoins.compareTo(b.priceCoins));
       case GiftReportsSort.priceDesc:
-        sorted.sort((a, b) => b.priceUsd.compareTo(a.priceUsd));
+        sorted.sort((a, b) => b.priceCoins.compareTo(a.priceCoins));
       case GiftReportsSort.mostSent:
         sorted.sort(
           (a, b) => b.counts.transactions.compareTo(a.counts.transactions),
         );
       case GiftReportsSort.mostRevenue:
         sorted.sort(
-          (a, b) => b.revenue.spendUsd.compareTo(a.revenue.spendUsd),
+          (a, b) => b.revenue.spendCoins.compareTo(a.revenue.spendCoins),
         );
       case GiftReportsSort.name:
         sorted.sort(
@@ -207,6 +208,7 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
     Emitter<GiftReportsState> emit, {
     int? page,
     GiftReportsLoaded? base,
+    bool append = false,
   }) {
     final filtered = _filterCatalog();
     final total = filtered.length;
@@ -214,11 +216,12 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
     final currentPage = math.min(page ?? _currentPage, lastPage).clamp(1, lastPage);
     _currentPage = currentPage;
 
-    final start = (currentPage - 1) * _pageLimit;
-    final items = filtered
-        .skip(start)
-        .take(_pageLimit)
-        .toList(growable: false);
+    final items = append
+        ? filtered.take(currentPage * _pageLimit).toList(growable: false)
+        : filtered
+            .skip((currentPage - 1) * _pageLimit)
+            .take(_pageLimit)
+            .toList(growable: false);
 
     final previous = base ?? _loaded;
     final seed = previous ??
@@ -247,6 +250,7 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
         minPriceFilter: _minPriceFilter,
         maxPriceFilter: _maxPriceFilter,
         isListFetching: false,
+        isListLoadingMore: false,
         clearListError: true,
       ),
     );
@@ -308,7 +312,29 @@ class GiftReportsBloc extends Bloc<GiftReportsEvent, GiftReportsState> {
       await _refreshCatalog(emit, page: event.page, showLoading: false);
       return;
     }
-    _emitFilteredPage(emit, page: event.page);
+    _emitFilteredPage(emit, page: event.page, append: false);
+  }
+
+  Future<void> _onLoadMore(
+    LoadMoreGiftReportsEvent event,
+    Emitter<GiftReportsState> emit,
+  ) async {
+    final loaded = _loaded;
+    if (loaded == null ||
+        loaded.hasReachedMax ||
+        loaded.isListLoadingMore ||
+        loaded.isListFetching) {
+      return;
+    }
+
+    if (_catalogItems.isEmpty) {
+      await _refreshCatalog(emit, page: 1, showLoading: false);
+      return;
+    }
+
+    final nextPage = loaded.currentPage + 1;
+    emit(loaded.copyWith(isListLoadingMore: true));
+    _emitFilteredPage(emit, page: nextPage, append: true);
   }
 
   void _onUpdateSearch(

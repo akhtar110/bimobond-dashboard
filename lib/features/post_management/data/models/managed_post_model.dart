@@ -1,6 +1,8 @@
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/data/models/category_model.dart';
 import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/utils/post_status_utils.dart';
+import 'post_engagement_user_model.dart';
 
 class ManagedPostModel extends ManagedPostEntity {
   const ManagedPostModel({
@@ -32,6 +34,11 @@ class ManagedPostModel extends ManagedPostEntity {
     required super.likeCount,
     required super.commentCount,
     required super.saveCount,
+    super.repostCount = 0,
+    super.recentReposts = const [],
+    super.recentLikes = const [],
+    super.recentViews = const [],
+    super.recentMentions = const [],
     super.duration,
     super.videoWidth,
     super.videoHeight,
@@ -52,6 +59,7 @@ class ManagedPostModel extends ManagedPostEntity {
 
   factory ManagedPostModel.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>?;
+    final userCounts = user?['_count'] as Map<String, dynamic>?;
 
     // category can be a nested object, a plain string, or only categoryId.
     CategoryModel? parsedCategoryEntity;
@@ -93,9 +101,16 @@ class ManagedPostModel extends ManagedPostEntity {
       userEmail: user?['email'] as String?,
       userProfileImage: resolveMediaUrl(rawAvatar),
       userIsVerified: user?['isVerified'] as bool? ?? false,
-      userFollowersCount: _readInt(user?['followerCount']) ?? 0,
-      userFollowingCount: _readInt(user?['followingCount']) ?? 0,
-      userPostsCount: _readInt(user?['postCount']) ?? 0,
+      userFollowersCount: _readInt(user?['followerCount']) ??
+          _readInt(userCounts?['followers']) ??
+          _readInt(userCounts?['follower']) ??
+          0,
+      userFollowingCount: _readInt(user?['followingCount']) ??
+          _readInt(userCounts?['following']) ??
+          _readInt(userCounts?['followings']) ??
+          0,
+      userPostsCount:
+          _readInt(user?['postCount']) ?? _readInt(userCounts?['posts']) ?? 0,
       userJoinedAt: user?['createdAt'] != null
           ? _readDate(user!['createdAt'])
           : null,
@@ -103,20 +118,37 @@ class ManagedPostModel extends ManagedPostEntity {
       // Resolve all media URL fields from relative → absolute.
       videoUrl: resolveMediaUrl(json['videoUrl'] as String?),
       hlsUrl: resolveMediaUrl(json['hlsUrl'] as String?),
-      thumbnailUrl: resolveMediaUrl(json['thumbnailUrl'] as String?),
+      thumbnailUrl: _readThumbnailUrl(json),
       // PostMediaEntity.fromJson already resolves each item's URL internally.
       media: PostMediaEntity.listFromJson(json['media']),
       animatedCoverUrl: resolveMediaUrl(json['animatedCoverUrl'] as String?),
       description: _readDescription(json),
       category: parsedCategory,
       categoryEntity: parsedCategoryEntity,
-      status: json['status']?.toString() ?? 'PUBLISHED',
+      status: normalizePostStatus(readPostStatusFromJson(json)),
       viewCount: _readInt(json['viewCount']) ?? 0,
       shareCount: _readInt(json['shareCount']) ?? 0,
       downloadCount: _readInt(json['downloadCount']) ?? 0,
       likeCount: _readInt(json['likeCount']) ?? 0,
       commentCount: _readInt(json['commentCount']) ?? 0,
       saveCount: _readInt(json['saveCount']) ?? 0,
+      repostCount: _readInt(json['repostCount'] ?? json['reposts']) ?? 0,
+      recentReposts: (json['recentReposts'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
+      recentLikes: parseEngagementUserList(
+        json['recentLikes'] ?? json['likes'],
+        kind: PostEngagementKind.likes,
+      ),
+      recentViews: parseEngagementUserList(
+        json['recentViews'] ?? json['views'],
+        kind: PostEngagementKind.views,
+      ),
+      recentMentions: parseEngagementUserList(
+        json['recentMentions'] ?? json['mentions'],
+        kind: PostEngagementKind.mentions,
+      ),
       duration: _readInt(json['duration']),
       videoWidth: _readInt(json['videoWidth']),
       videoHeight: _readInt(json['videoHeight']),
@@ -146,6 +178,29 @@ class ManagedPostModel extends ManagedPostEntity {
       if (data.allowDuets != null) 'allowDuets': data.allowDuets,
       if (data.allowStitch != null) 'allowStitch': data.allowStitch,
     };
+  }
+
+  static String? _readThumbnailUrl(Map<String, dynamic> json) {
+    for (final key in [
+      'thumbnailUrl',
+      'thumbnail',
+      'thumbUrl',
+      'coverUrl',
+      'posterUrl',
+    ]) {
+      final resolved = resolveMediaUrl(json[key] as String?);
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+    }
+
+    final video = json['video'];
+    if (video is Map<String, dynamic>) {
+      for (final key in ['thumbnailUrl', 'thumbnail', 'coverUrl']) {
+        final resolved = resolveMediaUrl(video[key] as String?);
+        if (resolved != null && resolved.isNotEmpty) return resolved;
+      }
+    }
+
+    return null;
   }
 
   static String? _readDescription(Map<String, dynamic> json) {

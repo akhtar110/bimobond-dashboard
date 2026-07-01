@@ -75,6 +75,7 @@ class _UserActivityRepostsTabState extends State<UserActivityRepostsTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return BlocBuilder<UserActivityBloc, UserActivityState>(
       buildWhen: (a, b) =>
@@ -142,9 +143,7 @@ class _UserActivityRepostsTabState extends State<UserActivityRepostsTab> {
                       'Repost Activity',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: widget.isDark
-                            ? Colors.white
-                            : const Color(0xFF0F172A),
+                        color: scheme.onSurface,
                       ),
                     ),
                     Text(
@@ -203,9 +202,7 @@ class _UserActivityRepostsTabState extends State<UserActivityRepostsTab> {
                     child: Text(
                       'All reposts loaded',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: widget.isDark
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade600,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -282,12 +279,8 @@ class _RepostCardState extends State<_RepostCard> {
     );
     final mediaUrl = _mediaUrl;
 
-    final cardBg = widget.isDark
-        ? const Color(0xFF1E293B)
-        : Colors.white;
-    final borderColor = widget.isDark
-        ? Colors.grey.shade700
-        : Colors.grey.shade200;
+    final cardBg = scheme.surface;
+    final borderColor = scheme.outlineVariant;
 
     final width = MediaQuery.sizeOf(context).width;
     final isCompact = width < 720;
@@ -373,7 +366,7 @@ class _RepostCardState extends State<_RepostCard> {
               ),
               if (reposter.isVerified) ...[
                 const SizedBox(width: 3),
-                Icon(Icons.verified_rounded, size: 11, color: Colors.blue),
+                Icon(Icons.verified_rounded, size: 11, color: scheme.primary),
               ],
               const SizedBox(width: 4),
               Text(
@@ -427,9 +420,7 @@ class _RepostCardState extends State<_RepostCard> {
           Text(
             post.description!,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: widget.isDark
-                  ? Colors.grey.shade300
-                  : Colors.grey.shade700,
+              color: scheme.onSurfaceVariant,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -459,7 +450,7 @@ class _RepostCardState extends State<_RepostCard> {
             RepostStatBadge(
               icon: Icons.favorite_rounded,
               label: _fmt(post.likeCount),
-              color: Colors.red,
+              color: scheme.error,
             ),
             RepostStatBadge(
               icon: Icons.comment_rounded,
@@ -469,14 +460,14 @@ class _RepostCardState extends State<_RepostCard> {
             RepostStatBadge(
               icon: Icons.bookmark_rounded,
               label: _fmt(post.saveCount),
-              color: Colors.orange,
+              color: scheme.secondary,
             ),
             RepostStatBadge(
               icon: Icons.repeat_rounded,
               label: _fmt(
                 (post.counts?['reposts'] as num?)?.toInt() ?? 0,
               ),
-              color: Colors.teal,
+              color: scheme.tertiary,
             ),
           ],
         ),
@@ -538,7 +529,7 @@ class _RepostCardState extends State<_RepostCard> {
               BoxShadow(
                 color: _hovered
                     ? scheme.primary.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04),
+                    : scheme.shadow.withValues(alpha: 0.04),
                 blurRadius: _hovered ? 16 : 8,
                 offset: const Offset(0, 2),
               ),
@@ -642,9 +633,7 @@ class _ViewDetailsChip extends StatelessWidget {
         horizontal: isNarrow ? 6 : (isCompact ? 8 : 10),
       ),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.1)
-            : scheme.primaryContainer,
+        color: scheme.primaryContainer,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

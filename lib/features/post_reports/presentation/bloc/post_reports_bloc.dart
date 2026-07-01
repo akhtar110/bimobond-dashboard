@@ -19,6 +19,7 @@ class PostReportsBloc extends Bloc<PostReportsEvent, PostReportsState> {
         super(PostReportsInitial()) {
     on<LoadPostReportsEvent>(_onLoad);
     on<GoToPostReportsPageEvent>(_onGoToPage);
+    on<LoadMorePostReportsEvent>(_onLoadMore);
     on<UpdatePostReportsSearchEvent>(_onUpdateSearch);
     on<UpdatePostReportsFiltersEvent>(_onUpdateFilters);
     on<UpdatePostReportsSortEvent>(_onUpdateSort);
@@ -43,6 +44,7 @@ class PostReportsBloc extends Bloc<PostReportsEvent, PostReportsState> {
   Future<void> _fetchPage(
     Emitter<PostReportsState> emit, {
     required int page,
+    required bool replace,
     bool showLoading = true,
   }) async {
     if (_busy) return;
@@ -53,7 +55,11 @@ class PostReportsBloc extends Bloc<PostReportsEvent, PostReportsState> {
     if (showLoading && previous is! PostReportsLoaded) {
       emit(PostReportsLoading());
     } else if (previous is PostReportsLoaded) {
-      emit(previous.copyWith(isFetching: true));
+      emit(
+        replace
+            ? previous.copyWith(isFetching: true, isLoadingMore: false)
+            : previous.copyWith(isLoadingMore: true),
+      );
     }
 
     try {
@@ -65,20 +71,33 @@ class PostReportsBloc extends Bloc<PostReportsEvent, PostReportsState> {
 
       _currentPage = response.page;
 
+      final merged = replace
+          ? response.items
+          : <PostReportListItem>[
+              if (previous is PostReportsLoaded) ...previous.posts,
+              ...response.items,
+            ];
+
       emit(PostReportsLoaded(
-        posts: response.items,
+        posts: merged,
         currentPage: response.page,
         lastPage: response.lastPage,
         total: response.total,
         query: _query,
         searchQuery: _searchQuery,
         isFetching: false,
+        isLoadingMore: false,
         overview: previous is PostReportsLoaded ? previous.overview : null,
         overviewDays: _overviewDays,
       ));
     } catch (e) {
       if (previous is PostReportsLoaded) {
-        emit(previous.copyWith(isFetching: false));
+        emit(
+          previous.copyWith(
+            isFetching: false,
+            isLoadingMore: false,
+          ),
+        );
       } else {
         emit(PostReportsError(e.toString()));
       }
@@ -96,6 +115,7 @@ class PostReportsBloc extends Bloc<PostReportsEvent, PostReportsState> {
     await _fetchPage(
       emit,
       page: page,
+      replace: true,
       showLoading: !hasData,
     );
   }
@@ -104,7 +124,29 @@ class PostReportsBloc extends Bloc<PostReportsEvent, PostReportsState> {
     GoToPostReportsPageEvent event,
     Emitter<PostReportsState> emit,
   ) async {
-    await _fetchPage(emit, page: event.page, showLoading: false);
+    await _fetchPage(
+      emit,
+      page: event.page,
+      replace: true,
+      showLoading: false,
+    );
+  }
+
+  Future<void> _onLoadMore(
+    LoadMorePostReportsEvent event,
+    Emitter<PostReportsState> emit,
+  ) async {
+    final loaded = state;
+    if (loaded is! PostReportsLoaded) return;
+    if (loaded.hasReachedMax || loaded.isLoadingMore || loaded.isFetching) {
+      return;
+    }
+    await _fetchPage(
+      emit,
+      page: loaded.currentPage + 1,
+      replace: false,
+      showLoading: false,
+    );
   }
 
   void _onUpdateSearch(

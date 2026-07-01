@@ -54,7 +54,7 @@ class PostStatusActionsPanel extends StatelessWidget {
           Text(
             l10n.t('changePostStatus'),
             style: theme.textTheme.bodySmall?.copyWith(
-              color: InvestigationTheme.mutedText(context, isDark),
+              color: InvestigationTheme.mutedText(context),
             ),
           ),
           const SizedBox(height: InvestigationTheme.s12),
@@ -63,7 +63,8 @@ class PostStatusActionsPanel extends StatelessWidget {
             runSpacing: InvestigationTheme.s8,
             children: kPostAdminStatuses.map((status) {
               final selected = active == status;
-              final color = postStatusColor(status);
+              final color =
+                  postStatusColorFromScheme(theme.colorScheme, status);
               return _StatusActionChip(
                 label: postStatusLabel(l10n, status),
                 icon: postStatusIcon(status),

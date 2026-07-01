@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/utils/post_status_utils.dart';
 
 /// All post statuses admins can set via [UpdatePostStatusEvent].
 const kPostAdminStatuses = [
@@ -14,7 +15,7 @@ const kPostAdminStatuses = [
 ];
 
 String postStatusLabel(AppLocalizations l10n, String status) {
-  switch (status.toUpperCase()) {
+  switch (normalizePostStatus(status)) {
     case 'PUBLISHED':
       return l10n.t('postStatusPublished');
     case 'BANNED':
@@ -33,7 +34,7 @@ String postStatusLabel(AppLocalizations l10n, String status) {
 }
 
 IconData postStatusIcon(String status) {
-  switch (status.toUpperCase()) {
+  switch (normalizePostStatus(status)) {
     case 'PUBLISHED':
       return Icons.check_circle_outline_rounded;
     case 'DRAFT':
@@ -51,22 +52,25 @@ IconData postStatusIcon(String status) {
   }
 }
 
-Color postStatusColor(String status) {
-  switch (status.toUpperCase()) {
+Color postStatusColor(String status, [ColorScheme? scheme]) =>
+    postStatusColorFromScheme(scheme ?? const ColorScheme.light(), status);
+
+Color postStatusColorFromScheme(ColorScheme scheme, String status) {
+  switch (normalizePostStatus(status)) {
     case 'PUBLISHED':
-      return const Color(0xFF16A34A);
+      return scheme.tertiary;
     case 'DRAFT':
-      return const Color(0xFF64748B);
+      return scheme.primary;
     case 'HIDDEN':
-      return const Color(0xFFEA580C);
+      return scheme.secondary;
     case 'BANNED':
-      return const Color(0xFFDC2626);
+      return scheme.error;
     case 'UNDER_REVIEW':
-      return const Color(0xFF6366F1);
+      return scheme.primary;
     case 'ARCHIVED':
-      return const Color(0xFF78716C);
+      return scheme.outline;
     default:
-      return const Color(0xFF64748B);
+      return scheme.onSurfaceVariant;
   }
 }
 

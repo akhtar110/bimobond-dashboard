@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/DeviceInfoService/device_info_service.dart';
+import '../../../../core/config/api_config.dart';
+import '../../../../core/utils/api_response_parser.dart';
 import '../models/login_request_model.dart';
 
 class AuthRemoteDataSource {
@@ -71,6 +73,10 @@ class AuthRemoteDataSource {
   /// SHARED BACKEND CALL
   /// ================================
   Future<Map<String, dynamic>> _sendToBackend(String idToken) async {
+    if (ApiConfig.requiresHostedApiSetup()) {
+      throw Exception(ApiConfig.missingConfigMessage);
+    }
+
     try {
       final deviceData = await DeviceInfoService.collect();
 
@@ -103,20 +109,29 @@ class AuthRemoteDataSource {
         throw Exception("Backend error: ${response.statusCode}");
       }
 
-      final data = response.data;
-
-      if (data is Map<String, dynamic>) return data;
-      if (data is Map) return Map<String, dynamic>.from(data);
-
-      throw Exception("Invalid backend response format");
+      try {
+        return ApiResponseParser.unwrapAuthPayload(response.data);
+      } on FormatException catch (e) {
+        final base = ApiConfig.resolve();
+        throw Exception(
+          '${e.message} (API base: ${base.isEmpty ? Uri.base.origin : base})',
+        );
+      }
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionError) {
-        throw Exception(
-          "Connection failed → CORS or backend unreachable",
-        );
+        final base = ApiConfig.resolve();
+        final hint = base.isEmpty
+            ? 'API URL is not configured for this host. Set API_BASE_URL via '
+                '--dart-define or web/app_config.js, then rebuild and redeploy.'
+            : 'Check that $base is reachable and CORS allows this site.';
+        throw Exception('Connection failed → $hint');
       }
 
       throw Exception(e.response?.data ?? e.message);
     }
+  }
+
+  Future<void> signOut() async {
+    await _auth.signOut();
   }
 }

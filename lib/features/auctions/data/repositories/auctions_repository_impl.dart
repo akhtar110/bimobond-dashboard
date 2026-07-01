@@ -25,6 +25,21 @@ class AuctionsRepositoryImpl implements AuctionsRepository {
       _dataSource.adminCancelAuction(auctionId);
 
   @override
+  Future<void> adminBanAuction(String auctionId) =>
+      _dataSource.adminBanAuction(auctionId);
+
+  @override
+  Future<AuctionEntity> adminUpdateAuction(
+    String auctionId, {
+    String? itemName,
+    String? status,
+  }) =>
+      _dataSource.adminUpdateAuction(auctionId, {
+        if (itemName != null) 'itemName': itemName,
+        if (status != null) 'status': status,
+      });
+
+  @override
   Future<AuctionEntity> adminResolveAuction(
           String auctionId, String winnerId) =>
       _dataSource.adminResolveAuction(auctionId, winnerId);

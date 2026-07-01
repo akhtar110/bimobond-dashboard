@@ -1,16 +1,16 @@
 class AuctionUpdateEntity {
   const AuctionUpdateEntity({
     required this.auctionId,
-    required this.currentTotalUsd,
-    required this.targetPriceUsd,
+    required this.currentTotalCoins,
+    required this.targetPriceCoins,
     required this.status,
     this.winnerId,
     this.lastGift,
   });
 
   final String auctionId;
-  final double currentTotalUsd;
-  final double targetPriceUsd;
+  final double currentTotalCoins;
+  final double targetPriceCoins;
   final String status;
   final String? winnerId;
   final Map<String, dynamic>? lastGift;
@@ -21,8 +21,12 @@ class AuctionUpdateEntity {
   factory AuctionUpdateEntity.fromJson(Map<String, dynamic> json) {
     return AuctionUpdateEntity(
       auctionId: json['auctionId']?.toString() ?? '',
-      currentTotalUsd: _toDouble(json['currentTotalUsd']),
-      targetPriceUsd: _toDouble(json['targetPriceUsd']),
+      currentTotalCoins: _toDouble(
+        json['currentTotalCoins'] ?? json['currentTotalUsd'],
+      ),
+      targetPriceCoins: _toDouble(
+        json['targetPriceCoins'] ?? json['targetPriceUsd'],
+      ),
       status: json['status']?.toString() ?? 'ACTIVE',
       winnerId: json['winnerId'] as String?,
       lastGift: json['lastGift'] as Map<String, dynamic>?,

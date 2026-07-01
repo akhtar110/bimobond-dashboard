@@ -161,7 +161,10 @@ class _UserActivityMentionsTabState extends State<UserActivityMentionsTab> {
                           openPostInvestigation(
                             context,
                             postId: postId,
-                            post: managedPostFromMention(m),
+                            post: managedPostFromMention(
+                              m,
+                              profileUser: widget.sourceUser,
+                            ),
                             sourceUser: widget.sourceUser,
                             activityContext: ActivityContext.mention(
                               activityDate: m.createdAt,
@@ -219,6 +222,7 @@ class _MentionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final dateStr = DateFormat('MMM d, yyyy · HH:mm').format(mention.createdAt);
     final isComment = mention.isCommentMention;
 
@@ -241,7 +245,7 @@ class _MentionCard extends StatelessWidget {
                   _headerLabel(context),
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
+                    color: scheme.onSurface,
                   ),
                 ),
               ),
@@ -249,7 +253,7 @@ class _MentionCard extends StatelessWidget {
                 dateStr,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF),
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -267,7 +271,7 @@ class _MentionCard extends StatelessWidget {
               mention.comment!.content,
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.35,
-                color: isDark ? Colors.grey.shade200 : const Color(0xFF374151),
+                color: scheme.onSurfaceVariant,
               ),
             ),
             if (mention.comment!.post.description != null &&
@@ -278,7 +282,7 @@ class _MentionCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isDark ? Colors.grey.shade500 : const Color(0xFF6B7280),
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -299,7 +303,7 @@ class _MentionCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   height: 1.35,
-                  color: isDark ? Colors.grey.shade200 : const Color(0xFF374151),
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ],

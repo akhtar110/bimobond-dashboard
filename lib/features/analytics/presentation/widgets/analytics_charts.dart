@@ -4,19 +4,33 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import '../utils/analytics_format.dart';
 
+int _chartLabelStep(int count) {
+  if (count <= 7) return 1;
+  return (count / 6).ceil().clamp(1, count);
+}
+
+bool _showChartLabel(int index, int count) {
+  if (count <= 7) return true;
+  final step = _chartLabelStep(count);
+  return index % step == 0 || index == count - 1;
+}
+
 class AnalyticsMultiLineChart extends StatelessWidget {
   const AnalyticsMultiLineChart({
     super.key,
     required this.series,
     this.height = 240,
+    this.weeklyLabels = false,
   });
 
   final List<AnalyticsLineSeries> series;
   final double height;
+  final bool weeklyLabels;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final locale = AnalyticsFormat.localeOf(context);
     if (series.every((s) => s.points.isEmpty)) {
       return SizedBox(
         height: height,
@@ -29,11 +43,11 @@ class AnalyticsMultiLineChart extends StatelessWidget {
       );
     }
 
-    final maxLen = series.map((s) => s.points.length).reduce((a, b) => a > b ? a : b);
     final maxY = series
         .expand((s) => s.points)
         .fold<double>(0, (m, p) => p.$2 > m ? p.$2 : m);
     final yMax = maxY <= 0 ? 1.0 : maxY * 1.15;
+    final bottomReserved = weeklyLabels ? 36.0 : 28.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,14 +98,16 @@ class AnalyticsMultiLineChart extends StatelessWidget {
               ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
                     reservedSize: 36,
                     getTitlesWidget: (v, _) => Text(
-                      AnalyticsFormat.count(v),
+                      AnalyticsFormat.count(v, locale: locale),
                       style: TextStyle(
                         fontSize: 10,
                         color: AnalyticsChartColors.axisLabel(scheme),
@@ -102,23 +118,35 @@ class AnalyticsMultiLineChart extends StatelessWidget {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 24,
-                    interval: (maxLen / 5).clamp(1, maxLen.toDouble()),
+                    reservedSize: bottomReserved,
+                    interval: 1,
                     getTitlesWidget: (v, meta) {
                       final idx = v.toInt();
-                      final points = series.firstWhere((s) => s.points.isNotEmpty,
-                          orElse: () => series.first).points;
-                      if (idx < 0 || idx >= points.length) {
+                      final points = series
+                          .firstWhere(
+                            (s) => s.points.isNotEmpty,
+                            orElse: () => series.first,
+                          )
+                          .points;
+                      if (idx < 0 ||
+                          idx >= points.length ||
+                          !_showChartLabel(idx, points.length)) {
                         return const SizedBox.shrink();
                       }
                       return Padding(
                         padding: const EdgeInsets.only(top: 6),
                         child: Text(
-                          AnalyticsFormat.shortDate(points[idx].$1),
+                          AnalyticsFormat.chartBucketLabel(
+                            points[idx].$1,
+                            weekly: weeklyLabels,
+                            locale: locale,
+                          ),
                           style: TextStyle(
                             fontSize: 9,
                             color: AnalyticsChartColors.axisLabel(scheme),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       );
                     },
@@ -131,8 +159,13 @@ class AnalyticsMultiLineChart extends StatelessWidget {
                   getTooltipItems: (spots) => spots.map((spot) {
                     final s = series[spot.barIndex];
                     final date = s.points[spot.spotIndex].$1;
+                    final dateLabel = AnalyticsFormat.chartBucketLabel(
+                      date,
+                      weekly: weeklyLabels,
+                      locale: locale,
+                    );
                     return LineTooltipItem(
-                      '${s.label}\n${AnalyticsFormat.shortDate(date)}: ${AnalyticsFormat.count(spot.y)}',
+                      '${s.label}\n$dateLabel: ${AnalyticsFormat.count(spot.y, locale: locale)}',
                       TextStyle(
                         color: scheme.onInverseSurface,
                         fontSize: 11,
@@ -187,27 +220,33 @@ class AnalyticsBarChart extends StatelessWidget {
     required this.entries,
     this.horizontal = false,
     this.height = 200,
+    this.weeklyLabels = false,
   });
 
   final List<AnalyticsBarEntry> entries;
   final bool horizontal;
   final double height;
+  final bool weeklyLabels;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final locale = AnalyticsFormat.localeOf(context);
     if (entries.isEmpty) {
       return SizedBox(
         height: height,
         child: Center(
-          child: Text(context.l10n.t('analyticsNoData'),
-              style: TextStyle(color: scheme.onSurfaceVariant)),
+          child: Text(
+            context.l10n.t('analyticsNoData'),
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
         ),
       );
     }
 
     final maxY = entries.fold<double>(0, (m, e) => e.value > m ? e.value : m);
     final yMax = maxY <= 0 ? 1.0 : maxY * 1.15;
+    final bottomReserved = weeklyLabels ? 36.0 : 28.0;
 
     if (horizontal) {
       return SizedBox(
@@ -226,8 +265,10 @@ class AnalyticsBarChart extends StatelessWidget {
             ),
             borderData: FlBorderData(show: false),
             titlesData: FlTitlesData(
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
@@ -245,14 +286,15 @@ class AnalyticsBarChart extends StatelessWidget {
                           fontSize: 10,
                           color: scheme.onSurfaceVariant,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     );
                   },
                 ),
               ),
-              bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
             barGroups: [
               for (var i = 0; i < entries.length; i++)
@@ -290,14 +332,16 @@ class AnalyticsBarChart extends StatelessWidget {
           ),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 32,
                 getTitlesWidget: (v, _) => Text(
-                  AnalyticsFormat.count(v),
+                  AnalyticsFormat.count(v, locale: locale),
                   style: TextStyle(
                     fontSize: 10,
                     color: scheme.onSurfaceVariant,
@@ -308,10 +352,13 @@ class AnalyticsBarChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
+                reservedSize: bottomReserved,
+                interval: 1,
                 getTitlesWidget: (v, meta) {
                   final idx = v.toInt();
-                  if (idx < 0 || idx >= entries.length) {
+                  if (idx < 0 ||
+                      idx >= entries.length ||
+                      !_showChartLabel(idx, entries.length)) {
                     return const SizedBox.shrink();
                   }
                   return Padding(
@@ -339,7 +386,8 @@ class AnalyticsBarChart extends StatelessWidget {
                     toY: entries[i].value,
                     color: entries[i].color ?? scheme.primary,
                     width: 18,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(4)),
                   ),
                 ],
               ),
@@ -378,93 +426,116 @@ class AnalyticsPieChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final locale = AnalyticsFormat.localeOf(context);
     final total = entries.fold<double>(0, (s, e) => s + e.value);
     if (total <= 0) {
       return SizedBox(
         height: size,
         child: Center(
-          child: Text(context.l10n.t('analyticsNoData'),
-              style: TextStyle(color: scheme.onSurfaceVariant)),
+          child: Text(
+            context.l10n.t('analyticsNoData'),
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
         ),
       );
     }
 
-    return SizedBox(
-      height: size,
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: donut ? 42 : 0,
-                sections: [
-                  for (final e in entries)
-                    if (e.value > 0)
-                      PieChartSectionData(
-                        value: e.value,
-                        color: e.color,
-                        title: '${((e.value / total) * 100).round()}%',
-                        radius: 52,
-                        titleStyle: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onPrimary,
-                        ),
+    final visible = entries.where((e) => e.value > 0).toList();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 320;
+
+        final legend = Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final e in visible) ...[
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: e.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      e.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    AnalyticsFormat.count(e.value, locale: locale),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
+                  ),
                 ],
               ),
-              swapAnimationDuration: const Duration(milliseconds: 450),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final e in entries)
-                  if (e.value > 0) ...[
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: e.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            e.label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          AnalyticsFormat.count(e.value),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: scheme.onSurface,
-                          ),
-                        ),
-                      ],
+              const SizedBox(height: 6),
+            ],
+          ],
+        );
+
+        final pie = SizedBox(
+          height: size,
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: donut ? 42 : 0,
+              sections: [
+                for (final e in visible)
+                  PieChartSectionData(
+                    value: e.value,
+                    color: e.color,
+                    title: '${((e.value / total) * 100).round()}%',
+                    radius: 52,
+                    titleStyle: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onPrimary,
                     ),
-                    const SizedBox(height: 6),
-                  ],
+                  ),
               ],
             ),
+            swapAnimationDuration: const Duration(milliseconds: 450),
           ),
-        ],
-      ),
+        );
+
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              pie,
+              const SizedBox(height: 12),
+              legend,
+            ],
+          );
+        }
+
+        return SizedBox(
+          height: size,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(flex: 3, child: pie),
+              const SizedBox(width: 8),
+              Expanded(flex: 2, child: legend),
+            ],
+          ),
+        );
+      },
     );
   }
 }

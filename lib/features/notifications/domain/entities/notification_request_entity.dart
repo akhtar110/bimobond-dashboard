@@ -9,6 +9,8 @@ class NotificationRequestEntity {
     this.type = NotificationType.adminMessage,
     this.sendPush = true,
     this.data,
+    this.scheduledAt,
+    this.timezoneName,
   });
 
   /// Single recipient (used with send endpoint).
@@ -24,4 +26,10 @@ class NotificationRequestEntity {
 
   /// Optional JSON data for deep linking.
   final Map<String, dynamic>? data;
+
+  /// When set, the notification should be delivered later (API-ready).
+  final DateTime? scheduledAt;
+
+  /// IANA or local timezone label for scheduled delivery.
+  final String? timezoneName;
 }

@@ -7,7 +7,7 @@ class CompactAnalyticsGrid extends StatelessWidget {
   const CompactAnalyticsGrid({
     super.key,
     required this.metrics,
-    required this.isDark,
+    this.isDark = false,
   });
 
   final List<({IconData icon, String label, int value, Color? color})> metrics;
@@ -33,7 +33,6 @@ class CompactAnalyticsGrid extends StatelessWidget {
             label: metrics[i].label,
             value: compactNumber(metrics[i].value),
             color: metrics[i].color,
-            isDark: isDark,
           ),
         );
       },
@@ -46,14 +45,12 @@ class _MetricCell extends StatefulWidget {
     required this.icon,
     required this.label,
     required this.value,
-    required this.isDark,
     this.color,
   });
 
   final IconData icon;
   final String label;
   final String value;
-  final bool isDark;
   final Color? color;
 
   @override
@@ -65,10 +62,8 @@ class _MetricCellState extends State<_MetricCell> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = widget.color ?? Theme.of(context).colorScheme.primary;
-    final bg = widget.isDark
-        ? const Color(0xFF0F1421)
-        : const Color(0xFFF8FAFC);
+    final scheme = Theme.of(context).colorScheme;
+    final accent = widget.color ?? scheme.primary;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -77,14 +72,14 @@ class _MetricCellState extends State<_MetricCell> {
         duration: const Duration(milliseconds: InvestigationTheme.animMs),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: _hovered ? accent.withValues(alpha: 0.06) : bg,
+          color: _hovered
+              ? accent.withValues(alpha: 0.08)
+              : scheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
           border: Border.all(
             color: _hovered
                 ? accent.withValues(alpha: 0.35)
-                : (widget.isDark
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFFE2E8F0)),
+                : scheme.outlineVariant.withValues(alpha: 0.6),
           ),
         ),
         child: Column(
@@ -103,7 +98,7 @@ class _MetricCellState extends State<_MetricCell> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: InvestigationTheme.mutedText(context, widget.isDark),
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -115,7 +110,7 @@ class _MetricCellState extends State<_MetricCell> {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: widget.isDark ? Colors.white : const Color(0xFF0F172A),
+                color: scheme.onSurface,
                 letterSpacing: -0.3,
               ),
             ),

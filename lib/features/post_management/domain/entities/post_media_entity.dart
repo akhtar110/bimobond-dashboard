@@ -13,18 +13,60 @@ class PostMediaEntity {
   final int order;
   final String? id;
 
-  factory PostMediaEntity.fromJson(Map<String, dynamic> json) {
-    // Resolve relative paths returned by the API (e.g. /uploads/media/…) to
-    // absolute URLs so CachedNetworkImage / VideoPlayerController can load them.
-    final rawUrl = json['url']?.toString() ?? '';
-    final resolvedUrl = resolveMediaUrl(rawUrl) ?? rawUrl;
+  /// Resolved type after URL/extension inspection (handles mislabeled API data).
+  String get effectiveMediaType {
+    final normalized = mediaType.trim().toUpperCase();
+    if (normalized == 'VIDEO' || normalized == 'AUDIO') return 'VIDEO';
+    if (isLikelyVideoFileUrl(url)) return 'VIDEO';
+    return 'IMAGE';
+  }
 
+  bool get isVideo => effectiveMediaType == 'VIDEO';
+
+  PostMediaEntity normalized() {
     return PostMediaEntity(
+      id: id,
+      url: url,
+      mediaType: effectiveMediaType,
+      order: order,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is PostMediaEntity &&
+        other.url == url &&
+        other.mediaType == mediaType &&
+        other.order == order &&
+        other.id == id;
+  }
+
+  @override
+  int get hashCode => Object.hash(url, mediaType, order, id);
+
+  factory PostMediaEntity.fromJson(Map<String, dynamic> json) {
+    final rawUrl = _readUrl(json);
+    final resolvedUrl = resolveMediaUrl(rawUrl) ?? rawUrl;
+    final rawType = json['mediaType']?.toString() ??
+        json['type']?.toString() ??
+        'IMAGE';
+
+    final entity = PostMediaEntity(
       id: json['id']?.toString(),
       url: resolvedUrl,
-      mediaType: json['mediaType']?.toString() ?? 'IMAGE',
+      mediaType: rawType,
       order: _readInt(json['order']) ?? 0,
     );
+    return entity.normalized();
+  }
+
+  static String _readUrl(Map<String, dynamic> json) {
+    for (final key in ['url', 'mediaUrl', 'src', 'path', 'fileUrl']) {
+      final value = json[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return '';
   }
 
   static List<PostMediaEntity> listFromJson(dynamic raw) {
@@ -32,8 +74,9 @@ class PostMediaEntity {
 
     final items = <PostMediaEntity>[];
     for (final entry in raw) {
-      if (entry is! Map<String, dynamic>) continue;
-      final parsed = PostMediaEntity.fromJson(entry);
+      if (entry is! Map) continue;
+      final map = Map<String, dynamic>.from(entry);
+      final parsed = PostMediaEntity.fromJson(map);
       if (parsed.url.isEmpty) continue;
       items.add(parsed);
     }
@@ -50,19 +93,36 @@ class PostMediaEntity {
   }
 }
 
+/// Whether [url] is safe to show as a list/card still image (not a playable video).
+bool isUsablePostThumbnailUrl(
+  String? url, {
+  Iterable<String> excludeUrls = const [],
+}) {
+  final trimmed = url?.trim();
+  if (trimmed == null || trimmed.isEmpty) return false;
+  if (isLikelyVideoFileUrl(trimmed)) return false;
+  for (final exclude in excludeUrls) {
+    final excluded = exclude.trim();
+    if (excluded.isNotEmpty && excluded == trimmed) return false;
+  }
+  return true;
+}
+
 /// Resolves the admin preview thumbnail: first IMAGE in [media], else [thumbnailUrl].
 String? resolvePostDisplayThumbnailUrl({
   required List<PostMediaEntity> media,
   String? thumbnailUrl,
+  Iterable<String> excludeUrls = const [],
 }) {
   for (final item in media) {
-    if (item.mediaType.toUpperCase() == 'IMAGE' && item.url.isNotEmpty) {
+    if (!item.isVideo &&
+        isUsablePostThumbnailUrl(item.url, excludeUrls: excludeUrls)) {
       return item.url;
     }
   }
 
-  if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-    return thumbnailUrl;
+  if (isUsablePostThumbnailUrl(thumbnailUrl, excludeUrls: excludeUrls)) {
+    return thumbnailUrl!.trim();
   }
 
   return null;
@@ -73,5 +133,6 @@ bool isLikelyVideoFileUrl(String url) {
   return path.endsWith('.mp4') ||
       path.endsWith('.webm') ||
       path.endsWith('.mov') ||
-      path.endsWith('.m3u8');
+      path.endsWith('.m3u8') ||
+      path.endsWith('.mkv');
 }

@@ -16,6 +16,7 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
         super(ReportsInitial()) {
     on<LoadReportsEvent>(_onLoad);
     on<LoadMoreReportsEvent>(_onLoadMore);
+    on<GoToReportsPageEvent>(_onGoToPage);
     on<FilterReportsEvent>(_onFilter);
     on<RefreshReportsEvent>(_onRefresh);
     on<UpdateReportStatusEvent>(_onUpdateStatus);
@@ -52,6 +53,15 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
     }
     emit(current.copyWith(isLoadingMore: true));
     await _fetch(emit, page: current.currentPage + 1, replace: false);
+  }
+
+  Future<void> _onGoToPage(
+    GoToReportsPageEvent event,
+    Emitter<ReportsState> emit,
+  ) async {
+    if (event.page < 1) return;
+    emit(ReportsLoading());
+    await _fetch(emit, page: event.page, replace: true);
   }
 
   Future<void> _onFilter(

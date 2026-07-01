@@ -15,6 +15,7 @@ class AuctionReportsLoaded extends AuctionReportsState {
     required this.query,
     this.searchQuery = '',
     this.isFetching = false,
+    this.isLoadingMore = false,
     this.overview,
     this.isOverviewLoading = false,
     this.overviewDays = 30,
@@ -27,9 +28,12 @@ class AuctionReportsLoaded extends AuctionReportsState {
   final AuctionReportsListQuery query;
   final String searchQuery;
   final bool isFetching;
+  final bool isLoadingMore;
   final AuctionReportOverviewEntity? overview;
   final bool isOverviewLoading;
   final int overviewDays;
+
+  bool get hasReachedMax => currentPage >= lastPage;
 
   AuctionReportsLoaded copyWith({
     List<AuctionReportListItem>? auctions,
@@ -39,6 +43,7 @@ class AuctionReportsLoaded extends AuctionReportsState {
     AuctionReportsListQuery? query,
     String? searchQuery,
     bool? isFetching,
+    bool? isLoadingMore,
     AuctionReportOverviewEntity? overview,
     bool? isOverviewLoading,
     int? overviewDays,
@@ -52,6 +57,7 @@ class AuctionReportsLoaded extends AuctionReportsState {
       query: query ?? this.query,
       searchQuery: searchQuery ?? this.searchQuery,
       isFetching: isFetching ?? this.isFetching,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       overview: clearOverview ? null : (overview ?? this.overview),
       isOverviewLoading: isOverviewLoading ?? this.isOverviewLoading,
       overviewDays: overviewDays ?? this.overviewDays,

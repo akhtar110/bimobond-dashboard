@@ -151,10 +151,10 @@ abstract final class AuctionReportJsonParser {
     if (value is! Map) return const AuctionReportMetrics();
     final m = Map<String, dynamic>.from(value);
     return AuctionReportMetrics(
-      startingPriceUsd: asDouble(m['startingPriceUsd']),
-      targetPriceUsd: asDouble(m['targetPriceUsd']),
-      currentTotalUsd: asDouble(m['currentTotalUsd']),
-      remainingUsd: asDouble(m['remainingUsd']),
+      startingPriceCoins: asDouble(m['startingPriceCoins']),
+      targetPriceCoins: asDouble(m['targetPriceCoins']),
+      currentTotalCoins: asDouble(m['currentTotalCoins']),
+      remainingCoins: asDouble(m['remainingCoins']),
       progressPercent: asInt(m['progressPercent']),
     );
   }
@@ -165,15 +165,15 @@ abstract final class AuctionReportJsonParser {
     return AuctionReportPeriodActivity(
       bids: asInt(m['bids']),
       gifts: asInt(m['gifts']),
-      contributionUsd: asDouble(m['contributionUsd']),
-      giftSpendUsd: asDouble(m['giftSpendUsd']),
+      contributionCoins: asDouble(m['contributionCoins']),
+      giftSpendCoins: asDouble(m['giftSpendCoins']),
     );
   }
 
   static AuctionReportBid parseBid(Map<String, dynamic> m) {
     return AuctionReportBid(
       id: asString(m['id']) ?? '',
-      amountUsd: asDouble(m['amountUsd']),
+      amountCoins: asDouble(m['amountCoins']),
       createdAt: _parseDate(m['createdAt']) ?? DateTime.now(),
       bidder: parseAdminUser(m['bidder']),
     );
@@ -197,8 +197,8 @@ abstract final class AuctionReportJsonParser {
   ) {
     return AuctionReportGiftTransaction(
       id: asString(m['id']) ?? '',
-      priceUsd: asDouble(m['priceUsd']),
-      contributionUsd: asDouble(m['contributionUsd']),
+      priceCoins: asDouble(m['priceCoins']),
+      contributionCoins: asDouble(m['contributionCoins']),
       createdAt: _parseDate(m['createdAt']) ?? DateTime.now(),
       sender: parseAdminUser(m['sender']),
       gift: parseGiftSummary(m['gift']),
@@ -211,8 +211,8 @@ abstract final class AuctionReportJsonParser {
       user: user ??
           const ReportAdminUser(id: '', username: 'unknown'),
       giftCount: asInt(m['giftCount']),
-      totalContributionUsd: asDouble(m['totalContributionUsd']),
-      totalSpendUsd: asDouble(m['totalSpendUsd']),
+      totalContributionCoins: asDouble(m['totalContributionCoins']),
+      totalSpendCoins: asDouble(m['totalSpendCoins']),
     );
   }
 
@@ -226,9 +226,9 @@ abstract final class AuctionReportJsonParser {
       postId: asString(m['postId']),
       liveId: asString(m['liveId']),
       itemImageUrl: asString(m['itemImageUrl']),
-      startingPriceUsd: asDouble(m['startingPriceUsd']),
-      targetPriceUsd: asDouble(m['targetPriceUsd']),
-      currentTotalUsd: asDouble(m['currentTotalUsd']),
+      startingPriceCoins: asDouble(m['startingPriceCoins']),
+      targetPriceCoins: asDouble(m['targetPriceCoins']),
+      currentTotalCoins: asDouble(m['currentTotalCoins']),
       winnerId: asString(m['winnerId']),
       endedAt: _parseDate(m['endedAt']),
       host: parseAdminUser(m['host']),

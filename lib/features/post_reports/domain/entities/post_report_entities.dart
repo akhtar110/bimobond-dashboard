@@ -264,8 +264,8 @@ class PostReportGiftTransaction extends Equatable {
   const PostReportGiftTransaction({
     required this.id,
     required this.createdAt,
-    this.priceUsd = 0,
-    this.contributionUsd = 0,
+    this.priceCoins = 0,
+    this.contributionCoins = 0,
     this.sender,
     this.receiver,
     this.gift,
@@ -273,15 +273,15 @@ class PostReportGiftTransaction extends Equatable {
 
   final String id;
   final DateTime createdAt;
-  final double priceUsd;
-  final double contributionUsd;
+  final double priceCoins;
+  final double contributionCoins;
   final ReportAdminUser? sender;
   final ReportAdminUser? receiver;
   final PostReportGiftSummary? gift;
 
   @override
   List<Object?> get props =>
-      [id, createdAt, priceUsd, contributionUsd, sender, receiver, gift];
+      [id, createdAt, priceCoins, contributionCoins, sender, receiver, gift];
 }
 
 class PostReportModerationFlag extends Equatable {

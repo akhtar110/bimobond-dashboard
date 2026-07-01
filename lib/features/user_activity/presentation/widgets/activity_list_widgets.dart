@@ -16,11 +16,11 @@ class ActivityListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final outlineBorder =
-        Theme.of(context).colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = Theme.of(context).colorScheme;
+    final outlineBorder = scheme.outlineVariant.withValues(alpha: 0.5);
 
     return Material(
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      color: scheme.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -54,20 +54,24 @@ class ActivityErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 48, color: Colors.red.shade400),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: scheme.error.withValues(alpha: 0.7),
+            ),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -98,20 +102,22 @@ class ActivityAuthorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final display = (fullName != null && fullName!.isNotEmpty)
         ? fullName!
         : username;
+
     return Row(
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+          backgroundColor: scheme.surfaceContainerHighest,
           backgroundImage:
               avatarUrl != null && avatarUrl!.isNotEmpty
                   ? NetworkImage(avatarUrl!)
                   : null,
           child: avatarUrl == null || avatarUrl!.isEmpty
-              ? Icon(Icons.person, size: 16, color: Colors.grey.shade500)
+              ? Icon(Icons.person, size: 16, color: scheme.onSurfaceVariant)
               : null,
         ),
         const SizedBox(width: 8),
@@ -123,7 +129,7 @@ class ActivityAuthorRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.grey.shade300 : const Color(0xFF374151),
+              color: scheme.onSurface,
             ),
           ),
         ),

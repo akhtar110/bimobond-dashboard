@@ -1,33 +1,41 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../injection_container.dart' as di;
 import '../bloc/notifications_bloc.dart';
 import '../widgets/notification_composer.dart';
 import '../widgets/notification_feed_panel.dart';
 import '../widgets/notification_status_banner.dart';
-import '../widgets/realtime_activity_feed.dart';
 
-class NotificationsPage extends StatefulWidget {
+class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
 
   @override
-  State<NotificationsPage> createState() => _NotificationsPageState();
+  Widget build(BuildContext context) {
+    if (kDebugMode) debugPrint('NotificationsPage rebuilt');
+    return PersistentBlocProvider<NotificationsBloc>(
+      debugLabel: 'NotificationsPage',
+      create: () =>
+          di.sl<NotificationsBloc>()..add(const ConnectAdminSocket()),
+      child: const _NotificationsPageView(),
+    );
+  }
 }
 
-class _NotificationsPageState extends State<NotificationsPage> {
-  late final NotificationsBloc _bloc;
+class _NotificationsPageView extends StatefulWidget {
+  const _NotificationsPageView();
 
   @override
-  void initState() {
-    super.initState();
-    _bloc = context.read<NotificationsBloc>();
-    _bloc.add(const ConnectAdminSocket());
-  }
+  State<_NotificationsPageView> createState() => _NotificationsPageViewState();
+}
 
+class _NotificationsPageViewState extends State<_NotificationsPageView> {
   @override
   void dispose() {
-    _bloc.add(const DisconnectAdminSocket());
+    context.read<NotificationsBloc>().add(const DisconnectAdminSocket());
     super.dispose();
   }
 
@@ -57,11 +65,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
       child: Stack(
         children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1680),
-              child: CustomScrollView(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final isDesktop = width >= 1200;
+              final isTablet = width >= 768 && width < 1200;
+
+              if (isDesktop) {
+                return _DesktopNotificationsLayout(isDark: isDark);
+              }
+
+              return CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
                     child: Padding(
@@ -70,69 +84,84 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                   ),
                   SliverPadding(
-                    padding: _pagePadding(context, top: 14, bottom: 16),
+                    padding: _pagePadding(context, top: 16, bottom: 16),
                     sliver: SliverToBoxAdapter(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth;
-                          // Desktop: 2-column layout
-                          if (width > 1100) {
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Expanded(
-                                  flex: 3,
-                                  child: NotificationComposer(),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    children: [
-                                      const _StatsRow(),
-                                      const SizedBox(height: 16),
-                                      const RealtimeActivityFeed(),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          // Tablet / small: stacked
-                          return const Column(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1680),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _StatsRow(),
-                              SizedBox(height: 16),
-                              NotificationComposer(),
-                              SizedBox(height: 16),
-                              RealtimeActivityFeed(),
+                              const _StatsRow(),
+                              const SizedBox(height: 24),
+                              const NotificationComposer(),
+                              const SizedBox(height: 24),
+                              NotificationFeedPanel(
+                                isDark: isDark,
+                                expandVertically: false,
+                                minHeight: isTablet ? 640 : 520,
+                              ),
                             ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  // ── Global notification feed with filters ────────────────
-                  SliverPadding(
-                    padding: _pagePadding(context, top: 8, bottom: 24),
-                    sliver: SliverToBoxAdapter(
-                      child: Builder(
-                        builder: (context) {
-                          final isDark =
-                              Theme.of(context).brightness == Brightness.dark;
-                          return NotificationFeedPanel(isDark: isDark);
-                        },
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-          // Status banner listener
           const NotificationStatusBanner(),
         ],
+      ),
+    );
+  }
+}
+
+class _DesktopNotificationsLayout extends StatelessWidget {
+  const _DesktopNotificationsLayout({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: _pagePadding(context, top: 12, bottom: 24),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1680),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _NotificationsHeader(),
+              const SizedBox(height: 24),
+              const _StatsRow(),
+              const SizedBox(height: 24),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(
+                      width: 480,
+                      child: NotificationComposer(
+                        expandVertically: true,
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: NotificationFeedPanel(
+                        isDark: isDark,
+                        expandVertically: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -143,13 +172,9 @@ EdgeInsetsDirectional _pagePadding(
   double top = 12,
   double bottom = 16,
 }) {
-  final horizontal = MediaQuery.sizeOf(context).width < 600 ? 12.0 : 16.0;
+  final horizontal = MediaQuery.sizeOf(context).width < 600 ? 12.0 : 24.0;
   return EdgeInsetsDirectional.fromSTEB(horizontal, top, horizontal, bottom);
 }
-
-// ──────────────────────────────────────────────────────────
-// Page header
-// ──────────────────────────────────────────────────────────
 
 class _NotificationsHeader extends StatelessWidget {
   const _NotificationsHeader();
@@ -160,136 +185,26 @@ class _NotificationsHeader extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.t('notificationsPageTitle'),
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.t('notificationsPageSubtitle'),
-                style: textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        Text(
+          l10n.t('notificationsPageTitle'),
+          style: textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
         ),
-        BlocBuilder<NotificationsBloc, NotificationsState>(
-          buildWhen: (a, b) => a.socketConnected != b.socketConnected,
-          builder: (context, state) => _LiveBadge(
-            connected: state.socketConnected,
+        const SizedBox(height: 4),
+        Text(
+          l10n.t('notificationsPageSubtitle'),
+          style: textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ],
     );
   }
 }
-
-class _LiveBadge extends StatelessWidget {
-  const _LiveBadge({required this.connected});
-  final bool connected;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: connected
-            ? Colors.green.withValues(alpha: 0.1)
-            : scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: connected
-              ? Colors.green.withValues(alpha: 0.4)
-              : scheme.outlineVariant,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (connected)
-            _PulsingDot()
-          else
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: scheme.outlineVariant,
-              ),
-            ),
-          const SizedBox(width: 6),
-          Text(
-            connected
-                ? l10n.t('notificationSocketLive')
-                : l10n.t('notificationSocketOffline'),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: connected ? Colors.green.shade700 : scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PulsingDot extends StatefulWidget {
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _anim,
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.green,
-        ),
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────
-// Quick stats row
-// ──────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
   const _StatsRow();
@@ -305,34 +220,63 @@ class _StatsRow extends StatelessWidget {
           0,
           (sum, e) => sum + e.sentCount,
         );
-        final broadcasts =
-            state.activityLog.where((e) => !(e.scope?.contains('admin') ?? false)).length;
-        final adminBroadcasts =
-            state.activityLog.where((e) => e.scope?.contains('admin') ?? false).length;
+        final broadcasts = state.activityLog
+            .where((e) => !(e.scope?.contains('admin') ?? false))
+            .length;
+        final adminBroadcasts = state.activityLog
+            .where((e) => e.scope?.contains('admin') ?? false)
+            .length;
 
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _StatChip(
-              label: l10n.t('notificationStatSentSession'),
-              value: '$totalSent',
-              icon: Icons.send_rounded,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            _StatChip(
-              label: l10n.t('notificationStatBroadcastEvents'),
-              value: '$broadcasts',
-              icon: Icons.campaign_rounded,
-              color: Colors.orange,
-            ),
-            _StatChip(
-              label: l10n.t('notificationStatAdminBroadcasts'),
-              value: '$adminBroadcasts',
-              icon: Icons.admin_panel_settings_rounded,
-              color: Colors.teal,
-            ),
-          ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            const gap = 12.0;
+
+            final cards = [
+              _StatChip(
+                label: l10n.t('notificationStatSentSession'),
+                value: '$totalSent',
+                icon: Icons.send_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              _StatChip(
+                label: l10n.t('notificationStatBroadcastEvents'),
+                value: '$broadcasts',
+                icon: Icons.campaign_rounded,
+                color: Colors.orange,
+              ),
+              _StatChip(
+                label: l10n.t('notificationStatAdminBroadcasts'),
+                value: '$adminBroadcasts',
+                icon: Icons.admin_panel_settings_rounded,
+                color: Colors.teal,
+              ),
+            ];
+
+            if (width >= 900) {
+              return Row(
+                children: [
+                  for (var i = 0; i < cards.length; i++) ...[
+                    if (i > 0) const SizedBox(width: gap),
+                    Expanded(child: cards[i]),
+                  ],
+                ],
+              );
+            }
+
+            final columns = width >= 640 ? 2 : 1;
+            final itemWidth = columns == 1
+                ? width
+                : (width - gap) / columns;
+
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: cards
+                  .map((card) => SizedBox(width: itemWidth, child: card))
+                  .toList(growable: false),
+            );
+          },
         );
       },
     );
@@ -358,12 +302,13 @@ class _StatChip extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          color: scheme.outlineVariant.withValues(alpha: 0.55),
+        ),
         boxShadow: [
           BoxShadow(
             color: scheme.shadow.withValues(alpha: 0.04),
@@ -373,34 +318,40 @@ class _StatChip extends StatelessWidget {
         ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 16, color: color),
+            child: Icon(icon, size: 15, color: color),
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: color,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    height: 1.1,
+                  ),
                 ),
-              ),
-              Text(
-                label,
-                style: textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

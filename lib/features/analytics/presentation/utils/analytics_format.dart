@@ -2,22 +2,53 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/entities/analytics_entities.dart';
+import 'analytics_date_series_filler.dart';
 
 abstract final class AnalyticsFormat {
-  static final _compact = NumberFormat.compact();
-  static final _currency = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
-  static final _currencyPrecise =
-      NumberFormat.currency(symbol: '\$', decimalDigits: 2);
-  static final _date = DateFormat('MMM d');
-  static final _dateTime = DateFormat('MMM d, yyyy');
+  static NumberFormat _compact([String? locale]) =>
+      NumberFormat.compact(locale: locale ?? 'en');
 
-  static String count(num value) => _compact.format(value);
-  static String usd(num value) =>
-      value >= 1000 ? _currency.format(value) : _currencyPrecise.format(value);
+  static NumberFormat _currency([String? locale]) =>
+      NumberFormat.currency(symbol: '\$', decimalDigits: 0, locale: locale);
 
-  static String shortDate(DateTime date) => _date.format(date);
-  static String rangeLabel(DateTime from, DateTime to) =>
-      '${_dateTime.format(from)} – ${_dateTime.format(to)}';
+  static NumberFormat _currencyPrecise([String? locale]) =>
+      NumberFormat.currency(symbol: '\$', decimalDigits: 2, locale: locale);
+
+  static String count(num value, {String? locale}) =>
+      _compact(locale).format(value);
+
+  static String usd(num value, {String? locale}) {
+    final cur = value >= 1000 ? _currency(locale) : _currencyPrecise(locale);
+    return cur.format(value);
+  }
+
+  static String shortDate(DateTime date, {String? locale}) =>
+      DateFormat.MMMd(locale ?? 'en').format(date);
+
+  /// Label for a weekly bucket (week start date).
+  static String weekLabel(DateTime weekStart, {String? locale}) {
+    final code = locale ?? 'en';
+    final end = weekStart.add(const Duration(days: 6));
+    final fmt = DateFormat.MMMd(code);
+    return '${fmt.format(weekStart)} – ${fmt.format(end)}';
+  }
+
+  static String chartBucketLabel(
+    DateTime date, {
+    required bool weekly,
+    String? locale,
+  }) {
+    if (weekly) return weekLabel(date, locale: locale);
+    return shortDate(date, locale: locale);
+  }
+
+  static String rangeLabel(DateTime from, DateTime to, {String? locale}) {
+    final fmt = DateFormat.yMMMd(locale ?? 'en');
+    return '${fmt.format(from)} – ${fmt.format(to)}';
+  }
+
+  static String localeOf(BuildContext context) =>
+      Localizations.localeOf(context).toString();
 }
 
 /// Chart palette derived from [ColorScheme] with semantic report status colors.
@@ -59,13 +90,7 @@ List<(DateTime date, double value)> fillDailyGaps(
     (to ?? series.last.date).month,
     (to ?? series.last.date).day,
   );
-  final map = {
-    for (final p in series)
-      DateTime(p.date.year, p.date.month, p.date.day): p.count.toDouble(),
-  };
-  final out = <(DateTime, double)>[];
-  for (var d = start; !d.isAfter(end); d = d.add(const Duration(days: 1))) {
-    out.add((d, map[d] ?? 0));
-  }
-  return out;
+  final filled = fillMissingDates(series, start, end);
+  final aggregated = aggregateSeriesForChart(filled);
+  return toChartPoints(aggregated);
 }

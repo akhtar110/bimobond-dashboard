@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import '../entities/gift_entity.dart';
+import '../entities/bulk_gift_action_request.dart';
+import '../entities/bulk_gift_action_result.dart';
 
 /// Payload for creating a new gift.
 /// The [imageBytes] + [imageName] are uploaded first; the returned URL
@@ -10,7 +12,7 @@ class CreateGiftData {
     required this.name,
     required this.imageBytes,
     required this.imageName,
-    required this.priceUsd,
+    required this.priceCoins,
     this.isActive = true,
     this.publishedAt,
   });
@@ -18,7 +20,7 @@ class CreateGiftData {
   final String name;
   final Uint8List imageBytes;
   final String imageName;
-  final double priceUsd;
+  final double priceCoins;
   final bool isActive;
 
   /// Explicit publish timestamp. Defaults to server-side `DateTime.now()` when null.
@@ -30,7 +32,7 @@ class UpdateGiftData {
     this.name,
     this.thumbnailUrl,
     this.animationUrl,
-    this.priceUsd,
+    this.priceCoins,
     this.isActive,
     this.publishedAt,
     this.imageBytes,
@@ -40,7 +42,7 @@ class UpdateGiftData {
   final String? name;
   final String? thumbnailUrl;
   final String? animationUrl;
-  final double? priceUsd;
+  final double? priceCoins;
   final bool? isActive;
 
   /// Update the published timestamp. Pass `null` to leave it unchanged.
@@ -56,4 +58,5 @@ abstract class GiftsRepository {
   Future<GiftEntity> createGift(CreateGiftData data);
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
+  Future<BulkGiftActionResult> executeBulkAction(BulkGiftActionRequest request);
 }

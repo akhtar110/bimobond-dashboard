@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -16,29 +17,36 @@ class CategoryReportsPage extends StatefulWidget {
 class _CategoryReportsPageState extends State<CategoryReportsPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late final CategoryReportsBloc _bloc;
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _bloc = di.sl<CategoryReportsBloc>()
+      ..add(LoadCategoryReportsListEvent(refresh: true))
+      ..add(LoadCategoryReportsOverviewEvent());
+    if (kDebugMode) {
+      debugPrint('CategoryReportsBloc created — LoadCategoryReports dispatched');
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _bloc.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (kDebugMode) debugPrint('CategoryReportsPage rebuilt');
     final scheme = Theme.of(context).colorScheme;
 
-    return BlocProvider(
-      create: (_) => di.sl<CategoryReportsBloc>()
-        ..add(LoadCategoryReportsListEvent(refresh: true))
-        ..add(LoadCategoryReportsOverviewEvent()),
+    return BlocProvider<CategoryReportsBloc>.value(
+      value: _bloc,
       child: Builder(
         builder: (context) {
           return Container(

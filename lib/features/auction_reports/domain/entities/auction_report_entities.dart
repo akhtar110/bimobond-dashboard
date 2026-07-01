@@ -128,25 +128,25 @@ class AuctionReportCounts extends Equatable {
 
 class AuctionReportMetrics extends Equatable {
   const AuctionReportMetrics({
-    this.startingPriceUsd = 0,
-    this.targetPriceUsd = 0,
-    this.currentTotalUsd = 0,
-    this.remainingUsd = 0,
+    this.startingPriceCoins = 0,
+    this.targetPriceCoins = 0,
+    this.currentTotalCoins = 0,
+    this.remainingCoins = 0,
     this.progressPercent = 0,
   });
 
-  final double startingPriceUsd;
-  final double targetPriceUsd;
-  final double currentTotalUsd;
-  final double remainingUsd;
+  final double startingPriceCoins;
+  final double targetPriceCoins;
+  final double currentTotalCoins;
+  final double remainingCoins;
   final int progressPercent;
 
   @override
   List<Object?> get props => [
-        startingPriceUsd,
-        targetPriceUsd,
-        currentTotalUsd,
-        remainingUsd,
+        startingPriceCoins,
+        targetPriceCoins,
+        currentTotalCoins,
+        remainingCoins,
         progressPercent,
       ];
 }
@@ -155,34 +155,34 @@ class AuctionReportPeriodActivity extends Equatable {
   const AuctionReportPeriodActivity({
     this.bids = 0,
     this.gifts = 0,
-    this.contributionUsd = 0,
-    this.giftSpendUsd = 0,
+    this.contributionCoins = 0,
+    this.giftSpendCoins = 0,
   });
 
   final int bids;
   final int gifts;
-  final double contributionUsd;
-  final double giftSpendUsd;
+  final double contributionCoins;
+  final double giftSpendCoins;
 
   @override
-  List<Object?> get props => [bids, gifts, contributionUsd, giftSpendUsd];
+  List<Object?> get props => [bids, gifts, contributionCoins, giftSpendCoins];
 }
 
 class AuctionReportBid extends Equatable {
   const AuctionReportBid({
     required this.id,
     required this.createdAt,
-    this.amountUsd = 0,
+    this.amountCoins = 0,
     this.bidder,
   });
 
   final String id;
   final DateTime createdAt;
-  final double amountUsd;
+  final double amountCoins;
   final ReportAdminUser? bidder;
 
   @override
-  List<Object?> get props => [id, createdAt, amountUsd, bidder];
+  List<Object?> get props => [id, createdAt, amountCoins, bidder];
 }
 
 class AuctionReportGiftSummary extends Equatable {
@@ -204,40 +204,40 @@ class AuctionReportGiftTransaction extends Equatable {
   const AuctionReportGiftTransaction({
     required this.id,
     required this.createdAt,
-    this.priceUsd = 0,
-    this.contributionUsd = 0,
+    this.priceCoins = 0,
+    this.contributionCoins = 0,
     this.sender,
     this.gift,
   });
 
   final String id;
   final DateTime createdAt;
-  final double priceUsd;
-  final double contributionUsd;
+  final double priceCoins;
+  final double contributionCoins;
   final ReportAdminUser? sender;
   final AuctionReportGiftSummary? gift;
 
   @override
   List<Object?> get props =>
-      [id, createdAt, priceUsd, contributionUsd, sender, gift];
+      [id, createdAt, priceCoins, contributionCoins, sender, gift];
 }
 
 class AuctionReportContributor extends Equatable {
   const AuctionReportContributor({
     required this.user,
     this.giftCount = 0,
-    this.totalContributionUsd = 0,
-    this.totalSpendUsd = 0,
+    this.totalContributionCoins = 0,
+    this.totalSpendCoins = 0,
   });
 
   final ReportAdminUser user;
   final int giftCount;
-  final double totalContributionUsd;
-  final double totalSpendUsd;
+  final double totalContributionCoins;
+  final double totalSpendCoins;
 
   @override
   List<Object?> get props =>
-      [user, giftCount, totalContributionUsd, totalSpendUsd];
+      [user, giftCount, totalContributionCoins, totalSpendCoins];
 }
 
 class AuctionReportListItem extends Equatable {
@@ -250,9 +250,9 @@ class AuctionReportListItem extends Equatable {
     this.postId,
     this.liveId,
     this.itemImageUrl,
-    this.startingPriceUsd = 0,
-    this.targetPriceUsd = 0,
-    this.currentTotalUsd = 0,
+    this.startingPriceCoins = 0,
+    this.targetPriceCoins = 0,
+    this.currentTotalCoins = 0,
     this.winnerId,
     this.endedAt,
     this.host,
@@ -271,9 +271,9 @@ class AuctionReportListItem extends Equatable {
   final String? postId;
   final String? liveId;
   final String? itemImageUrl;
-  final double startingPriceUsd;
-  final double targetPriceUsd;
-  final double currentTotalUsd;
+  final double startingPriceCoins;
+  final double targetPriceCoins;
+  final double currentTotalCoins;
   final String? winnerId;
   final DateTime? endedAt;
   final ReportAdminUser? host;
@@ -293,9 +293,9 @@ class AuctionReportListItem extends Equatable {
         postId,
         liveId,
         itemImageUrl,
-        startingPriceUsd,
-        targetPriceUsd,
-        currentTotalUsd,
+        startingPriceCoins,
+        targetPriceCoins,
+        currentTotalCoins,
         winnerId,
         endedAt,
         host,
@@ -316,8 +316,8 @@ class AuctionReportOverviewEntity extends Equatable {
     required this.completed,
     required this.cancelled,
     required this.banned,
-    required this.totalRevenueUsd,
-    required this.totalGiftSpendUsd,
+    required this.totalRevenueCoins,
+    required this.totalGiftSpendCoins,
     required this.byStatus,
     required this.periodEngagement,
     required this.topByTotal,
@@ -332,8 +332,8 @@ class AuctionReportOverviewEntity extends Equatable {
   final int completed;
   final int cancelled;
   final int banned;
-  final double totalRevenueUsd;
-  final double totalGiftSpendUsd;
+  final double totalRevenueCoins;
+  final double totalGiftSpendCoins;
   final List<ReportCountPair> byStatus;
   final AuctionReportPeriodActivity periodEngagement;
   final List<AuctionReportListItem> topByTotal;
@@ -349,8 +349,8 @@ class AuctionReportOverviewEntity extends Equatable {
         completed,
         cancelled,
         banned,
-        totalRevenueUsd,
-        totalGiftSpendUsd,
+        totalRevenueCoins,
+        totalGiftSpendCoins,
         byStatus,
         periodEngagement,
         topByTotal,

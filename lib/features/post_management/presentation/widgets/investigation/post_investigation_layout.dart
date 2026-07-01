@@ -2,28 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/localization/localization.dart';
+import '../../../domain/entities/activity_context.dart';
 import '../../../domain/entities/managed_post_entity.dart';
 import '../../bloc/post_management_bloc.dart';
-import '../comments_moderation_panel.dart';
 import '../post_author_card.dart';
 import 'activity_context_card.dart';
 import 'activity_relationship_banner.dart';
-import 'compact_analytics_grid.dart';
 import 'investigation_theme.dart';
 import 'moderation_sidebar.dart';
+import '../post_media_snapshot.dart';
+import 'portrait_media_panel.dart';
 import 'post_content_section.dart';
+import 'post_engagement_panel.dart';
 import 'post_status_actions_panel.dart';
-import 'post_surface_card.dart';
 import 'post_user_sidebar.dart';
 
-/// Modern moderation workspace — post content + investigation sidebar + comments.
+/// Modern 3-column moderation workspace.
 class PostInvestigationLayout extends StatelessWidget {
   const PostInvestigationLayout({
     super.key,
-    required this.isDark,
     required this.isBusy,
     required this.isSaving,
     required this.dirty,
+    this.hideComments = false,
     required this.captionController,
     required this.onCaptionChanged,
     required this.onCategorySelected,
@@ -34,10 +35,10 @@ class PostInvestigationLayout extends StatelessWidget {
     required this.onDelete,
   });
 
-  final bool isDark;
   final bool isBusy;
   final bool isSaving;
   final bool dirty;
+  final bool hideComments;
   final TextEditingController captionController;
   final VoidCallback onCaptionChanged;
   final void Function(CategoryEntity) onCategorySelected;
@@ -57,10 +58,10 @@ class PostInvestigationLayout extends StatelessWidget {
         if (loaded == null) return const SizedBox.shrink();
         return _InvestigationBody(
           state: loaded,
-          isDark: isDark,
           isBusy: isBusy,
           isSaving: isSaving,
           dirty: dirty,
+          hideComments: hideComments,
           captionController: captionController,
           onCaptionChanged: onCaptionChanged,
           onCategorySelected: onCategorySelected,
@@ -78,10 +79,10 @@ class PostInvestigationLayout extends StatelessWidget {
 class _InvestigationBody extends StatelessWidget {
   const _InvestigationBody({
     required this.state,
-    required this.isDark,
     required this.isBusy,
     required this.isSaving,
     required this.dirty,
+    required this.hideComments,
     required this.captionController,
     required this.onCaptionChanged,
     required this.onCategorySelected,
@@ -93,10 +94,10 @@ class _InvestigationBody extends StatelessWidget {
   });
 
   final PostManagementLoaded state;
-  final bool isDark;
   final bool isBusy;
   final bool isSaving;
   final bool dirty;
+  final bool hideComments;
   final TextEditingController captionController;
   final VoidCallback onCaptionChanged;
   final void Function(CategoryEntity) onCategorySelected;
@@ -111,8 +112,9 @@ class _InvestigationBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final highlightId = state.activityContext?.highlightCommentId;
     final l10n = context.l10n;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    Widget investigationSidebar() {
+    Widget moderationSidebar() {
       return BlocSelector<PostManagementBloc, PostManagementState,
           ({ManagedPostEntity post, ManagedPostEntity draft, bool saving, bool deleting})>(
         selector: (s) {
@@ -140,25 +142,6 @@ class _InvestigationBody extends StatelessWidget {
                 const SizedBox(height: InvestigationTheme.s12),
               ],
               PostAuthorCard(post: data.post, isDark: isDark),
-              const SizedBox(height: InvestigationTheme.s12),
-              PostSurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      l10n.t('postStatistics'),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: InvestigationTheme.s8),
-                    CompactAnalyticsGrid(
-                      isDark: isDark,
-                      metrics: _metricsFor(data.post, l10n),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: InvestigationTheme.s12),
               PostStatusActionsPanel(
                 currentStatus: data.draft.status,
@@ -189,7 +172,7 @@ class _InvestigationBody extends StatelessWidget {
       );
     }
 
-    Widget mainContent() {
+    Widget centerContent() {
       return BlocSelector<PostManagementBloc, PostManagementState,
           ManagedPostEntity>(
         selector: (s) => s is PostManagementLoaded ? s.draft : state.draft,
@@ -212,6 +195,7 @@ class _InvestigationBody extends StatelessWidget {
               PostContentSection(
                 draft: draft,
                 isBusy: isBusy,
+                hideComments: hideComments,
                 captionController: captionController,
                 onCaptionChanged: onCaptionChanged,
                 onCategorySelected: onCategorySelected,
@@ -223,17 +207,14 @@ class _InvestigationBody extends StatelessWidget {
       );
     }
 
-    Widget commentsSection() {
+    Widget leftMedia() {
       return BlocSelector<PostManagementBloc, PostManagementState,
-          PostManagementLoaded>(
-        selector: (s) => s is PostManagementLoaded ? s : state,
-        builder: (context, commentsState) {
-          return CommentsModerationPanel(
-            state: commentsState,
-            isDark: isDark,
-            isBusy: isBusy,
-            highlightCommentId: highlightId,
-          );
+          PostMediaSnapshot?>(
+        selector: (s) =>
+            s is PostManagementLoaded ? PostMediaSnapshot.fromPost(s.post) : null,
+        builder: (context, snapshot) {
+          if (snapshot == null) return const SizedBox.shrink();
+          return PortraitMediaPanel(snapshot: snapshot);
         },
       );
     }
@@ -241,50 +222,90 @@ class _InvestigationBody extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final desktop = width >= InvestigationTheme.desktop;
-        final tablet = width >= InvestigationTheme.tablet && !desktop;
+        final isDesktop = width >= InvestigationTheme.desktop;
+        final isTablet =
+            width >= InvestigationTheme.tablet && width < InvestigationTheme.desktop;
 
-        final topRow = desktop
-            ? Row(
+        Widget columns;
+        Widget centeredMedia({double? maxWidth}) {
+          final width = maxWidth ?? 750.0;
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: width),
+              child: leftMedia(),
+            ),
+          );
+        }
+
+        if (isDesktop) {
+          columns = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 30,
+                child: SingleChildScrollView(child: moderationSidebar()),
+              ),
+              const SizedBox(width: InvestigationTheme.s16),
+              Expanded(
+                flex: 40,
+                child: centeredMedia(),
+              ),
+              const SizedBox(width: InvestigationTheme.s16),
+              Expanded(flex: 30, child: centerContent()),
+            ],
+          );
+        } else if (isTablet) {
+          columns = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              centeredMedia(maxWidth: 750.0),
+              const SizedBox(height: InvestigationTheme.s16),
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 7, child: mainContent()),
-                  const SizedBox(width: InvestigationTheme.s24),
-                  Expanded(flex: 3, child: investigationSidebar()),
+                  Expanded(flex: 3, child: centerContent()),
+                  const SizedBox(width: InvestigationTheme.s16),
+                  Expanded(flex: 2, child: moderationSidebar()),
                 ],
-              )
-            : tablet
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 6, child: mainContent()),
-                      const SizedBox(width: InvestigationTheme.s16),
-                      Expanded(flex: 4, child: investigationSidebar()),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      mainContent(),
-                      const SizedBox(height: InvestigationTheme.s16),
-                      investigationSidebar(),
-                    ],
-                  );
+              ),
+            ],
+          );
+        } else {
+          columns = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              centeredMedia(maxWidth: 750.0),
+              const SizedBox(height: InvestigationTheme.s16),
+              centerContent(),
+              const SizedBox(height: InvestigationTheme.s16),
+              moderationSidebar(),
+            ],
+          );
+        }
 
         return Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1680),
+                    constraints: const BoxConstraints(maxWidth: 1920),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        topRow,
+                        columns,
                         const SizedBox(height: InvestigationTheme.s24),
-                        commentsSection(),
+                        PostEngagementPanel(
+                          isBusy: isBusy,
+                          hideComments: hideComments,
+                          highlightCommentId: highlightId,
+                          initialTabIndex: _engagementTabIndex(
+                            state.activityContext,
+                            hideComments: hideComments,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -303,48 +324,17 @@ class _InvestigationBody extends StatelessWidget {
     );
   }
 
-  List<({IconData icon, String label, int value, Color? color})> _metricsFor(
-    ManagedPostEntity post,
-    AppLocalizations l10n,
-  ) {
-    return [
-      (
-        icon: Icons.visibility_outlined,
-        label: l10n.t('views'),
-        value: post.viewCount,
-        color: const Color(0xFF6366F1),
-      ),
-      (
-        icon: Icons.favorite_border_rounded,
-        label: l10n.t('likes'),
-        value: post.likeCount,
-        color: const Color(0xFFEC4899),
-      ),
-      (
-        icon: Icons.chat_bubble_outline_rounded,
-        label: l10n.t('comments'),
-        value: post.commentCount,
-        color: const Color(0xFF3B82F6),
-      ),
-      (
-        icon: Icons.share_outlined,
-        label: l10n.t('shares'),
-        value: post.shareCount,
-        color: const Color(0xFF14B8A6),
-      ),
-      (
-        icon: Icons.bookmark_border_rounded,
-        label: l10n.t('saves'),
-        value: post.saveCount,
-        color: const Color(0xFFF59E0B),
-      ),
-      (
-        icon: Icons.trending_up_rounded,
-        label: l10n.t('reach'),
-        value: post.viewCount + post.shareCount,
-        color: const Color(0xFF8B5CF6),
-      ),
-    ];
+  int _engagementTabIndex(
+    ActivityContext? context, {
+    bool hideComments = false,
+  }) {
+    if (context == null) return 0;
+    return switch (context.type) {
+      ActivityType.mention => hideComments ? 2 : 3,
+      ActivityType.like => hideComments ? 1 : 2,
+      ActivityType.comment => 0,
+      _ => 0,
+    };
   }
 }
 
@@ -361,45 +351,39 @@ class _FloatingSaveBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSlide(
-      duration: const Duration(milliseconds: InvestigationTheme.animMs),
-      offset: Offset.zero,
-      child: Material(
-        elevation: 8,
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.edit_note_rounded,
-                  color: Theme.of(context).colorScheme.primary,
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 0,
+      color: scheme.surfaceContainerHigh,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Icons.edit_note_rounded, color: scheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  context.l10n.t('unsavedChanges'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    context.l10n.t('unsavedChanges'),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: isBusy ? null : onSave,
-                  icon: isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.save_rounded, size: 18),
-                  label: Text(context.l10n.t('saveChangesPost')),
-                ),
-              ],
-            ),
+              ),
+              FilledButton.icon(
+                onPressed: isBusy ? null : onSave,
+                icon: isSaving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.save_rounded, size: 18),
+                label: Text(context.l10n.t('saveChangesPost')),
+              ),
+            ],
           ),
         ),
       ),

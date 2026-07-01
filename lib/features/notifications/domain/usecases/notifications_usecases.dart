@@ -1,6 +1,7 @@
 import '../entities/notification_filters.dart';
 import '../entities/notification_request_entity.dart';
 import '../entities/notification_send_result_entity.dart';
+import '../entities/scheduled_notification_entity.dart';
 import '../repositories/notifications_repository.dart';
 import '../../data/models/notification_model.dart';
 
@@ -54,4 +55,15 @@ class GetAllNotifications {
     NotificationFilters? filters,
   }) =>
       _repo.getAllNotifications(page: page, limit: limit, filters: filters);
+}
+
+class ScheduleNotification {
+  const ScheduleNotification(this._repo);
+  final NotificationsRepository _repo;
+
+  Future<ScheduledNotificationEntity> call({
+    required NotificationRequestEntity request,
+    required ScheduledNotificationTarget target,
+  }) =>
+      _repo.scheduleNotification(request: request, target: target);
 }

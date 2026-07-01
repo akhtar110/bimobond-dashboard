@@ -11,9 +11,16 @@ import 'notification_item_card.dart';
 
 /// Full notification feed panel with filters — used on [NotificationsPage].
 class NotificationFeedPanel extends StatefulWidget {
-  const NotificationFeedPanel({super.key, required this.isDark});
+  const NotificationFeedPanel({
+    super.key,
+    required this.isDark,
+    this.expandVertically = false,
+    this.minHeight = 520,
+  });
 
   final bool isDark;
+  final bool expandVertically;
+  final double minHeight;
 
   @override
   State<NotificationFeedPanel> createState() => _NotificationFeedPanelState();
@@ -88,6 +95,9 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
     final scheme = theme.colorScheme;
 
     return Container(
+      constraints: widget.expandVertically
+          ? null
+          : BoxConstraints(minHeight: widget.minHeight),
       decoration: BoxDecoration(
         color: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -128,7 +138,6 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
                   ),
                 ),
                 const Spacer(),
-                // Refresh
                 BlocBuilder<NotificationsBloc, NotificationsState>(
                   buildWhen: (a, b) =>
                       a.notificationsLoading != b.notificationsLoading,
@@ -164,7 +173,6 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // Type dropdown
                 _FilterDropdown<String>(
                   value: _selectedType,
                   items: _notifTypes,
@@ -176,8 +184,6 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
                   isDark: widget.isDark,
                   icon: Icons.category_outlined,
                 ),
-
-                // Read state toggle
                 _ReadToggle(
                   selected: _readFilter,
                   isDark: widget.isDark,
@@ -186,8 +192,6 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
                     _applyFilters();
                   },
                 ),
-
-                // Active filter chips
                 BlocBuilder<NotificationsBloc, NotificationsState>(
                   buildWhen: (a, b) => a.filters != b.filters,
                   builder: (context, state) {
@@ -213,127 +217,145 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
 
           const Divider(height: 1),
 
-          // ── Feed list ───────────────────────────────────────────────────
-          BlocBuilder<NotificationsBloc, NotificationsState>(
-            buildWhen: (a, b) =>
-                a.notifications != b.notifications ||
-                a.notificationsLoading != b.notificationsLoading ||
-                a.notificationsLoadingMore != b.notificationsLoadingMore ||
-                a.notificationsHasReachedMax !=
-                    b.notificationsHasReachedMax ||
-                a.notificationsError != b.notificationsError,
-            builder: (context, state) {
-              if (state.notificationsLoading &&
-                  state.notifications.isEmpty) {
-                return _LoadingShimmer(isDark: widget.isDark);
-              }
-
-              if (state.notificationsError != null &&
-                  state.notifications.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline_rounded,
-                          size: 40,
-                          color: scheme.error.withValues(alpha: 0.6)),
-                      const SizedBox(height: 10),
-                      Text(
-                        state.notificationsError!,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              if (state.notifications.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.notifications_none_rounded,
-                          size: 48,
-                          color: widget.isDark
-                              ? Colors.grey.shade600
-                              : Colors.grey.shade300),
-                      const SizedBox(height: 12),
-                      Text(
-                        l10n.t('notificationNoResultsFound'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: widget.isDark
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              final total = state.notificationsTotal > 0
-                  ? state.notificationsTotal
-                  : state.notifications.length;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    child: Text(
-                      notificationCountLabel(l10n, total),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  ListView.separated(
-                    controller: _scroll,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    itemCount: state.notifications.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, index) =>
-                        NotificationItemCard(
-                      notification: state.notifications[index],
-                      isDark: widget.isDark,
-                    ),
-                  ),
-                  if (state.notificationsLoadingMore)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child:
-                          Center(child: CircularProgressIndicator()),
-                    ),
-                  if (state.notificationsHasReachedMax &&
-                      state.notifications.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Center(
-                        child: Text(
-                          l10n.t('allNotificationsLoaded'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: widget.isDark
-                                ? Colors.grey.shade500
-                                : Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+          if (widget.expandVertically)
+            Expanded(child: _buildFeedBody(context))
+          else
+            _buildFeedBody(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildFeedBody(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return BlocBuilder<NotificationsBloc, NotificationsState>(
+      buildWhen: (a, b) =>
+          a.notifications != b.notifications ||
+          a.notificationsLoading != b.notificationsLoading ||
+          a.notificationsLoadingMore != b.notificationsLoadingMore ||
+          a.notificationsHasReachedMax != b.notificationsHasReachedMax ||
+          a.notificationsError != b.notificationsError,
+      builder: (context, state) {
+        if (state.notificationsLoading && state.notifications.isEmpty) {
+          return _LoadingShimmer(isDark: widget.isDark);
+        }
+
+        if (state.notificationsError != null && state.notifications.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline_rounded,
+                    size: 40, color: scheme.error.withValues(alpha: 0.6)),
+                const SizedBox(height: 10),
+                Text(
+                  state.notificationsError!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (state.notifications.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.notifications_none_rounded,
+                    size: 48,
+                    color: widget.isDark
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300),
+                const SizedBox(height: 12),
+                Text(
+                  l10n.t('notificationNoResultsFound'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: widget.isDark
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final total = state.notificationsTotal > 0
+            ? state.notificationsTotal
+            : state.notifications.length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                notificationCountLabel(l10n, total),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (widget.expandVertically)
+              Expanded(
+                child: ListView.separated(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  itemCount: state.notifications.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) => NotificationItemCard(
+                    notification: state.notifications[index],
+                    isDark: widget.isDark,
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                controller: _scroll,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                itemCount: state.notifications.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 8),
+                itemBuilder: (context, index) => NotificationItemCard(
+                  notification: state.notifications[index],
+                  isDark: widget.isDark,
+                ),
+              ),
+            if (state.notificationsLoadingMore)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            if (state.notificationsHasReachedMax &&
+                state.notifications.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    l10n.t('allNotificationsLoaded'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: widget.isDark
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

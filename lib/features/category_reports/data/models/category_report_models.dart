@@ -112,11 +112,43 @@ abstract final class CategoryReportModels {
 
   static CategoryReportParentSummary? _parent(dynamic raw) {
     if (raw is! Map<String, dynamic>) return null;
+    final id = raw['id']?.toString() ?? '';
+    final name = raw['name']?.toString() ?? '';
+    if (id.isEmpty && name.isEmpty) return null;
     return CategoryReportParentSummary(
-      id: raw['id']?.toString() ?? '',
-      name: raw['name']?.toString() ?? '',
+      id: id,
+      name: name,
       slug: raw['slug']?.toString() ?? '',
     );
+  }
+
+  static CategoryReportParentSummary? _parentFromItem(
+    Map<String, dynamic> json,
+  ) {
+    for (final key in [
+      'parent',
+      'parentCategory',
+      'rootCategory',
+      'mainCategory',
+    ]) {
+      final parsed = _parent(json[key]);
+      if (parsed != null) return parsed;
+    }
+
+    final parentId = json['parentId']?.toString();
+    final parentName = json['parentName']?.toString() ??
+        json['rootCategoryName']?.toString() ??
+        json['mainCategoryName']?.toString() ??
+        json['parent_category_name']?.toString();
+    if (parentName != null && parentName.trim().isNotEmpty) {
+      return CategoryReportParentSummary(
+        id: parentId ?? '',
+        name: parentName.trim(),
+        slug: json['parentSlug']?.toString() ?? '',
+      );
+    }
+
+    return null;
   }
 
   static List<CategoryReportChildSummary> _children(dynamic raw) {
@@ -241,7 +273,7 @@ class CategoryReportListItemModel extends CategoryReportListItemEntity {
           CategoryReportModels._date(json['createdAt']) ?? DateTime.now(),
       updatedAt:
           CategoryReportModels._date(json['updatedAt']) ?? DateTime.now(),
-      parent: CategoryReportModels._parent(json['parent']),
+      parent: CategoryReportModels._parentFromItem(json),
       children: CategoryReportModels._children(json['children']),
       counts: CategoryReportModels._counts(countsJson),
       postMetrics: CategoryReportModels._postMetrics(metricsJson),

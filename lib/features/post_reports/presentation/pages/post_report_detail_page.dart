@@ -448,7 +448,7 @@ class _GiftTile extends StatelessWidget {
       subtitle: Text(
         '${gift.sender?.username ?? ReportDetailLabels.unknown(l10n)} → '
         '${gift.receiver?.username ?? ReportDetailLabels.unknown(l10n)} · '
-        '${AnalyticsFormat.usd(gift.priceUsd)}',
+        '${AnalyticsFormat.usd(gift.priceCoins)}',
       ),
       trailing: Text(_PostReportDetailView._formatDate(gift.createdAt)),
     );

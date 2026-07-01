@@ -15,6 +15,8 @@ class GoToGiftReportsPageEvent extends GiftReportsEvent {
   final int page;
 }
 
+class LoadMoreGiftReportsEvent extends GiftReportsEvent {}
+
 class UpdateGiftReportsSearchEvent extends GiftReportsEvent {
   UpdateGiftReportsSearchEvent(this.query);
   final String query;

@@ -18,6 +18,7 @@ class CreatePostState {
     this.uploadProgress = 0,
     this.errorMessage,
     this.wasDraft = false,
+    this.isGeneratingThumbnail = false,
   });
 
   final CreatePostStatus status;
@@ -26,14 +27,18 @@ class CreatePostState {
   final double uploadProgress;
   final String? errorMessage;
   final bool wasDraft;
+  final bool isGeneratingThumbnail;
 
   static const stepCount = 4;
 
   bool get isBusy =>
       status == CreatePostStatus.uploadingMedia ||
-      status == CreatePostStatus.creatingPost;
+      status == CreatePostStatus.creatingPost ||
+      isGeneratingThumbnail;
 
   bool get canPublish => form.canSubmit && !isBusy;
+
+  bool get canSaveDraft => form.canSaveDraft && !isBusy;
 
   CreatePostState copyWith({
     CreatePostStatus? status,
@@ -42,6 +47,7 @@ class CreatePostState {
     double? uploadProgress,
     String? errorMessage,
     bool? wasDraft,
+    bool? isGeneratingThumbnail,
     bool clearError = false,
   }) {
     return CreatePostState(
@@ -51,6 +57,8 @@ class CreatePostState {
       uploadProgress: uploadProgress ?? this.uploadProgress,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       wasDraft: wasDraft ?? this.wasDraft,
+      isGeneratingThumbnail:
+          isGeneratingThumbnail ?? this.isGeneratingThumbnail,
     );
   }
 }

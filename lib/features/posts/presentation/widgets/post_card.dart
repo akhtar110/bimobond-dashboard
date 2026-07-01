@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../features/categories/presentation/widgets/category_icon.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
+import '../utils/posts_responsive.dart';
+import 'post_list_thumbnail.dart';
 import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 
 /// Fixed thumbnail height — card body grows with content below.
@@ -28,7 +30,13 @@ class _PostCardState extends State<PostCard> {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return MouseRegion(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 220;
+        final bodyPadding = compact ? 6.0 : 8.0;
+        final descFontSize = compact ? 11.5 : 12.5;
+
+        return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: widget.onTap != null
@@ -41,7 +49,7 @@ class _PostCardState extends State<PostCard> {
           curve: Curves.easeOut,
           decoration: BoxDecoration(
             color: scheme.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(compact ? 10 : 12),
             border: Border.all(
               color: _hovered
                   ? scheme.primary.withValues(alpha: 0.35)
@@ -62,17 +70,20 @@ class _PostCardState extends State<PostCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _MediaPreview(post: widget.post),
+              _MediaPreview(
+                post: widget.post,
+                cardWidth: constraints.maxWidth,
+              ),
               Padding(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(bodyPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _UserDateRow(post: widget.post, isDark: isDark),
+                    _UserDateRow(post: widget.post, isDark: isDark, compact: compact),
                     if (widget.post.description != null &&
                         widget.post.description!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      SizedBox(height: compact ? 4 : 6),
                       Text(
                         widget.post.description!,
                         maxLines: 2,
@@ -80,14 +91,14 @@ class _PostCardState extends State<PostCard> {
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: scheme.onSurface,
                           height: 1.35,
-                          fontSize: 12.5,
+                          fontSize: descFontSize,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 6),
-                    _CategoryStatusRow(post: widget.post),
-                    const SizedBox(height: 6),
-                    _StatsRow(post: widget.post, isDark: isDark),
+                    SizedBox(height: compact ? 4 : 6),
+                    _CategoryStatusRow(post: widget.post, compact: compact),
+                    SizedBox(height: compact ? 4 : 6),
+                    _StatsRow(post: widget.post, isDark: isDark, compact: compact),
                   ],
                 ),
               ),
@@ -95,6 +106,8 @@ class _PostCardState extends State<PostCard> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }
@@ -104,34 +117,38 @@ class _PostCardState extends State<PostCard> {
 // ─────────────────────────────────────────────────────────────
 
 class _MediaPreview extends StatelessWidget {
-  const _MediaPreview({required this.post});
+  const _MediaPreview({required this.post, required this.cardWidth});
 
   final ManagedPostEntity post;
+  final double cardWidth;
 
-  String? get _mediaUrl => post.displayThumbnailUrl ?? post.videoUrl;
-  bool get _isVideo => post.type.toUpperCase() == 'VIDEO';
+  String? get _mediaUrl => post.previewThumbnailUrl;
+  bool get _isVideo => post.containsVideoMedia;
   bool get _isCarousel => post.type.toUpperCase() == 'CAROUSEL';
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mediaUrl = _mediaUrl;
 
     return SizedBox(
-      height: kPostCardThumbnailHeight,
+      height: postCardThumbnailHeight(cardWidth),
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (_mediaUrl != null && _mediaUrl!.isNotEmpty)
-            CachedNetworkImage(
-              imageUrl: _mediaUrl!,
+          if (mediaUrl != null && mediaUrl.isNotEmpty)
+            PostListThumbnail(
+              key: ValueKey('post_thumb_${post.id}_$mediaUrl'),
+              postId: post.id,
+              imageUrl: mediaUrl,
               fit: BoxFit.cover,
-              placeholder: (context, url) => _ShimmerBox(isDark: isDark),
-              errorWidget: (context, url, error) =>
-                  _MediaPlaceholder(isDark: isDark),
+              placeholder: (context) => _ShimmerBox(isDark: isDark),
+              error: (context) =>
+                  _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
             )
           else
-            _MediaPlaceholder(isDark: isDark),
+            _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
           if (_isVideo)
             Center(
               child: Builder(
@@ -183,10 +200,11 @@ class _MediaPreview extends StatelessWidget {
 }
 
 class _MediaPlaceholder extends StatelessWidget {
-  const _MediaPlaceholder({required this.isDark});
+  const _MediaPlaceholder({required this.isDark, this.isVideo = false});
 
   /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
+  final bool isVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +213,7 @@ class _MediaPlaceholder extends StatelessWidget {
       color: scheme.surfaceContainerLow,
       child: Center(
         child: Icon(
-          Icons.image_outlined,
+          isVideo ? Icons.videocam_outlined : Icons.image_outlined,
           size: 32,
           color: scheme.onSurfaceVariant,
         ),
@@ -209,23 +227,30 @@ class _MediaPlaceholder extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 
 class _UserDateRow extends StatelessWidget {
-  const _UserDateRow({required this.post, required this.isDark});
+  const _UserDateRow({
+    required this.post,
+    required this.isDark,
+    this.compact = false,
+  });
 
   final ManagedPostEntity post;
 
   /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final name = post.userName ?? post.userId;
     final dateStr = DateFormat('MMM d, yyyy').format(post.createdAt);
+    final nameSize = compact ? 11.0 : 12.0;
+    final dateSize = compact ? 9.5 : 10.5;
 
     return Row(
       children: [
-        _Avatar(url: post.userProfileImage, name: name, isDark: isDark),
-        const SizedBox(width: 6),
+        _Avatar(url: post.userProfileImage, name: name, isDark: isDark, compact: compact),
+        SizedBox(width: compact ? 5 : 6),
         Expanded(
           child: Text(
             name,
@@ -233,7 +258,7 @@ class _UserDateRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
-              fontSize: 12,
+              fontSize: nameSize,
               color: scheme.onSurface,
             ),
           ),
@@ -241,7 +266,7 @@ class _UserDateRow extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           dateStr,
-          style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
+          style: TextStyle(fontSize: dateSize, color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -253,6 +278,7 @@ class _Avatar extends StatelessWidget {
     required this.url,
     required this.name,
     required this.isDark,
+    this.compact = false,
   });
 
   final String? url;
@@ -260,24 +286,26 @@ class _Avatar extends StatelessWidget {
 
   /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final radius = compact ? 12.0 : 14.0;
     if (url != null && url!.isNotEmpty) {
       return CircleAvatar(
-        radius: 14,
+        radius: radius,
         backgroundImage: CachedNetworkImageProvider(url!),
         backgroundColor: scheme.surfaceContainerHighest,
       );
     }
     return CircleAvatar(
-      radius: 14,
+      radius: radius,
       backgroundColor: scheme.primaryContainer,
       child: Text(
         name.isNotEmpty ? name[0].toUpperCase() : '?',
         style: TextStyle(
-          fontSize: 11,
+          fontSize: compact ? 10 : 11,
           fontWeight: FontWeight.w700,
           color: scheme.onPrimaryContainer,
         ),
@@ -291,15 +319,16 @@ class _Avatar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 
 class _CategoryStatusRow extends StatelessWidget {
-  const _CategoryStatusRow({required this.post});
+  const _CategoryStatusRow({required this.post, this.compact = false});
 
   final ManagedPostEntity post;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 6,
-      runSpacing: 4,
+      spacing: compact ? 4 : 6,
+      runSpacing: compact ? 3 : 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (post.categoryEntity != null || post.category != null)
@@ -321,22 +350,32 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final fg = postStatusColor(status);
+    final scheme = Theme.of(context).colorScheme;
+    final fg = postStatusColor(status, scheme);
     final label = postStatusLabel(l10n, status);
+    final icon = postStatusIcon(status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         color: fg.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: fg.withValues(alpha: 0.35)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -413,12 +452,17 @@ class _CategoryBadge extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.post, required this.isDark});
+  const _StatsRow({
+    required this.post,
+    required this.isDark,
+    this.compact = false,
+  });
 
   final ManagedPostEntity post;
 
   /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -426,7 +470,7 @@ class _StatsRow extends StatelessWidget {
     final color = scheme.onSurfaceVariant;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: compact ? 3 : 4),
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),

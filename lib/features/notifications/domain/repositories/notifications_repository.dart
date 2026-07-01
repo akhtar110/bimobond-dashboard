@@ -2,6 +2,7 @@ import '../entities/admin_notification_event_entity.dart';
 import '../entities/notification_filters.dart';
 import '../entities/notification_request_entity.dart';
 import '../entities/notification_send_result_entity.dart';
+import '../entities/scheduled_notification_entity.dart';
 import '../../data/models/notification_model.dart';
 
 abstract class NotificationsRepository {
@@ -31,5 +32,10 @@ abstract class NotificationsRepository {
     int page = 1,
     int limit = 20,
     NotificationFilters? filters,
+  });
+
+  Future<ScheduledNotificationEntity> scheduleNotification({
+    required NotificationRequestEntity request,
+    required ScheduledNotificationTarget target,
   });
 }

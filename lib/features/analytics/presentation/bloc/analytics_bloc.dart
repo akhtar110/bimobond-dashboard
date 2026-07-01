@@ -33,6 +33,7 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     on<LoadUsersAnalyticsEvent>(_onLoadUsers);
     on<LoadPostsAnalyticsEvent>(_onLoadPosts);
     on<LoadGrowthAnalyticsEvent>(_onLoadGrowth);
+    on<LoadEngagementAnalyticsEvent>(_onLoadEngagement);
     on<LoadMonetizationAnalyticsEvent>(_onLoadMonetization);
     on<RefreshAnalyticsEvent>(_onRefresh);
     on<ChangeAnalyticsDateRangeEvent>(_onChangeDateRange);
@@ -50,6 +51,8 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
 
   AnalyticsQuery _query = const AnalyticsQuery(days: 30);
   AnalyticsDatePreset _preset = AnalyticsDatePreset.last30Days;
+  AnalyticsDashboardMode _mode = AnalyticsDashboardMode.admin;
+  AnalyticsAccessLevel _accessLevel = AnalyticsAccessLevel.admin;
 
   AnalyticsLoaded? get _loaded =>
       state is AnalyticsLoaded ? state as AnalyticsLoaded : null;
@@ -86,6 +89,8 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     LoadAnalyticsDashboardEvent event,
     Emitter<AnalyticsState> emit,
   ) async {
+    _mode = event.mode;
+    _accessLevel = event.accessLevel;
     await _loadAll(emit, showFullLoading: true);
   }
 
@@ -132,6 +137,18 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
         (loaded, data) => loaded.copyWith(growth: data));
   }
 
+  Future<void> _onLoadEngagement(
+    LoadEngagementAnalyticsEvent event,
+    Emitter<AnalyticsState> emit,
+  ) async {
+    await _loadSection(
+      emit,
+      'engagement',
+      () => _getAdminEngagementAnalytics(_query),
+      (loaded, data) => loaded.copyWith(engagement: data),
+    );
+  }
+
   Future<void> _onLoadMonetization(
     LoadMonetizationAnalyticsEvent event,
     Emitter<AnalyticsState> emit,
@@ -175,6 +192,19 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
       }
     }
 
+    if (_accessLevel == AnalyticsAccessLevel.creator) {
+      emit(
+        AnalyticsLoaded(
+          query: _query,
+          preset: _preset,
+          mode: _mode,
+          accessLevel: _accessLevel,
+          isRefreshing: false,
+        ),
+      );
+      return;
+    }
+
     await Future.wait([
       safe('overview', () => _getAdminOverview(_query), (v) => overview = v),
       safe('users', () => _getAdminUsersAnalytics(_query), (v) => users = v),
@@ -184,11 +214,12 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
         () => _getAdminEngagementAnalytics(_query),
         (v) => engagement = v,
       ),
-      safe(
-        'monetization',
-        () => _getAdminMonetizationAnalytics(_query),
-        (v) => monetization = v,
-      ),
+      if (_accessLevel == AnalyticsAccessLevel.admin)
+        safe(
+          'monetization',
+          () => _getAdminMonetizationAnalytics(_query),
+          (v) => monetization = v,
+        ),
       safe(
         'auctions',
         () => _getAdminAuctionsAnalytics(_query),
@@ -224,6 +255,8 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
       AnalyticsLoaded(
         query: _query,
         preset: _preset,
+        mode: _mode,
+        accessLevel: _accessLevel,
         overview: overview,
         users: users,
         posts: posts,
@@ -249,6 +282,8 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
         AnalyticsLoaded(
           query: _query,
           preset: _preset,
+          mode: _mode,
+          accessLevel: _accessLevel,
         );
     try {
       final data = await call();

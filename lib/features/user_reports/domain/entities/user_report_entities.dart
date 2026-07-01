@@ -146,7 +146,7 @@ class UserReportListItemEntity extends Equatable {
     this.country,
     this.city,
     this.createdAt,
-    this.walletBalanceUsd = 0,
+    this.walletBalanceCoins = 0,
     this.deviceCount = 0,
     this.counts = const UserReportCountsEntity(),
   });
@@ -166,7 +166,7 @@ class UserReportListItemEntity extends Equatable {
   final String? country;
   final String? city;
   final DateTime? createdAt;
-  final double walletBalanceUsd;
+  final double walletBalanceCoins;
   final int deviceCount;
   final UserReportCountsEntity counts;
 
@@ -187,7 +187,7 @@ class UserReportListItemEntity extends Equatable {
         country,
         city,
         createdAt,
-        walletBalanceUsd,
+        walletBalanceCoins,
         deviceCount,
         counts,
       ];
@@ -268,8 +268,8 @@ class UserReportWalletTransactionEntity extends Equatable {
     required this.id,
     required this.type,
     required this.action,
-    required this.amountUsd,
-    required this.balanceAfter,
+    required this.amountCoins,
+    required this.balanceAfterCoins,
     this.reason,
     this.createdAt,
   });
@@ -277,27 +277,27 @@ class UserReportWalletTransactionEntity extends Equatable {
   final String id;
   final String type;
   final String action;
-  final double amountUsd;
-  final double balanceAfter;
+  final double amountCoins;
+  final double balanceAfterCoins;
   final String? reason;
   final DateTime? createdAt;
 
   @override
   List<Object?> get props =>
-      [id, type, action, amountUsd, balanceAfter, reason, createdAt];
+      [id, type, action, amountCoins, balanceAfterCoins, reason, createdAt];
 }
 
 class UserReportWalletEntity extends Equatable {
   const UserReportWalletEntity({
-    required this.balanceUsd,
+    required this.balanceCoins,
     this.recentTransactions = const [],
   });
 
-  final double balanceUsd;
+  final double balanceCoins;
   final List<UserReportWalletTransactionEntity> recentTransactions;
 
   @override
-  List<Object?> get props => [balanceUsd, recentTransactions];
+  List<Object?> get props => [balanceCoins, recentTransactions];
 }
 
 class UserReportDeviceSummaryEntity extends Equatable {
@@ -347,7 +347,7 @@ class UserReportPeriodActivityEntity extends Equatable {
     this.newFollowers = 0,
     this.giftsSent = 0,
     this.giftsReceived = 0,
-    this.giftRevenueUsd = 0,
+    this.giftRevenueCoins = 0,
     this.auctionsHosted = 0,
     this.auctionsWon = 0,
   });
@@ -362,7 +362,7 @@ class UserReportPeriodActivityEntity extends Equatable {
   final int newFollowers;
   final int giftsSent;
   final int giftsReceived;
-  final double giftRevenueUsd;
+  final double giftRevenueCoins;
   final int auctionsHosted;
   final int auctionsWon;
 
@@ -378,7 +378,7 @@ class UserReportPeriodActivityEntity extends Equatable {
         newFollowers,
         giftsSent,
         giftsReceived,
-        giftRevenueUsd,
+        giftRevenueCoins,
         auctionsHosted,
         auctionsWon,
       ];

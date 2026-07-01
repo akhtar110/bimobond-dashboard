@@ -195,7 +195,11 @@ class CategoryReportListItemEntity extends Equatable {
   final CategoryReportCounts counts;
   final CategoryReportPostMetrics postMetrics;
 
-  bool get isMain => parentId == null;
+  bool get isMain {
+    if (parentId != null && parentId!.isNotEmpty) return false;
+    if (parent != null) return false;
+    return true;
+  }
 
   @override
   List<Object?> get props => [

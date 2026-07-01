@@ -31,11 +31,11 @@ abstract final class AuctionReportModels {
       completed: AuctionReportJsonParser.asInt(totals['completed']),
       cancelled: AuctionReportJsonParser.asInt(totals['cancelled']),
       banned: AuctionReportJsonParser.asInt(totals['banned']),
-      totalRevenueUsd: AuctionReportJsonParser.asDouble(
-        totals['totalRevenueUsd'],
+      totalRevenueCoins: AuctionReportJsonParser.asDouble(
+        totals['totalRevenueCoins'],
       ),
-      totalGiftSpendUsd: AuctionReportJsonParser.asDouble(
-        totals['totalGiftSpendUsd'],
+      totalGiftSpendCoins: AuctionReportJsonParser.asDouble(
+        totals['totalGiftSpendCoins'],
       ),
       byStatus: AuctionReportJsonParser.countPairs(json['byStatus']),
       periodEngagement: AuctionReportJsonParser.parsePeriodActivity(

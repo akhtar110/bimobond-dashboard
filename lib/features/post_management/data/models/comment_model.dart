@@ -1,3 +1,4 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/comment_entity.dart';
 
 class CommentModel extends CommentEntity {
@@ -20,13 +21,19 @@ class CommentModel extends CommentEntity {
       id: json['id']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
       postId: json['postId']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? user?['id']?.toString() ?? '',
       parentId: json['parentId'] as String?,
       likeCount: _int(json['likeCount']),
       replyCount: _int(json['replyCount']),
       createdAt: _date(json['createdAt']),
-      username: user?['username'] as String? ?? user?['name'] as String?,
-      avatarUrl: user?['avatarUrl'] as String?,
+      username: user?['username'] as String? ??
+          user?['name'] as String? ??
+          json['username']?.toString(),
+      avatarUrl: resolveMediaUrl(
+        user?['avatarUrl'] as String? ??
+            user?['avatar'] as String? ??
+            user?['profileImage'] as String?,
+      ),
     );
   }
 
@@ -56,17 +63,11 @@ class PostCommentsPageModel extends PostCommentsPageEntity {
     Map<String, dynamic> json, {
     required int limit,
   }) {
-    final raw = json['data'];
-    final List<dynamic> items;
-    if (raw is List) {
-      items = raw;
-    } else if (raw is Map && raw['data'] is List) {
-      items = raw['data'] as List;
-    } else {
-      items = [];
-    }
+    final items = _extractComments(json);
 
-    final meta = json['meta'] as Map<String, dynamic>? ?? {};
+    final meta = json['meta'] is Map<String, dynamic>
+        ? json['meta'] as Map<String, dynamic>
+        : <String, dynamic>{};
     final page = _int(meta['page']) ?? 1;
     final lastPage = _int(meta['lastPage']);
     final totalPages = _int(meta['totalPages']);
@@ -84,6 +85,17 @@ class PostCommentsPageModel extends PostCommentsPageEntity {
       page: page,
       hasMore: hasMore,
     );
+  }
+
+  static List<dynamic> _extractComments(Map<String, dynamic> json) {
+    for (final key in ['comments', 'data', 'items']) {
+      final raw = json[key];
+      if (raw is List) return raw;
+      if (raw is Map && raw['data'] is List) {
+        return raw['data'] as List;
+      }
+    }
+    return const [];
   }
 
   static int? _int(dynamic v) {

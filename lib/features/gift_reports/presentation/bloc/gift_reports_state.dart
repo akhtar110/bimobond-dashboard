@@ -23,6 +23,7 @@ class GiftReportsLoaded extends GiftReportsState {
     this.maxPriceFilter,
     this.isOverviewLoading = false,
     this.isListFetching = false,
+    this.isListLoadingMore = false,
     this.overviewError,
     this.listError,
   });
@@ -42,8 +43,11 @@ class GiftReportsLoaded extends GiftReportsState {
   final double? maxPriceFilter;
   final bool isOverviewLoading;
   final bool isListFetching;
+  final bool isListLoadingMore;
   final String? overviewError;
   final String? listError;
+
+  bool get hasReachedMax => currentPage >= lastPage;
 
   GiftReportsLoaded copyWith({
     GiftReportOverviewEntity? overview,
@@ -64,6 +68,7 @@ class GiftReportsLoaded extends GiftReportsState {
     double? maxPriceFilter,
     bool? isOverviewLoading,
     bool? isListFetching,
+    bool? isListLoadingMore,
     String? overviewError,
     String? listError,
     bool clearOverviewError = false,
@@ -90,6 +95,7 @@ class GiftReportsLoaded extends GiftReportsState {
           : (maxPriceFilter ?? this.maxPriceFilter),
       isOverviewLoading: isOverviewLoading ?? this.isOverviewLoading,
       isListFetching: isListFetching ?? this.isListFetching,
+      isListLoadingMore: isListLoadingMore ?? this.isListLoadingMore,
       overviewError:
           clearOverviewError ? null : (overviewError ?? this.overviewError),
       listError: clearListError ? null : (listError ?? this.listError),

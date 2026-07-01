@@ -5,16 +5,17 @@ import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/entities/post_media_entity.dart';
 import 'media_carousel_item.dart';
 
-/// Swipeable admin preview for all items in [ManagedPostEntity.media].
 class PostMediaCarousel extends StatefulWidget {
   const PostMediaCarousel({
     super.key,
     required this.post,
-    this.height = 320,
+    this.fit = BoxFit.contain,
+    this.onAspectRatioChanged,
   });
 
   final ManagedPostEntity post;
-  final double height;
+  final BoxFit fit;
+  final ValueChanged<double>? onAspectRatioChanged;
 
   @override
   State<PostMediaCarousel> createState() => _PostMediaCarouselState();
@@ -23,6 +24,7 @@ class PostMediaCarousel extends StatefulWidget {
 class _PostMediaCarouselState extends State<PostMediaCarousel> {
   late final PageController _pageController;
   int _currentIndex = 0;
+  final Map<int, double> _aspectRatios = {};
 
   List<PostMediaEntity> get _media => widget.post.media;
 
@@ -35,13 +37,23 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
   @override
   void didUpdateWidget(PostMediaCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
+
     if (oldWidget.post.id != widget.post.id ||
-        oldWidget.post.media.length != widget.post.media.length) {
+        !_sameMedia(oldWidget.post.media, widget.post.media)) {
       _currentIndex = 0;
+      _aspectRatios.clear();
       if (_pageController.hasClients) {
         _pageController.jumpToPage(0);
       }
     }
+  }
+
+  bool _sameMedia(List<PostMediaEntity> a, List<PostMediaEntity> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -50,59 +62,194 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
     super.dispose();
   }
 
-  String? _videoPosterUrl(int videoIndex) {
-    for (var i = 0; i < videoIndex; i++) {
-      final prior = _media[i];
-      if (prior.mediaType.toUpperCase() == 'IMAGE' && prior.url.isNotEmpty) {
-        return prior.url;
-      }
+  void _onRatioDetermined(int index, double ratio) {
+    if (_aspectRatios[index] == ratio) return;
+    _aspectRatios[index] = ratio;
+    if (index == _currentIndex) {
+      widget.onAspectRatioChanged?.call(ratio);
     }
-    return widget.post.displayThumbnailUrl ?? widget.post.thumbnailUrl;
   }
 
-  void _openVideoPlayer(String videoUrl) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black87,
-      builder: (ctx) {
-        final maxWidth = MediaQuery.sizeOf(ctx).width * 0.92;
-        final maxHeight = MediaQuery.sizeOf(ctx).height * 0.75;
+  void _notifyAspectForIndex(int index) {
+    if (_aspectRatios.containsKey(index)) {
+      widget.onAspectRatioChanged?.call(_aspectRatios[index]!);
+      return;
+    }
+    final item = _media[index];
+    widget.onAspectRatioChanged?.call(item.isVideo ? 9 / 16 : 1.0);
+  }
 
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxWidth.clamp(320, 960),
-              maxHeight: maxHeight,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black45,
-                    ),
-                  ),
+  void _goToPrevious() {
+    if (_currentIndex <= 0 || !_pageController.hasClients) return;
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _goToNext() {
+    if (_currentIndex >= _media.length - 1 || !_pageController.hasClients) {
+      return;
+    }
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _buildCarouselNavButton({
+    required ColorScheme scheme,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required Alignment alignment,
+  }) {
+    final enabled = onPressed != null;
+
+    final backgroundColor = enabled
+        ? scheme.primaryContainer.withValues(alpha: 0.94)
+        : scheme.surfaceContainerHighest.withValues(alpha: 0.72);
+    final foregroundColor =
+        enabled ? scheme.primary : scheme.onSurfaceVariant;
+    final borderColor = enabled
+        ? scheme.primary.withValues(alpha: 0.42)
+        : scheme.outlineVariant.withValues(alpha: 0.65);
+
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Material(
+          color: Colors.transparent,
+          elevation: enabled ? 2 : 0,
+          shadowColor: scheme.shadow.withValues(alpha: 0.18),
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: onPressed,
+            customBorder: const CircleBorder(),
+            splashColor: scheme.primary.withValues(alpha: 0.12),
+            highlightColor: scheme.primary.withValues(alpha: 0.08),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: enabled ? 1 : 0.55,
+              child: Ink(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: backgroundColor,
+                  border: Border.all(color: borderColor),
                 ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: PostMediaPreview(
-                    thumbnailUrl: widget.post.displayThumbnailUrl,
-                    videoUrl: videoUrl,
-                    hlsUrl: widget.post.hlsUrl,
-                    type: 'VIDEO',
-                    height: (maxHeight - 56).clamp(200, 520),
-                  ),
+                child: Icon(
+                  icon,
+                  size: 26,
+                  color: foregroundColor,
                 ),
-              ],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCarouselWithControls(double mediaHeight, ColorScheme scheme) {
+    final hasMultiple = _media.length > 1;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildPageView(mediaHeight),
+        if (hasMultiple) ...[
+          _buildCarouselNavButton(
+            scheme: scheme,
+            icon: Icons.chevron_left_rounded,
+            onPressed: _currentIndex > 0 ? _goToPrevious : null,
+            alignment: Alignment.centerLeft,
+          ),
+          _buildCarouselNavButton(
+            scheme: scheme,
+            icon: Icons.chevron_right_rounded,
+            onPressed:
+                _currentIndex < _media.length - 1 ? _goToNext : null,
+            alignment: Alignment.centerRight,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildIndicators(ColorScheme scheme) {
+    if (_media.length <= 1) {
+      return const SizedBox(height: 16);
+    }
+
+    return SizedBox(
+      height: 36,
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(_media.length, (index) {
+            final selected = index == _currentIndex;
+
+            return GestureDetector(
+              onTap: () {
+                _pageController.animateToPage(
+                  index,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: selected ? 18 : 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: selected ? scheme.primary : scheme.outlineVariant,
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackMedia(double mediaHeight) {
+    final isVideoPost = widget.post.type.toUpperCase() == 'VIDEO';
+    return PostMediaPreview(
+      thumbnailUrl: isVideoPost ? null : widget.post.displayThumbnailUrl,
+      videoUrl: widget.post.videoUrl,
+      hlsUrl: widget.post.hlsUrl,
+      type: widget.post.type,
+      fit: widget.fit,
+      height: mediaHeight,
+      autoplay: true,
+      onAspectRatioDetermined: widget.onAspectRatioChanged,
+    );
+  }
+
+  Widget _buildPageView(double mediaHeight) {
+    return PageView.builder(
+      key: PageStorageKey<String>('post_media_${widget.post.id}'),
+      controller: _pageController,
+      itemCount: _media.length,
+      allowImplicitScrolling: true,
+      onPageChanged: (index) {
+        setState(() => _currentIndex = index);
+        _notifyAspectForIndex(index);
+      },
+      itemBuilder: (context, index) {
+        final item = _media[index];
+        return MediaCarouselItem(
+          key: ValueKey('${widget.post.id}_${item.url}_$index'),
+          item: item,
+          height: mediaHeight,
+          fit: widget.fit,
+          isActive: index == _currentIndex,
+          hlsUrl: widget.post.hlsUrl,
+          onAspectRatioDetermined: (ratio) => _onRatioDetermined(index, ratio),
         );
       },
     );
@@ -110,111 +257,37 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
-    if (_media.isEmpty) {
-      return PostMediaPreview(
-        thumbnailUrl: widget.post.displayThumbnailUrl,
-        videoUrl: widget.post.videoUrl,
-        hlsUrl: widget.post.hlsUrl,
-        type: widget.post.type,
-        height: widget.height,
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const indicatorHeight = 36.0;
+        final hasMultiple = _media.length > 1;
+        final reservedIndicator = hasMultiple ? indicatorHeight : 0.0;
 
-    final showIndicators = _media.length > 1;
-    final indicatorActive = theme.colorScheme.primary;
-    final indicatorInactive = isDark
-        ? Colors.grey.shade700
-        : theme.colorScheme.outline.withValues(alpha: 0.35);
+        final mediaHeight = (constraints.maxHeight - reservedIndicator)
+            .clamp(120.0, double.infinity)
+            .toDouble();
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: widget.height,
-            width: double.infinity,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: _media.length,
-              onPageChanged: (index) => setState(() => _currentIndex = index),
-              itemBuilder: (context, index) {
-                final item = _media[index];
-                final isVideo = item.mediaType.toUpperCase() == 'VIDEO';
+        if (_media.isEmpty) {
+          return _buildFallbackMedia(
+            constraints.maxHeight.isFinite
+                ? constraints.maxHeight
+                : mediaHeight,
+          );
+        }
 
-                return MediaCarouselItem(
-                  item: item,
-                  height: widget.height,
-                  videoPosterUrl: isVideo ? _videoPosterUrl(index) : null,
-                  onVideoTap: isVideo
-                      ? () => _openVideoPlayer(item.url)
-                      : null,
-                );
-              },
+        return Column(
+          children: [
+            SizedBox(
+              height: mediaHeight,
+              width: double.infinity,
+              child: _buildCarouselWithControls(mediaHeight, scheme),
             ),
-          ),
-          if (showIndicators) ...[
-            const SizedBox(height: 10),
-            _PageIndicators(
-              count: _media.length,
-              currentIndex: _currentIndex,
-              activeColor: indicatorActive,
-              inactiveColor: indicatorInactive,
-              onDotTap: (index) {
-                _pageController.animateToPage(
-                  index,
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOutCubic,
-                );
-              },
-            ),
-            const SizedBox(height: 4),
+            if (hasMultiple) _buildIndicators(scheme),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PageIndicators extends StatelessWidget {
-  const _PageIndicators({
-    required this.count,
-    required this.currentIndex,
-    required this.activeColor,
-    required this.inactiveColor,
-    this.onDotTap,
-  });
-
-  final int count;
-  final int currentIndex;
-  final Color activeColor;
-  final Color inactiveColor;
-  final void Function(int index)? onDotTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (index) {
-        final selected = index == currentIndex;
-        return GestureDetector(
-          onTap: onDotTap != null ? () => onDotTap!(index) : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: selected ? 18 : 7,
-            height: 7,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              color: selected ? activeColor : inactiveColor,
-            ),
-          ),
         );
-      }),
+      },
     );
   }
 }

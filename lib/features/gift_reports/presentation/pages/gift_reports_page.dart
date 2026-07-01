@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -16,29 +17,36 @@ class GiftReportsPage extends StatefulWidget {
 class _GiftReportsPageState extends State<GiftReportsPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late final GiftReportsBloc _bloc;
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _bloc = di.sl<GiftReportsBloc>()
+      ..add(LoadGiftReportsOverviewEvent())
+      ..add(LoadGiftReportsListEvent(refresh: true));
+    if (kDebugMode) {
+      debugPrint('GiftReportsBloc created — LoadGiftReports dispatched');
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _bloc.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (kDebugMode) debugPrint('GiftReportsPage rebuilt');
     final scheme = Theme.of(context).colorScheme;
 
-    return BlocProvider(
-      create: (_) => di.sl<GiftReportsBloc>()
-        ..add(LoadGiftReportsOverviewEvent())
-        ..add(LoadGiftReportsListEvent(refresh: true)),
+    return BlocProvider<GiftReportsBloc>.value(
+      value: _bloc,
       child: Builder(
         builder: (context) {
           return Container(

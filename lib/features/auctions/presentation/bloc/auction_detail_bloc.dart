@@ -3,9 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/auction_entity.dart';
 import '../../domain/entities/auction_update_entity.dart';
+import '../../domain/usecases/ban_auction_usecase.dart';
 import '../../domain/usecases/cancel_auction_usecase.dart';
 import '../../domain/usecases/get_auction_details_usecase.dart';
 import '../../domain/usecases/resolve_auction_usecase.dart';
+import '../../domain/usecases/update_auction_usecase.dart';
 import '../../data/datasources/auction_socket_service.dart';
 
 // ─── Events ──────────────────────────────────────────────────────────────────
@@ -30,6 +32,13 @@ class ReceiveAuctionUpdateEvent extends AuctionDetailEvent {
 }
 
 class AdminCancelDetailAuctionEvent extends AuctionDetailEvent {}
+
+class AdminBanDetailAuctionEvent extends AuctionDetailEvent {}
+
+class AdminUpdateAuctionEvent extends AuctionDetailEvent {
+  AdminUpdateAuctionEvent({this.itemName});
+  final String? itemName;
+}
 
 class AdminResolveAuctionEvent extends AuctionDetailEvent {
   AdminResolveAuctionEvent(this.winnerId);
@@ -96,10 +105,14 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
   AuctionDetailBloc({
     required GetAuctionDetails getAuctionDetails,
     required AdminCancelAuction cancelAuction,
+    required AdminBanAuction banAuction,
+    required AdminUpdateAuction updateAuction,
     required AdminResolveAuction resolveAuction,
     required AuctionSocketService socketService,
   })  : _getAuctionDetails = getAuctionDetails,
         _cancelAuction = cancelAuction,
+        _banAuction = banAuction,
+        _updateAuction = updateAuction,
         _resolveAuction = resolveAuction,
         _socketService = socketService,
         super(AuctionDetailInitial()) {
@@ -108,11 +121,15 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     on<LeaveAuctionRoomEvent>(_onLeaveRoom);
     on<ReceiveAuctionUpdateEvent>(_onReceiveUpdate);
     on<AdminCancelDetailAuctionEvent>(_onCancel);
+    on<AdminBanDetailAuctionEvent>(_onBan);
+    on<AdminUpdateAuctionEvent>(_onUpdate);
     on<AdminResolveAuctionEvent>(_onResolve);
   }
 
   final GetAuctionDetails _getAuctionDetails;
   final AdminCancelAuction _cancelAuction;
+  final AdminBanAuction _banAuction;
+  final AdminUpdateAuction _updateAuction;
   final AdminResolveAuction _resolveAuction;
   final AuctionSocketService _socketService;
   StreamSubscription<AuctionUpdateEntity>? _socketSub;
@@ -168,7 +185,7 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     if (current is! AuctionDetailLoaded) return;
     final update = event.update;
     final updated = current.auction.copyWith(
-      currentTotalUsd: update.currentTotalUsd,
+      currentTotalCoins: update.currentTotalCoins,
       status: update.status,
       winnerId: update.winnerId,
     );
@@ -199,6 +216,46 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     } catch (e) {
       emit(current.copyWith(
           isActioning: false, errorMessage: e.toString()));
+    }
+  }
+
+  Future<void> _onBan(
+      AdminBanDetailAuctionEvent event, Emitter<AuctionDetailState> emit) async {
+    final current = state;
+    if (current is! AuctionDetailLoaded) return;
+    emit(current.copyWith(isActioning: true, clearMessages: true));
+    try {
+      await _banAuction(current.auction.id);
+      final updated = current.auction.copyWith(status: 'BANNED');
+      emit(current.copyWith(
+        auction: updated,
+        isActioning: false,
+        isLive: false,
+        successMessage: 'Auction banned',
+      ));
+      add(LeaveAuctionRoomEvent());
+    } catch (e) {
+      emit(current.copyWith(isActioning: false, errorMessage: e.toString()));
+    }
+  }
+
+  Future<void> _onUpdate(
+      AdminUpdateAuctionEvent event, Emitter<AuctionDetailState> emit) async {
+    final current = state;
+    if (current is! AuctionDetailLoaded) return;
+    emit(current.copyWith(isActioning: true, clearMessages: true));
+    try {
+      final updated = await _updateAuction(
+        current.auction.id,
+        itemName: event.itemName,
+      );
+      emit(current.copyWith(
+        auction: updated,
+        isActioning: false,
+        successMessage: 'Auction updated',
+      ));
+    } catch (e) {
+      emit(current.copyWith(isActioning: false, errorMessage: e.toString()));
     }
   }
 

@@ -16,6 +16,8 @@ class ActivityContext {
     required this.type,
     this.commentId,
     this.commentText,
+    this.commentUserId,
+    this.commentUsername,
     this.activityDate,
     this.mentionText,
     this.likeId,
@@ -27,6 +29,8 @@ class ActivityContext {
   final ActivityType type;
   final String? commentId;
   final String? commentText;
+  final String? commentUserId;
+  final String? commentUsername;
   final DateTime? activityDate;
   final String? mentionText;
   final String? likeId;
@@ -45,11 +49,15 @@ class ActivityContext {
     required String commentText,
     required DateTime activityDate,
     String? postOwnerName,
+    String? commentUserId,
+    String? commentUsername,
   }) =>
       ActivityContext(
         type: ActivityType.comment,
         commentId: commentId,
         commentText: commentText,
+        commentUserId: commentUserId,
+        commentUsername: commentUsername,
         activityDate: activityDate,
         postOwnerName: postOwnerName,
       );

@@ -3,67 +3,68 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/user_entity.dart';
 
 class UserEngagementBar extends StatelessWidget {
-  const UserEngagementBar({super.key, required this.user});
+  const UserEngagementBar({
+    super.key,
+    required this.user,
+    this.compact = false,
+  });
 
   final UserEntity user;
+  final bool compact;
 
-  static double percentFor(UserEntity user) {
-    final raw = (user.postCount / (user.followerCount + 1)) * 100;
-    return raw.clamp(0, 100).toDouble();
+  static String formatCount(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final percent = percentFor(user);
-    final primary = theme.colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final style = TextStyle(fontSize: 11, color: scheme.onSurfaceVariant);
 
-    final trackColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : const Color(0xFFE2E8F0);
-    final fillGradient = LinearGradient(
-      colors: [
-        primary.withValues(alpha: 0.85),
-        primary,
-      ],
+    if (compact) {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _metric(Icons.people_outline, formatCount(user.followerCount), style),
+            const SizedBox(width: 8),
+            _metric(Icons.grid_view_rounded, formatCount(user.postCount), style),
+            const SizedBox(width: 8),
+            _metric(Icons.favorite_border, formatCount(user.totalLikes), style),
+          ],
+        ),
+      );
+    }
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _metric(Icons.people_outline, formatCount(user.followerCount), style),
+          const SizedBox(width: 8),
+          _metric(Icons.person_add_outlined, formatCount(user.followingCount), style),
+          const SizedBox(width: 8),
+          _metric(Icons.grid_view_rounded, formatCount(user.postCount), style),
+          const SizedBox(width: 8),
+          _metric(Icons.favorite_border, formatCount(user.totalLikes), style),
+        ],
+      ),
     );
+  }
 
+  Widget _metric(IconData icon, String value, TextStyle style) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              height: 6,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ColoredBox(color: trackColor),
-                  FractionallySizedBox(
-                    alignment: AlignmentDirectional.centerStart,
-                    widthFactor: percent / 100,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(gradient: fillGradient),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 38,
-          child: Text(
-            '${percent.round()}%',
-            textAlign: TextAlign.end,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.grey.shade300 : const Color(0xFF475569),
-            ),
-          ),
-        ),
+        Icon(icon, size: 12, color: style.color),
+        const SizedBox(width: 3),
+        Text(value, style: style),
       ],
     );
   }

@@ -437,8 +437,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     final current = state;
     if (current is! PostsLoaded) return;
     final updated = current.posts
-        .map((p) => p.id == event.updatedPost.id ? event.updatedPost : p)
-        .toList();
+        .map(
+          (p) => p.id == event.updatedPost.id ? event.updatedPost : p,
+        )
+        .toList(growable: false);
     emit(_withUiState(current.copyWith(posts: updated)));
   }
 

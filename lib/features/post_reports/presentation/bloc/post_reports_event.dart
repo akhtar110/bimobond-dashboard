@@ -13,6 +13,8 @@ class GoToPostReportsPageEvent extends PostReportsEvent {
   final int page;
 }
 
+class LoadMorePostReportsEvent extends PostReportsEvent {}
+
 class UpdatePostReportsSearchEvent extends PostReportsEvent {
   UpdatePostReportsSearchEvent(this.query);
   final String query;

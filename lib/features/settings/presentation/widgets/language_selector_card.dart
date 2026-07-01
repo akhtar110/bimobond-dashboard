@@ -5,16 +5,33 @@ import '../../../../core/localization/localization.dart';
 import '../bloc/settings_cubit.dart';
 import 'settings_section.dart';
 
-class LanguageSelectorCard extends StatelessWidget {
+class LanguageSelectorCard extends StatefulWidget {
   const LanguageSelectorCard({super.key});
 
+  @override
+  State<LanguageSelectorCard> createState() => _LanguageSelectorCardState();
+}
+
+class _LanguageSelectorCardState extends State<LanguageSelectorCard> {
   static const _english = Locale('en');
   static const _arabic = Locale('ar');
+
+  String? _optimisticLanguageCode;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final locale = context.watch<SettingsCubit>().state.locale;
+    final locale = context.select<SettingsCubit, Locale>(
+      (cubit) => cubit.state.locale,
+    );
+
+    if (_optimisticLanguageCode != null &&
+        _optimisticLanguageCode == locale.languageCode) {
+      _optimisticLanguageCode = null;
+    }
+
+    final effectiveCode = _optimisticLanguageCode ?? locale.languageCode;
+    final cubit = context.read<SettingsCubit>();
 
     return SettingsSection(
       title: l10n.t('languageAndRegion'),
@@ -28,18 +45,26 @@ class LanguageSelectorCard extends StatelessWidget {
               label: l10n.t('english'),
               subtitle: 'English (US)',
               flag: 'EN',
-              selected: locale.languageCode == 'en',
-              onTap: () =>
-                  context.read<SettingsCubit>().switchLanguage(_english),
+              selected: effectiveCode == 'en',
+              onTap: () {
+                if (effectiveCode != 'en') {
+                  setState(() => _optimisticLanguageCode = 'en');
+                  cubit.switchLanguage(_english);
+                }
+              },
             );
 
             final arabicOption = _LanguageOption(
               label: l10n.t('arabic'),
               subtitle: 'العربية',
               flag: 'AR',
-              selected: locale.languageCode == 'ar',
-              onTap: () =>
-                  context.read<SettingsCubit>().switchLanguage(_arabic),
+              selected: effectiveCode == 'ar',
+              onTap: () {
+                if (effectiveCode != 'ar') {
+                  setState(() => _optimisticLanguageCode = 'ar');
+                  cubit.switchLanguage(_arabic);
+                }
+              },
             );
 
             if (useRow) {
@@ -91,8 +116,9 @@ class _LanguageOptionState extends State<_LanguageOption> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final primary = scheme.primary;
+    final selected = widget.selected;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -101,24 +127,20 @@ class _LanguageOptionState extends State<_LanguageOption> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
+          duration: Duration.zero,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: widget.selected
+            color: selected
                 ? primary.withValues(alpha: 0.08)
                 : (_hovered
-                    ? theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5)
+                    ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
                     : Colors.transparent),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: widget.selected
+              color: selected
                   ? primary.withValues(alpha: 0.55)
-                  : theme.colorScheme.outline.withValues(
-                      alpha: _hovered ? 0.35 : 0.2,
-                    ),
-              width: widget.selected ? 1.5 : 1,
+                  : scheme.outline.withValues(alpha: _hovered ? 0.35 : 0.2),
+              width: selected ? 1.5 : 1,
             ),
           ),
           child: Row(
@@ -128,12 +150,10 @@ class _LanguageOptionState extends State<_LanguageOption> {
                 height: 44,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF252B3B)
-                      : const Color(0xFFF3F4F6),
+                  color: scheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                    color: scheme.outline.withValues(alpha: 0.15),
                   ),
                 ),
                 child: Text(
@@ -141,7 +161,7 @@ class _LanguageOptionState extends State<_LanguageOption> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: widget.selected ? primary : theme.colorScheme.onSurface,
+                    color: selected ? primary : scheme.onSurface,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -155,24 +175,22 @@ class _LanguageOptionState extends State<_LanguageOption> {
                       widget.label,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight:
-                            widget.selected ? FontWeight.w700 : FontWeight.w600,
-                        color: widget.selected ? primary : null,
+                            selected ? FontWeight.w700 : FontWeight.w600,
+                        color: selected ? primary : null,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       widget.subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? Colors.grey.shade500
-                            : const Color(0xFF6B7280),
+                        color: scheme.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (widget.selected)
+              if (selected)
                 Icon(Icons.check_circle_rounded, size: 20, color: primary),
             ],
           ),

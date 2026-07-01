@@ -1,3 +1,4 @@
+import '../entities/create_post_auction_entity.dart';
 import '../entities/create_post_entity.dart';
 import '../entities/create_post_field.dart';
 
@@ -50,7 +51,9 @@ class CreatePostFormReducer {
         final enabled = value as bool;
         return form.copyWith(
           isAuctionable: enabled,
-          auction: enabled ? (form.auction ?? const CreatePostAuctionEntity()) : null,
+          auction: enabled
+              ? (form.auction ?? const CreatePostAuctionEntity())
+              : null,
           clearAuction: !enabled,
         );
       case CreatePostField.duration:
@@ -90,15 +93,57 @@ class CreatePostFormReducer {
           form,
           (a) => a.copyWith(itemImageUrl: value as String),
         );
-      case CreatePostField.auctionStartingPriceUsd:
+      case CreatePostField.auctionStartingPriceCoins:
         return _updateAuction(
           form,
-          (a) => a.copyWith(startingPriceUsd: value as double?),
+          (a) => (value == null)
+              ? a.copyWith(clearStartingPriceCoins: true)
+              : a.copyWith(startingPriceCoins: value as double),
         );
-      case CreatePostField.auctionTargetPriceUsd:
+      case CreatePostField.auctionTargetPriceCoins:
         return _updateAuction(
           form,
-          (a) => a.copyWith(targetPriceUsd: value as double?),
+          (a) => (value == null)
+              ? a.copyWith(clearTargetPriceCoins: true)
+              : a.copyWith(targetPriceCoins: value as double),
+        );
+      case CreatePostField.auctionPricingMode:
+        return _updateAuction(
+          form,
+          (a) {
+            final mode = value as AuctionPricingMode;
+            if (mode == AuctionPricingMode.money) {
+              return a.copyWith(
+                pricingMode: mode,
+                clearStartingPriceCoins: true,
+                clearTargetPriceCoins: true,
+              );
+            }
+            return a.copyWith(
+              pricingMode: mode,
+              clearStartingPrice: true,
+              clearTargetPrice: true,
+            );
+          },
+        );
+      case CreatePostField.auctionStartingPrice:
+        return _updateAuction(
+          form,
+          (a) => (value == null)
+              ? a.copyWith(clearStartingPrice: true)
+              : a.copyWith(startingPrice: value as double),
+        );
+      case CreatePostField.auctionTargetPrice:
+        return _updateAuction(
+          form,
+          (a) => (value == null)
+              ? a.copyWith(clearTargetPrice: true)
+              : a.copyWith(targetPrice: value as double),
+        );
+      case CreatePostField.auctionCurrencyCode:
+        return _updateAuction(
+          form,
+          (a) => a.copyWith(currencyCode: value as String),
         );
       case CreatePostField.auctionStartedAt:
         return _updateAuction(

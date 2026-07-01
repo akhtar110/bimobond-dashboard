@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../domain/repositories/gifts_repository.dart';
+import '../models/admin_bulk_gift_action.dart';
+import '../models/admin_bulk_gifts_dto.dart';
+import '../models/bulk_admin_gift_action_result.dart';
 import '../models/gift_model.dart';
 
 abstract class GiftsRemoteDataSource {
@@ -14,13 +17,14 @@ abstract class GiftsRemoteDataSource {
   Future<GiftModel> createGiftWithUrl({
     required String name,
     required String thumbnailUrl,
-    required double priceUsd,
+    required double priceCoins,
     bool isActive = true,
     DateTime? publishedAt,
   });
 
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
+  Future<BulkAdminGiftActionResult> executeAdminBulkAction(AdminBulkGiftsDto dto);
 }
 
 class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
@@ -95,14 +99,14 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   Future<GiftModel> createGiftWithUrl({
     required String name,
     required String thumbnailUrl,
-    required double priceUsd,
+    required double priceCoins,
     bool isActive = true,
     DateTime? publishedAt,
   }) async {
     final body = <String, dynamic>{
       'name': name,
       'thumbnailUrl': thumbnailUrl,
-      'priceUsd': priceUsd,
+      'priceCoins': priceCoins,
       'isActive': isActive,
       // Always send publishedAt; use provided value or default to now.
       'publishedAt':
@@ -125,7 +129,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     if (data.name != null) body['name'] = data.name;
     if (data.thumbnailUrl != null) body['thumbnailUrl'] = data.thumbnailUrl;
     if (data.animationUrl != null) body['animationUrl'] = data.animationUrl;
-    if (data.priceUsd != null) body['priceUsd'] = data.priceUsd;
+    if (data.priceCoins != null) body['priceCoins'] = data.priceCoins;
     if (data.isActive != null) body['isActive'] = data.isActive;
     if (data.publishedAt != null) {
       body['publishedAt'] = data.publishedAt!.toUtc().toIso8601String();
@@ -144,6 +148,65 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   @override
   Future<void> deleteGift(String giftId) async {
     await _dio.delete('/gifts/admin/$giftId');
+  }
+
+  @override
+  Future<BulkAdminGiftActionResult> executeAdminBulkAction(
+    AdminBulkGiftsDto dto,
+  ) async {
+    final response = await _dio.post(
+      '/gifts/admin/bulk',
+      data: dto.toJson(),
+      options: Options(contentType: Headers.jsonContentType),
+    );
+    return _parseBulkResponse(dto, response.data);
+  }
+
+  BulkAdminGiftActionResult _parseBulkResponse(
+    AdminBulkGiftsDto dto,
+    dynamic data,
+  ) {
+    final isDelete = dto.action == AdminBulkGiftAction.delete;
+
+    if (data is! Map<String, dynamic>) {
+      return BulkAdminGiftActionResult(
+        affectedGiftIds: dto.giftIds,
+        isDelete: isDelete,
+      );
+    }
+
+    final nested = data['data'] ?? data;
+    if (nested is! Map<String, dynamic>) {
+      return BulkAdminGiftActionResult(
+        affectedGiftIds: dto.giftIds,
+        isDelete: isDelete,
+      );
+    }
+
+    final failed = _readStringList(
+      nested['failedGiftIds'] ?? nested['failedIds'] ?? nested['errors'],
+    );
+    final succeeded = _readStringList(
+      nested['succeededGiftIds'] ??
+          nested['successGiftIds'] ??
+          nested['affectedGiftIds'] ??
+          nested['giftIds'],
+    );
+
+    final affected = succeeded.isNotEmpty
+        ? succeeded
+        : dto.giftIds.where((id) => !failed.contains(id)).toList();
+
+    return BulkAdminGiftActionResult(
+      affectedGiftIds: affected,
+      failedGiftIds: failed,
+      isDelete: isDelete,
+    );
+  }
+
+  List<String> _readStringList(dynamic value) {
+    if (value is! List) return const [];
+    return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

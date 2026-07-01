@@ -20,6 +20,7 @@ class CategoryReportsBloc
     on<LoadCategoryReportsOverviewEvent>(_onLoadOverview);
     on<LoadCategoryReportsListEvent>(_onLoadList);
     on<GoToCategoryReportsPageEvent>(_onGoToPage);
+    on<LoadMoreCategoryReportsEvent>(_onLoadMore);
     on<UpdateCategoryReportsSearchEvent>(_onUpdateSearch);
     on<UpdateCategoryReportsSortEvent>(_onUpdateSort);
     on<UpdateCategoryReportsActiveFilterEvent>(_onUpdateActiveFilter);
@@ -62,6 +63,22 @@ class CategoryReportsBloc
 
   CategoryReportsLoaded? get _loaded =>
       state is CategoryReportsLoaded ? state as CategoryReportsLoaded : null;
+
+  List<CategoryReportListItemEntity> _dedupeListItems(
+    List<CategoryReportListItemEntity> items,
+  ) {
+    final seen = <String>{};
+    final unique = <CategoryReportListItemEntity>[];
+    for (final item in items) {
+      final key = item.id.trim().isNotEmpty
+          ? item.id.trim()
+          : '${item.name.toLowerCase()}|${item.parentId ?? ''}|${item.isMain}';
+      if (seen.add(key)) {
+        unique.add(item);
+      }
+    }
+    return unique;
+  }
 
   Future<void> _onLoadOverview(
     LoadCategoryReportsOverviewEvent event,
@@ -109,6 +126,7 @@ class CategoryReportsBloc
   Future<void> _fetchListPage(
     Emitter<CategoryReportsState> emit, {
     required int page,
+    required bool replace,
     bool showLoading = true,
   }) async {
     if (_busy) {
@@ -123,7 +141,11 @@ class CategoryReportsBloc
     if (showLoading && previous is! CategoryReportsLoaded) {
       emit(CategoryReportsLoading());
     } else if (previous is CategoryReportsLoaded) {
-      emit(previous.copyWith(isListFetching: true, clearListError: true));
+      emit(
+        replace
+            ? previous.copyWith(isListFetching: true, isListLoadingMore: false)
+            : previous.copyWith(isListLoadingMore: true, clearListError: true),
+      );
     }
 
     try {
@@ -145,9 +167,14 @@ class CategoryReportsBloc
               days: _days,
             );
 
+      final pageItems = _dedupeListItems(response.items);
+      final merged = replace
+          ? pageItems
+          : _dedupeListItems([...base.items, ...pageItems]);
+
       emit(
         base.copyWith(
-          items: response.items,
+          items: merged,
           currentPage: response.page,
           lastPage: response.lastPage,
           total: response.total,
@@ -155,10 +182,14 @@ class CategoryReportsBloc
           searchQuery: _searchQuery,
           sort: _sort,
           isActiveFilter: _isActiveFilter,
+          clearActiveFilter: _isActiveFilter == null,
           isMainFilter: _isMainFilter,
+          clearMainFilter: _isMainFilter == null,
           parentIdFilter: _parentIdFilter,
+          clearParentFilter: _parentIdFilter == null,
           mainCategoryOptions: _mainCategoryOptions,
           isListFetching: false,
+          isListLoadingMore: false,
           clearListError: true,
         ),
       );
@@ -167,6 +198,7 @@ class CategoryReportsBloc
         emit(
           previous.copyWith(
             isListFetching: false,
+            isListLoadingMore: false,
             listError: e.toString(),
           ),
         );
@@ -190,14 +222,43 @@ class CategoryReportsBloc
   ) async {
     final page = event.refresh ? 1 : (event.page ?? _currentPage);
     final hasData = state is CategoryReportsLoaded;
-    await _fetchListPage(emit, page: page, showLoading: !hasData);
+    await _fetchListPage(
+      emit,
+      page: page,
+      replace: true,
+      showLoading: !hasData,
+    );
   }
 
   Future<void> _onGoToPage(
     GoToCategoryReportsPageEvent event,
     Emitter<CategoryReportsState> emit,
   ) async {
-    await _fetchListPage(emit, page: event.page, showLoading: false);
+    await _fetchListPage(
+      emit,
+      page: event.page,
+      replace: true,
+      showLoading: false,
+    );
+  }
+
+  Future<void> _onLoadMore(
+    LoadMoreCategoryReportsEvent event,
+    Emitter<CategoryReportsState> emit,
+  ) async {
+    final loaded = _loaded;
+    if (loaded == null ||
+        loaded.hasReachedMax ||
+        loaded.isListLoadingMore ||
+        loaded.isListFetching) {
+      return;
+    }
+    await _fetchListPage(
+      emit,
+      page: loaded.currentPage + 1,
+      replace: false,
+      showLoading: false,
+    );
   }
 
   void _onUpdateSearch(

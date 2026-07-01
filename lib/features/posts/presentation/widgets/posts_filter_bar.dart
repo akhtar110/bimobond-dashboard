@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/post_filters.dart';
 import '../bloc/posts_bloc.dart';
+import '../utils/posts_responsive.dart';
 
 /// Advanced filters for the posts feed (search + dropdowns).
 class PostsFilterBar extends StatefulWidget {
@@ -13,11 +14,13 @@ class PostsFilterBar extends StatefulWidget {
     super.key,
     required this.isDark,
     this.compact = false,
+    this.metrics,
   });
 
   /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
   final bool compact;
+  final PostsLayoutMetrics? metrics;
 
   @override
   State<PostsFilterBar> createState() => _PostsFilterBarState();
@@ -86,6 +89,10 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     Widget? suffixIcon,
   }) {
     final scheme = Theme.of(context).colorScheme;
+    final m = widget.metrics;
+    final verticalPad = m != null
+        ? (m.filterControlHeight - 24) / 2
+        : (widget.compact ? 10.0 : 12.0);
     return InputDecoration(
       hintText: hint,
       prefixIcon: prefixIcon,
@@ -94,8 +101,8 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
       filled: true,
       fillColor: scheme.surfaceContainerLow,
       contentPadding: EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: widget.compact ? 10 : 12,
+        horizontal: m?.isMobile == true ? 10 : 12,
+        vertical: verticalPad,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -147,6 +154,7 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
             ],
             activeFilters: _activeFilters(l10n, theme, filters, isApplying),
             compact: widget.compact,
+            metrics: widget.metrics,
           );
 
           if (widget.compact) return content;
@@ -226,20 +234,22 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
     if (!filters.hasAdvancedFilters) return const [];
 
     return [
-      const SizedBox(height: 8),
-      Row(
-        children: [
-          Text(
+      SizedBox(height: widget.metrics?.filterGap ?? 8),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          final summary = Text(
             context.tr('activeFiltersCount', {
               'count': '${filters.advancedActiveCount}',
             }),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-          const Spacer(),
-          TextButton(
+          );
+          final clearButton = TextButton(
             style: TextButton.styleFrom(
               visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -255,8 +265,28 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
               l10n.t('clearAllFilters'),
               style: const TextStyle(fontSize: 12),
             ),
-          ),
-        ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                summary,
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: clearButton,
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: summary),
+              clearButton,
+            ],
+          );
+        },
       ),
       const SizedBox(height: 4),
       _ActiveFilterChips(
@@ -494,18 +524,47 @@ class _FilterContent extends StatelessWidget {
     required this.dropdowns,
     required this.activeFilters,
     required this.compact,
+    this.metrics,
   });
 
   final Widget searchField;
   final List<Widget> dropdowns;
   final List<Widget> activeFilters;
   final bool compact;
+  final PostsLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final narrow = constraints.maxWidth < (compact ? 560 : 640);
+        final width = constraints.maxWidth;
+        final m = metrics ?? PostsLayoutMetrics(getPostsDeviceType(width));
+        final gap = m.filterGap;
+        final veryNarrow = width < 520;
+        final narrow = width < 760;
+        final medium = width < 1100;
+
+        if (veryNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              searchField,
+              SizedBox(height: gap),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: dropdowns[0]),
+                  SizedBox(width: gap),
+                  Expanded(child: dropdowns[1]),
+                ],
+              ),
+              SizedBox(height: gap),
+              dropdowns[2],
+              ...activeFilters,
+            ],
+          );
+        }
 
         if (narrow) {
           return Column(
@@ -513,31 +572,59 @@ class _FilterContent extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               searchField,
-              const SizedBox(height: 8),
-              for (var i = 0; i < dropdowns.length; i++) ...[
-                if (i > 0) const SizedBox(height: 8),
-                dropdowns[i],
-              ],
+              SizedBox(height: gap),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: dropdowns[0]),
+                  SizedBox(width: gap),
+                  Expanded(child: dropdowns[1]),
+                  SizedBox(width: gap),
+                  Expanded(child: dropdowns[2]),
+                ],
+              ),
               ...activeFilters,
             ],
           );
         }
 
         if (compact) {
+          if (medium) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                searchField,
+                SizedBox(height: gap),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 2, child: dropdowns[0]),
+                    SizedBox(width: gap),
+                    Expanded(child: dropdowns[1]),
+                    SizedBox(width: gap),
+                    Expanded(child: dropdowns[2]),
+                  ],
+                ),
+                ...activeFilters,
+              ],
+            );
+          }
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Wrap(
-                alignment: WrapAlignment.end,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(width: 220, child: searchField),
-                  SizedBox(width: 158, child: dropdowns[0]),
-                  SizedBox(width: 120, child: dropdowns[1]),
-                  SizedBox(width: 120, child: dropdowns[2]),
+                  Expanded(flex: 3, child: searchField),
+                  SizedBox(width: gap),
+                  Expanded(flex: 2, child: dropdowns[0]),
+                  SizedBox(width: gap),
+                  Expanded(child: dropdowns[1]),
+                  SizedBox(width: gap),
+                  Expanded(child: dropdowns[2]),
                 ],
               ),
               ...activeFilters,
@@ -550,14 +637,14 @@ class _FilterContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             searchField,
-            const SizedBox(height: 10),
+            SizedBox(height: gap + 2),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(child: dropdowns[0]),
-                const SizedBox(width: 8),
+                SizedBox(width: gap),
                 Expanded(child: dropdowns[1]),
-                const SizedBox(width: 8),
+                SizedBox(width: gap),
                 Expanded(child: dropdowns[2]),
               ],
             ),

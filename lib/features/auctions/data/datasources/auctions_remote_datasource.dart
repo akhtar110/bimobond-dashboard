@@ -12,6 +12,11 @@ abstract class AuctionsRemoteDataSource {
   });
   Future<AuctionModel> getAuctionDetails(String auctionId);
   Future<void> adminCancelAuction(String auctionId);
+  Future<void> adminBanAuction(String auctionId);
+  Future<AuctionModel> adminUpdateAuction(
+    String auctionId,
+    Map<String, dynamic> body,
+  );
   Future<AuctionModel> adminResolveAuction(String auctionId, String winnerId);
 }
 
@@ -50,6 +55,23 @@ class AuctionsRemoteDataSourceImpl implements AuctionsRemoteDataSource {
   @override
   Future<AuctionModel> getAuctionDetails(String auctionId) async {
     final response = await _dio.get('/auctions/$auctionId');
+    return _parse(response.data);
+  }
+
+  @override
+  Future<void> adminBanAuction(String auctionId) async {
+    await _dio.patch('/auctions/admin/$auctionId/ban');
+  }
+
+  @override
+  Future<AuctionModel> adminUpdateAuction(
+    String auctionId,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.patch(
+      '/auctions/admin/$auctionId',
+      data: body,
+    );
     return _parse(response.data);
   }
 

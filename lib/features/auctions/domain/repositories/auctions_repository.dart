@@ -10,5 +10,11 @@ abstract class AuctionsRepository {
   });
   Future<AuctionEntity> getAuctionDetails(String auctionId);
   Future<void> adminCancelAuction(String auctionId);
+  Future<void> adminBanAuction(String auctionId);
+  Future<AuctionEntity> adminUpdateAuction(
+    String auctionId, {
+    String? itemName,
+    String? status,
+  });
   Future<AuctionEntity> adminResolveAuction(String auctionId, String winnerId);
 }

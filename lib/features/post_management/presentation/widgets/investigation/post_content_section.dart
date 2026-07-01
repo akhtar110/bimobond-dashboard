@@ -7,8 +7,9 @@ import '../../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../../categories/presentation/widgets/category_icon.dart';
 import '../../../domain/entities/managed_post_entity.dart';
 import '../../utils/post_detail_labels.dart';
-import '../post_media_carousel.dart';
+import 'engagement_metric_cards.dart';
 import 'investigation_theme.dart';
+import 'post_preview_card.dart';
 import 'post_surface_card.dart';
 
 class PostContentSection extends StatelessWidget {
@@ -16,6 +17,7 @@ class PostContentSection extends StatelessWidget {
     super.key,
     required this.draft,
     required this.isBusy,
+    this.hideComments = false,
     required this.captionController,
     required this.onCaptionChanged,
     required this.onCategorySelected,
@@ -24,6 +26,7 @@ class PostContentSection extends StatelessWidget {
 
   final ManagedPostEntity draft;
   final bool isBusy;
+  final bool hideComments;
   final TextEditingController captionController;
   final VoidCallback onCaptionChanged;
   final void Function(CategoryEntity) onCategorySelected;
@@ -33,206 +36,240 @@ class PostContentSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
 
-    return PostSurfaceCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: BlocBuilder<CategoriesBloc, CategoriesState>(
-              builder: (context, catState) {
-                final categoryLabel = _resolveCategoryLabel(draft, catState);
-                return Wrap(
-                  spacing: InvestigationTheme.s8,
-                  runSpacing: InvestigationTheme.s8,
-                  children: [
-                    if (categoryLabel != null && categoryLabel.isNotEmpty)
-                      _Badge(
-                        icon: Icons.category_outlined,
-                        label: categoryLabel,
-                        color: const Color(0xFF6366F1),
-                        isDark: isDark,
-                      ),
-                    _Badge(
-                      icon: Icons.lock_outline_rounded,
-                      label: privacyLabel(l10n, draft.privacyStatus),
-                      color: const Color(0xFF64748B),
-                      isDark: isDark,
-                    ),
-                    _StatusBadge(status: draft.status, l10n: l10n),
-                  ],
-                );
-              },
-            ),
-          ),
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.zero,
-              top: Radius.zero,
-            ),
-            child: PostMediaCarousel(post: draft, height: 360),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  l10n.t('postInformation'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PostPreviewCard(post: draft),
+        const SizedBox(height: InvestigationTheme.s12),
+        PostSurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.t('postInformation'),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: InvestigationTheme.s12),
-                TextField(
-                  controller: captionController,
-                  maxLines: 4,
-                  enabled: !isBusy,
-                  onChanged: (_) => onCaptionChanged(),
-                  decoration: InputDecoration(
-                    labelText: l10n.t('caption'),
-                    filled: true,
-                    fillColor: isDark
-                        ? const Color(0xFF0F1421)
-                        : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(InvestigationTheme.radiusSm),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(InvestigationTheme.radiusSm),
-                      borderSide: BorderSide(
-                        color: isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: InvestigationTheme.s12),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final sideBySide = constraints.maxWidth >= 480;
-                    final category = _CategoryDropdown(
-                      draft: draft,
-                      isBusy: isBusy,
-                      onCategorySelected: onCategorySelected,
-                    );
-                    final privacy = DropdownButtonFormField<String>(
-                      initialValue: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
-                              .contains(draft.privacyStatus)
-                          ? draft.privacyStatus
-                          : 'PUBLIC',
-                      decoration: InputDecoration(
-                        labelText: l10n.t('privacy'),
-                        filled: true,
-                        fillColor: isDark
-                            ? const Color(0xFF0F1421)
-                            : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            InvestigationTheme.radiusSm,
-                          ),
-                        ),
-                      ),
-                      items: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
-                          .map(
-                            (v) => DropdownMenuItem(
-                              value: v,
-                              child: Text(privacyLabel(l10n, v)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: isBusy
-                          ? null
-                          : (v) => v != null ? onPrivacyChanged(v) : null,
-                    );
-                    if (!sideBySide) {
-                      return Column(
-                        children: [
-                          category,
-                          const SizedBox(height: InvestigationTheme.s12),
-                          privacy,
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: category),
-                        const SizedBox(width: InvestigationTheme.s12),
-                        Expanded(child: privacy),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: InvestigationTheme.s16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF0F1421)
-                        : const Color(0xFFF8FAFC),
-                    borderRadius:
-                        BorderRadius.circular(InvestigationTheme.radiusSm),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+              ),
+              const SizedBox(height: InvestigationTheme.s12),
+              BlocBuilder<CategoriesBloc, CategoriesState>(
+                builder: (context, catState) {
+                  final categoryLabel = _resolveCategoryLabel(draft, catState);
+                  return Wrap(
+                    spacing: InvestigationTheme.s8,
+                    runSpacing: InvestigationTheme.s8,
                     children: [
-                      Text(
-                        l10n.t('engagementSummary'),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: InvestigationTheme.mutedText(context, isDark),
+                      if (categoryLabel != null && categoryLabel.isNotEmpty)
+                        _Badge(
+                          icon: Icons.category_outlined,
+                          label: categoryLabel,
+                          color: scheme.primary,
                         ),
+                      _Badge(
+                        icon: Icons.lock_outline_rounded,
+                        label: privacyLabel(l10n, draft.privacyStatus),
+                        color: scheme.secondary,
                       ),
-                      const SizedBox(height: InvestigationTheme.s8),
-                      Wrap(
-                        spacing: InvestigationTheme.s16,
-                        runSpacing: InvestigationTheme.s8,
-                        children: [
-                          _EngagementStat(
-                            icon: Icons.visibility_outlined,
-                            value: compactNumber(draft.viewCount),
-                            isDark: isDark,
-                          ),
-                          _EngagementStat(
-                            icon: Icons.favorite_border,
-                            value: compactNumber(draft.likeCount),
-                            isDark: isDark,
-                          ),
-                          _EngagementStat(
-                            icon: Icons.chat_bubble_outline,
-                            value: compactNumber(draft.commentCount),
-                            isDark: isDark,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: InvestigationTheme.s8),
-                      Text(
-                        context.tr('postTimestamps', {
-                          'created': DateFormat('MMM dd, yyyy · HH:mm')
-                              .format(draft.createdAt),
-                          'updated': DateFormat('MMM dd, yyyy · HH:mm')
-                              .format(draft.updatedAt),
-                        }),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: InvestigationTheme.mutedText(context, isDark),
-                        ),
-                      ),
+                      _StatusBadge(status: draft.status, l10n: l10n),
                     ],
-                  ),
+                  );
+                },
+              ),
+              const SizedBox(height: InvestigationTheme.s12),
+              _PostInfoRow(
+                icon: Icons.category_outlined,
+                label: l10n.t('type'),
+                value: draft.type,
+              ),
+              const SizedBox(height: InvestigationTheme.s8),
+              _PostInfoRow(
+                icon: Icons.calendar_today_outlined,
+                label: l10n.t('created'),
+                value: DateFormat('MMM dd, yyyy · HH:mm').format(draft.createdAt),
+              ),
+              if (draft.media.isNotEmpty) ...[
+                const SizedBox(height: InvestigationTheme.s8),
+                _PostInfoRow(
+                  icon: Icons.collections_outlined,
+                  label: l10n.tOr('mediaItems', 'Media items'),
+                  value: '${draft.media.length}',
                 ),
               ],
-            ),
+              const SizedBox(height: InvestigationTheme.s16),
+              TextField(
+                controller: captionController,
+                maxLines: 4,
+                enabled: !isBusy,
+                onChanged: (_) => onCaptionChanged(),
+                decoration: InvestigationTheme.fieldDecoration(
+                  context,
+                  labelText: l10n.t('caption'),
+                ),
+              ),
+              const SizedBox(height: InvestigationTheme.s12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final sideBySide = constraints.maxWidth >= 480;
+                  final category = _CategoryDropdown(
+                    draft: draft,
+                    isBusy: isBusy,
+                    onCategorySelected: onCategorySelected,
+                  );
+                  final privacy = DropdownButtonFormField<String>(
+                    initialValue: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
+                            .contains(draft.privacyStatus)
+                        ? draft.privacyStatus
+                        : 'PUBLIC',
+                    decoration: InvestigationTheme.fieldDecoration(
+                      context,
+                      labelText: l10n.t('privacy'),
+                    ),
+                    items: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
+                        .map(
+                          (v) => DropdownMenuItem(
+                            value: v,
+                            child: Text(privacyLabel(l10n, v)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: isBusy
+                        ? null
+                        : (v) => v != null ? onPrivacyChanged(v) : null,
+                  );
+                  if (!sideBySide) {
+                    return Column(
+                      children: [
+                        category,
+                        const SizedBox(height: InvestigationTheme.s12),
+                        privacy,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: category),
+                      const SizedBox(width: InvestigationTheme.s12),
+                      Expanded(child: privacy),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: InvestigationTheme.s12),
+        PostSurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.t('engagementSummary'),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: InvestigationTheme.s12),
+              EngagementMetricCards(
+                metrics: [
+                  (
+                    icon: Icons.favorite_border_rounded,
+                    label: l10n.t('likes'),
+                    value: draft.likeCount,
+                    accent: scheme.error,
+                  ),
+                  if (!hideComments)
+                    (
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: l10n.t('comments'),
+                      value: draft.commentCount,
+                      accent: scheme.primary,
+                    ),
+                  (
+                    icon: Icons.repeat_rounded,
+                    label: l10n.t('reposts'),
+                    value: draft.repostCount,
+                    accent: scheme.tertiary,
+                  ),
+                  (
+                    icon: Icons.visibility_outlined,
+                    label: l10n.t('views'),
+                    value: draft.viewCount,
+                    accent: scheme.secondary,
+                  ),
+                  (
+                    icon: Icons.share_outlined,
+                    label: l10n.t('shares'),
+                    value: draft.shareCount,
+                    accent: scheme.tertiary,
+                  ),
+                  (
+                    icon: Icons.bookmark_border_rounded,
+                    label: l10n.t('saves'),
+                    value: draft.saveCount,
+                    accent: scheme.primary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: InvestigationTheme.s12),
+              Text(
+                context.tr('postTimestamps', {
+                  'created': DateFormat('MMM dd, yyyy · HH:mm')
+                      .format(draft.createdAt),
+                  'updated': DateFormat('MMM dd, yyyy · HH:mm')
+                      .format(draft.updatedAt),
+                }),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PostInfoRow extends StatelessWidget {
+  const _PostInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: scheme.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -242,20 +279,18 @@ class _Badge extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.color,
-    required this.isDark,
   });
 
   final IconData icon;
   final String label;
   final Color color;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
@@ -286,43 +321,12 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = status.toUpperCase();
-    final color = postStatusColor(s);
+    final scheme = Theme.of(context).colorScheme;
+    final color = postStatusColorFromScheme(scheme, s);
     return _Badge(
       icon: postStatusIcon(s),
       label: postStatusLabel(l10n, s),
       color: color,
-      isDark: Theme.of(context).brightness == Brightness.dark,
-    );
-  }
-}
-
-class _EngagementStat extends StatelessWidget {
-  const _EngagementStat({
-    required this.icon,
-    required this.value,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final String value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: InvestigationTheme.mutedText(context, isDark)),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -358,18 +362,14 @@ class _CategoryDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return BlocBuilder<CategoriesBloc, CategoriesState>(
       builder: (context, catState) {
         if (catState is CategoriesInitial || catState is CategoriesLoading) {
           return InputDecorator(
-            decoration: InputDecoration(
+            decoration: InvestigationTheme.fieldDecoration(
+              context,
               labelText: l10n.t('categoryName'),
-              filled: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
-              ),
             ),
             child: const SizedBox(
               height: 20,
@@ -390,10 +390,15 @@ class _CategoryDropdown extends StatelessWidget {
         final cats = catState.catalogCategories;
         String? resolvedId = draft.categoryEntity?.id;
         if (resolvedId == null || !cats.any((c) => c.id == resolvedId)) {
-          resolvedId = cats
-              .where((c) => c.name == draft.category)
-              .map((c) => c.id)
-              .firstOrNull;
+          final categoryName = draft.category?.trim();
+          if (categoryName != null && categoryName.isNotEmpty) {
+            resolvedId = cats
+                .where(
+                  (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
+                )
+                .map((c) => c.id)
+                .firstOrNull;
+          }
         }
         final selectedId =
             (resolvedId != null && cats.any((c) => c.id == resolvedId))
@@ -401,15 +406,12 @@ class _CategoryDropdown extends StatelessWidget {
                 : null;
 
         return DropdownButtonFormField<String?>(
+          key: ValueKey('cat_${draft.id}_${selectedId ?? draft.category ?? ''}'),
           initialValue: selectedId,
           isExpanded: true,
-          decoration: InputDecoration(
+          decoration: InvestigationTheme.fieldDecoration(
+            context,
             labelText: l10n.t('categoryName'),
-            filled: true,
-            fillColor: isDark ? const Color(0xFF0F1421) : const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
-            ),
           ),
           items: cats
               .map(

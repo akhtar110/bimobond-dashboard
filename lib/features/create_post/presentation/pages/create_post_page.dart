@@ -144,6 +144,7 @@ class _StepBody extends StatelessWidget {
         0 => MediaUploadSection(
             form: state.form,
             status: state.status,
+            isGeneratingThumbnail: state.isGeneratingThumbnail,
             onFilesPicked: (files) => bloc.add(PickMedia(files)),
             onRemove: (id) => bloc.add(RemoveMedia(id)),
             onReorder: (oldIndex, newIndex) =>

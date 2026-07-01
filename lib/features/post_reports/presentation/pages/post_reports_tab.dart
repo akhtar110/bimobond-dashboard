@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/post_report_entities.dart';
 import '../../domain/entities/post_reports_query.dart';
+import '../../../reports/presentation/utils/reports_responsive.dart';
+import '../../../reports/presentation/widgets/reports_pagination_bar.dart';
 import '../bloc/post_reports_bloc.dart';
 import '../widgets/post_report_thumbnail.dart';
 
@@ -24,8 +26,30 @@ class PostReportsTab extends StatefulWidget {
 
 class _PostReportsTabState extends State<PostReportsTab>
     with AutomaticKeepAliveClientMixin {
+  final _scrollController = ScrollController();
+
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    if (!reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width)) return;
+    if (!reportsShouldLoadMore(_scrollController)) return;
+    context.read<PostReportsBloc>().add(LoadMorePostReportsEvent());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   void _applyCategoryFilter(
     BuildContext context,
@@ -115,10 +139,26 @@ class _PostReportsTabState extends State<PostReportsTab>
                     )
                   : _PostsTable(
                       posts: state.posts,
+                      scrollController: _scrollController,
+                      isLoadingMore: state.isLoadingMore,
                       onRowTap: widget.onRowTap,
                     ),
             ),
-            _PaginationBar(loaded: state),
+            if (reportsUseDesktopPagination(MediaQuery.sizeOf(context).width))
+              ReportsPaginationBar(
+                page: state.currentPage,
+                totalPages: state.lastPage,
+                total: state.total,
+                itemLabel: 'posts',
+                onPage: (page) => context
+                    .read<PostReportsBloc>()
+                    .add(GoToPostReportsPageEvent(page)),
+              )
+            else if (state.hasReachedMax && state.posts.isNotEmpty)
+              ReportsLoadMoreFooter(
+                hasReachedMax: true,
+                total: state.total,
+              ),
             ],
           ),
         );
@@ -224,10 +264,14 @@ class _CategoryChip extends StatelessWidget {
 class _PostsTable extends StatelessWidget {
   const _PostsTable({
     required this.posts,
+    required this.scrollController,
+    required this.isLoadingMore,
     required this.onRowTap,
   });
 
   final List<PostReportListItem> posts;
+  final ScrollController scrollController;
+  final bool isLoadingMore;
   final ValueChanged<PostReportListItem> onRowTap;
 
   static final _dateFormat = DateFormat('MMM d, yyyy');
@@ -235,12 +279,23 @@ class _PostsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = reportsMetricsOf(context);
+    final useInfinite = metrics.useInfiniteScroll;
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      itemCount: posts.length,
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(
+        metrics.pageHorizontalPadding,
+        0,
+        metrics.pageHorizontalPadding,
+        8,
+      ),
+      itemCount: posts.length + (useInfinite && isLoadingMore ? 1 : 0),
       separatorBuilder: (_, __) => Divider(color: scheme.outlineVariant, height: 1),
       itemBuilder: (context, index) {
+        if (index >= posts.length) {
+          return const ReportsLoadMoreFooter(isLoading: true);
+        }
         final post = posts[index];
 
         return Material(
@@ -254,8 +309,8 @@ class _PostsTable extends StatelessWidget {
                 children: [
                   PostReportThumbnail(
                     post: post,
-                    width: 48,
-                    height: 48,
+                    width: metrics.isMobile ? 40 : 48,
+                    height: metrics.isMobile ? 40 : 48,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -327,43 +382,6 @@ class _MetricChip extends StatelessWidget {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ],
-    );
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({required this.loaded});
-
-  final PostReportsLoaded loaded;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loaded.lastPage <= 1) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            onPressed: loaded.currentPage > 1
-                ? () => context
-                    .read<PostReportsBloc>()
-                    .add(GoToPostReportsPageEvent(loaded.currentPage - 1))
-                : null,
-            icon: const Icon(Icons.chevron_left_rounded),
-          ),
-          Text('Page ${loaded.currentPage} of ${loaded.lastPage}'),
-          IconButton(
-            onPressed: loaded.currentPage < loaded.lastPage
-                ? () => context
-                    .read<PostReportsBloc>()
-                    .add(GoToPostReportsPageEvent(loaded.currentPage + 1))
-                : null,
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
-        ],
-      ),
     );
   }
 }

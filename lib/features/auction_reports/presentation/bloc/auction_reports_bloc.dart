@@ -19,6 +19,7 @@ class AuctionReportsBloc extends Bloc<AuctionReportsEvent, AuctionReportsState> 
         super(AuctionReportsInitial()) {
     on<LoadAuctionReportsEvent>(_onLoad);
     on<GoToAuctionReportsPageEvent>(_onGoToPage);
+    on<LoadMoreAuctionReportsEvent>(_onLoadMore);
     on<UpdateAuctionReportsSearchEvent>(_onUpdateSearch);
     on<UpdateAuctionReportsFiltersEvent>(_onUpdateFilters);
     on<UpdateAuctionReportsSortEvent>(_onUpdateSort);
@@ -43,6 +44,7 @@ class AuctionReportsBloc extends Bloc<AuctionReportsEvent, AuctionReportsState> 
   Future<void> _fetchPage(
     Emitter<AuctionReportsState> emit, {
     required int page,
+    required bool replace,
     bool showLoading = true,
   }) async {
     if (_busy) return;
@@ -53,7 +55,11 @@ class AuctionReportsBloc extends Bloc<AuctionReportsEvent, AuctionReportsState> 
     if (showLoading && previous is! AuctionReportsLoaded) {
       emit(AuctionReportsLoading());
     } else if (previous is AuctionReportsLoaded) {
-      emit(previous.copyWith(isFetching: true));
+      emit(
+        replace
+            ? previous.copyWith(isFetching: true, isLoadingMore: false)
+            : previous.copyWith(isLoadingMore: true),
+      );
     }
 
     try {
@@ -65,20 +71,33 @@ class AuctionReportsBloc extends Bloc<AuctionReportsEvent, AuctionReportsState> 
 
       _currentPage = response.page;
 
+      final merged = replace
+          ? response.items
+          : <AuctionReportListItem>[
+              if (previous is AuctionReportsLoaded) ...previous.auctions,
+              ...response.items,
+            ];
+
       emit(AuctionReportsLoaded(
-        auctions: response.items,
+        auctions: merged,
         currentPage: response.page,
         lastPage: response.lastPage,
         total: response.total,
         query: _query,
         searchQuery: _searchQuery,
         isFetching: false,
+        isLoadingMore: false,
         overview: previous is AuctionReportsLoaded ? previous.overview : null,
         overviewDays: _overviewDays,
       ));
     } catch (e) {
       if (previous is AuctionReportsLoaded) {
-        emit(previous.copyWith(isFetching: false));
+        emit(
+          previous.copyWith(
+            isFetching: false,
+            isLoadingMore: false,
+          ),
+        );
       } else {
         emit(AuctionReportsError(e.toString()));
       }
@@ -96,6 +115,7 @@ class AuctionReportsBloc extends Bloc<AuctionReportsEvent, AuctionReportsState> 
     await _fetchPage(
       emit,
       page: page,
+      replace: true,
       showLoading: !hasData,
     );
   }
@@ -104,7 +124,29 @@ class AuctionReportsBloc extends Bloc<AuctionReportsEvent, AuctionReportsState> 
     GoToAuctionReportsPageEvent event,
     Emitter<AuctionReportsState> emit,
   ) async {
-    await _fetchPage(emit, page: event.page, showLoading: false);
+    await _fetchPage(
+      emit,
+      page: event.page,
+      replace: true,
+      showLoading: false,
+    );
+  }
+
+  Future<void> _onLoadMore(
+    LoadMoreAuctionReportsEvent event,
+    Emitter<AuctionReportsState> emit,
+  ) async {
+    final loaded = state;
+    if (loaded is! AuctionReportsLoaded) return;
+    if (loaded.hasReachedMax || loaded.isLoadingMore || loaded.isFetching) {
+      return;
+    }
+    await _fetchPage(
+      emit,
+      page: loaded.currentPage + 1,
+      replace: false,
+      showLoading: false,
+    );
   }
 
   void _onUpdateSearch(

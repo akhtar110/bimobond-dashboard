@@ -11,9 +11,12 @@ class AuctionModel extends AuctionEntity {
     required super.hostId,
     super.itemName,
     super.itemImageUrl,
-    required super.startingPriceUsd,
-    required super.targetPriceUsd,
-    required super.currentTotalUsd,
+    required super.startingPriceCoins,
+    required super.targetPriceCoins,
+    super.startingPrice,
+    super.targetPrice,
+    super.currencyCode,
+    required super.currentTotalCoins,
     required super.status,
     super.winnerId,
     required super.startedAt,
@@ -22,6 +25,7 @@ class AuctionModel extends AuctionEntity {
     super.winner,
     super.giftTransactions,
     super.post,
+    super.pricing,
   });
 
   factory AuctionModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +42,7 @@ class AuctionModel extends AuctionEntity {
       );
     }
 
+    final pricingJson = map['pricing'];
     return AuctionModel(
       id: map['id']?.toString() ?? '',
       postId: map['postId']?.toString(),
@@ -45,9 +50,12 @@ class AuctionModel extends AuctionEntity {
       hostId: map['hostId']?.toString() ?? '',
       itemName: map['itemName']?.toString(),
       itemImageUrl: itemImageUrl,
-      startingPriceUsd: _d(map['startingPriceUsd']),
-      targetPriceUsd: _d(map['targetPriceUsd']),
-      currentTotalUsd: _d(map['currentTotalUsd']),
+      startingPriceCoins: _d(map['startingPriceCoins'] ?? map['startingPriceUsd']),
+      targetPriceCoins: _d(map['targetPriceCoins'] ?? map['targetPriceUsd']),
+      startingPrice: _optionalD(map['startingPrice']),
+      targetPrice: _optionalD(map['targetPrice'] ?? map['targetFiatUsd']),
+      currencyCode: map['currencyCode']?.toString(),
+      currentTotalCoins: _d(map['currentTotalCoins'] ?? map['currentTotalUsd']),
       status: map['status']?.toString() ?? 'ACTIVE',
       winnerId: map['winnerId']?.toString(),
       startedAt: _date(map['startedAt']),
@@ -64,6 +72,30 @@ class AuctionModel extends AuctionEntity {
               ))
           .toList(),
       post: postSummary,
+      pricing: pricingJson is Map<String, dynamic>
+          ? _parsePricing(pricingJson)
+          : null,
+    );
+  }
+
+  static AuctionPricingEntity _parsePricing(Map<String, dynamic> json) {
+    return AuctionPricingEntity(
+      coinsPerPriceUnit: _optionalD(json['coinsPerPriceUnit'] ?? json['coinsPerUsd']),
+      commissionPercent: _optionalD(json['commissionPercent']),
+      currencyCode: json['currencyCode']?.toString(),
+      targetPrice: _optionalD(json['targetPrice']),
+      startingPrice: _optionalD(json['startingPrice']),
+      estimatedHostEarningsCoins:
+          _optionalD(json['estimatedHostEarningsCoins']),
+      estimatedHostEarningsPrice:
+          _optionalD(json['estimatedHostEarningsPrice'] ?? json['estimatedHostEarningsFiatUsd']),
+      estimatedBidderSpendCoins:
+          _optionalD(json['estimatedBidderSpendCoins']),
+      estimatedBidderSpendPrice:
+          _optionalD(json['estimatedBidderSpendPrice'] ?? json['estimatedBidderSpendFiatUsd']),
+      remainingCoins: _optionalD(json['remainingCoins']),
+      remainingPrice: _optionalD(json['remainingPrice'] ?? json['remainingFiatUsd']),
+      progressPercent: _optionalD(json['progressPercent']),
     );
   }
 
@@ -112,6 +144,14 @@ class AuctionModel extends AuctionEntity {
     if (v is num) return v.toDouble();
     if (v is String) return double.tryParse(v) ?? 0;
     return 0;
+  }
+
+  static double? _optionalD(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
   }
 
   static DateTime _date(dynamic v) {

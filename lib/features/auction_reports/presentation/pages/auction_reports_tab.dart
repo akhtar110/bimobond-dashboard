@@ -4,9 +4,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../analytics/presentation/utils/analytics_format.dart';
 import '../../domain/entities/auction_report_entities.dart';
+import '../../../reports/presentation/utils/reports_responsive.dart';
+import '../../../reports/presentation/widgets/reports_pagination_bar.dart';
 import '../bloc/auction_reports_bloc.dart';
 
 class AuctionReportsTab extends StatefulWidget {
@@ -46,13 +49,29 @@ String? _statusApiValue(_AuctionStatusFilter filter) {
 class _AuctionReportsTabState extends State<AuctionReportsTab>
     with AutomaticKeepAliveClientMixin {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
 
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    if (!reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width)) return;
+    if (!reportsShouldLoadMore(_scrollController)) return;
+    context.read<AuctionReportsBloc>().add(LoadMoreAuctionReportsEvent());
+  }
+
+  @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -124,10 +143,26 @@ class _AuctionReportsTabState extends State<AuctionReportsTab>
                       )
                     : _AuctionsTable(
                         auctions: state.auctions,
+                        scrollController: _scrollController,
+                        isLoadingMore: state.isLoadingMore,
                         onRowTap: widget.onRowTap,
                       ),
               ),
-              _PaginationBar(loaded: state),
+              if (reportsUseDesktopPagination(MediaQuery.sizeOf(context).width))
+                ReportsPaginationBar(
+                  page: state.currentPage,
+                  totalPages: state.lastPage,
+                  total: state.total,
+                  itemLabel: 'auctions',
+                  onPage: (page) => context
+                      .read<AuctionReportsBloc>()
+                      .add(GoToAuctionReportsPageEvent(page)),
+                )
+              else if (state.hasReachedMax && state.auctions.isNotEmpty)
+                ReportsLoadMoreFooter(
+                  hasReachedMax: true,
+                  total: state.total,
+                ),
             ],
           ),
         );
@@ -278,10 +313,14 @@ class _StatusChip extends StatelessWidget {
 class _AuctionsTable extends StatelessWidget {
   const _AuctionsTable({
     required this.auctions,
+    required this.scrollController,
+    required this.isLoadingMore,
     required this.onRowTap,
   });
 
   final List<AuctionReportListItem> auctions;
+  final ScrollController scrollController;
+  final bool isLoadingMore;
   final ValueChanged<AuctionReportListItem> onRowTap;
 
   static final _dateFormat = DateFormat('MMM d, yyyy');
@@ -289,13 +328,24 @@ class _AuctionsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = reportsMetricsOf(context);
+    final useInfinite = metrics.useInfiniteScroll;
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      itemCount: auctions.length,
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(
+        metrics.pageHorizontalPadding,
+        0,
+        metrics.pageHorizontalPadding,
+        8,
+      ),
+      itemCount: auctions.length + (useInfinite && isLoadingMore ? 1 : 0),
       separatorBuilder: (_, __) =>
           Divider(color: scheme.outlineVariant, height: 1),
       itemBuilder: (context, index) {
+        if (index >= auctions.length) {
+          return const ReportsLoadMoreFooter(isLoading: true);
+        }
         final auction = auctions[index];
         final image = resolveMediaUrl(auction.itemImageUrl);
 
@@ -348,7 +398,7 @@ class _AuctionsTable extends StatelessWidget {
                   ),
                   _MetricChip(
                     icon: Icons.payments_outlined,
-                    value: AnalyticsFormat.usd(auction.currentTotalUsd),
+                    value: CoinFormat.coinsAmount(auction.currentTotalCoins),
                   ),
                   const SizedBox(width: 8),
                   _MetricChip(
@@ -415,43 +465,6 @@ class _MetricChip extends StatelessWidget {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ],
-    );
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({required this.loaded});
-
-  final AuctionReportsLoaded loaded;
-
-  @override
-  Widget build(BuildContext context) {
-    if (loaded.lastPage <= 1) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            onPressed: loaded.currentPage > 1
-                ? () => context
-                    .read<AuctionReportsBloc>()
-                    .add(GoToAuctionReportsPageEvent(loaded.currentPage - 1))
-                : null,
-            icon: const Icon(Icons.chevron_left_rounded),
-          ),
-          Text('Page ${loaded.currentPage} of ${loaded.lastPage}'),
-          IconButton(
-            onPressed: loaded.currentPage < loaded.lastPage
-                ? () => context
-                    .read<AuctionReportsBloc>()
-                    .add(GoToAuctionReportsPageEvent(loaded.currentPage + 1))
-                : null,
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -3,15 +3,24 @@ import 'package:flutter/material.dart';
 import 'app_fonts.dart';
 
 class AppTheme {
-  static ThemeData darkTheme(Locale locale) => _build(
-        brightness: Brightness.dark,
-        locale: locale,
-      );
+  static final Map<String, ThemeData> _cache = {};
 
-  static ThemeData lightTheme(Locale locale) => _build(
-        brightness: Brightness.light,
-        locale: locale,
-      );
+  static ThemeData darkTheme(Locale locale) =>
+      _cached(brightness: Brightness.dark, locale: locale);
+
+  static ThemeData lightTheme(Locale locale) =>
+      _cached(brightness: Brightness.light, locale: locale);
+
+  static ThemeData _cached({
+    required Brightness brightness,
+    required Locale locale,
+  }) {
+    final key = '${brightness.name}_${locale.languageCode}';
+    return _cache.putIfAbsent(
+      key,
+      () => _build(brightness: brightness, locale: locale),
+    );
+  }
 
   static ThemeData _build({
     required Brightness brightness,

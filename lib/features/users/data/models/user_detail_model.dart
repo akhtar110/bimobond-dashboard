@@ -17,14 +17,15 @@ class UserDetailModel extends UserDetailEntity {
     Map<String, dynamic> json, [
     List<UserPostEntity> posts = const [],
   ]) {
+    final counts = json['_count'] as Map<String, dynamic>?;
     return UserDetailModel(
-      user: UserModel.fromJson(json),
+      user: UserModel.fromJson(json, counts: counts),
       posts: posts,
       wallet: json['wallet'] as Map<String, dynamic>?,
       devices: (json['devices'] as List?)
           ?.map((e) => e as Map<String, dynamic>)
           .toList(),
-      counts: json['_count'] as Map<String, dynamic>?,
+      counts: counts,
     );
   }
 }

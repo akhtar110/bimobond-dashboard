@@ -5,12 +5,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../domain/entities/gift_report_entities.dart';
+import '../../../reports/presentation/utils/reports_responsive.dart';
+import '../../../reports/presentation/widgets/reports_pagination_bar.dart';
 import '../bloc/gift_reports_bloc.dart';
 import '../utils/gift_report_format.dart';
 import 'gift_report_range_filters.dart';
 import 'gift_reports_pagination_bar.dart';
 
-class GiftReportsTablePanel extends StatelessWidget {
+class GiftReportsTablePanel extends StatefulWidget {
   const GiftReportsTablePanel({
     super.key,
     required this.state,
@@ -27,7 +29,35 @@ class GiftReportsTablePanel extends StatelessWidget {
   final bool denseLayout;
 
   @override
+  State<GiftReportsTablePanel> createState() => _GiftReportsTablePanelState();
+}
+
+class _GiftReportsTablePanelState extends State<GiftReportsTablePanel> {
+  final _listScrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _listScrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    if (!reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width)) return;
+    if (!reportsShouldLoadMore(_listScrollController)) return;
+    context.read<GiftReportsBloc>().add(LoadMoreGiftReportsEvent());
+  }
+
+  @override
+  void dispose() {
+    _listScrollController.removeListener(_onScroll);
+    _listScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -36,13 +66,13 @@ class GiftReportsTablePanel extends StatelessWidget {
       children: [
         _GiftReportsFiltersBar(
           state: state,
-          searchController: searchController,
-          hideSearchBar: hideSearchBar,
-          denseLayout: denseLayout,
+          searchController: widget.searchController,
+          hideSearchBar: widget.hideSearchBar,
+          denseLayout: widget.denseLayout,
         ),
-        if (denseLayout && state.isListFetching)
+        if (widget.denseLayout && state.isListFetching)
           const LinearProgressIndicator(minHeight: 2),
-        SizedBox(height: denseLayout ? 6 : 12),
+        SizedBox(height: widget.denseLayout ? 6 : 12),
         if (state.listError != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -62,7 +92,10 @@ class GiftReportsTablePanel extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: Column(
                 children: [
-                  _TableHeader(scheme: scheme),
+                  _TableHeader(
+                    scheme: scheme,
+                    compact: reportsMetricsOf(context).isMobile,
+                  ),
                   Expanded(
                     child: state.items.isEmpty
                         ? Center(
@@ -77,7 +110,12 @@ class GiftReportsTablePanel extends StatelessWidget {
                             ),
                           )
                         : ListView.separated(
-                            itemCount: state.items.length,
+                            controller: _listScrollController,
+                            itemCount: state.items.length +
+                                (reportsMetricsOf(context).useInfiniteScroll &&
+                                        state.isListLoadingMore
+                                    ? 1
+                                    : 0),
                             separatorBuilder: (_, __) => Divider(
                               height: 1,
                               color: scheme.outlineVariant.withValues(
@@ -85,12 +123,18 @@ class GiftReportsTablePanel extends StatelessWidget {
                               ),
                             ),
                             itemBuilder: (context, index) {
+                              if (index >= state.items.length) {
+                                return const ReportsLoadMoreFooter(
+                                  isLoading: true,
+                                );
+                              }
                               final item = state.items[index];
                               return _GiftReportRow(
                                 item: item,
-                                onTap: onRowTap == null
+                                compact: reportsMetricsOf(context).isMobile,
+                                onTap: widget.onRowTap == null
                                     ? null
-                                    : () => onRowTap!(item.id),
+                                    : () => widget.onRowTap!(item.id),
                               );
                             },
                           ),
@@ -100,6 +144,13 @@ class GiftReportsTablePanel extends StatelessWidget {
                     lastPage: state.lastPage,
                     total: state.total,
                   ),
+                  if (reportsMetricsOf(context).useInfiniteScroll &&
+                      state.hasReachedMax &&
+                      state.items.isNotEmpty)
+                    ReportsLoadMoreFooter(
+                      hasReachedMax: true,
+                      total: state.total,
+                    ),
                 ],
               ),
             ),
@@ -127,7 +178,6 @@ class _GiftReportsFiltersBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
     final bloc = context.read<GiftReportsBloc>();
 
     final hasDateRange = state.fromDate != null || state.toDate != null;
@@ -253,29 +303,19 @@ class _GiftReportsFiltersBar extends StatelessWidget {
                 ),
                 hasRange: hasDateRange,
                 onTap: () async {
-                  final result = await showDateRangePicker(
+                  await showDialog<void>(
                     context: context,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime.now(),
-                    initialDateRange: hasDateRange
-                        ? DateTimeRange(
-                            start: state.fromDate ?? state.toDate!,
-                            end: state.toDate ?? state.fromDate!,
-                          )
-                        : null,
-                    builder: (ctx, child) => Theme(
-                      data: theme,
-                      child: child!,
+                    builder: (_) => GiftReportDateRangeDialog(
+                      initialFrom: state.fromDate,
+                      initialTo: state.toDate,
+                      onApply: (from, to) => bloc.add(
+                        SetGiftReportsDateRangeFilterEvent(
+                          fromDate: from,
+                          toDate: to,
+                        ),
+                      ),
                     ),
                   );
-                  if (result != null) {
-                    bloc.add(
-                      SetGiftReportsDateRangeFilterEvent(
-                        fromDate: result.start,
-                        toDate: result.end,
-                      ),
-                    );
-                  }
                 },
                 onClear: hasDateRange
                     ? () => bloc.add(
@@ -292,8 +332,8 @@ class _GiftReportsFiltersBar extends StatelessWidget {
                 value: state.sort,
                 hint: l10n.t('sortBy'),
                 items: [
-                  (label: l10n.t('sortNewestFirst'), value: GiftReportsSort.newest),
-                  (label: l10n.t('sortOldestFirst'), value: GiftReportsSort.oldest),
+                  (label: 'New Gifts', value: GiftReportsSort.newest),
+                  (label: 'Old Gifts', value: GiftReportsSort.oldest),
                   (label: l10n.t('sortMostViewed'), value: GiftReportsSort.mostSent),
                   (label: l10n.t('sortHighestBid'), value: GiftReportsSort.mostRevenue),
                   (label: l10n.t('priceLowToHigh'), value: GiftReportsSort.priceAsc),
@@ -384,12 +424,17 @@ class _CompactDropdown<T> extends StatelessWidget {
 }
 
 class _TableHeader extends StatelessWidget {
-  const _TableHeader({required this.scheme});
+  const _TableHeader({
+    required this.scheme,
+    this.compact = false,
+  });
 
   final ColorScheme scheme;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    if (compact) return const SizedBox.shrink();
     final l10n = context.l10n;
     final style = TextStyle(
       fontSize: 12,
@@ -420,16 +465,82 @@ class _GiftReportRow extends StatelessWidget {
   const _GiftReportRow({
     required this.item,
     this.onTap,
+    this.compact = false,
   });
 
   final GiftReportListItemEntity item;
   final VoidCallback? onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
+
+    final thumbSize = compact ? 32.0 : 36.0;
+
+    if (compact) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (onTap != null) {
+              onTap!();
+              return;
+            }
+            Navigator.of(context).pushNamed(
+              AppRoutes.giftReportDetail,
+              arguments: item.id,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: item.thumbnailUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: item.thumbnailUrl,
+                          width: thumbSize,
+                          height: thumbSize,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => _thumbFallback(scheme),
+                        )
+                      : _thumbFallback(scheme),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        '${formatReportCoins(item.priceCoins)} · ${formatReportCount(item.counts.transactions)} sends',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Material(
       color: Colors.transparent,
@@ -484,13 +595,13 @@ class _GiftReportRow extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: Text(formatReportUsd(item.priceUsd)),
+                child: Text(formatReportCoins(item.priceCoins)),
               ),
               Expanded(
                 child: Text(formatReportCount(item.counts.transactions)),
               ),
               Expanded(
-                child: Text(formatReportUsd(item.revenue.spendUsd)),
+                child: Text(formatReportCoins(item.revenue.spendCoins)),
               ),
               Expanded(
                 child: _StatusBadge(

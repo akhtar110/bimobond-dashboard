@@ -18,15 +18,17 @@ class CommentsModerationPanel extends StatefulWidget {
   const CommentsModerationPanel({
     super.key,
     required this.state,
-    required this.isDark,
+    this.isDark = false,
     required this.isBusy,
     this.highlightCommentId,
+    this.embedded = false,
   });
 
   final PostManagementLoaded state;
   final bool isDark;
   final bool isBusy;
   final String? highlightCommentId;
+  final bool embedded;
 
   @override
   State<CommentsModerationPanel> createState() =>
@@ -41,7 +43,6 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
   _CommentFilter _filter = _CommentFilter.all;
 
   PostManagementLoaded get state => widget.state;
-  bool get isDark => widget.isDark;
   bool get isBusy => widget.isBusy;
 
   @override
@@ -111,34 +112,34 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
     final bloc = context.read<PostManagementBloc>();
     final filtered = _filteredComments();
 
-    return PostSurfaceCard(
-      child: Column(
+    final content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Icon(Icons.forum_outlined, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  l10n.t('commentsInvestigation'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
+          if (!widget.embedded)
+            Row(
+              children: [
+                Icon(Icons.forum_outlined, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.t('commentsInvestigation'),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: l10n.t('refresh'),
-                visualDensity: VisualDensity.compact,
-                onPressed: state.isCommentsLoading || isBusy
-                    ? null
-                    : () => bloc.add(LoadPostCommentsEvent()),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-              ),
-            ],
-          ),
-          const SizedBox(height: InvestigationTheme.s8),
+                IconButton(
+                  tooltip: l10n.t('refresh'),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: state.isCommentsLoading || isBusy
+                      ? null
+                      : () => bloc.add(LoadPostCommentsEvent()),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                ),
+              ],
+            ),
+          if (!widget.embedded) const SizedBox(height: InvestigationTheme.s8),
           Wrap(
             spacing: InvestigationTheme.s16,
             runSpacing: InvestigationTheme.s4,
@@ -146,14 +147,12 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
               _HeaderStat(
                 label: l10n.t('comments'),
                 value: '${state.comments.length}',
-                isDark: isDark,
               ),
               if (widget.highlightCommentId != null)
                 _HeaderStat(
                   label: l10n.t('filterReported'),
                   value: '1',
-                  isDark: isDark,
-                  accent: Colors.orange,
+                  accent: theme.colorScheme.tertiary,
                 ),
             ],
           ),
@@ -161,16 +160,10 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
           TextField(
             controller: _searchController,
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
+            decoration: InvestigationTheme.fieldDecoration(
+              context,
               hintText: l10n.t('searchComments'),
               prefixIcon: const Icon(Icons.search_rounded, size: 20),
-              filled: true,
-              fillColor: isDark ? const Color(0xFF0F1421) : const Color(0xFFF8FAFC),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
           ),
           const SizedBox(height: InvestigationTheme.s12),
@@ -182,35 +175,30 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
                   label: l10n.t('filterAll'),
                   selected: _filter == _CommentFilter.all,
                   onTap: () => setState(() => _filter = _CommentFilter.all),
-                  isDark: isDark,
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
                   label: l10n.t('filterRecent'),
                   selected: _filter == _CommentFilter.recent,
                   onTap: () => setState(() => _filter = _CommentFilter.recent),
-                  isDark: isDark,
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
                   label: l10n.t('filterOldest'),
                   selected: _filter == _CommentFilter.oldest,
                   onTap: () => setState(() => _filter = _CommentFilter.oldest),
-                  isDark: isDark,
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
                   label: l10n.t('filterReported'),
                   selected: _filter == _CommentFilter.reported,
                   onTap: () => setState(() => _filter = _CommentFilter.reported),
-                  isDark: isDark,
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
                   label: l10n.t('filterHidden'),
                   selected: _filter == _CommentFilter.hidden,
                   onTap: () => setState(() => _filter = _CommentFilter.hidden),
-                  isDark: isDark,
                 ),
               ],
             ),
@@ -221,8 +209,11 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
             child: _buildBody(context, bloc, l10n, theme, filtered),
           ),
         ],
-      ),
-    );
+      );
+
+    if (widget.embedded) return content;
+
+    return PostSurfaceCard(child: content);
   }
 
   Widget _buildBody(
@@ -233,7 +224,7 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
     List<CommentEntity> filtered,
   ) {
     if (state.isCommentsLoading && state.comments.isEmpty) {
-      return _CommentsSkeleton(isDark: isDark);
+      return const _CommentsSkeleton();
     }
 
     if (state.commentsError != null && state.comments.isEmpty) {
@@ -242,7 +233,6 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
         message: state.commentsError!,
         actionLabel: l10n.t('tryAgain'),
         onAction: () => bloc.add(LoadPostCommentsEvent()),
-        isDark: isDark,
       );
     }
 
@@ -252,7 +242,6 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
         message: l10n.t('noCommentsOnPost'),
         actionLabel: l10n.t('refresh'),
         onAction: () => bloc.add(LoadPostCommentsEvent()),
-        isDark: isDark,
       );
     }
 
@@ -265,7 +254,6 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
           _filter = _CommentFilter.all;
           _searchController.clear();
         }),
-        isDark: isDark,
       );
     }
 
@@ -286,34 +274,21 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
             final key = _highlightKeys.putIfAbsent(comment.id, GlobalKey.new);
             if (highlighted && !_didScrollToHighlight) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _scrollToHighlight();
+                if (!mounted) return;
+                _scrollToHighlight();
+                Future.delayed(const Duration(milliseconds: 350), () {
+                  if (mounted) _scrollToHighlight();
+                });
               });
             }
             return _CommentCard(
               key: key,
               comment: comment,
-              isDark: isDark,
               isDeleting: isDeleting,
               highlighted: highlighted,
               disabled: isBusy || state.deletingCommentId != null,
               onDelete: () => _confirmDeleteComment(context, bloc, comment),
-              onBanUser: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.t('banUserComingSoon')),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
               onViewProfile: () => _openUserProfile(context, comment),
-              onHide: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.t('banUserComingSoon')),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
             );
           },
         ),
@@ -342,7 +317,10 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
           const SizedBox(height: InvestigationTheme.s8),
           Text(
             state.commentsError!,
-            style: TextStyle(fontSize: 12, color: Colors.red.shade400),
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.error,
+            ),
           ),
         ],
       ],
@@ -387,13 +365,11 @@ class _HeaderStat extends StatelessWidget {
   const _HeaderStat({
     required this.label,
     required this.value,
-    required this.isDark,
     this.accent,
   });
 
   final String label;
   final String value;
-  final bool isDark;
   final Color? accent;
 
   @override
@@ -406,7 +382,7 @@ class _HeaderStat extends StatelessWidget {
           '$label: ',
           style: TextStyle(
             fontSize: 12,
-            color: InvestigationTheme.mutedText(context, isDark),
+            color: InvestigationTheme.mutedText(context),
           ),
         ),
         Text(
@@ -427,17 +403,15 @@ class _FilterChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    required this.isDark,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -448,13 +422,13 @@ class _FilterChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: selected
-                ? primary.withValues(alpha: 0.12)
-                : (isDark ? const Color(0xFF0F1421) : const Color(0xFFF1F5F9)),
+                ? scheme.primaryContainer
+                : scheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: selected
-                  ? primary.withValues(alpha: 0.5)
-                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                  ? scheme.primary.withValues(alpha: 0.5)
+                  : scheme.outlineVariant,
             ),
           ),
           child: Text(
@@ -462,7 +436,7 @@ class _FilterChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? primary : InvestigationTheme.mutedText(context, isDark),
+              color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -475,42 +449,35 @@ class _CommentCard extends StatelessWidget {
   const _CommentCard({
     super.key,
     required this.comment,
-    required this.isDark,
     required this.isDeleting,
     required this.highlighted,
     required this.disabled,
     required this.onDelete,
-    required this.onBanUser,
     required this.onViewProfile,
-    required this.onHide,
   });
 
   final CommentEntity comment;
-  final bool isDark;
   final bool isDeleting;
   final bool highlighted;
   final bool disabled;
   final VoidCallback onDelete;
-  final VoidCallback onBanUser;
   final VoidCallback onViewProfile;
-  final VoidCallback onHide;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
-    final borderColor = highlighted
-        ? Colors.orange.shade600
-        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0));
+    final borderColor = highlighted ? scheme.tertiary : scheme.outlineVariant;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: InvestigationTheme.animMs),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: highlighted
-            ? Colors.orange.withValues(alpha: 0.06)
-            : (isDark ? const Color(0xFF0F1421) : const Color(0xFFFAFBFC)),
+            ? scheme.tertiaryContainer.withValues(alpha: 0.45)
+            : scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
         border: Border.all(
           color: borderColor,
@@ -526,14 +493,14 @@ class _CommentCard extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(Icons.warning_amber_rounded,
-                      size: 14, color: Colors.orange.shade700),
+                      size: 14, color: scheme.onTertiaryContainer),
                   const SizedBox(width: 4),
                   Text(
                     l10n.t('selectedActivity'),
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: Colors.orange.shade800,
+                      color: scheme.onTertiaryContainer,
                     ),
                   ),
                 ],
@@ -544,6 +511,8 @@ class _CommentCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 18,
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
                 backgroundImage: comment.avatarUrl != null &&
                         comment.avatarUrl!.isNotEmpty
                     ? CachedNetworkImageProvider(comment.avatarUrl!)
@@ -571,13 +540,14 @@ class _CommentCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w700,
+                              color: scheme.onSurface,
                             ),
                           ),
                         ),
                         Text(
                           dateFormat.format(comment.createdAt),
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: InvestigationTheme.mutedText(context, isDark),
+                            color: InvestigationTheme.mutedText(context),
                             fontSize: 10,
                           ),
                         ),
@@ -588,9 +558,7 @@ class _CommentCard extends StatelessWidget {
                       comment.content,
                       style: theme.textTheme.bodySmall?.copyWith(
                         height: 1.45,
-                        color: isDark
-                            ? Colors.grey.shade300
-                            : const Color(0xFF374151),
+                        color: scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -599,13 +567,11 @@ class _CommentCard extends StatelessWidget {
                         _MetaChip(
                           icon: Icons.favorite_border,
                           label: '${comment.likeCount}',
-                          isDark: isDark,
                         ),
                         const SizedBox(width: 12),
                         _MetaChip(
                           icon: Icons.reply_rounded,
                           label: '${comment.replyCount} ${l10n.t('replies')}',
-                          isDark: isDark,
                         ),
                       ],
                     ),
@@ -629,29 +595,15 @@ class _CommentCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _ActionBtn(
-                  icon: Icons.visibility_off_outlined,
-                  label: l10n.t('hideComment'),
-                  onPressed: disabled ? null : onHide,
-                  isDark: isDark,
-                ),
-                _ActionBtn(
                   icon: Icons.delete_outline,
                   label: l10n.t('delete'),
                   onPressed: disabled ? null : onDelete,
-                  isDark: isDark,
                   danger: true,
-                ),
-                _ActionBtn(
-                  icon: Icons.block_outlined,
-                  label: l10n.t('banUser'),
-                  onPressed: disabled ? null : onBanUser,
-                  isDark: isDark,
                 ),
                 _ActionBtn(
                   icon: Icons.person_outline,
                   label: l10n.t('viewProfile'),
                   onPressed: disabled ? null : onViewProfile,
-                  isDark: isDark,
                 ),
               ],
             ),
@@ -665,25 +617,23 @@ class _MetaChip extends StatelessWidget {
   const _MetaChip({
     required this.icon,
     required this.label,
-    required this.isDark,
   });
 
   final IconData icon;
   final String label;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: InvestigationTheme.mutedText(context, isDark)),
+        Icon(icon, size: 12, color: InvestigationTheme.mutedText(context)),
         const SizedBox(width: 3),
         Text(
           label,
           style: TextStyle(
             fontSize: 11,
-            color: InvestigationTheme.mutedText(context, isDark),
+            color: InvestigationTheme.mutedText(context),
           ),
         ),
       ],
@@ -696,19 +646,18 @@ class _ActionBtn extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
-    required this.isDark,
     this.danger = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
-  final bool isDark;
   final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? Colors.red.shade600 : InvestigationTheme.mutedText(context, isDark);
+    final scheme = Theme.of(context).colorScheme;
+    final color = danger ? scheme.error : scheme.onSurfaceVariant;
     return TextButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, size: 14, color: color),
@@ -723,12 +672,11 @@ class _ActionBtn extends StatelessWidget {
 }
 
 class _CommentsSkeleton extends StatelessWidget {
-  const _CommentsSkeleton({required this.isDark});
-  final bool isDark;
+  const _CommentsSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final bg = Theme.of(context).colorScheme.surfaceContainerHigh;
     return Column(
       children: List.generate(
         3,
@@ -753,17 +701,16 @@ class _CommentsMessage extends StatelessWidget {
     required this.message,
     this.actionLabel,
     this.onAction,
-    required this.isDark,
   });
 
   final IconData icon;
   final String message;
   final String? actionLabel;
   final VoidCallback? onAction;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
@@ -772,15 +719,13 @@ class _CommentsMessage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF0F1421)
-                  : const Color(0xFFF8FAFC),
+              color: scheme.surfaceContainerLow,
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 36,
-              color: InvestigationTheme.mutedText(context, isDark),
+              color: scheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
@@ -790,7 +735,7 @@ class _CommentsMessage extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: InvestigationTheme.mutedText(context, isDark),
+              color: scheme.onSurfaceVariant,
             ),
           ),
           if (actionLabel != null && onAction != null) ...[

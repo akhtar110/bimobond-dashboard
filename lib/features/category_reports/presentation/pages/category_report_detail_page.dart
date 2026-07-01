@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/category_report_entities.dart';
@@ -22,8 +24,10 @@ class CategoryReportDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => di.sl<CategoryReportDetailBloc>()
+    if (kDebugMode) debugPrint('CategoryReportDetailPage rebuilt');
+    return PersistentBlocProvider<CategoryReportDetailBloc>(
+      debugLabel: 'CategoryReportDetailPage',
+      create: () => di.sl<CategoryReportDetailBloc>()
         ..add(LoadCategoryReportDetailEvent(categoryId: categoryId)),
       child: _CategoryReportDetailView(onClose: onClose),
     );

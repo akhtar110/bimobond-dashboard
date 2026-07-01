@@ -50,7 +50,8 @@ class UserPostModel extends UserPostEntity {
   });
 
   factory UserPostModel.fromJson(Map<String, dynamic> json) {
-    final userMap = json['user'] as Map<String, dynamic>?;
+    final userMap = json['user'] as Map<String, dynamic>? ??
+        json['author'] as Map<String, dynamic>?;
 
     String? parsedCategory;
     String? parsedCategoryId;
@@ -68,9 +69,9 @@ class UserPostModel extends UserPostEntity {
       userId:
           json['userId']?.toString() ?? userMap?['id']?.toString() ?? '',
       type: json['type']?.toString() ?? 'VIDEO',
-      videoUrl: resolveMediaUrl(json['videoUrl'] as String?),
+      videoUrl: _readVideoUrl(json),
       hlsUrl: resolveMediaUrl(json['hlsUrl'] as String?),
-      thumbnailUrl: resolveMediaUrl(json['thumbnailUrl'] as String?),
+      thumbnailUrl: _readThumbnailUrl(json),
       animatedCoverUrl:
           resolveMediaUrl(json['animatedCoverUrl'] as String?),
       description: _readDescription(json),
@@ -107,8 +108,11 @@ class UserPostModel extends UserPostEntity {
       originalPostId: json['originalPostId']?.toString(),
       user: userMap,
       media: (json['media'] as List?)?.map((e) {
-        final item = e as Map<String, dynamic>;
-        final rawUrl = item['url']?.toString() ?? '';
+        final item = Map<String, dynamic>.from(e as Map);
+        final rawUrl = item['url']?.toString() ??
+            item['mediaUrl']?.toString() ??
+            item['src']?.toString() ??
+            '';
         return <String, dynamic>{
           ...item,
           'url': resolveMediaUrl(rawUrl) ?? rawUrl,
@@ -164,6 +168,44 @@ class UserPostsResponseModel extends UserPostsResponseEntity {
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+String? _readVideoUrl(Map<String, dynamic> json) {
+  final direct = resolveMediaUrl(json['videoUrl'] as String?);
+  if (direct != null && direct.isNotEmpty) return direct;
+
+  final video = json['video'];
+  if (video is Map<String, dynamic>) {
+    for (final key in ['url', 'videoUrl', 'src', 'path']) {
+      final resolved = resolveMediaUrl(video[key] as String?);
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+    }
+  }
+
+  return resolveMediaUrl(json['mediaUrl'] as String?);
+}
+
+String? _readThumbnailUrl(Map<String, dynamic> json) {
+  for (final key in [
+    'thumbnailUrl',
+    'thumbnail',
+    'thumbUrl',
+    'coverUrl',
+    'posterUrl',
+  ]) {
+    final resolved = resolveMediaUrl(json[key] as String?);
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+  }
+
+  final video = json['video'];
+  if (video is Map<String, dynamic>) {
+    for (final key in ['thumbnailUrl', 'thumbnail', 'coverUrl']) {
+      final resolved = resolveMediaUrl(video[key] as String?);
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+    }
+  }
+
+  return null;
+}
 
 String? _readDescription(Map<String, dynamic> json) {
   for (final key in ['description', 'caption']) {

@@ -15,6 +15,8 @@ class NotificationStatusBanner extends StatelessWidget {
       listener: (context, state) {
         if (state.hasSent) {
           _showBanner(context, state);
+        } else if (state.hasScheduled) {
+          _showScheduledBanner(context);
         } else if (state.hasError && state.errorMessage != null) {
           _showError(context, state.errorMessage!);
         }
@@ -55,6 +57,39 @@ class NotificationStatusBanner extends StatelessWidget {
     );
 
     // Auto-reset after display
+    Future.delayed(const Duration(seconds: 4), () {
+      if (context.mounted) {
+        context.read<NotificationsBloc>().add(const ClearNotificationStatus());
+      }
+    });
+  }
+
+  void _showScheduledBanner(BuildContext context) {
+    final l10n = context.l10n;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.schedule_send_rounded,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(l10n.t('notificationScheduledSuccess'))),
+          ],
+        ),
+        backgroundColor: Colors.deepPurple.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: l10n.t('notificationDismiss'),
+          textColor: Colors.white,
+          onPressed: () =>
+              ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+        ),
+      ),
+    );
+
     Future.delayed(const Duration(seconds: 4), () {
       if (context.mounted) {
         context.read<NotificationsBloc>().add(const ClearNotificationStatus());

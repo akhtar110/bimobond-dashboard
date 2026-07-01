@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../domain/entities/notification_filters.dart';
 import '../../domain/entities/notification_request_entity.dart';
 import '../../domain/entities/notification_send_result_entity.dart';
+import '../../domain/entities/scheduled_notification_entity.dart';
 import '../models/notification_model.dart';
 import '../models/notification_request_model.dart';
 import '../models/notification_send_result_model.dart';
@@ -28,6 +29,11 @@ abstract class NotificationsRemoteDataSource {
     int page = 1,
     int limit = 20,
     NotificationFilters? filters,
+  });
+
+  Future<ScheduledNotificationEntity> scheduleNotification({
+    required NotificationRequestEntity request,
+    required ScheduledNotificationTarget target,
   });
 }
 
@@ -106,7 +112,53 @@ class NotificationsRemoteDataSourceImpl
       },
     );
     final data = response.data as Map<String, dynamic>? ?? {};
-    print("Notifications data >>>>>$data");
     return NotificationFeedResponse.fromJson(data);
+  }
+
+  @override
+  Future<ScheduledNotificationEntity> scheduleNotification({
+    required NotificationRequestEntity request,
+    required ScheduledNotificationTarget target,
+  }) async {
+    final model = NotificationRequestModel(request);
+    final targetValue = switch (target) {
+      ScheduledNotificationTarget.single => 'single',
+      ScheduledNotificationTarget.bulk => 'bulk',
+      ScheduledNotificationTarget.broadcastAll => 'broadcast',
+      ScheduledNotificationTarget.broadcastAdmins => 'broadcast_admins',
+    };
+
+    final body = model.toJsonSchedule(
+      target: targetValue,
+      userId: request.userId,
+      userIds: request.userIds,
+    );
+
+    final response = await _dio.post(
+      '/notifications/admin/schedule',
+      data: body,
+    );
+    final data = response.data as Map<String, dynamic>? ?? {};
+    final nested = data['data'];
+    final json = nested is Map<String, dynamic> ? nested : data;
+
+    return ScheduledNotificationEntity(
+      id: json['id']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      scheduledAt: DateTime.tryParse(json['scheduledAt']?.toString() ?? '') ??
+          request.scheduledAt ??
+          DateTime.now(),
+      timezoneName:
+          json['timezone']?.toString() ?? request.timezoneName ?? 'UTC',
+      title: request.title,
+      body: request.body,
+      type: request.type,
+      sendPush: request.sendPush,
+      target: target,
+      userId: request.userId,
+      userIds: request.userIds,
+      data: request.data,
+      createdAt: DateTime.now(),
+    );
   }
 }

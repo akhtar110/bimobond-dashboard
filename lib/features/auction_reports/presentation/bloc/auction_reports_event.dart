@@ -13,6 +13,8 @@ class GoToAuctionReportsPageEvent extends AuctionReportsEvent {
   final int page;
 }
 
+class LoadMoreAuctionReportsEvent extends AuctionReportsEvent {}
+
 class UpdateAuctionReportsSearchEvent extends AuctionReportsEvent {
   UpdateAuctionReportsSearchEvent(this.query);
   final String query;

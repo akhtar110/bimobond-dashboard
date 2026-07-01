@@ -147,6 +147,8 @@ class _UserActivityCommentsTabState extends State<UserActivityCommentsTab> {
                         commentText: c.content,
                         activityDate: c.createdAt,
                         postOwnerName: owner,
+                        commentUserId: c.user?.id ?? c.userId,
+                        commentUsername: c.user?.username,
                       ),
                     );
                   },
@@ -179,6 +181,7 @@ class _CommentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final dateStr = DateFormat('MMM d, yyyy · HH:mm').format(comment.createdAt);
     final post = comment.post;
 
@@ -197,7 +200,7 @@ class _CommentCard extends StatelessWidget {
                   comment.content,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     height: 1.4,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
+                    color: scheme.onSurface,
                   ),
                 ),
               ),
@@ -217,19 +220,19 @@ class _CommentCard extends StatelessWidget {
           Row(
             children: [
               Icon(Icons.favorite_border,
-                  size: 14, color: Colors.grey.shade500),
+                  size: 14, color: scheme.onSurfaceVariant),
               const SizedBox(width: 4),
-              Text('${comment.likeCount}', style: _meta(isDark)),
+              Text('${comment.likeCount}', style: _meta(scheme)),
               const SizedBox(width: 12),
               Icon(Icons.reply_outlined,
-                  size: 14, color: Colors.grey.shade500),
+                  size: 14, color: scheme.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 context.tr('repliesCount', {'count': '${comment.replyCount}'}),
-                style: _meta(isDark),
+                style: _meta(scheme),
               ),
               const Spacer(),
-              Text(dateStr, style: _meta(isDark)),
+              Text(dateStr, style: _meta(scheme)),
             ],
           ),
 
@@ -237,7 +240,7 @@ class _CommentCard extends StatelessWidget {
           const SizedBox(height: 12),
           Divider(
             height: 1,
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+            color: scheme.outlineVariant,
           ),
           const SizedBox(height: 10),
 
@@ -263,7 +266,7 @@ class _CommentCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -272,9 +275,9 @@ class _CommentCard extends StatelessWidget {
     );
   }
 
-  TextStyle _meta(bool isDark) => TextStyle(
+  TextStyle _meta(ColorScheme scheme) => TextStyle(
         fontSize: 11,
-        color: isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF),
+        color: scheme.onSurfaceVariant,
       );
 }
 
@@ -293,13 +296,15 @@ class _ContextRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         Text(
           '$label ',
           style: TextStyle(
             fontSize: 11,
-            color: isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF),
+            color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),

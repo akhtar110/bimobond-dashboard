@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../post_management/data/mappers/managed_post_mapper.dart';
 import '../../../post_management/domain/entities/activity_context.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/user_activity_item_entity.dart';
@@ -81,6 +82,8 @@ class _UserActivityTabState extends State<UserActivityTab> {
     AppLocalizations l10n,
   ) {
     final type = item.type.toUpperCase();
+    final postOwnerName = postOwnerDisplayNameFromActivityItem(item);
+    final actor = activityActorFromActivityItem(item);
 
     if (type == 'COMMENT') {
       final commentId = _resolveCommentId(item);
@@ -89,9 +92,18 @@ class _UserActivityTabState extends State<UserActivityTab> {
           commentId: commentId,
           commentText: item.detailString('content') ?? '',
           activityDate: item.createdAt,
-          postOwnerName: item.detailString('postOwnerName'),
+          postOwnerName: postOwnerName,
+          commentUserId: actor?.id ?? item.detailString('userId'),
+          commentUsername: actor?.username ?? item.detailString('username'),
         );
       }
+    }
+
+    if (type == 'LIKE_POST') {
+      return ActivityContext.like(
+        likeId: item.id,
+        activityDate: item.createdAt,
+      );
     }
 
     if (type.contains('MENTION')) {
@@ -105,7 +117,7 @@ class _UserActivityTabState extends State<UserActivityTab> {
         mentionSource: isCommentMention
             ? l10n.t('mentionInComment')
             : l10n.t('mentionInPost'),
-        postOwnerName: item.detailString('postOwnerName'),
+        postOwnerName: postOwnerName,
         commentId: commentId,
         commentText: item.detailString('content') ??
             item.detailString('commentContent'),
@@ -140,6 +152,10 @@ class _UserActivityTabState extends State<UserActivityTab> {
       openPostInvestigation(
         context,
         postId: postId,
+        post: managedPostFromActivityItem(
+          item,
+          profileUser: widget.sourceUser,
+        ),
         sourceUser: widget.sourceUser,
         activityContext: _activityContextForItem(item, context.l10n),
       );
@@ -244,6 +260,7 @@ class _TimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final (icon, color, title, body) = _resolvePresentation(context, item);
 
     return IntrinsicHeight(
@@ -269,9 +286,7 @@ class _TimelineItem extends StatelessWidget {
                     child: Container(
                       width: 2,
                       margin: const EdgeInsets.symmetric(vertical: 4),
-                      color: isDark
-                          ? Colors.grey.shade800
-                          : Colors.grey.shade200,
+                      color: scheme.outlineVariant,
                     ),
                   ),
               ],
@@ -302,9 +317,7 @@ class _TimelineItem extends StatelessWidget {
                                   title,
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF111827),
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -313,9 +326,7 @@ class _TimelineItem extends StatelessWidget {
                                     .format(item.createdAt),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: isDark
-                                      ? Colors.grey.shade500
-                                      : const Color(0xFF9CA3AF),
+                                  color: scheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -326,9 +337,7 @@ class _TimelineItem extends StatelessWidget {
                               body,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 height: 1.35,
-                                color: isDark
-                                    ? Colors.grey.shade300
-                                    : const Color(0xFF374151),
+                                color: scheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -355,10 +364,7 @@ class _TimelineItem extends StatelessWidget {
                                 ),
                               )
                             : Material(
-                                color: (isDark
-                                        ? const Color(0xFF1E293B)
-                                        : Colors.white)
-                                    .withValues(alpha: 0.92),
+                                color: scheme.surface.withValues(alpha: 0.92),
                                 borderRadius: BorderRadius.circular(8),
                                 child: IconButton(
                                   tooltip: context.l10n.t('delete'),
@@ -405,7 +411,7 @@ class _TimelineItem extends StatelessWidget {
       case 'COMMENT':
         return (
           Icons.chat_bubble_outline,
-          const Color(0xFF2563EB),
+          theme.colorScheme.secondary,
           l10n.t('activityComment'),
           item.detailString('content') ??
               item.detailString('postDescription') ??
@@ -414,7 +420,7 @@ class _TimelineItem extends StatelessWidget {
       case 'LIKE_POST':
         return (
           Icons.favorite_border,
-          const Color(0xFFDC2626),
+          theme.colorScheme.error,
           l10n.t('activityLikePost'),
           item.detailString('postDescription') ?? '',
         );
@@ -426,19 +432,19 @@ class _TimelineItem extends StatelessWidget {
             : description;
         return (
           Icons.repeat_rounded,
-          const Color(0xFF059669),
+          theme.colorScheme.tertiary,
           l10n.tOr('activityRepost', 'Reposted a post'),
           body,
         );
       case 'SEND_GIFT':
         final giftName = item.detailString('giftName') ?? l10n.t('gift');
         final receiver = item.detailString('receiverUsername') ?? '';
-        final price = item.detailDouble('priceUsd');
+        final price = item.detailDouble('priceCoins');
         final priceLabel =
             price != null ? ' · \$${price.toStringAsFixed(2)}' : '';
         return (
           Icons.card_giftcard,
-          const Color(0xFF9333EA),
+          theme.colorScheme.tertiary,
           l10n.t('activitySendGift'),
           '$giftName → @$receiver$priceLabel',
         );

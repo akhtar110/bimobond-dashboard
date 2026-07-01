@@ -22,6 +22,7 @@ class CategoryReportsLoaded extends CategoryReportsState {
     this.mainCategoryOptions = const [],
     this.isOverviewLoading = false,
     this.isListFetching = false,
+    this.isListLoadingMore = false,
     this.overviewError,
     this.listError,
   });
@@ -40,8 +41,11 @@ class CategoryReportsLoaded extends CategoryReportsState {
   final List<CategoryReportFilterOption> mainCategoryOptions;
   final bool isOverviewLoading;
   final bool isListFetching;
+  final bool isListLoadingMore;
   final String? overviewError;
   final String? listError;
+
+  bool get hasReachedMax => currentPage >= lastPage;
 
   CategoryReportsLoaded copyWith({
     CategoryReportOverviewEntity? overview,
@@ -61,6 +65,7 @@ class CategoryReportsLoaded extends CategoryReportsState {
     List<CategoryReportFilterOption>? mainCategoryOptions,
     bool? isOverviewLoading,
     bool? isListFetching,
+    bool? isListLoadingMore,
     String? overviewError,
     String? listError,
     bool clearOverviewError = false,
@@ -85,6 +90,7 @@ class CategoryReportsLoaded extends CategoryReportsState {
       mainCategoryOptions: mainCategoryOptions ?? this.mainCategoryOptions,
       isOverviewLoading: isOverviewLoading ?? this.isOverviewLoading,
       isListFetching: isListFetching ?? this.isListFetching,
+      isListLoadingMore: isListLoadingMore ?? this.isListLoadingMore,
       overviewError:
           clearOverviewError ? null : (overviewError ?? this.overviewError),
       listError: clearListError ? null : (listError ?? this.listError),

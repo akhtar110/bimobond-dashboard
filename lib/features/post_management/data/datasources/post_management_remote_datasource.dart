@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 
-import '../../domain/entities/comment_entity.dart';
-import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/entities/comment_entity.dart';import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/entities/post_engagement_user_item.dart';
 import '../models/comment_model.dart';
 import '../models/managed_post_model.dart';
+import '../models/post_engagement_user_model.dart';
 
 abstract class PostManagementRemoteDataSource {
   Future<ManagedPostModel> getManagedPostById(String postId);
@@ -30,6 +31,14 @@ abstract class PostManagementRemoteDataSource {
   });
 
   Future<void> deleteCommentAsAdmin(String commentId);
+
+  Future<PostEngagementUsersPageEntity> getPostEngagementUsers(
+    String postId, {
+    required PostEngagementKind kind,
+    required int page,
+    required int limit,
+    String? postAuthorId,
+  });
 }
 
 class PostManagementRemoteDataSourceImpl
@@ -40,8 +49,22 @@ class PostManagementRemoteDataSourceImpl
 
   @override
   Future<ManagedPostModel> getManagedPostById(String postId) async {
-    final response = await _dio.get('/posts/admin/$postId');
-    return _parsePostResponse(response.data);
+    DioException? lastError;
+    const paths = ['/posts/admin/', '/posts/'];
+
+    for (final prefix in paths) {
+      try {
+        final response = await _dio.get('$prefix$postId');
+        return _parsePostResponse(response.data);
+      } on DioException catch (e) {
+        lastError = e;
+        final code = e.response?.statusCode;
+        if (code == 404 || code == 405) continue;
+        rethrow;
+      }
+    }
+
+    throw lastError ?? Exception('Post not found: $postId');
   }
 
   @override
@@ -104,17 +127,193 @@ class PostManagementRemoteDataSourceImpl
     required int page,
     required int limit,
   }) async {
-    final response = await _dio.get(
-      '/posts/$postId/comments',
-      queryParameters: {'page': page, 'limit': limit},
-    );
-    final data = response.data as Map<String, dynamic>;
-    return PostCommentsPageModel.fromJson(data, limit: limit);
+    DioException? lastError;
+    const paths = ['/posts/admin/', '/posts/'];
+
+    for (final prefix in paths) {
+      try {
+        final response = await _dio.get(
+          '$prefix$postId/comments',
+          queryParameters: {'page': page, 'limit': limit},
+        );
+        return PostCommentsPageModel.fromJson(
+          _asMap(response.data),
+          limit: limit,
+        );
+      } on DioException catch (e) {
+        lastError = e;
+        final code = e.response?.statusCode;
+        if (code == 404 || code == 405) continue;
+        rethrow;
+      }
+    }
+
+    throw lastError ?? Exception('Failed to load comments for post $postId');
   }
 
   @override
   Future<void> deleteCommentAsAdmin(String commentId) async {
     await _dio.delete('/posts/comments/$commentId');
+  }
+
+  @override
+  Future<PostEngagementUsersPageEntity> getPostEngagementUsers(
+    String postId, {
+    required PostEngagementKind kind,
+    required int page,
+    required int limit,
+    String? postAuthorId,
+  }) async {
+    if (kind == PostEngagementKind.mentions) {
+      try {
+        final pageResult = await _fetchPostEngagementPage(
+          postId: postId,
+          segment: 'mentions',
+          page: page,
+          limit: limit,
+          parser: (data) => PostEngagementUsersPageModel.fromMentionsJson(
+            data,
+            limit: limit,
+          ),
+        );
+        if (pageResult.items.isNotEmpty) return pageResult;
+      } catch (_) {
+        // Per-post mentions endpoint may not exist — fall back below.
+      }
+
+      if (postAuthorId != null && postAuthorId.isNotEmpty) {
+        return _fetchUserMentionsForPost(
+          userId: postAuthorId,
+          postId: postId,
+          page: page,
+          limit: limit,
+        );
+      }
+
+      return const PostEngagementUsersPageModel(
+        items: [],
+        page: 1,
+        hasMore: false,
+      );
+    }
+
+    final segment = switch (kind) {
+      PostEngagementKind.likes => 'likes',
+      PostEngagementKind.views => 'views',
+      PostEngagementKind.mentions => 'mentions',
+    };
+
+    return _fetchPostEngagementPage(
+      postId: postId,
+      segment: segment,
+      page: page,
+      limit: limit,
+      parser: (data) => switch (kind) {
+        PostEngagementKind.likes => PostEngagementUsersPageModel.fromLikesJson(
+            data,
+            limit: limit,
+          ),
+        PostEngagementKind.views => PostEngagementUsersPageModel.fromViewsJson(
+            data,
+            limit: limit,
+          ),
+        PostEngagementKind.mentions =>
+          PostEngagementUsersPageModel.fromMentionsJson(
+            data,
+            limit: limit,
+          ),
+      },
+    );
+  }
+
+  Future<PostEngagementUsersPageModel> _fetchPostEngagementPage({
+    required String postId,
+    required String segment,
+    required int page,
+    required int limit,
+    required PostEngagementUsersPageModel Function(Map<String, dynamic> data)
+        parser,
+  }) async {
+    final response = await _fetchEngagementSegment(
+      postId: postId,
+      segment: segment,
+      page: page,
+      limit: limit,
+    );
+    return parser(_asMap(response.data));
+  }
+
+  Future<PostEngagementUsersPageModel> _fetchUserMentionsForPost({
+    required String userId,
+    required String postId,
+    required int page,
+    required int limit,
+  }) async {
+    final response = await _dio.get(
+      '/users/$userId/mentions',
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+        'type': 'all',
+      },
+    );
+    final data = _asMap(response.data);
+    final rawMentions = data['mentions'];
+    if (rawMentions is List) {
+      final filtered = rawMentions.where((entry) {
+        if (entry is! Map) return false;
+        final map = Map<String, dynamic>.from(entry);
+        if (map['postId']?.toString() == postId) return true;
+        final post = map['post'];
+        if (post is Map && post['id']?.toString() == postId) return true;
+        final comment = map['comment'];
+        if (comment is Map) {
+          final nestedPost = comment['post'];
+          if (nestedPost is Map && nestedPost['id']?.toString() == postId) {
+            return true;
+          }
+        }
+        return false;
+      }).toList();
+      data['mentions'] = filtered;
+    }
+
+    return PostEngagementUsersPageModel.fromMentionsJson(data, limit: limit);
+  }
+
+  Future<Response<dynamic>> _fetchEngagementSegment({
+    required String postId,
+    required String segment,
+    required int page,
+    required int limit,
+  }) async {
+    final query = {'page': page, 'limit': limit};
+    final paths = [
+      '/posts/admin/$postId/$segment',
+      '/posts/$postId/$segment',
+    ];
+
+    DioException? lastError;
+    for (final path in paths) {
+      try {
+        return await _dio.get(path, queryParameters: query);
+      } on DioException catch (e) {
+        lastError = e;
+        final code = e.response?.statusCode;
+        if (code == 404 || code == 405) continue;
+        rethrow;
+      }
+    }
+    throw lastError ?? Exception('Failed to load $segment for post $postId');
+  }
+
+  Map<String, dynamic> _asMap(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data is List) {
+      return {'data': data};
+    }
+    throw Exception('Invalid engagement response format');
   }
 
   ManagedPostModel _parsePostResponse(dynamic data) {
@@ -129,3 +328,4 @@ class PostManagementRemoteDataSourceImpl
     throw Exception('Invalid post response format');
   }
 }
+

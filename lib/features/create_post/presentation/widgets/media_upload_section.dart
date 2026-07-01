@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
@@ -11,6 +13,7 @@ class MediaUploadSection extends StatelessWidget {
     super.key,
     required this.form,
     required this.status,
+    required this.isGeneratingThumbnail,
     required this.onFilesPicked,
     required this.onRemove,
     required this.onReorder,
@@ -18,6 +21,7 @@ class MediaUploadSection extends StatelessWidget {
 
   final CreatePostEntity form;
   final CreatePostStatus status;
+  final bool isGeneratingThumbnail;
   final void Function(List<LocalMediaFile> files) onFilesPicked;
   final void Function(String id) onRemove;
   final void Function(int oldIndex, int newIndex) onReorder;
@@ -68,6 +72,26 @@ class MediaUploadSection extends StatelessWidget {
             color: isDark ? Colors.grey.shade500 : const Color(0xFF6B7280),
           ),
         ),
+        if (isGeneratingThumbnail) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l10n.tOr('generatingThumbnail', 'Generating thumbnail…'),
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
+          ),
+        ],
         if (status == CreatePostStatus.mediaUploaded || allUploaded) ...[
           const SizedBox(height: 8),
           Row(
@@ -109,12 +133,20 @@ class MediaUploadSection extends StatelessWidget {
             itemCount: files.length,
             itemBuilder: (context, index) {
               final file = files[index];
+              final firstVideoId = form.hasVideoMedia
+                  ? form.localMedia
+                      .firstWhere((item) => item.mediaType == 'VIDEO')
+                      .id
+                  : null;
               return _MediaListTile(
                 key: ValueKey(file.id),
                 file: file,
                 index: index,
                 total: files.length,
                 isDark: isDark,
+                videoThumbnailBytes: file.id == firstVideoId
+                    ? form.thumbnailBytes
+                    : null,
                 onRemove: () => onRemove(file.id),
                 onMoveUp: index > 0
                     ? () => onReorder(index, index - 1)
@@ -139,6 +171,7 @@ class _MediaListTile extends StatelessWidget {
     required this.total,
     required this.isDark,
     required this.onRemove,
+    this.videoThumbnailBytes,
     this.onMoveUp,
     this.onMoveDown,
   });
@@ -147,6 +180,7 @@ class _MediaListTile extends StatelessWidget {
   final int index;
   final int total;
   final bool isDark;
+  final Uint8List? videoThumbnailBytes;
   final VoidCallback onRemove;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
@@ -183,7 +217,13 @@ class _MediaListTile extends StatelessWidget {
                 height: 56,
                 child: isImage
                     ? Image.memory(file.bytes, fit: BoxFit.cover)
-                    : ColoredBox(
+                    : videoThumbnailBytes != null &&
+                            videoThumbnailBytes!.isNotEmpty
+                        ? Image.memory(
+                            videoThumbnailBytes!,
+                            fit: BoxFit.cover,
+                          )
+                        : ColoredBox(
                         color: isDark
                             ? const Color(0xFF1E293B)
                             : const Color(0xFFF1F5F9),

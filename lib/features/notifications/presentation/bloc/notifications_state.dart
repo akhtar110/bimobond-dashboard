@@ -1,6 +1,6 @@
 part of 'notifications_bloc.dart';
 
-enum NotificationsSendStatus { idle, sending, sent, error }
+enum NotificationsSendStatus { idle, sending, sent, scheduled, error }
 
 class NotificationsState {
   const NotificationsState({
@@ -21,6 +21,10 @@ class NotificationsState {
     this.notificationsHasReachedMax = false,
     this.notificationsError,
     this.filters = const NotificationFilters(),
+    // ── Scheduling ───────────────────────────────────────
+    this.isScheduled = false,
+    this.scheduledDateTime,
+    this.scheduledNotifications = const [],
   });
 
   final NotificationsSendStatus status;
@@ -44,9 +48,37 @@ class NotificationsState {
   final String? notificationsError;
   final NotificationFilters filters;
 
+  // Scheduling
+  final bool isScheduled;
+  final DateTime? scheduledDateTime;
+  final List<ScheduledNotificationEntity> scheduledNotifications;
+
   bool get isSending => status == NotificationsSendStatus.sending;
   bool get hasSent => status == NotificationsSendStatus.sent;
+  bool get hasScheduled => status == NotificationsSendStatus.scheduled;
   bool get hasError => status == NotificationsSendStatus.error;
+
+  List<ScheduledNotificationEntity> get pendingScheduledNotifications =>
+      scheduledNotifications
+          .where((item) => item.status == ScheduledNotificationStatus.pending)
+          .toList(growable: false);
+
+  int get pendingScheduledCount => pendingScheduledNotifications.length;
+
+  DateTime? get nextScheduledAt {
+    final pending = pendingScheduledNotifications;
+    if (pending.isEmpty) return null;
+    final sorted = [...pending]
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    return sorted.first.scheduledAt;
+  }
+
+  bool get isScheduleValid {
+    if (!isScheduled) return true;
+    final scheduledAt = scheduledDateTime;
+    if (scheduledAt == null) return false;
+    return scheduledAt.isAfter(DateTime.now());
+  }
 
   NotificationsState copyWith({
     NotificationsSendStatus? status,
@@ -69,6 +101,11 @@ class NotificationsState {
     String? notificationsError,
     bool clearNotificationsError = false,
     NotificationFilters? filters,
+    // Scheduling
+    bool? isScheduled,
+    DateTime? scheduledDateTime,
+    bool clearScheduledDateTime = false,
+    List<ScheduledNotificationEntity>? scheduledNotifications,
   }) {
     return NotificationsState(
       status: status ?? this.status,
@@ -92,6 +129,12 @@ class NotificationsState {
           ? null
           : (notificationsError ?? this.notificationsError),
       filters: filters ?? this.filters,
+      isScheduled: isScheduled ?? this.isScheduled,
+      scheduledDateTime: clearScheduledDateTime
+          ? null
+          : (scheduledDateTime ?? this.scheduledDateTime),
+      scheduledNotifications:
+          scheduledNotifications ?? this.scheduledNotifications,
     );
   }
 }

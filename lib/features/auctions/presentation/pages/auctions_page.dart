@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../bloc/auctions_bloc.dart';
 import '../services/auction_image_lookup.dart';
+import '../utils/auctions_responsive.dart';
 import '../widgets/auction_card.dart';
 
 /// Responsive column count for admin catalog grids.
@@ -19,52 +22,78 @@ int adminGridColumnCount(double width) {
   return 1;
 }
 
-class AuctionsPage extends StatefulWidget {
+class AuctionsPage extends StatelessWidget {
   const AuctionsPage({super.key});
 
   @override
-  State<AuctionsPage> createState() => _AuctionsPageState();
+  Widget build(BuildContext context) {
+    if (kDebugMode) debugPrint('AuctionsPage rebuilt');
+    return PersistentBlocProvider<AuctionsBloc>(
+      debugLabel: 'AuctionsPage',
+      create: () =>
+          sl<AuctionsBloc>()..add(LoadAllAuctionsEvent(refresh: true)),
+      child: const _AuctionsPageView(),
+    );
+  }
 }
 
-class _AuctionsPageState extends State<AuctionsPage> {
-  @override
-  void initState() {
-    super.initState();
-    context.read<AuctionsBloc>().add(LoadAllAuctionsEvent(refresh: true));
-  }
+class _AuctionsPageView extends StatefulWidget {
+  const _AuctionsPageView();
 
+  @override
+  State<_AuctionsPageView> createState() => _AuctionsPageViewState();
+}
+
+class _AuctionsPageViewState extends State<_AuctionsPageView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: scheme.surfaceContainerLowest,
-      body: BlocConsumer<AuctionsBloc, AuctionsState>(
-        listener: (context, state) {},
-        builder: (context, state) {
-          return CustomScrollView(
-            slivers: [
-              _SliverHeader(theme: theme, state: state),
-              if (state is AuctionsLoaded) ...[
-                _SliverFilters(
-                  key: const ValueKey('auctions_filter_bar'),
-                  loaded: state,
-                  theme: theme,
-                ),
-                _SliverGrid(loaded: state),
-                if (state.lastPage > 1)
-                  _SliverPagination(loaded: state),
-              ] else if (state is AuctionsLoading) ...[
-                const _SliverSkeletons(),
-              ] else if (state is AuctionsError) ...[
-                _SliverError(message: state.message),
-              ],
-              const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
-            ],
-          );
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final metrics = AuctionsLayoutMetrics(
+          getAuctionsDeviceType(constraints.maxWidth),
+        );
+
+        return Scaffold(
+          backgroundColor: scheme.surfaceContainerLowest,
+          body: BlocConsumer<AuctionsBloc, AuctionsState>(
+            listener: (context, state) {},
+            builder: (context, state) {
+              return CustomScrollView(
+                slivers: [
+                  _SliverHeader(
+                    theme: theme,
+                    state: state,
+                    metrics: metrics,
+                  ),
+                  if (state is AuctionsLoaded) ...[
+                    _SliverFilters(
+                      key: const ValueKey('auctions_filter_bar'),
+                      loaded: state,
+                      theme: theme,
+                      metrics: metrics,
+                    ),
+                    _SliverGrid(loaded: state, metrics: metrics),
+                    if (state.lastPage > 1)
+                      _SliverPagination(loaded: state, metrics: metrics),
+                  ] else if (state is AuctionsLoading) ...[
+                    _SliverSkeletons(metrics: metrics),
+                  ] else if (state is AuctionsError) ...[
+                    _SliverError(message: state.message),
+                  ],
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      bottom: metrics.isMobile ? 16 : 24,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -75,10 +104,12 @@ class _SliverHeader extends StatelessWidget {
   const _SliverHeader({
     required this.theme,
     required this.state,
+    required this.metrics,
   });
 
   final ThemeData theme;
   final AuctionsState state;
+  final AuctionsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +124,12 @@ class _SliverHeader extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1680),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            padding: EdgeInsets.fromLTRB(
+              metrics.pageHorizontalPadding,
+              metrics.pageTopPadding,
+              metrics.pageHorizontalPadding,
+              0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -123,10 +159,10 @@ class _SliverHeader extends StatelessWidget {
                             ),
                           ),
                           if (loaded != null) ...[
-                            const SizedBox(height: 12),
+                            SizedBox(height: metrics.isMobile ? 8 : 12),
                             Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                              spacing: metrics.isMobile ? 6 : 8,
+                              runSpacing: metrics.isMobile ? 6 : 8,
                               alignment: WrapAlignment.start,
                               children: [
                                 _StatChip(
@@ -134,24 +170,28 @@ class _SliverHeader extends StatelessWidget {
                                   value: loaded.total.toString(),
                                   icon: Icons.gavel_rounded,
                                   color: scheme.primary,
+                                  compact: metrics.isMobile,
                                 ),
                                 _StatChip(
                                   label: l10n.t('active'),
                                   value: loaded.activeCount.toString(),
                                   icon: Icons.play_circle_rounded,
                                   color: scheme.primary,
+                                  compact: metrics.isMobile,
                                 ),
                                 _StatChip(
                                   label: l10n.t('completed'),
                                   value: loaded.completedCount.toString(),
                                   icon: Icons.check_circle_rounded,
                                   color: scheme.secondary,
+                                  compact: metrics.isMobile,
                                 ),
                                 _StatChip(
                                   label: l10n.t('cancelled'),
                                   value: loaded.cancelledCount.toString(),
                                   icon: Icons.cancel_rounded,
                                   color: scheme.error,
+                                  compact: metrics.isMobile,
                                 ),
                               ],
                             ),
@@ -193,7 +233,7 @@ class _SliverHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: metrics.sectionGap),
                 Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
               ],
             ),
@@ -210,42 +250,47 @@ class _StatChip extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
+    this.compact = false,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color color;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 4 : 6,
+      ),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(compact ? 10 : 12),
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: compact ? 12 : 14, color: color),
+          SizedBox(width: compact ? 4 : 6),
           Text(
             value,
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 13,
+              fontSize: compact ? 12 : 13,
               color: color,
             ),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: compact ? 3 : 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: compact ? 10 : 11,
               color: scheme.onSurfaceVariant,
             ),
           ),
@@ -258,10 +303,16 @@ class _StatChip extends StatelessWidget {
 // ─── Filter section ───────────────────────────────────────────────────────────
 
 class _SliverFilters extends StatefulWidget {
-  const _SliverFilters({super.key, required this.loaded, required this.theme});
+  const _SliverFilters({
+    super.key,
+    required this.loaded,
+    required this.theme,
+    required this.metrics,
+  });
 
   final AuctionsLoaded loaded;
   final ThemeData theme;
+  final AuctionsLayoutMetrics metrics;
 
   @override
   State<_SliverFilters> createState() => _SliverFiltersState();
@@ -332,48 +383,112 @@ class _SliverFiltersState extends State<_SliverFilters> {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1680),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: _searchCtrl,
-                  focusNode: _searchFocus,
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: l10n.tOr('searchAuctions', 'Search auctions…'),
-                    prefixIcon:
-                        const Icon(Icons.search_rounded, size: 18),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 16),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: scheme.outlineVariant),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: scheme.outlineVariant),
-                    ),
-                    filled: true,
-                    fillColor: scheme.surface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 32,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final metrics = widget.metrics;
+              final gap = metrics.toolbarFilterGap;
+              final controlHeight = metrics.filterControlHeight;
+              final veryNarrow = constraints.maxWidth < 520;
+              final useStackedFilters = metrics.isMobile || veryNarrow;
+
+              Widget statusChips() {
+                return SizedBox(
+                  height: controlHeight,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
                       for (var i = 0; i < filters.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 6),
+                        if (i > 0) SizedBox(width: gap),
+                        Builder(builder: (context) {
+                          final (status, label) = filters[i];
+                          final selected = loaded.statusFilter == status;
+                          return FilterChip(
+                            label: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: metrics.isMobile ? 11 : 12,
+                              ),
+                            ),
+                            selected: selected,
+                            showCheckmark: false,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: metrics.isMobile ? 2 : 4,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (v) => bloc.add(
+                              FilterAuctionsEvent(v ? status : null),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                metrics.isMobile ? 10 : 12,
+                              ),
+                            ),
+                            backgroundColor: scheme.surface,
+                            side: BorderSide(
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.outlineVariant,
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                );
+              }
+
+              final sortMenu = _AuctionFilterMenu<AuctionSortOption>(
+                label: l10n.t('sortBy'),
+                value: loaded.sortOption,
+                height: controlHeight,
+                items: AuctionSortOption.values,
+                itemLabel: (option) => switch (option) {
+                  AuctionSortOption.newestFirst =>
+                    l10n.tOr('auctionSortMostRecent', 'Most recent'),
+                  AuctionSortOption.oldestFirst =>
+                    l10n.tOr('auctionSortOldest', 'Oldest auctions'),
+                  AuctionSortOption.highestBid => l10n.t('sortHighestBid'),
+                  AuctionSortOption.lowestBid => l10n.t('sortLowestBid'),
+                  AuctionSortOption.mostViewed => l10n.t('sortMostViewed'),
+                  AuctionSortOption.endingSoon => l10n.t('sortEndingSoon'),
+                },
+                onSelected: (value) =>
+                    bloc.add(UpdateAuctionSortEvent(value)),
+              );
+
+              final dateMenu = _AuctionDateFilterMenu(
+                dateRange: loaded.dateRange,
+                height: controlHeight,
+                onSelected: (range) => bloc.add(
+                  UpdateAuctionDateRangeEvent(range),
+                ),
+              );
+
+              Widget filterToolbar() {
+                if (useStackedFilters) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      statusChips(),
+                      SizedBox(height: gap),
+                      Row(
+                        children: [
+                          Expanded(child: sortMenu),
+                          SizedBox(width: gap),
+                          Expanded(child: dateMenu),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return SizedBox(
+                  height: controlHeight,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (var i = 0; i < filters.length; i++) ...[
+                        if (i > 0) SizedBox(width: gap),
                         Builder(builder: (context) {
                           final (status, label) = filters[i];
                           final selected = loaded.statusFilter == status;
@@ -400,78 +515,103 @@ class _SliverFiltersState extends State<_SliverFilters> {
                           );
                         }),
                       ],
-                      const SizedBox(width: 8),
-                      _AuctionFilterMenu<AuctionSortOption>(
-                        label: l10n.t('sortBy'),
-                        value: loaded.sortOption,
-                        items: AuctionSortOption.values,
-                        itemLabel: (option) => switch (option) {
-                          AuctionSortOption.newestFirst =>
-                            l10n.t('sortNewestFirst'),
-                          AuctionSortOption.oldestFirst =>
-                            l10n.t('sortOldestFirst'),
-                          AuctionSortOption.highestBid =>
-                            l10n.t('sortHighestBid'),
-                          AuctionSortOption.lowestBid =>
-                            l10n.t('sortLowestBid'),
-                          AuctionSortOption.mostViewed =>
-                            l10n.t('sortMostViewed'),
-                          AuctionSortOption.endingSoon =>
-                            l10n.t('sortEndingSoon'),
-                        },
-                        onSelected: (value) =>
-                            bloc.add(UpdateAuctionSortEvent(value)),
-                      ),
-                      const SizedBox(width: 8),
-                      _AuctionFilterMenu<AuctionTypeFilter>(
-                        label: l10n.t('auctionType'),
-                        value: loaded.typeFilter,
-                        items: AuctionTypeFilter.values,
-                        itemLabel: (option) => switch (option) {
-                          AuctionTypeFilter.all => l10n.t('allTypes'),
-                          AuctionTypeFilter.fixed =>
-                            l10n.t('auctionTypeFixed'),
-                          AuctionTypeFilter.timed =>
-                            l10n.t('auctionTypeTimed'),
-                          AuctionTypeFilter.live =>
-                            l10n.t('auctionTypeLive'),
-                        },
-                        onSelected: (value) => bloc
-                            .add(UpdateAuctionTypeFilterEvent(value)),
-                      ),
-                      const SizedBox(width: 8),
-                      _AuctionDateFilterMenu(
-                        dateRange: loaded.dateRange,
-                        onSelected: (range) => bloc.add(
-                          UpdateAuctionDateRangeEvent(range),
-                        ),
-                      ),
+                      SizedBox(width: gap),
+                      sortMenu,
+                      SizedBox(width: gap),
+                      dateMenu,
                     ],
                   ),
+                );
+              }
+
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  metrics.pageHorizontalPadding,
+                  metrics.isMobile ? 4 : 8,
+                  metrics.pageHorizontalPadding,
+                  0,
                 ),
-                const SizedBox(height: 6),
-                if (loaded.isFetching)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: LinearProgressIndicator(
-                      minHeight: 2,
-                      color: scheme.primary,
-                      backgroundColor: scheme.surfaceContainerHighest,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _searchCtrl,
+                      focusNode: _searchFocus,
+                      onChanged: _onSearchChanged,
+                      style: TextStyle(
+                        fontSize: metrics.isMobile ? 13 : 14,
+                      ),
+                      decoration: InputDecoration(
+                        hintText:
+                            l10n.tOr('searchAuctions', 'Search auctions…'),
+                        hintStyle: TextStyle(
+                          fontSize: metrics.isMobile ? 13 : 14,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          size: metrics.isMobile ? 16 : 18,
+                        ),
+                        suffixIcon: _searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  size: metrics.isMobile ? 14 : 16,
+                                ),
+                                onPressed: _clearSearch,
+                              )
+                            : null,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: metrics.isMobile ? 10 : 12,
+                          vertical: metrics.isMobile ? 8 : 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            metrics.isMobile ? 8 : 10,
+                          ),
+                          borderSide:
+                              BorderSide(color: scheme.outlineVariant),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            metrics.isMobile ? 8 : 10,
+                          ),
+                          borderSide:
+                              BorderSide(color: scheme.outlineVariant),
+                        ),
+                        filled: true,
+                        fillColor: scheme.surface,
+                      ),
                     ),
-                  ),
-                Text(
-                  _resultsCountLabel(
-                    l10n,
-                    loaded.displayedCount,
-                    loaded.totalCount,
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant,
-                  ),
+                    SizedBox(height: metrics.filterGap),
+                    filterToolbar(),
+                    SizedBox(height: metrics.toolbarFilterGap),
+                    if (loaded.isFetching)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: metrics.toolbarFilterGap,
+                        ),
+                        child: LinearProgressIndicator(
+                          minHeight: 2,
+                          color: scheme.primary,
+                          backgroundColor: scheme.surfaceContainerHighest,
+                        ),
+                      ),
+                    Text(
+                      _resultsCountLabel(
+                        l10n,
+                        loaded.displayedCount,
+                        loaded.totalCount,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: metrics.isMobile ? 11 : 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -486,6 +626,7 @@ class _AuctionFilterMenu<T> extends StatelessWidget {
     required this.items,
     required this.itemLabel,
     required this.onSelected,
+    this.height = 32,
   });
 
   final String label;
@@ -493,6 +634,7 @@ class _AuctionFilterMenu<T> extends StatelessWidget {
   final List<T> items;
   final String Function(T) itemLabel;
   final ValueChanged<T> onSelected;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -511,8 +653,10 @@ class _AuctionFilterMenu<T> extends StatelessWidget {
           )
           .toList(),
       child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: height,
+        padding: EdgeInsets.symmetric(
+          horizontal: height <= 28 ? 8 : 10,
+        ),
         decoration: BoxDecoration(
           color: scheme.surface,
           borderRadius: BorderRadius.circular(12),
@@ -523,10 +667,12 @@ class _AuctionFilterMenu<T> extends StatelessWidget {
           children: [
             Text(
               itemLabel(value),
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: height <= 28 ? 11 : 12),
+              overflow: TextOverflow.ellipsis,
             ),
             Icon(Icons.arrow_drop_down_rounded,
-                size: 18, color: scheme.onSurfaceVariant),
+                size: height <= 28 ? 16 : 18,
+                color: scheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -538,10 +684,12 @@ class _AuctionDateFilterMenu extends StatelessWidget {
   const _AuctionDateFilterMenu({
     required this.dateRange,
     required this.onSelected,
+    this.height = 32,
   });
 
   final DateTimeRange? dateRange;
   final ValueChanged<DateTimeRange?> onSelected;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -591,8 +739,10 @@ class _AuctionDateFilterMenu extends StatelessWidget {
         PopupMenuItem(value: 'custom', child: Text(l10n.t('customRange'))),
       ],
       child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: height,
+        padding: EdgeInsets.symmetric(
+          horizontal: height <= 28 ? 8 : 10,
+        ),
         decoration: BoxDecoration(
           color: scheme.surface,
           borderRadius: BorderRadius.circular(12),
@@ -601,9 +751,14 @@ class _AuctionDateFilterMenu extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12)),
+            Text(
+              label,
+              style: TextStyle(fontSize: height <= 28 ? 11 : 12),
+              overflow: TextOverflow.ellipsis,
+            ),
             Icon(Icons.arrow_drop_down_rounded,
-                size: 18, color: scheme.onSurfaceVariant),
+                size: height <= 28 ? 16 : 18,
+                color: scheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -614,9 +769,13 @@ class _AuctionDateFilterMenu extends StatelessWidget {
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 class _SliverPagination extends StatelessWidget {
-  const _SliverPagination({required this.loaded});
+  const _SliverPagination({
+    required this.loaded,
+    required this.metrics,
+  });
 
   final AuctionsLoaded loaded;
+  final AuctionsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -628,7 +787,12 @@ class _SliverPagination extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1680),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            padding: EdgeInsets.fromLTRB(
+              metrics.pageHorizontalPadding,
+              metrics.sectionGap,
+              metrics.pageHorizontalPadding,
+              0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -725,8 +889,12 @@ class _AuctionCardWithImageState extends State<_AuctionCardWithImage> {
 // ─── Grid ─────────────────────────────────────────────────────────────────────
 
 class _SliverGrid extends StatelessWidget {
-  const _SliverGrid({required this.loaded});
+  const _SliverGrid({
+    required this.loaded,
+    required this.metrics,
+  });
   final AuctionsLoaded loaded;
+  final AuctionsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -744,10 +912,15 @@ class _SliverGrid extends StatelessWidget {
       builder: (context, constraints) {
         final columns = adminGridColumnCount(constraints.crossAxisExtent);
         final rowCount = (auctions.length / columns).ceil();
-        const gap = 12.0;
+        final gap = metrics.gridGap;
 
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          padding: EdgeInsets.fromLTRB(
+            metrics.pageHorizontalPadding,
+            metrics.gridTopPadding,
+            metrics.pageHorizontalPadding,
+            0,
+          ),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, rowIndex) {
@@ -838,18 +1011,25 @@ class _SliverGrid extends StatelessWidget {
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
 class _SliverSkeletons extends StatelessWidget {
-  const _SliverSkeletons();
+  const _SliverSkeletons({required this.metrics});
+
+  final AuctionsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final columns = adminGridColumnCount(constraints.crossAxisExtent);
-        const gap = 12.0;
+        final gap = metrics.gridGap;
         const rows = 2;
 
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          padding: EdgeInsets.fromLTRB(
+            metrics.pageHorizontalPadding,
+            metrics.gridTopPadding,
+            metrics.pageHorizontalPadding,
+            0,
+          ),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, rowIndex) {
@@ -860,7 +1040,7 @@ class _SliverSkeletons extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         for (var i = 0; i < columns; i++) ...[
-                          if (i > 0) const SizedBox(width: gap),
+                          if (i > 0) SizedBox(width: gap),
                           const Expanded(child: AuctionCardSkeleton()),
                         ],
                       ],

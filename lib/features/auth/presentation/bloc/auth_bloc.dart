@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/utils/admin_access.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -19,25 +20,41 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final user = await _repository.getSession();
-      if (user != null) {
-        emit(Authenticated(user));
-      } else {
+      if (user == null) {
         emit(Unauthenticated());
+        return;
       }
+
+      if (!isDashboardStaff(user)) {
+        await _repository.logout();
+        emit(Unauthenticated());
+        return;
+      }
+
+      emit(Authenticated(user));
     } catch (_) {
+      await _repository.logout();
       emit(Unauthenticated());
     }
   }
 
-  void _onUserChanged(
+  Future<void> _onUserChanged(
     AuthUserChanged event,
     Emitter<AuthState> emit,
-  ) {
-    if (event.user != null) {
-      emit(Authenticated(event.user!));
-    } else {
+  ) async {
+    final user = event.user;
+    if (user == null) {
       emit(Unauthenticated());
+      return;
     }
+
+    if (!isDashboardStaff(user)) {
+      await _repository.logout();
+      emit(Unauthenticated());
+      return;
+    }
+
+    emit(Authenticated(user));
   }
 
   Future<void> _onLogoutRequested(
@@ -45,7 +62,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
-    await _repository.clearSession();
+    await _repository.logout();
     emit(Unauthenticated());
   }
 }

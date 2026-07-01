@@ -11,7 +11,9 @@ import '../widgets/report_card.dart';
 import '../widgets/report_card_theme.dart';
 import '../utils/moderation_filter_labels.dart';
 import '../utils/reports_center_theme.dart';
+import '../utils/reports_responsive.dart';
 import '../widgets/report_status_chip.dart';
+import '../widgets/reports_pagination_bar.dart';
 
 class ModerationReportsTab extends StatefulWidget {
   const ModerationReportsTab({
@@ -46,10 +48,10 @@ class _ModerationReportsTabState extends State<ModerationReportsTab>
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 300) {
-      context.read<ReportsBloc>().add(LoadMoreReportsEvent());
-    }
+    if (!mounted) return;
+    if (!reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width)) return;
+    if (!reportsShouldLoadMore(_scrollController)) return;
+    context.read<ReportsBloc>().add(LoadMoreReportsEvent());
   }
 
   @override
@@ -177,6 +179,18 @@ class _ModerationTable extends StatelessWidget {
               ),
               if (state.hasReachedMax && state.reports.isNotEmpty)
                 _TableFooter(total: state.total),
+              if (reportsUseDesktopPagination(
+                MediaQuery.sizeOf(context).width,
+              ))
+                ReportsPaginationBar(
+                  page: state.currentPage,
+                  totalPages: state.lastPage,
+                  total: state.total,
+                  itemLabel: 'reports',
+                  onPage: (page) => context.read<ReportsBloc>().add(
+                        GoToReportsPageEvent(page),
+                      ),
+                ),
             ],
           ),
         );
@@ -826,22 +840,30 @@ class _ReportsCardList extends StatelessWidget {
         ),
         if (state.isLoadingMore)
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
+            child: ReportsLoadMoreFooter(isLoading: true),
+          ),
+        if (reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width) &&
+            state.hasReachedMax &&
+            state.reports.isNotEmpty)
+          SliverToBoxAdapter(
+            child: ReportsLoadMoreFooter(
+              hasReachedMax: true,
+              total: state.total,
             ),
           ),
-        if (state.hasReachedMax && state.reports.isNotEmpty)
-          SliverToBoxAdapter(child: _EndLabel(total: state.total)),
+        if (!reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width))
+          SliverToBoxAdapter(
+            child: ReportsPaginationBar(
+              page: state.currentPage,
+              totalPages: state.lastPage,
+              total: state.total,
+              itemLabel: 'reports',
+              showTopBorder: false,
+              onPage: (page) => context.read<ReportsBloc>().add(
+                    GoToReportsPageEvent(page),
+                  ),
+            ),
+          ),
         const SliverToBoxAdapter(child: SizedBox(height: 16)),
       ],
     );
@@ -1144,45 +1166,6 @@ class _ErrorView extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _EndLabel extends StatelessWidget {
-  const _EndLabel({required this.total});
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 32,
-            height: 1,
-            color: scheme.outlineVariant,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            l10n.tArgs('allReportsLoaded', {'total': '$total'}),
-            style: TextStyle(
-              fontSize: 12,
-              color: scheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 32,
-            height: 1,
-            color: scheme.outlineVariant,
-          ),
-        ],
       ),
     );
   }

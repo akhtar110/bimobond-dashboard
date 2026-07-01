@@ -20,10 +20,13 @@ class SettingsCubit extends Cubit<SettingsState> {
     : super(const SettingsState(themeMode: ThemeMode.dark, locale: Locale('en')));
 
   void switchTheme(bool isDark) {
-    emit(state.copyWith(themeMode: isDark ? ThemeMode.dark : ThemeMode.light));
+    final mode = isDark ? ThemeMode.dark : ThemeMode.light;
+    if (state.themeMode == mode) return;
+    emit(state.copyWith(themeMode: mode));
   }
 
   void switchLanguage(Locale locale) {
+    if (state.locale.languageCode == locale.languageCode) return;
     emit(state.copyWith(locale: locale));
   }
 }

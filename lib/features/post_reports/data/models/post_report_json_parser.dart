@@ -227,8 +227,8 @@ abstract final class PostReportJsonParser {
   static PostReportGiftTransaction parseGiftTransaction(Map<String, dynamic> m) {
     return PostReportGiftTransaction(
       id: asString(m['id']) ?? '',
-      priceUsd: asDouble(m['priceUsd']),
-      contributionUsd: asDouble(m['contributionUsd']),
+      priceCoins: asDouble(m['priceCoins']),
+      contributionCoins: asDouble(m['contributionCoins']),
       createdAt: _parseDate(m['createdAt']) ?? DateTime.now(),
       sender: parseAdminUser(m['sender']),
       receiver: parseAdminUser(m['receiver']),

@@ -1,28 +1,33 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/user_entity.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/login_with_google_usecase.dart';
+import '../../domain/usecases/logout_usecase.dart';
+import '../../domain/usecases/save_session_usecase.dart';
+import '../../domain/utils/admin_access.dart';
 import 'login_event.dart';
 import 'login_state.dart';
 
 class LoginBloc extends Bloc<LoginEvent, LoginState> {
   final LoginUseCase loginUseCase;
   final LoginWithGoogleUseCase loginWithGoogleUseCase;
+  final SaveSessionUseCase saveSessionUseCase;
+  final LogoutUseCase logoutUseCase;
 
-  LoginBloc(
-      this.loginUseCase,
-      this.loginWithGoogleUseCase,
-      ) : super(LoginInitial()) {
+  LoginBloc({
+    required this.loginUseCase,
+    required this.loginWithGoogleUseCase,
+    required this.saveSessionUseCase,
+    required this.logoutUseCase,
+  }) : super(LoginInitial()) {
     on<LoginSubmitted>(_onEmailLogin);
     on<LoginWithGooglePressed>(_onGoogleLogin);
   }
 
-  /// =========================
-  /// EMAIL LOGIN
-  /// =========================
   Future<void> _onEmailLogin(
-      LoginSubmitted event,
-      Emitter<LoginState> emit,
-      ) async {
+    LoginSubmitted event,
+    Emitter<LoginState> emit,
+  ) async {
     emit(LoginLoading());
 
     try {
@@ -31,33 +36,40 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
         password: event.password,
       );
 
-      emit(LoginSuccess(user));
+      await _completeLogin(user, emit);
     } catch (e) {
       emit(LoginFailure(_formatError(e)));
     }
   }
 
-  /// =========================
-  /// GOOGLE LOGIN
-  /// =========================
   Future<void> _onGoogleLogin(
-      LoginWithGooglePressed event,
-      Emitter<LoginState> emit,
-      ) async {
+    LoginWithGooglePressed event,
+    Emitter<LoginState> emit,
+  ) async {
     emit(LoginLoading());
 
     try {
       final user = await loginWithGoogleUseCase();
-
-      emit(LoginSuccess(user));
+      await _completeLogin(user, emit);
     } catch (e) {
       emit(LoginFailure(_formatError(e)));
     }
   }
 
-  /// =========================
-  /// CLEAN ERROR HANDLING
-  /// =========================
+  Future<void> _completeLogin(
+    DashboardUserEntity user,
+    Emitter<LoginState> emit,
+  ) async {
+    if (!isDashboardAdmin(user)) {
+      await logoutUseCase();
+      emit(LoginAccessDenied());
+      return;
+    }
+
+    await saveSessionUseCase(user);
+    emit(LoginSuccess(user));
+  }
+
   String _formatError(Object e) {
     return e.toString().replaceFirst('Exception: ', '');
   }

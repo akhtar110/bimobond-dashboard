@@ -5,13 +5,29 @@ import '../../../../core/localization/localization.dart';
 import '../bloc/settings_cubit.dart';
 import 'settings_section.dart';
 
-class ThemeSelectorCard extends StatelessWidget {
+class ThemeSelectorCard extends StatefulWidget {
   const ThemeSelectorCard({super.key});
+
+  @override
+  State<ThemeSelectorCard> createState() => _ThemeSelectorCardState();
+}
+
+class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
+  bool? _optimisticDark;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = context.watch<SettingsCubit>().state.themeMode == ThemeMode.dark;
+    final isDark = context.select<SettingsCubit, bool>(
+      (cubit) => cubit.state.themeMode == ThemeMode.dark,
+    );
+
+    if (_optimisticDark != null && _optimisticDark == isDark) {
+      _optimisticDark = null;
+    }
+
+    final effectiveDark = _optimisticDark ?? isDark;
+    final cubit = context.read<SettingsCubit>();
 
     return SettingsSection(
       title: l10n.t('appearance'),
@@ -29,8 +45,13 @@ class ThemeSelectorCard extends StatelessWidget {
                 Color(0xFFE2E8F0),
                 Color(0xFFCBD5E1),
               ],
-              selected: !isDark,
-              onTap: () => context.read<SettingsCubit>().switchTheme(false),
+              selected: !effectiveDark,
+              onTap: () {
+                if (effectiveDark) {
+                  setState(() => _optimisticDark = false);
+                  cubit.switchTheme(false);
+                }
+              },
             );
 
             final darkOption = _ThemeOption(
@@ -41,8 +62,13 @@ class ThemeSelectorCard extends StatelessWidget {
                 Color(0xFF1E293B),
                 Color(0xFF334155),
               ],
-              selected: isDark,
-              onTap: () => context.read<SettingsCubit>().switchTheme(true),
+              selected: effectiveDark,
+              onTap: () {
+                if (!effectiveDark) {
+                  setState(() => _optimisticDark = true);
+                  cubit.switchTheme(true);
+                }
+              },
             );
 
             if (useRow) {
@@ -95,6 +121,7 @@ class _ThemeOptionState extends State<_ThemeOption> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final selected = widget.selected;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -103,11 +130,10 @@ class _ThemeOptionState extends State<_ThemeOption> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
+          duration: Duration.zero,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: widget.selected
+            color: selected
                 ? primary.withValues(alpha: 0.08)
                 : (_hovered
                     ? theme.colorScheme.surfaceContainerHighest
@@ -115,12 +141,12 @@ class _ThemeOptionState extends State<_ThemeOption> {
                     : Colors.transparent),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: widget.selected
+              color: selected
                   ? primary.withValues(alpha: 0.55)
                   : theme.colorScheme.outline.withValues(
                       alpha: _hovered ? 0.35 : 0.2,
                     ),
-              width: widget.selected ? 1.5 : 1,
+              width: selected ? 1.5 : 1,
             ),
           ),
           child: Column(
@@ -144,7 +170,7 @@ class _ThemeOptionState extends State<_ThemeOption> {
                   Icon(
                     widget.icon,
                     size: 18,
-                    color: widget.selected ? primary : theme.iconTheme.color,
+                    color: selected ? primary : theme.iconTheme.color,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -152,12 +178,12 @@ class _ThemeOptionState extends State<_ThemeOption> {
                       widget.label,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight:
-                            widget.selected ? FontWeight.w700 : FontWeight.w500,
-                        color: widget.selected ? primary : null,
+                            selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? primary : null,
                       ),
                     ),
                   ),
-                  if (widget.selected)
+                  if (selected)
                     Icon(Icons.check_circle_rounded, size: 18, color: primary),
                 ],
               ),

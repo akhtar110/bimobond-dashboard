@@ -132,9 +132,7 @@ class _UserActivityNotificationsTabState
                       l10n.t('userNotifications'),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: widget.isDark
-                            ? Colors.white
-                            : const Color(0xFF0F172A),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     Row(
@@ -190,9 +188,7 @@ class _UserActivityNotificationsTabState
                     child: Text(
                       l10n.t('allNotificationsLoaded'),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: widget.isDark
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade600,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),

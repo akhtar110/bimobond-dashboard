@@ -8,6 +8,12 @@ class LoadReportsEvent extends ReportsEvent {}
 /// Append next page to the existing list.
 class LoadMoreReportsEvent extends ReportsEvent {}
 
+/// Jump to a specific page and replace the list (desktop pagination).
+class GoToReportsPageEvent extends ReportsEvent {
+  GoToReportsPageEvent(this.page);
+  final int page;
+}
+
 /// Switch status/type filter and reload from page 1.
 class FilterReportsEvent extends ReportsEvent {
   FilterReportsEvent({this.status, this.type});

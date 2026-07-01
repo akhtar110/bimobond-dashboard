@@ -27,7 +27,7 @@ class SelectablePostCard extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        PostCard(post: post, onTap: onTap),
+        PostCard(key: ValueKey('post_card_${post.id}'), post: post, onTap: onTap),
         PositionedDirectional(
           top: 8,
           start: 8,

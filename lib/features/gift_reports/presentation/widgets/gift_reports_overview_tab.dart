@@ -117,9 +117,9 @@ class GiftReportsOverviewTab extends StatelessWidget {
                     width: width,
                     child: AnalyticsKpiCard(
                       title: 'Period spend',
-                      value: formatReportUsd(overview.periodSpendUsd),
+                      value: formatReportCoins(overview.periodSpendCoins),
                       subtitle:
-                          'Commission ${formatReportUsd(overview.periodCommissionUsd)}',
+                          'Commission ${formatReportCoins(overview.periodCommissionCoins)}',
                       icon: Icons.payments_outlined,
                       accent: scheme.tertiary,
                     ),
@@ -128,9 +128,9 @@ class GiftReportsOverviewTab extends StatelessWidget {
                     width: width,
                     child: AnalyticsKpiCard(
                       title: 'All-time spend',
-                      value: formatReportUsd(overview.allTimeSpendUsd),
+                      value: formatReportCoins(overview.allTimeSpendCoins),
                       subtitle:
-                          'Contribution ${formatReportUsd(overview.allTimeContributionUsd)}',
+                          'Contribution ${formatReportCoins(overview.allTimeContributionCoins)}',
                       icon: Icons.account_balance_wallet_outlined,
                     ),
                   ),
@@ -240,13 +240,13 @@ class _TopGiftsList extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    item.name,
+                    item.displayName,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
                 Text(formatReportCount(item.transactions)),
                 const SizedBox(width: 12),
-                Text(formatReportUsd(item.spendUsd)),
+                Text(formatReportCoins(item.spendCoins)),
               ],
             ),
           ),

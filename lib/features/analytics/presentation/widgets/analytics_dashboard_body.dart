@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/entities/analytics_entities.dart';
 import '../bloc/analytics_bloc.dart';
+import '../utils/analytics_date_series_filler.dart';
 import '../utils/analytics_format.dart';
+import '../../../../core/utils/coin_format.dart';
+import '../utils/analytics_l10n.dart';
 import 'analytics_charts.dart';
 import 'analytics_dashboard_header.dart';
 import 'analytics_grid.dart';
 import 'analytics_kpi_card.dart';
 import 'analytics_loading_skeleton.dart';
+import 'period_engagement_card.dart';
+import 'post_totals_card.dart';
+import 'posts_analytics_charts_section.dart';
+import 'stories_analytics_card.dart';
 
 double _analyticsGridWidth(BoxConstraints constraints, BuildContext context) {
   final maxW = constraints.maxWidth.isFinite
@@ -98,6 +106,27 @@ class _DashboardSections extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!state.isAdminDashboard) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AnalyticsDashboardHeader(
+            isRefreshing: isRefreshing || state.isRefreshing,
+          ),
+          const SizedBox(height: 24),
+          AnalyticsSectionCard(
+            title: context.l10n.t('analyticsCreatorTitle'),
+            child: Text(
+              context.l10n.t('analyticsCreatorBody'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -121,6 +150,72 @@ class _DashboardSections extends StatelessWidget {
             AnalyticsGridItem(
               desktopSpan: 6,
               tabletSpan: 6,
+              child: _DailyNewPostsSection(state: state),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        AnalyticsGrid(
+          width: width,
+          children: [
+            AnalyticsGridItem(
+              desktopSpan: 12,
+              tabletSpan: 6,
+              child: PostsAnalyticsChartsSection(state: state),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        AnalyticsGrid(
+          width: width,
+          children: [
+            if (state.posts != null)
+              AnalyticsGridItem(
+                desktopSpan: 6,
+                tabletSpan: 6,
+                child: PostTotalsCard(posts: state.posts!),
+              ),
+            if (state.posts != null)
+              AnalyticsGridItem(
+                desktopSpan: 6,
+                tabletSpan: 6,
+                child: StoriesAnalyticsCard(posts: state.posts!),
+              ),
+          ],
+        ),
+        if (state.posts != null) ...[
+          const SizedBox(height: 16),
+          AnalyticsGrid(
+            width: width,
+            children: [
+              AnalyticsGridItem(
+                desktopSpan: 12,
+                tabletSpan: 6,
+                child: PeriodEngagementCard(
+                  engagement: state.posts!.periodEngagement,
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        AnalyticsGrid(
+          width: width,
+          children: [
+            AnalyticsGridItem(
+              desktopSpan: 4,
+              tabletSpan: 6,
+              child: _EngagementSection(state: state),
+            ),
+            if (state.showMonetization)
+              AnalyticsGridItem(
+                desktopSpan: 4,
+                tabletSpan: 6,
+                child: _MonetizationSection(state: state),
+              ),
+            AnalyticsGridItem(
+              desktopSpan: 4,
+              tabletSpan: 6,
               child: _UserGrowthSection(state: state),
             ),
           ],
@@ -130,46 +225,19 @@ class _DashboardSections extends StatelessWidget {
           width: width,
           children: [
             AnalyticsGridItem(
-              desktopSpan: 6,
-              tabletSpan: 6,
-              child: _EngagementSection(state: state),
-            ),
-            AnalyticsGridItem(
-              desktopSpan: 6,
-              tabletSpan: 6,
-              child: _MonetizationSection(state: state),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        AnalyticsGrid(
-          width: width,
-          children: [
-            AnalyticsGridItem(
-              desktopSpan: 6,
+              desktopSpan: 4,
               tabletSpan: 6,
               child: _ReportsSection(state: state),
             ),
             AnalyticsGridItem(
-              desktopSpan: 6,
+              desktopSpan: 4,
               tabletSpan: 6,
               child: _AuctionsSection(state: state),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        AnalyticsGrid(
-          width: width,
-          children: [
             AnalyticsGridItem(
-              desktopSpan: 6,
+              desktopSpan: 4,
               tabletSpan: 6,
               child: _UsersSection(state: state),
-            ),
-            AnalyticsGridItem(
-              desktopSpan: 6,
-              tabletSpan: 6,
-              child: _PostsSection(state: state),
             ),
           ],
         ),
@@ -183,11 +251,15 @@ class _DashboardSections extends StatelessWidget {
   List<AnalyticsGridItem> _kpiRow(AnalyticsLoaded state, BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+    String count(num n) => AnalyticsFormat.count(n, locale: locale);
+    String usd(num n) => AnalyticsFormat.usd(n, locale: locale);
+    String coins(num n) => CoinFormat.coins(n, locale: locale);
     final o = state.overview;
     final m = state.monetization;
     final e = state.engagement;
 
-    return [
+    final kpis = <AnalyticsGridItem>[
       AnalyticsGridItem(
         desktopSpan: 3,
         tabletSpan: 3,
@@ -195,10 +267,9 @@ class _DashboardSections extends StatelessWidget {
           title: l10n.t('users'),
           icon: Icons.people_alt_rounded,
           accent: scheme.primary,
-          value: AnalyticsFormat.count(o?.usersTotal ?? state.users?.total ?? 0),
+          value: count(o?.usersTotal ?? state.users?.total ?? 0),
           subtitle: l10n.tArgs('analyticsInPeriod', {
-            'count': AnalyticsFormat.count(
-                o?.usersNewInPeriod ?? state.users?.newInPeriod ?? 0),
+            'count': count(o?.usersNewInPeriod ?? state.users?.newInPeriod ?? 0),
           }),
         ),
       ),
@@ -209,10 +280,9 @@ class _DashboardSections extends StatelessWidget {
           title: l10n.t('posts'),
           icon: Icons.article_rounded,
           accent: scheme.secondary,
-          value: AnalyticsFormat.count(o?.postsTotal ?? state.posts?.total ?? 0),
+          value: count(o?.postsTotal ?? state.posts?.total ?? 0),
           subtitle: l10n.tArgs('analyticsInPeriod', {
-            'count': AnalyticsFormat.count(
-                o?.postsNewInPeriod ?? state.posts?.inPeriod ?? 0),
+            'count': count(o?.postsNewInPeriod ?? state.posts?.inPeriod ?? 0),
           }),
         ),
       ),
@@ -223,31 +293,50 @@ class _DashboardSections extends StatelessWidget {
           title: l10n.t('analyticsEngagementSection'),
           icon: Icons.favorite_rounded,
           accent: scheme.tertiary,
-          value: AnalyticsFormat.count(o?.totalViews ?? e?.views ?? 0),
+          value: count(
+            state.posts?.periodEngagement.views ??
+                o?.totalViews ??
+                e?.views ??
+                0,
+          ),
           subtitle: l10n.tArgs('analyticsLikesComments', {
-            'likes': AnalyticsFormat.count(o?.totalLikes ?? e?.likes ?? 0),
-            'comments':
-                AnalyticsFormat.count(o?.totalComments ?? e?.comments ?? 0),
-          }),
-        ),
-      ),
-      AnalyticsGridItem(
-        desktopSpan: 3,
-        tabletSpan: 3,
-        child: AnalyticsKpiCard(
-          title: l10n.t('analyticsMonetizationSection'),
-          icon: Icons.payments_rounded,
-          accent: scheme.primary,
-          value: AnalyticsFormat.usd(
-              m?.totalWalletBalanceUsd ?? o?.walletBalances ?? 0),
-          subtitle: l10n.tArgs('analyticsGiftRevenueSubtitle', {
-            'giftRevenue': AnalyticsFormat.usd(m?.giftGrossUsd ?? 0),
-            'giftCount': AnalyticsFormat.count(
-                m?.giftTransactionCount ?? o?.giftsInPeriod ?? 0),
+            'likes': count(
+              state.posts?.periodEngagement.likes ??
+                  o?.totalLikes ??
+                  e?.likes ??
+                  0,
+            ),
+            'comments': count(
+              state.posts?.periodEngagement.comments ??
+                  o?.totalComments ??
+                  e?.comments ??
+                  0,
+            ),
           }),
         ),
       ),
     ];
+
+    if (state.showMonetization) {
+      kpis.add(
+        AnalyticsGridItem(
+          desktopSpan: 3,
+          tabletSpan: 3,
+          child: AnalyticsKpiCard(
+            title: l10n.t('analyticsMonetizationSection'),
+            icon: Icons.payments_rounded,
+            accent: scheme.primary,
+            value: coins(m?.totalBalanceCoins ?? o?.walletBalances ?? 0),
+            subtitle: l10n.tArgs('analyticsGiftRevenueSubtitle', {
+              'giftRevenue': coins(m?.giftGrossCoins ?? 0),
+              'giftCount': count(m?.giftTransactionCount ?? o?.giftsInPeriod ?? 0),
+            }),
+          ),
+        ),
+      );
+    }
+
+    return kpis;
   }
 }
 
@@ -293,9 +382,18 @@ class _GrowthSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final growthSeries = growth == null
+        ? null
+        : chartPointsForPeriod(
+            source: growth.newUsers,
+            period: growth.period,
+            query: state.query,
+          );
     return AnalyticsSectionCard(
       title: l10n.t('analyticsPlatformGrowth'),
-      subtitle: l10n.t('analyticsPlatformGrowthSubtitle'),
+      subtitle: growthSeries?.weekly == true
+          ? l10n.t('analyticsPlatformGrowthSubtitleWeekly')
+          : l10n.t('analyticsPlatformGrowthSubtitle'),
       error: state.errorFor('growth'),
       onRetry: () => bloc.add(const LoadGrowthAnalyticsEvent()),
       child: growth == null
@@ -304,21 +402,34 @@ class _GrowthSection extends StatelessWidget {
               child: Center(child: CircularProgressIndicator()),
             )
           : AnalyticsMultiLineChart(
+              weeklyLabels: growthSeries?.weekly ?? false,
               series: [
                 AnalyticsLineSeries(
                   label: l10n.t('analyticsNewUsers'),
                   color: scheme.primary,
-                  points: fillDailyGaps(growth.newUsers),
+                  points: _chartPoints(
+                    growth.newUsers,
+                    growth.period,
+                    state.query,
+                  ),
                 ),
                 AnalyticsLineSeries(
                   label: l10n.t('analyticsNewPosts'),
                   color: scheme.secondary,
-                  points: fillDailyGaps(growth.newPosts),
+                  points: _chartPoints(
+                    growth.newPosts,
+                    growth.period,
+                    state.query,
+                  ),
                 ),
                 AnalyticsLineSeries(
                   label: l10n.t('analyticsGiftTransactions'),
                   color: scheme.tertiary,
-                  points: fillDailyGaps(growth.giftTransactions),
+                  points: _chartPoints(
+                    growth.giftTransactions,
+                    growth.period,
+                    state.query,
+                  ),
                 ),
               ],
             ),
@@ -337,9 +448,18 @@ class _UserGrowthSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final userSeries = users == null
+        ? null
+        : chartPointsForPeriod(
+            source: users.dailyNewUsers,
+            period: users.period,
+            query: state.query,
+          );
     return AnalyticsSectionCard(
       title: l10n.t('analyticsUserGrowth'),
-      subtitle: l10n.t('analyticsUserGrowthSubtitle'),
+      subtitle: userSeries?.weekly == true
+          ? l10n.t('analyticsUserGrowthSubtitleWeekly')
+          : l10n.t('analyticsUserGrowthSubtitle'),
       error: state.errorFor('users'),
       onRetry: () => bloc.add(const LoadUsersAnalyticsEvent()),
       child: users == null
@@ -348,11 +468,16 @@ class _UserGrowthSection extends StatelessWidget {
               child: Center(child: CircularProgressIndicator()),
             )
           : AnalyticsMultiLineChart(
+              weeklyLabels: userSeries?.weekly ?? false,
               series: [
                 AnalyticsLineSeries(
                   label: l10n.t('analyticsNewUsers'),
                   color: scheme.primary,
-                  points: fillDailyGaps(users.dailyNewUsers),
+                  points: _chartPoints(
+                    users.dailyNewUsers,
+                    users.period,
+                    state.query,
+                  ),
                 ),
               ],
             ),
@@ -371,6 +496,8 @@ class _UsersSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+    String count(num n) => AnalyticsFormat.count(n, locale: locale);
     return AnalyticsSectionCard(
       title: l10n.t('analyticsUsersSection'),
       error: state.errorFor('users'),
@@ -386,17 +513,17 @@ class _UsersSection extends StatelessWidget {
                   children: [
                     AnalyticsMiniStat(
                       label: l10n.t('totalUsers'),
-                      value: AnalyticsFormat.count(users.total),
+                      value: count(users.total),
                       icon: Icons.groups_rounded,
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('verified'),
-                      value: AnalyticsFormat.count(users.verified),
+                      value: count(users.verified),
                       icon: Icons.verified_rounded,
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('banned'),
-                      value: AnalyticsFormat.count(users.banned),
+                      value: count(users.banned),
                       icon: Icons.block_rounded,
                     ),
                   ],
@@ -406,7 +533,7 @@ class _UsersSection extends StatelessWidget {
                   entries: [
                     for (final e in users.roleCounts.entries)
                       AnalyticsPieEntry(
-                        label: e.key,
+                        label: AnalyticsL10n.roleLabel(context, e.key),
                         value: e.value.toDouble(),
                         color: _roleColor(scheme, e.key),
                       ),
@@ -425,8 +552,8 @@ class _UsersSection extends StatelessWidget {
       };
 }
 
-class _PostsSection extends StatelessWidget {
-  const _PostsSection({required this.state});
+class _DailyNewPostsSection extends StatelessWidget {
+  const _DailyNewPostsSection({required this.state});
   final AnalyticsLoaded state;
 
   @override
@@ -434,81 +561,59 @@ class _PostsSection extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final posts = state.posts;
     final bloc = context.read<AnalyticsBloc>();
-
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+
+    final series = posts == null
+        ? null
+        : chartPointsForPeriod(
+            source: posts.dailyNewPosts,
+            period: posts.period,
+            query: state.query,
+          );
+
     return AnalyticsSectionCard(
-      title: l10n.t('analyticsPostsSection'),
+      title: l10n.t('analyticsNewPostsOverTime'),
+      subtitle: series?.weekly == true
+          ? l10n.t('analyticsNewPostsOverTimeSubtitle')
+          : l10n.t('analyticsPlatformGrowthSubtitle'),
       error: state.errorFor('posts'),
       onRetry: () => bloc.add(const LoadPostsAnalyticsEvent()),
-      child: posts == null
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    AnalyticsMiniStat(
-                      label: l10n.t('analyticsStories'),
-                      value: AnalyticsFormat.count(posts.stories),
+      child: posts == null || series == null
+          ? const SizedBox(
+              height: 240,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : AnalyticsBarChart(
+              height: 240,
+              weeklyLabels: series.weekly,
+              entries: [
+                for (final point in series.points)
+                  AnalyticsBarEntry(
+                    label: AnalyticsFormat.chartBucketLabel(
+                      point.$1,
+                      weekly: series.weekly,
+                      locale: locale,
                     ),
-                    AnalyticsMiniStat(
-                      label: l10n.t('analyticsAds'),
-                      value: AnalyticsFormat.count(posts.ads),
-                    ),
-                    AnalyticsMiniStat(
-                      label: l10n.t('analyticsAuctionable'),
-                      value: AnalyticsFormat.count(posts.auctionable),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.t('analyticsPostTypes'),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                AnalyticsPieChart(
-                  donut: true,
-                  size: 160,
-                  entries: [
-                    for (var i = 0; i < posts.byType.length; i++)
-                      AnalyticsPieEntry(
-                        label: posts.byType.keys.elementAt(i),
-                        value: posts.byType.values.elementAt(i).toDouble(),
-                        color: AnalyticsChartColors.seriesPalette(scheme)[i %
-                            AnalyticsChartColors.seriesPalette(scheme).length],
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.t('analyticsPostStatus'),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                AnalyticsBarChart(
-                  height: 180,
-                  entries: [
-                    for (var i = 0; i < posts.byStatus.length; i++)
-                      AnalyticsBarEntry(
-                        label: posts.byStatus.keys.elementAt(i),
-                        value: posts.byStatus.values.elementAt(i).toDouble(),
-                        color: scheme.primary.withValues(
-                          alpha: 1 - (i * 0.15).clamp(0, 0.5),
-                        ),
-                      ),
-                  ],
-                ),
+                    value: point.$2,
+                    color: scheme.secondary,
+                  ),
               ],
             ),
     );
   }
+}
+
+List<(DateTime date, double value)> _chartPoints(
+  List<DailyCount> source,
+  AnalyticsPeriod period,
+  AnalyticsQuery query,
+) {
+  return chartPointsForPeriod(
+    source: source,
+    period: period,
+    query: query,
+  ).points;
 }
 
 class _EngagementSection extends StatelessWidget {
@@ -522,11 +627,13 @@ class _EngagementSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+    String count(num n) => AnalyticsFormat.count(n, locale: locale);
     return AnalyticsSectionCard(
       title: l10n.t('analyticsEngagementSection'),
       subtitle: l10n.t('analyticsEngagementSubtitle'),
       error: state.errorFor('engagement'),
-      onRetry: () => bloc.add(const LoadOverviewEvent()),
+      onRetry: () => bloc.add(const LoadEngagementAnalyticsEvent()),
       child: engagement == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -538,27 +645,27 @@ class _EngagementSection extends StatelessWidget {
                   children: [
                     AnalyticsMiniStat(
                       label: l10n.t('views'),
-                      value: AnalyticsFormat.count(engagement.views),
+                      value: count(engagement.views),
                       icon: Icons.visibility_rounded,
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('likes'),
-                      value: AnalyticsFormat.count(engagement.likes),
+                      value: count(engagement.likes),
                       icon: Icons.favorite_rounded,
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('comments'),
-                      value: AnalyticsFormat.count(engagement.comments),
+                      value: count(engagement.comments),
                       icon: Icons.chat_bubble_outline_rounded,
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('saves'),
-                      value: AnalyticsFormat.count(engagement.saves),
+                      value: count(engagement.saves),
                       icon: Icons.bookmark_outline_rounded,
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsReposts'),
-                      value: AnalyticsFormat.count(engagement.reposts),
+                      value: count(engagement.reposts),
                       icon: Icons.repeat_rounded,
                     ),
                   ],
@@ -611,6 +718,10 @@ class _MonetizationSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+    String count(num n) => AnalyticsFormat.count(n, locale: locale);
+    String volume(num n) => CoinFormat.purchaseVolume(n, locale: locale);
+    String coins(num n) => CoinFormat.coins(n, locale: locale);
     return AnalyticsSectionCard(
       title: l10n.t('analyticsMonetizationSection'),
       error: state.errorFor('monetization'),
@@ -626,19 +737,19 @@ class _MonetizationSection extends StatelessWidget {
                   children: [
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsGiftRevenue'),
-                      value: AnalyticsFormat.usd(m.giftGrossUsd),
+                      value: coins(m.giftGrossCoins),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsFiatPurchases'),
-                      value: AnalyticsFormat.usd(m.fiatCompletedVolumeUsd),
+                      value: volume(m.completedPurchaseVolume),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsWalletBalance'),
-                      value: AnalyticsFormat.usd(m.totalWalletBalanceUsd),
+                      value: coins(m.totalBalanceCoins),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsPendingWithdrawals'),
-                      value: AnalyticsFormat.count(m.pendingWithdrawals),
+                      value: count(m.pendingWithdrawals),
                     ),
                   ],
                 ),
@@ -648,17 +759,17 @@ class _MonetizationSection extends StatelessWidget {
                   entries: [
                     AnalyticsPieEntry(
                       label: l10n.t('gifts'),
-                      value: m.giftGrossUsd,
+                      value: m.giftGrossCoins,
                       color: scheme.primary,
                     ),
                     AnalyticsPieEntry(
                       label: l10n.t('analyticsFiat'),
-                      value: m.fiatCompletedVolumeUsd,
+                      value: m.completedPurchaseVolume,
                       color: scheme.secondary,
                     ),
                     AnalyticsPieEntry(
                       label: l10n.t('analyticsWallet'),
-                      value: m.totalWalletBalanceUsd,
+                      value: m.totalBalanceCoins,
                       color: scheme.tertiary,
                     ),
                   ],
@@ -701,6 +812,8 @@ class _ReportsSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+    String count(num n) => AnalyticsFormat.count(n, locale: locale);
     return AnalyticsSectionCard(
       title: l10n.t('analyticsReportsOverview'),
       error: state.errorFor('reports'),
@@ -716,25 +829,19 @@ class _ReportsSection extends StatelessWidget {
                   children: [
                     AnalyticsMiniStat(
                       label: l10n.t('total'),
-                      value: AnalyticsFormat.count(reports.total),
+                      value: count(reports.total),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsPending'),
-                      value: AnalyticsFormat.count(
-                        reports.byStatus['PENDING'] ?? 0,
-                      ),
+                      value: count(reports.byStatus['PENDING'] ?? 0),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsResolved'),
-                      value: AnalyticsFormat.count(
-                        reports.byStatus['RESOLVED'] ?? 0,
-                      ),
+                      value: count(reports.byStatus['RESOLVED'] ?? 0),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsDismissed'),
-                      value: AnalyticsFormat.count(
-                        reports.byStatus['DISMISSED'] ?? 0,
-                      ),
+                      value: count(reports.byStatus['DISMISSED'] ?? 0),
                     ),
                   ],
                 ),
@@ -776,6 +883,9 @@ class _AuctionsSection extends StatelessWidget {
     final bloc = context.read<AnalyticsBloc>();
 
     final l10n = context.l10n;
+    final locale = AnalyticsFormat.localeOf(context);
+    String count(num n) => AnalyticsFormat.count(n, locale: locale);
+    String coins(num n) => CoinFormat.coins(n, locale: locale);
     return AnalyticsSectionCard(
       title: l10n.t('analyticsAuctionsOverview'),
       error: state.errorFor('auctions'),
@@ -791,25 +901,19 @@ class _AuctionsSection extends StatelessWidget {
                   children: [
                     AnalyticsMiniStat(
                       label: l10n.t('total'),
-                      value: AnalyticsFormat.count(auctions.total),
+                      value: count(auctions.total),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('active'),
-                      value: AnalyticsFormat.count(
-                        auctions.byStatus['ACTIVE'] ?? 0,
-                      ),
+                      value: count(auctions.byStatus['ACTIVE'] ?? 0),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('completed'),
-                      value: AnalyticsFormat.count(
-                        auctions.byStatus['COMPLETED'] ?? 0,
-                      ),
+                      value: count(auctions.byStatus['COMPLETED'] ?? 0),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('cancelled'),
-                      value: AnalyticsFormat.count(
-                        auctions.byStatus['CANCELLED'] ?? 0,
-                      ),
+                      value: count(auctions.byStatus['CANCELLED'] ?? 0),
                     ),
                   ],
                 ),
@@ -820,15 +924,15 @@ class _AuctionsSection extends StatelessWidget {
                   children: [
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsTargetVolume'),
-                      value: AnalyticsFormat.usd(auctions.targetVolume),
+                      value: coins(auctions.targetVolume),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsRaisedVolume'),
-                      value: AnalyticsFormat.usd(auctions.raisedVolume),
+                      value: coins(auctions.raisedVolume),
                     ),
                     AnalyticsMiniStat(
                       label: l10n.t('analyticsAvgRaised'),
-                      value: AnalyticsFormat.usd(auctions.avgRaised),
+                      value: coins(auctions.avgRaised),
                     ),
                   ],
                 ),
@@ -938,7 +1042,10 @@ class _CategoryBar extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          AnalyticsFormat.count(count),
+          AnalyticsFormat.count(
+            count,
+            locale: AnalyticsFormat.localeOf(context),
+          ),
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,

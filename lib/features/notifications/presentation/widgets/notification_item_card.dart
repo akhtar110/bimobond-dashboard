@@ -39,16 +39,12 @@ class NotificationItemCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: n.isRead
-                ? (isDark ? const Color(0xFF1A2233) : Colors.white)
-                : (isDark
-                    ? scheme.primaryContainer.withValues(alpha: 0.18)
-                    : scheme.primaryContainer.withValues(alpha: 0.12)),
+                ? scheme.surface
+                : scheme.primaryContainer.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: n.isRead
-                  ? (isDark
-                      ? Colors.grey.shade800
-                      : Colors.grey.shade200)
+                  ? scheme.outlineVariant
                   : scheme.primary.withValues(alpha: 0.25),
             ),
           ),
@@ -75,9 +71,7 @@ class NotificationItemCard extends StatelessWidget {
                         color: typeColor.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark
-                              ? const Color(0xFF1A2233)
-                              : Colors.white,
+                          color: scheme.surface,
                           width: 1.5,
                         ),
                       ),
@@ -129,9 +123,7 @@ class NotificationItemCard extends StatelessWidget {
                     RichText(
                       text: TextSpan(
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? Colors.grey.shade300
-                              : Colors.grey.shade800,
+                          color: scheme.onSurface,
                           height: 1.4,
                         ),
                         children: [
@@ -190,20 +182,20 @@ class NotificationItemCard extends StatelessWidget {
   Color _typeColor(String type, ColorScheme scheme) {
     switch (type.toUpperCase()) {
       case 'POST_LIKE':
-        return Colors.red;
+        return scheme.error;
       case 'COMMENT':
       case 'COMMENT_LIKE':
-        return Colors.blue;
+        return scheme.primary;
       case 'FOLLOW':
-        return Colors.green;
+        return scheme.tertiary;
       case 'MENTION':
-        return Colors.orange;
+        return scheme.secondary;
       case 'REPOST':
-        return Colors.teal;
+        return scheme.tertiary;
       case 'ADMIN_MESSAGE':
         return scheme.primary;
       case 'BROADCAST':
-        return Colors.deepOrange;
+        return scheme.error;
       default:
         return scheme.secondary;
     }

@@ -17,3 +17,5 @@ class LoginFailure extends LoginState {
 
   LoginFailure(this.message);
 }
+
+class LoginAccessDenied extends LoginState {}

@@ -7,7 +7,7 @@ class GiftModel extends GiftEntity {
     required super.name,
     required super.thumbnailUrl,
     super.animationUrl,
-    required super.priceUsd,
+    required super.priceCoins,
     required super.isActive,
     super.publishedAt,
   });
@@ -19,7 +19,7 @@ class GiftModel extends GiftEntity {
       thumbnailUrl:
           resolveMediaUrl(json['thumbnailUrl']?.toString()) ?? '',
       animationUrl: resolveMediaUrl(json['animationUrl'] as String?),
-      priceUsd: _d(json['priceUsd']),
+      priceCoins: _d(json['priceCoins'] ?? json['priceUsd']),
       isActive: json['isActive'] as bool? ?? true,
       publishedAt: _parseDate(
         json['publishedAt'] ?? json['published_at'] ?? json['createdAt'],
@@ -33,7 +33,7 @@ class GiftModel extends GiftEntity {
       'name': name,
       'thumbnailUrl': thumbnailUrl,
       if (animationUrl != null) 'animationUrl': animationUrl,
-      'priceUsd': priceUsd,
+      'priceCoins': priceCoins,
       'isActive': isActive,
       if (publishedAt != null) 'publishedAt': publishedAt!.toUtc().toIso8601String(),
     };

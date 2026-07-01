@@ -1,24 +1,54 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
+import 'post_list_thumbnail.dart';
 import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 import '../bloc/posts_bloc.dart';
 
-const double kPostsTableHeaderHeight = 40;
+const double kPostsTableHeaderHeight = 36;
+const double kPostsTableRowHeight = 56;
 const double _kCellHPad = 8;
-const double _kRowVPad = 8;
 
-enum PostsTableDensity { wide, medium, narrow }
+String postDisplayTitle(ManagedPostEntity post) {
+  final description = post.description?.trim();
+  if (description != null && description.isNotEmpty) return description;
+  return post.userName ?? post.userId;
+}
+
+String postDisplayAuthor(ManagedPostEntity post) =>
+    post.userFullName?.trim().isNotEmpty == true
+        ? post.userFullName!
+        : (post.userName ?? post.userId);
+
+enum PostsTableDensity { wide, medium, narrow, compact }
 
 PostsTableDensity postsTableDensityForWidth(double width) {
   if (width >= 1180) return PostsTableDensity.wide;
-  if (width >= 860) return PostsTableDensity.medium;
-  return PostsTableDensity.narrow;
+  if (width >= 900) return PostsTableDensity.medium;
+  if (width >= 700) return PostsTableDensity.narrow;
+  return PostsTableDensity.compact;
 }
+
+double _postsTableCheckboxWidth(PostsTableDensity density) =>
+    density == PostsTableDensity.compact ? 28.0 : 34.0;
+
+double _postsTableThumbWidth(PostsTableDensity density) => switch (density) {
+      PostsTableDensity.compact => 32.0,
+      PostsTableDensity.narrow => 42.0,
+      _ => 50.0,
+    };
+
+double _postsTableCellHPad(PostsTableDensity density) => switch (density) {
+      PostsTableDensity.compact => 4.0,
+      PostsTableDensity.narrow => 6.0,
+      _ => _kCellHPad,
+    };
+
+double _postsTableRowHPad(PostsTableDensity density) =>
+    density == PostsTableDensity.compact ? 6.0 : 10.0;
 
 class PostsTableHeader extends StatelessWidget {
   const PostsTableHeader({
@@ -47,7 +77,7 @@ class PostsTableHeader extends StatelessWidget {
     return Container(
       height: kPostsTableHeaderHeight,
       color: scheme.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: EdgeInsets.symmetric(horizontal: _postsTableRowHPad(density)),
       child: _PostsTableRowLayout(
         density: density,
         checkbox: Checkbox(
@@ -68,18 +98,38 @@ class PostsTableHeader extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        title: Text(l10n.t('postTitle'), style: style),
+        title: Text(
+          l10n.t('postTitle'),
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         author: density == PostsTableDensity.narrow
             ? const SizedBox.shrink()
-            : Text(l10n.t('postAuthor'), style: style),
-        status: Text(l10n.t('postStatus'), style: style),
+            : Text(
+                l10n.t('postAuthor'),
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+        status: Text(
+          l10n.t('postStatus'),
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         visibility: density == PostsTableDensity.wide
             ? Text(l10n.t('visibility'), style: style)
             : const SizedBox.shrink(),
         engagement: density != PostsTableDensity.narrow
             ? Text(l10n.t('engagement'), style: style)
             : const SizedBox.shrink(),
-        created: Text(l10n.t('createdAt'), style: style),
+        created: Text(
+          l10n.t('createdAt'),
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }
@@ -93,6 +143,7 @@ class PostsTableRow extends StatefulWidget {
     required this.onSelectionChanged,
     required this.onTap,
     required this.density,
+    this.striped = false,
   });
 
   final ManagedPostEntity post;
@@ -100,6 +151,7 @@ class PostsTableRow extends StatefulWidget {
   final ValueChanged<bool?> onSelectionChanged;
   final VoidCallback onTap;
   final PostsTableDensity density;
+  final bool striped;
 
   @override
   State<PostsTableRow> createState() => _PostsTableRowState();
@@ -107,17 +159,6 @@ class PostsTableRow extends StatefulWidget {
 
 class _PostsTableRowState extends State<PostsTableRow> {
   bool _hovered = false;
-
-  String get _title {
-    final description = widget.post.description?.trim();
-    if (description != null && description.isNotEmpty) return description;
-    return widget.post.userName ?? widget.post.userId;
-  }
-
-  String get _author =>
-      widget.post.userFullName?.trim().isNotEmpty == true
-          ? widget.post.userFullName!
-          : (widget.post.userName ?? widget.post.userId);
 
   @override
   Widget build(BuildContext context) {
@@ -132,49 +173,58 @@ class _PostsTableRowState extends State<PostsTableRow> {
           height: 1.25,
         );
 
-    final bg = widget.isSelected
-        ? scheme.primaryContainer.withValues(alpha: 0.18)
-        : _hovered
-            ? scheme.surfaceContainerHighest
-            : scheme.surface;
+    Color rowColor;
+    if (widget.isSelected) {
+      rowColor = scheme.primaryContainer.withValues(alpha: 0.18);
+    } else if (_hovered) {
+      rowColor = scheme.surfaceContainerHighest;
+    } else if (widget.striped) {
+      rowColor = scheme.surfaceContainerHighest.withValues(alpha: 0.35);
+    } else {
+      rowColor = scheme.surface;
+    }
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: Material(
-        color: bg,
+        color: rowColor,
         child: InkWell(
           onTap: widget.onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: _kRowVPad),
-            child: _PostsTableRowLayout(
-              density: widget.density,
-              checkbox: Checkbox(
-                value: widget.isSelected,
-                onChanged: widget.onSelectionChanged,
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          child: SizedBox(
+            height: kPostsTableRowHeight,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: _postsTableRowHPad(widget.density),
               ),
-              thumbnail: _Thumb(
-                post: post,
-                small: widget.density == PostsTableDensity.narrow,
-              ),
-              title: Text(
-                _title,
-                maxLines: widget.density == PostsTableDensity.narrow ? 1 : 2,
-                overflow: TextOverflow.ellipsis,
-                style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
-              ),
+              child: _PostsTableRowLayout(
+                density: widget.density,
+                checkbox: Checkbox(
+                  value: widget.isSelected,
+                  onChanged: widget.onSelectionChanged,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                thumbnail: _Thumb(
+                  post: post,
+                  small: widget.density == PostsTableDensity.narrow,
+                ),
+                title: Text(
+                  postDisplayTitle(post),
+                  maxLines: widget.density == PostsTableDensity.narrow ? 1 : 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
+                ),
               author: widget.density == PostsTableDensity.narrow
                   ? const SizedBox.shrink()
                   : Text(
-                      _author,
+                      postDisplayAuthor(post),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: cellStyle,
                     ),
-              status: _StatusChip(status: post.status),
+              status: PostsStatusChip(status: post.status),
               visibility: widget.density == PostsTableDensity.wide
                   ? Text(
                       privacyLabel(l10n, post.privacyStatus),
@@ -190,13 +240,14 @@ class _PostsTableRowState extends State<PostsTableRow> {
                     )
                   : const SizedBox.shrink(),
               created: Text(
-                created,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: cellStyle?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: 11,
-                ),
+                      created,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: cellStyle?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
               ),
             ),
           ),
@@ -234,40 +285,45 @@ class _PostsTableRowLayout extends StatelessWidget {
     final showAuthor = density != PostsTableDensity.narrow;
     final showVisibility = density == PostsTableDensity.wide;
     final showEngagement = density != PostsTableDensity.narrow;
-    final thumbWidth = density == PostsTableDensity.narrow ? 42.0 : 50.0;
+    final showCreated = true;
+    final checkboxWidth = _postsTableCheckboxWidth(density);
+    final thumbWidth = _postsTableThumbWidth(density);
+    final cellHPad = _postsTableCellHPad(density);
 
     // Flex weights redistribute space after removing the category column.
     final titleFlex = switch (density) {
       PostsTableDensity.wide => 5,
       PostsTableDensity.medium => 5,
       PostsTableDensity.narrow => 6,
+      PostsTableDensity.compact => 1,
     };
     final authorFlex = 3;
-    final statusFlex = 2;
+    const statusFlex = 2;
     final visibilityFlex = 2;
     final engagementFlex = density == PostsTableDensity.medium ? 3 : 4;
-    final createdFlex = 2;
+    const createdFlex = 2;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(width: 34, child: checkbox),
+        SizedBox(width: checkboxWidth, child: checkbox),
         SizedBox(width: thumbWidth, child: thumbnail),
-        Expanded(flex: titleFlex, child: _cell(title)),
-        if (showAuthor) Expanded(flex: authorFlex, child: _cell(author)),
-        Expanded(flex: statusFlex, child: _cell(status)),
+        Expanded(flex: titleFlex, child: _cell(title, cellHPad)),
+        if (showAuthor) Expanded(flex: authorFlex, child: _cell(author, cellHPad)),
+        Expanded(flex: statusFlex, child: _cell(status, cellHPad)),
         if (showVisibility)
-          Expanded(flex: visibilityFlex, child: _cell(visibility)),
+          Expanded(flex: visibilityFlex, child: _cell(visibility, cellHPad)),
         if (showEngagement)
-          Expanded(flex: engagementFlex, child: _cell(engagement)),
-        Expanded(flex: createdFlex, child: _cell(created)),
+          Expanded(flex: engagementFlex, child: _cell(engagement, cellHPad)),
+        if (showCreated)
+          Expanded(flex: createdFlex, child: _cell(created, cellHPad)),
       ],
     );
   }
 
-  Widget _cell(Widget child) {
+  Widget _cell(Widget child, double horizontalPadding) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: _kCellHPad),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Align(
         alignment: AlignmentDirectional.centerStart,
         child: child,
@@ -277,64 +333,198 @@ class _PostsTableRowLayout extends StatelessWidget {
 }
 
 class _Thumb extends StatelessWidget {
-  const _Thumb({required this.post, this.small = false});
+  const _Thumb({
+    required this.post,
+    this.small = false,
+    this.size,
+  });
 
   final ManagedPostEntity post;
   final bool small;
+  final double? size;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final url = post.displayThumbnailUrl;
-    final size = small ? 36.0 : 42.0;
+    final url = post.previewThumbnailUrl;
+    final thumbSize = size ?? (small ? 36.0 : 42.0);
+    final isVideo = post.containsVideoMedia;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: SizedBox(
-        width: size,
-        height: size,
+        width: thumbSize,
+        height: thumbSize,
         child: url != null && url.isNotEmpty
-            ? CachedNetworkImage(
+            ? PostListThumbnail(
+                key: ValueKey('table_thumb_${post.id}_$url'),
+                postId: post.id,
                 imageUrl: url,
                 fit: BoxFit.cover,
-                errorWidget: (_, e, st) => _placeholder(scheme),
+                error: (_) => _placeholder(scheme, isVideo: isVideo),
               )
-            : _placeholder(scheme),
+            : _placeholder(scheme, isVideo: isVideo),
       ),
     );
   }
 
-  Widget _placeholder(ColorScheme scheme) {
+  Widget _placeholder(ColorScheme scheme, {bool isVideo = false}) {
     return ColoredBox(
       color: scheme.surfaceContainerLow,
-      child: Icon(Icons.image_outlined, size: 16, color: scheme.onSurfaceVariant),
+      child: Icon(
+        isVideo ? Icons.videocam_outlined : Icons.image_outlined,
+        size: 16,
+        color: scheme.onSurfaceVariant,
+      ),
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+class PostsStatusChip extends StatelessWidget {
+  const PostsStatusChip({
+    super.key,
+    required this.status,
+    this.compact = false,
+  });
 
   final String status;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final color = postStatusColor(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    final scheme = Theme.of(context).colorScheme;
+    final color = postStatusColor(status, scheme);
+    final label = postStatusLabel(l10n, status);
+    final icon = postStatusIcon(status);
+
+    final chip = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 7,
+        vertical: compact ? 2 : 3,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
-      child: Text(
-        postStatusLabel(l10n, status),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-          color: color,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: compact ? 10 : 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: compact ? 10 : 10.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: chip,
+    );
+  }
+}
+
+class PostsCompactCard extends StatelessWidget {
+  const PostsCompactCard({
+    super.key,
+    required this.post,
+    required this.isSelected,
+    required this.onSelectionChanged,
+    required this.onTap,
+  });
+
+  final ManagedPostEntity post;
+  final bool isSelected;
+  final ValueChanged<bool?> onSelectionChanged;
+  final VoidCallback onTap;
+
+  String _fmt(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return '$n';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final created = DateFormat('MMM d').format(post.createdAt);
+    final subtitle =
+        '${postDisplayAuthor(post)} · $created · ${_fmt(post.likeCount)} ♥';
+
+    return Material(
+      color: isSelected
+          ? scheme.primaryContainer.withValues(alpha: 0.12)
+          : scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: isSelected
+              ? scheme.primary.withValues(alpha: 0.45)
+              : scheme.outlineVariant.withValues(alpha: 0.65),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: isSelected,
+                onChanged: onSelectionChanged,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              _Thumb(post: post, size: 48),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      postDisplayTitle(post),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.25,
+                          ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    PostsStatusChip(status: post.status, compact: true),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: scheme.onSurfaceVariant,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

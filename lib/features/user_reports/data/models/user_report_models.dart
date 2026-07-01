@@ -225,7 +225,7 @@ class UserReportListItemModel extends UserReportListItemEntity {
     super.country,
     super.city,
     super.createdAt,
-    super.walletBalanceUsd,
+    super.walletBalanceCoins,
     super.deviceCount,
     super.counts,
   });
@@ -250,7 +250,7 @@ class UserReportListItemModel extends UserReportListItemEntity {
       country: json['country'] as String?,
       city: json['city'] as String?,
       createdAt: UserReportModels._date(json['createdAt']),
-      walletBalanceUsd: UserReportModels._double(json['walletBalanceUsd']),
+      walletBalanceCoins: UserReportModels._double(json['walletBalanceCoins']),
       deviceCount: UserReportModels._int(
         json['deviceCount'] ?? (countsRaw is Map ? countsRaw['devices'] : null),
       ),
@@ -318,8 +318,8 @@ class UserReportWalletTransactionModel extends UserReportWalletTransactionEntity
     required super.id,
     required super.type,
     required super.action,
-    required super.amountUsd,
-    required super.balanceAfter,
+    required super.amountCoins,
+    required super.balanceAfterCoins,
     super.reason,
     super.createdAt,
   });
@@ -329,8 +329,12 @@ class UserReportWalletTransactionModel extends UserReportWalletTransactionEntity
       id: json['id']?.toString() ?? '',
       type: json['type']?.toString() ?? '',
       action: json['action']?.toString() ?? '',
-      amountUsd: UserReportModels._double(json['amountUsd']),
-      balanceAfter: UserReportModels._double(json['balanceAfter']),
+      amountCoins: UserReportModels._double(
+        json['amountCoins'] ?? json['amountUsd'],
+      ),
+      balanceAfterCoins: UserReportModels._double(
+        json['balanceAfterCoins'] ?? json['balanceAfter'],
+      ),
       reason: json['reason'] as String?,
       createdAt: UserReportModels._date(json['createdAt']),
     );
@@ -339,7 +343,7 @@ class UserReportWalletTransactionModel extends UserReportWalletTransactionEntity
 
 class UserReportWalletModel extends UserReportWalletEntity {
   const UserReportWalletModel({
-    required super.balanceUsd,
+    required super.balanceCoins,
     super.recentTransactions,
   });
 
@@ -353,8 +357,8 @@ class UserReportWalletModel extends UserReportWalletEntity {
         : const <UserReportWalletTransactionEntity>[];
 
     return UserReportWalletModel(
-      balanceUsd: UserReportModels._double(
-        json['balanceUsd'] ?? json['balance'],
+      balanceCoins: UserReportModels._double(
+        json['balanceCoins'] ?? json['balance'],
       ),
       recentTransactions: txs,
     );
@@ -417,7 +421,7 @@ class UserReportPeriodActivityModel extends UserReportPeriodActivityEntity {
     super.newFollowers,
     super.giftsSent,
     super.giftsReceived,
-    super.giftRevenueUsd,
+    super.giftRevenueCoins,
     super.auctionsHosted,
     super.auctionsWon,
   });
@@ -436,7 +440,7 @@ class UserReportPeriodActivityModel extends UserReportPeriodActivityEntity {
       giftsReceived: UserReportModels._int(
         json['giftsReceived'] ?? json['receivedGifts'],
       ),
-      giftRevenueUsd: UserReportModels._double(json['giftRevenueUsd']),
+      giftRevenueCoins: UserReportModels._double(json['giftRevenueCoins']),
       auctionsHosted: UserReportModels._int(json['auctionsHosted']),
       auctionsWon: UserReportModels._int(json['auctionsWon']),
     );

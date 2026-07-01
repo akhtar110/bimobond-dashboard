@@ -67,12 +67,19 @@ class FocusRootCategoryEvent extends CategoriesEvent {
   final String rootId;
 }
 
+class ClearFocusedRootEvent extends CategoriesEvent {}
+
 class ToggleCategorySelectionEvent extends CategoriesEvent {
   ToggleCategorySelectionEvent(this.categoryId);
   final String categoryId;
 }
 
-class SelectAllVisibleCategoriesEvent extends CategoriesEvent {}
+class SelectAllVisibleCategoriesEvent extends CategoriesEvent {
+  SelectAllVisibleCategoriesEvent({this.toggle = true});
+
+  /// When false (toolbar "Select all" link), only adds visible ids.
+  final bool toggle;
+}
 
 class ClearCategorySelectionEvent extends CategoriesEvent {}
 
@@ -203,6 +210,74 @@ class CategoriesLoaded extends CategoriesState {
 
   bool isCategoryHighlighted(String id) => highlightedIds.contains(id);
 
+  bool matchesSearch(CategoryEntity category) {
+    final query = searchQuery.trim();
+    if (query.isEmpty) return true;
+    final q = query.toLowerCase();
+    bool contains(String? value) =>
+        value != null && value.toLowerCase().contains(q);
+
+    return contains(category.name) ||
+        contains(category.slug) ||
+        contains(category.description) ||
+        contains(category.id);
+  }
+
+  CategoryEntity? get focusedRoot {
+    final id = focusedRootId;
+    if (id == null) return null;
+    for (final root in displayRoots) {
+      if (root.id == id) return root;
+    }
+    for (final root in catalogRoots) {
+      if (root.id == id) return root;
+    }
+    return null;
+  }
+
+  /// Roots shown in the left master panel (search scoped when no root focused).
+  List<CategoryEntity> get leftPanelRoots {
+    final roots = displayRoots;
+    if (focusedRootId != null || searchQuery.trim().isEmpty) {
+      return roots;
+    }
+    if (typeFilter == CategoryTypeFilter.subOnly) {
+      return roots;
+    }
+    return roots.where(matchesSearch).toList();
+  }
+
+  /// Children for the right detail panel of [rootId], with status + search applied.
+  List<CategoryEntity> displayChildrenFor(String rootId) {
+    CategoryEntity? root;
+    for (final candidate in displayRoots) {
+      if (candidate.id == rootId) {
+        root = candidate;
+        break;
+      }
+    }
+    root ??= catalogRoots.where((r) => r.id == rootId).firstOrNull;
+    if (root == null) return const [];
+
+    var children = subcategoriesFor(rootId, root: root);
+    children = children.where((c) {
+      switch (filter) {
+        case CategoryFilter.all:
+          return true;
+        case CategoryFilter.active:
+          return c.isActive;
+        case CategoryFilter.inactive:
+          return !c.isActive;
+      }
+    }).toList();
+
+    final query = searchQuery.trim();
+    if (query.isNotEmpty) {
+      children = children.where(matchesSearch).toList();
+    }
+    return children;
+  }
+
   int subcategoryCountFor(String rootId) {
     final fromCatalog = catalogCategories
         .where((c) => c.parentId == rootId)
@@ -242,16 +317,29 @@ class CategoriesLoaded extends CategoriesState {
     return roots;
   }
 
+  /// Category ids matching the current filters (roots + subs as applicable).
   List<String> get visibleSelectableIds {
-    final ids = <String>[];
-    for (final root in displayRoots) {
-      ids.add(root.id);
-      if (isCategoryExpanded(root.id)) {
-        final subs = subcategoriesFor(root.id, root: root);
-        ids.addAll(subs.map((s) => s.id));
-      }
+    switch (typeFilter) {
+      case CategoryTypeFilter.rootOnly:
+        return leftPanelRoots.map((root) => root.id).toList();
+      case CategoryTypeFilter.subOnly:
+        final ids = <String>[];
+        for (final root in leftPanelRoots) {
+          ids.addAll(
+            displayChildrenFor(root.id).map((category) => category.id),
+          );
+        }
+        return ids;
+      case CategoryTypeFilter.all:
+        final ids = <String>[];
+        for (final root in leftPanelRoots) {
+          ids.add(root.id);
+          ids.addAll(
+            displayChildrenFor(root.id).map((category) => category.id),
+          );
+        }
+        return ids;
     }
-    return ids;
   }
 
   bool get allVisibleSelected {
@@ -397,6 +485,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     on<DeleteCategoryEvent>(_onDelete);
     on<ToggleCategoryExpandEvent>(_onToggleExpand);
     on<FocusRootCategoryEvent>(_onFocusRoot);
+    on<ClearFocusedRootEvent>(_onClearFocusedRoot);
     on<ToggleCategorySelectionEvent>(_onToggleSelection);
     on<SelectAllVisibleCategoriesEvent>(_onSelectAllVisible);
     on<ClearCategorySelectionEvent>(_onClearSelection);
@@ -415,6 +504,31 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
 
   Timer? _searchDebounce;
   static const _searchDebounceMs = 300;
+  static const _fullCatalogQuery = CategoriesAdminListQuery(includeInactive: true);
+
+  bool _useLocalCatalog(CategoriesLoaded state) =>
+      state.searchQuery.trim().isEmpty &&
+      state.filter == CategoryFilter.all &&
+      state.typeFilter == CategoryTypeFilter.all;
+
+  bool _matchesStatus(CategoryEntity category, CategoryFilter filter) {
+    switch (filter) {
+      case CategoryFilter.all:
+        return true;
+      case CategoryFilter.active:
+        return category.isActive;
+      case CategoryFilter.inactive:
+        return !category.isActive;
+    }
+  }
+
+  List<CategoryEntity> _filterByStatus(
+    List<CategoryEntity> list,
+    CategoryFilter filter,
+  ) {
+    if (filter == CategoryFilter.all) return list;
+    return list.where((c) => _matchesStatus(c, filter)).toList();
+  }
 
   List<CategoryEntity> _sorted(List<CategoryEntity> list) {
     final roots = list.where((c) => c.isRoot).toList()
@@ -432,15 +546,29 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
       searchQuery: state.searchQuery,
       typeFilter: state.typeFilter,
     );
+
+    var focusedRootId = state.focusedRootId;
+    if (focusedRootId != null &&
+        !cache.filteredRoots.any((r) => r.id == focusedRootId)) {
+      focusedRootId = null;
+    }
+
+    final hasSearch = state.searchQuery.trim().isNotEmpty;
+    if (hasSearch && cache.autoExpandRootIds.isNotEmpty && focusedRootId == null) {
+      focusedRootId = cache.autoExpandRootIds.first;
+    }
+
     return state.copyWith(
       filteredRoots: cache.filteredRoots,
       visibleChildren: cache.visibleChildren,
       autoExpandRootIds: cache.autoExpandRootIds,
       highlightedIds: cache.highlightedIds,
       displayedCount: cache.displayedCount,
+      focusedRootId: focusedRootId,
       expandedCategoryIds: {
         ...state.expandedCategoryIds,
         ...cache.autoExpandRootIds,
+        if (focusedRootId != null) focusedRootId,
       },
       clearMessages: true,
     );
@@ -464,11 +592,12 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     bool? includeInactive;
     switch (state.filter) {
       case CategoryFilter.all:
-        break;
+        includeInactive = true;
       case CategoryFilter.active:
         isActive = true;
       case CategoryFilter.inactive:
         isActive = false;
+        includeInactive = true;
     }
 
     bool? isMain;
@@ -495,28 +624,23 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     );
   }
 
-  bool _isDefaultAdminView(CategoriesLoaded state) =>
-      state.searchQuery.trim().isEmpty &&
-      state.filter == CategoryFilter.all &&
-      state.typeFilter == CategoryTypeFilter.all;
-
   Future<void> _refetchAdmin(
     Emitter<CategoriesState> emit,
     CategoriesLoaded state,
   ) async {
-    final query = _buildQuery(state);
     emit(state.copyWith(isFetching: true, clearMessages: true));
 
     try {
-      var list = _isDefaultAdminView(state) && state.catalogCategories.isNotEmpty
+      var list = _useLocalCatalog(state)
           ? state.catalogCategories
-          : query.isDefault && state.catalogCategories.isNotEmpty
-              ? state.catalogCategories
-              : _sorted(_flatten(await _getAll(query: query)));
+          : _sorted(_flatten(await _getAll(query: _buildQuery(state))));
 
       if (state.typeFilter == CategoryTypeFilter.subOnly &&
           list.where((c) => !c.isRoot).isEmpty) {
-        list = state.catalogCategories.where((c) => !c.isRoot).toList();
+        list = _filterByStatus(
+          state.catalogCategories.where((c) => !c.isRoot).toList(),
+          state.filter,
+        );
       }
 
       emit(_emitWithFilters(state.copyWith(
@@ -540,23 +664,26 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   }) {
     final query = searchQuery.trim();
     final hasSearch = query.isNotEmpty;
+    categories = _filterByStatus(categories, statusFilter);
 
     if (typeFilter == CategoryTypeFilter.subOnly) {
       return _applySubOnlyFilters(
         categories: categories,
         catalogCategories: catalogCategories,
+        statusFilter: statusFilter,
         query: query,
         hasSearch: hasSearch,
       );
     }
 
-    final serverFiltered = !_buildQuery(CategoriesLoaded(
+    final serverFiltered = !_useLocalCatalog(CategoriesLoaded(
       categories,
       catalogCategories: catalogCategories,
       filter: statusFilter,
       searchQuery: searchQuery,
       typeFilter: typeFilter,
-    )).isDefault;
+    )) &&
+        searchQuery.trim().isEmpty;
 
     final roots = categories.where((c) => c.isRoot).toList()
       ..sort(CategoriesLoaded._compareByOrderThenName);
@@ -591,7 +718,12 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     var displayedCount = 0;
 
     for (final root in roots) {
-      final allChildren = childrenByParent[root.id] ?? [];
+      if (!_matchesStatus(root, statusFilter)) continue;
+
+      final allChildren = _filterByStatus(
+        childrenByParent[root.id] ?? [],
+        statusFilter,
+      );
       final rootMatchesSearch = _matchesSearch(root, query);
       final matchingChildren =
           allChildren.where((c) => _matchesSearch(c, query)).toList();
@@ -648,6 +780,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   _CategoryFilterCache _applySubOnlyFilters({
     required List<CategoryEntity> categories,
     required List<CategoryEntity> catalogCategories,
+    required CategoryFilter statusFilter,
     required String query,
     required bool hasSearch,
   }) {
@@ -655,9 +788,15 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
       for (final c in catalogCategories) c.id: c,
     };
 
-    var subs = categories.where((c) => !c.isRoot).toList();
+    var subs = _filterByStatus(
+      categories.where((c) => !c.isRoot).toList(),
+      statusFilter,
+    );
     if (subs.isEmpty) {
-      subs = catalogCategories.where((c) => !c.isRoot).toList();
+      subs = _filterByStatus(
+        catalogCategories.where((c) => !c.isRoot).toList(),
+        statusFilter,
+      );
     }
 
     final grouped = <String, List<CategoryEntity>>{};
@@ -677,6 +816,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     for (final entry in grouped.entries) {
       final parent = catalogById[entry.key];
       if (parent == null || !parent.isRoot) continue;
+      if (!_matchesStatus(parent, statusFilter)) continue;
 
       entry.value.sort(CategoriesLoaded._compareByOrderThenName);
       filteredRoots.add(parent);
@@ -730,21 +870,24 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
       clearMessages: true,
     );
 
-    void scheduleRefetch() {
-      add(_RefetchCategoriesEvent(next));
-    }
-
     if (trimmed.isEmpty) {
-      scheduleRefetch();
+      add(_RefetchCategoriesEvent(next));
       return;
     }
 
-    // Wait until the admin finishes typing a meaningful query.
+    final base = _useLocalCatalog(current)
+        ? current.catalogCategories
+        : current.categories;
+    emit(_emitWithFilters(next.copyWith(
+      categories: base,
+      isFetching: trimmed.length >= 2,
+    )));
+
     if (trimmed.length < 2) return;
 
     _searchDebounce = Timer(
       const Duration(milliseconds: _searchDebounceMs),
-      scheduleRefetch,
+      () => add(_RefetchCategoriesEvent(next)),
     );
   }
 
@@ -755,19 +898,13 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     final current = state;
     if (current is! CategoriesLoaded) return;
 
-    final next = current.copyWith(
-      typeFilter: event.typeFilter,
-      clearMessages: true,
+    await _refetchAdmin(
+      emit,
+      current.copyWith(
+        typeFilter: event.typeFilter,
+        clearMessages: true,
+      ),
     );
-
-    if (current.searchQuery.trim().isEmpty) {
-      emit(_emitWithFilters(
-        next.copyWith(categories: current.catalogCategories),
-      ));
-      return;
-    }
-
-    await _refetchAdmin(emit, next);
   }
 
   Future<void> _onRefetch(
@@ -788,7 +925,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
         return;
       }
       try {
-        final list = _sorted(_flatten(await _getAll()));
+        final list = _sorted(_flatten(await _getAll(query: _fullCatalogQuery)));
         if (existing is CategoriesLoaded) {
           emit(_emitWithFilters(existing.copyWith(
             catalogCategories: list,
@@ -812,7 +949,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     }
 
     try {
-      final catalog = _sorted(_flatten(await _getAll()));
+      final catalog = _sorted(_flatten(await _getAll(query: _fullCatalogQuery)));
       final loaded = CategoriesLoaded(catalog, catalogCategories: catalog);
       emit(_emitWithFilters(loaded));
     } catch (e) {
@@ -1011,13 +1148,24 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   ) {
     final current = state;
     if (current is! CategoriesLoaded) return;
-    final expanded = Set<String>.from(current.expandedCategoryIds)
-      ..add(event.rootId);
+    if (current.focusedRootId == event.rootId) {
+      emit(current.copyWith(clearFocusedRoot: true, clearMessages: true));
+      return;
+    }
     emit(current.copyWith(
       focusedRootId: event.rootId,
-      expandedCategoryIds: expanded,
       clearMessages: true,
     ));
+  }
+
+  void _onClearFocusedRoot(
+    ClearFocusedRootEvent event,
+    Emitter<CategoriesState> emit,
+  ) {
+    final current = state;
+    if (current is! CategoriesLoaded) return;
+    if (current.focusedRootId == null) return;
+    emit(current.copyWith(clearFocusedRoot: true, clearMessages: true));
   }
 
   void _onToggleSelection(
@@ -1042,12 +1190,20 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     final current = state;
     if (current is! CategoriesLoaded) return;
     final visible = current.visibleSelectableIds;
-    if (current.allVisibleSelected) {
-      emit(current.copyWith(clearSelection: true, clearMessages: true));
-      return;
+    if (visible.isEmpty) return;
+
+    final selected = Set<String>.from(current.selectedCategoryIds);
+    final visibleSet = visible.toSet();
+    final allVisibleSelected = current.allVisibleSelected;
+
+    if (event.toggle && allVisibleSelected) {
+      selected.removeAll(visibleSet);
+    } else {
+      selected.addAll(visibleSet);
     }
+
     emit(current.copyWith(
-      selectedCategoryIds: visible.toSet(),
+      selectedCategoryIds: selected,
       clearMessages: true,
     ));
   }
@@ -1058,6 +1214,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   ) {
     final current = state;
     if (current is! CategoriesLoaded) return;
+    if (current.selectedCategoryIds.isEmpty) return;
     emit(current.copyWith(clearSelection: true, clearMessages: true));
   }
 

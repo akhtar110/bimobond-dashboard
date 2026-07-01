@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +16,15 @@ class AppLocalizations {
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
+  static final Map<String, Map<String, dynamic>> _bundleCache = {};
+
+  /// Loads all supported locale bundles into memory so switching is instant.
+  static Future<void> preloadBundles() async {
+    for (final locale in supportedLocales) {
+      await AppLocalizations(locale).load();
+    }
+  }
+
   static AppLocalizations of(BuildContext context) {
     final localizations =
         Localizations.of<AppLocalizations>(context, AppLocalizations);
@@ -24,11 +34,28 @@ class AppLocalizations {
     return localizations;
   }
 
+  /// Synchronous access to preloaded strings (no asset I/O).
+  static AppLocalizations ofLocale(Locale locale) {
+    final localization = AppLocalizations(locale);
+    final languageCode = Intl.canonicalizedLocale(locale.languageCode);
+    final bundle = _bundleCache[languageCode] ?? _bundleCache['en'];
+    localization._localizedValues = bundle ?? const <String, dynamic>{};
+    return localization;
+  }
+
   Future<void> load() async {
     final languageCode = Intl.canonicalizedLocale(locale.languageCode);
+    final cached = _bundleCache[languageCode];
+    if (cached != null && !kDebugMode) {
+      _localizedValues = cached;
+      return;
+    }
+
     final filePath = 'lib/core/localization/app_$languageCode.arb';
     final jsonString = await rootBundle.loadString(filePath);
-    _localizedValues = json.decode(jsonString) as Map<String, dynamic>;
+    final bundle = json.decode(jsonString) as Map<String, dynamic>;
+    _bundleCache[languageCode] = bundle;
+    _localizedValues = bundle;
   }
 
   String t(String key) => _localizedValues[key] as String? ?? key;
@@ -64,11 +91,13 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool shouldReload(_AppLocalizationsDelegate old) => true;
+  bool shouldReload(_AppLocalizationsDelegate old) => kDebugMode;
 }
 
 extension LocalizationX on BuildContext {
-  AppLocalizations get l10n => AppLocalizations.of(this);
+  /// Resolves strings from the effective locale (including [Localizations.override]).
+  AppLocalizations get l10n =>
+      AppLocalizations.ofLocale(Localizations.localeOf(this));
 
   String tr(String key, [Map<String, String> args = const {}]) {
     if (args.isEmpty) return l10n.t(key);

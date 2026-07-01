@@ -3,8 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/user_report_entities.dart';
 import '../../../reports/presentation/widgets/report_safe_media.dart';
+import '../../../reports/presentation/utils/reports_responsive.dart';
+import '../../../reports/presentation/widgets/reports_pagination_bar.dart';
 import '../bloc/user_reports_bloc.dart';
 
 class UserReportsTab extends StatefulWidget {
@@ -25,14 +28,30 @@ class _UserReportsTabState extends State<UserReportsTab>
     with AutomaticKeepAliveClientMixin {
   final _searchController = TextEditingController();
   final _horizontalScrollController = ScrollController();
+  final _listScrollController = ScrollController();
 
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    _listScrollController.addListener(_onListScroll);
+  }
+
+  void _onListScroll() {
+    if (!mounted) return;
+    if (!reportsUseInfiniteScroll(MediaQuery.sizeOf(context).width)) return;
+    if (!reportsShouldLoadMore(_listScrollController)) return;
+    context.read<UserReportsBloc>().add(const LoadMore());
+  }
+
+  @override
   void dispose() {
+    _listScrollController.removeListener(_onListScroll);
     _searchController.dispose();
     _horizontalScrollController.dispose();
+    _listScrollController.dispose();
     super.dispose();
   }
 
@@ -40,15 +59,33 @@ class _UserReportsTabState extends State<UserReportsTab>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
+    final bloc = context.read<UserReportsBloc>();
+
+    void clearAllFilters() {
+      _searchController.clear();
+      bloc.add(const SearchChanged(''));
+      bloc.add(
+        const FilterChanged(
+          clearVerified: true,
+          clearBanned: true,
+          clearRole: true,
+        ),
+      );
+      bloc.add(const SortChanged(UserReportSort.newest));
+      bloc.add(const LoadList(refresh: true));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.denseLayout)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: 10),
-            child: _UserReportsFiltersBar(compact: true),
+            child: _UserReportsFiltersBar(
+              compact: true,
+              onClearAll: clearAllFilters,
+            ),
           )
         else
           Padding(
@@ -58,6 +95,7 @@ class _UserReportsTabState extends State<UserReportsTab>
               onSearchChanged: (value) => context.read<UserReportsBloc>().add(
                     SearchChanged(value),
                   ),
+              onClearAll: clearAllFilters,
             ),
           ),
         Expanded(
@@ -72,12 +110,8 @@ class _UserReportsTabState extends State<UserReportsTab>
               decoration: BoxDecoration(
                 borderRadius:
                     BorderRadius.circular(widget.denseLayout ? 0 : 12),
-                color: isDark ? const Color(0xFF12151C) : Colors.white,
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : const Color(0xFFE6E8EC),
-                ),
+                color: scheme.surface,
+                border: Border.all(color: scheme.outlineVariant),
               ),
               child: ClipRRect(
                 borderRadius:
@@ -119,6 +153,7 @@ class _UserReportsTabState extends State<UserReportsTab>
                           state: loaded,
                           horizontalScrollController:
                               _horizontalScrollController,
+                          listScrollController: _listScrollController,
                           onUserTap: widget.onUserTap,
                         );
                       },
@@ -136,15 +171,16 @@ class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.searchController,
     required this.onSearchChanged,
+    required this.onClearAll,
   });
 
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback onClearAll;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -156,29 +192,22 @@ class _Toolbar extends StatelessWidget {
             hintText: context.l10n.t('searchUsers'),
             prefixIcon: const Icon(Icons.search_rounded),
             filled: true,
-            fillColor: isDark
-                ? Colors.white.withValues(alpha: 0.04)
-                : const Color(0xFFF8FAFC),
+            fillColor: scheme.surfaceContainerLow,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.1)
-                    : const Color(0xFFE2E8F0),
-              ),
+              borderSide: BorderSide(color: scheme.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.1)
-                    : const Color(0xFFE2E8F0),
-              ),
+              borderSide: BorderSide(color: scheme.outlineVariant),
             ),
           ),
         );
 
-        final filters = const _UserReportsFiltersBar(compact: false);
+        final filters = _UserReportsFiltersBar(
+          compact: false,
+          onClearAll: onClearAll,
+        );
 
         if (compact) {
           return Column(
@@ -201,13 +230,18 @@ class _Toolbar extends StatelessWidget {
 }
 
 class _UserReportsFiltersBar extends StatelessWidget {
-  const _UserReportsFiltersBar({required this.compact});
+  const _UserReportsFiltersBar({
+    required this.compact,
+    required this.onClearAll,
+  });
 
   final bool compact;
+  final VoidCallback onClearAll;
 
   @override
   Widget build(BuildContext context) {
     final bloc = context.read<UserReportsBloc>();
+    final scheme = Theme.of(context).colorScheme;
 
     return BlocBuilder<UserReportsBloc, UserReportsState>(
       buildWhen: (prev, next) {
@@ -220,6 +254,11 @@ class _UserReportsFiltersBar extends StatelessWidget {
       builder: (context, state) {
         final query =
             state is UserReportsLoaded ? state.query : const UserReportListQuery();
+        final isAllSelected = query.search.trim().isEmpty &&
+            query.isVerified == null &&
+            query.isBanned == null &&
+            query.role == null &&
+            query.sort == UserReportSort.newest;
 
         return Wrap(
           spacing: 8,
@@ -227,8 +266,32 @@ class _UserReportsFiltersBar extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             FilterChip(
-              label: Text(context.l10n.t('verified')),
+              label: Text(
+                context.l10n.t('all'),
+                style: TextStyle(
+                  color: isAllSelected ? scheme.primary : scheme.onSurface,
+                ),
+              ),
+              selected: isAllSelected,
+              backgroundColor: scheme.surface,
+              selectedColor: scheme.primaryContainer,
+              side: BorderSide(color: scheme.outlineVariant),
+              checkmarkColor: scheme.primary,
+              onSelected: (_) => onClearAll(),
+            ),
+            FilterChip(
+              label: Text(
+                context.l10n.t('verified'),
+                style: TextStyle(
+                  color:
+                      query.isVerified == true ? scheme.primary : scheme.onSurface,
+                ),
+              ),
               selected: query.isVerified == true,
+              backgroundColor: scheme.surface,
+              selectedColor: scheme.primaryContainer,
+              side: BorderSide(color: scheme.outlineVariant),
+              checkmarkColor: scheme.primary,
               onSelected: (selected) => bloc.add(
                 FilterChanged(
                   isVerified: selected ? true : null,
@@ -237,8 +300,17 @@ class _UserReportsFiltersBar extends StatelessWidget {
               ),
             ),
             FilterChip(
-              label: Text(context.l10n.t('banned')),
+              label: Text(
+                context.l10n.t('banned'),
+                style: TextStyle(
+                  color: query.isBanned == true ? scheme.primary : scheme.onSurface,
+                ),
+              ),
               selected: query.isBanned == true,
+              backgroundColor: scheme.surface,
+              selectedColor: scheme.primaryContainer,
+              side: BorderSide(color: scheme.outlineVariant),
+              checkmarkColor: scheme.primary,
               onSelected: (selected) => bloc.add(
                 FilterChanged(
                   isBanned: selected ? true : null,
@@ -260,6 +332,19 @@ class _UserReportsFiltersBar extends StatelessWidget {
               onChanged: (sort) => bloc.add(SortChanged(sort)),
               compact: compact,
             ),
+            TextButton.icon(
+              onPressed: onClearAll,
+              icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
+              label: Text(context.l10n.t('clear')),
+              style: TextButton.styleFrom(
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -279,6 +364,7 @@ class _RoleFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     final label = switch (selectedRole) {
       'ADMIN' => l10n.t('roleAdmin'),
       'MODERATOR' => l10n.t('roleModerator'),
@@ -296,11 +382,21 @@ class _RoleFilterChip extends StatelessWidget {
         PopupMenuItem(value: 'ADMIN', child: Text(l10n.t('roleAdmin'))),
       ],
       child: Chip(
-        avatar: const Icon(Icons.badge_outlined, size: 18),
-        label: Text(label),
+        avatar: Icon(
+          Icons.badge_outlined,
+          size: 18,
+          color: selectedRole != null ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+        label: Text(
+          label,
+          style: TextStyle(
+            color: selectedRole != null ? scheme.primary : scheme.onSurface,
+          ),
+        ),
         backgroundColor: selectedRole != null
-            ? Theme.of(context).colorScheme.primaryContainer
-            : null,
+            ? scheme.primaryContainer
+            : scheme.surface,
+        side: BorderSide(color: scheme.outlineVariant),
       ),
     );
   }
@@ -318,8 +414,8 @@ class _SortDropdown extends StatelessWidget {
   final bool compact;
 
   String _label(UserReportSort sort) => switch (sort) {
-        UserReportSort.newest => 'Newest',
-        UserReportSort.oldest => 'Oldest',
+        UserReportSort.newest => 'New Users',
+        UserReportSort.oldest => 'Old Users',
         UserReportSort.mostFollowers => 'Most followers',
         UserReportSort.mostPosts => 'Most posts',
         UserReportSort.mostLikes => 'Most likes',
@@ -327,25 +423,37 @@ class _SortDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<UserReportSort>(
-        value: value,
-        isDense: compact,
-        borderRadius: BorderRadius.circular(12),
-        items: UserReportSort.values
-            .map(
-              (sort) => DropdownMenuItem(
-                value: sort,
-                child: Text(
-                  _label(sort),
-                  overflow: TextOverflow.ellipsis,
+    final scheme = Theme.of(context).colorScheme;
+    final isSelected = value != UserReportSort.newest;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isSelected ? scheme.primaryContainer : Colors.transparent,
+        border: Border.all(
+          color: isSelected ? scheme.primary : scheme.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<UserReportSort>(
+          value: value,
+          isDense: compact,
+          borderRadius: BorderRadius.circular(12),
+          items: UserReportSort.values
+              .map(
+                (sort) => DropdownMenuItem(
+                  value: sort,
+                  child: Text(
+                    _label(sort),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            )
-            .toList(),
-        onChanged: (sort) {
-          if (sort != null) onChanged(sort);
-        },
+              )
+              .toList(),
+          onChanged: (sort) {
+            if (sort != null) onChanged(sort);
+          },
+        ),
       ),
     );
   }
@@ -355,11 +463,13 @@ class _LoadedTable extends StatelessWidget {
   const _LoadedTable({
     required this.state,
     required this.horizontalScrollController,
+    required this.listScrollController,
     required this.onUserTap,
   });
 
   final UserReportsLoaded state;
   final ScrollController horizontalScrollController;
+  final ScrollController listScrollController;
   final ValueChanged<String> onUserTap;
 
   @override
@@ -380,7 +490,9 @@ class _LoadedTable extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
-    const minWidth = 980.0;
+    final scheme = theme.colorScheme;
+    final metrics = reportsMetricsOf(context);
+    final minWidth = metrics.tableMinWidth > 0 ? metrics.tableMinWidth : null;
 
     return Column(
       children: [
@@ -389,10 +501,12 @@ class _LoadedTable extends StatelessWidget {
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final tableWidth = constraints.maxWidth < minWidth
+              final tableWidth = minWidth != null &&
+                      constraints.maxWidth < minWidth
                   ? minWidth
                   : constraints.maxWidth;
-              final needsScroll = constraints.maxWidth < tableWidth;
+              final needsScroll =
+                  minWidth != null && constraints.maxWidth < tableWidth;
 
               return Scrollbar(
                 controller: horizontalScrollController,
@@ -405,14 +519,26 @@ class _LoadedTable extends StatelessWidget {
                     height: constraints.maxHeight,
                     child: Column(
                       children: [
-                        _TableHeader(isDark: theme.brightness == Brightness.dark),
+                        if (!metrics.isMobile)
+                          _TableHeader(scheme: scheme),
                         Expanded(
                           child: ListView.builder(
-                            itemCount: state.items.length,
+                            controller: listScrollController,
+                            itemCount: state.items.length +
+                                (metrics.useInfiniteScroll &&
+                                        state.listLoadingMore
+                                    ? 1
+                                    : 0),
                             itemBuilder: (context, index) {
+                              if (index >= state.items.length) {
+                                return const ReportsLoadMoreFooter(
+                                  isLoading: true,
+                                );
+                              }
                               final user = state.items[index];
                               return _UserReportRow(
                                 user: user,
+                                compact: metrics.isMobile,
                                 onTap: () => onUserTap(user.id),
                               );
                             },
@@ -426,40 +552,44 @@ class _LoadedTable extends StatelessWidget {
             },
           ),
         ),
-        _PaginationBar(
-          currentPage: state.currentPage,
-          lastPage: state.lastPage,
-          total: state.total,
-        ),
+        if (metrics.useDesktopPagination)
+          ReportsPaginationBar(
+            page: state.currentPage,
+            totalPages: state.lastPage,
+            total: state.total,
+            itemLabel: 'users',
+            showTopBorder: true,
+            onPage: (page) =>
+                context.read<UserReportsBloc>().add(GoToPage(page)),
+          )
+        else if (state.hasReachedMax && state.items.isNotEmpty)
+          ReportsLoadMoreFooter(
+            hasReachedMax: true,
+            total: state.total,
+          ),
       ],
     );
   }
 }
 
 class _TableHeader extends StatelessWidget {
-  const _TableHeader({required this.isDark});
+  const _TableHeader({required this.scheme});
 
-  final bool isDark;
+  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.labelMedium?.copyWith(
           fontWeight: FontWeight.w700,
-          color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
+          color: scheme.onSurfaceVariant,
         );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : const Color(0xFFF8FAFC),
+        color: scheme.surfaceContainerLow,
         border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : const Color(0xFFE8ECF1),
-          ),
+          bottom: BorderSide(color: scheme.outlineVariant),
         ),
       ),
       child: Row(
@@ -481,32 +611,81 @@ class _UserReportRow extends StatelessWidget {
   const _UserReportRow({
     required this.user,
     required this.onTap,
+    this.compact = false,
   });
 
   final UserReportListItemEntity user;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
-    final muted = isDark ? Colors.grey.shade400 : const Color(0xFF64748B);
-    final wallet = NumberFormat.simpleCurrency().format(user.walletBalanceUsd);
+    final scheme = theme.colorScheme;
+    final wallet = CoinFormat.coins(user.walletBalanceCoins);
+
+    if (compact) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                ReportSafeAvatar(
+                  url: user.avatarUrl,
+                  fallbackLabel: user.username,
+                  radius: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.fullName ?? user.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        '@${user.username} · ${user.followerCount} followers',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: scheme.onSurfaceVariant,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        hoverColor: primary.withValues(alpha: isDark ? 0.06 : 0.04),
+        hoverColor: scheme.primary.withValues(alpha: 0.06),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.04)
-                    : const Color(0xFFF1F5F9),
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -539,7 +718,7 @@ class _UserReportRow extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: muted,
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -578,16 +757,19 @@ class _UserReportRow extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (user.isVerified)
-                          _Badge(label: 'Verified', color: Colors.blue),
+                          _Badge(
+                            label: 'Verified',
+                            color: scheme.primary,
+                          ),
                         if (user.isVerified && user.isBanned)
                           const SizedBox(width: 6),
                         if (user.isBanned)
-                          _Badge(label: 'Banned', color: Colors.red),
+                          _Badge(label: 'Banned', color: scheme.error),
                         if ((user.isVerified || user.isBanned) &&
                             user.roles.isNotEmpty)
                           const SizedBox(width: 6),
                         if (user.roles.isNotEmpty)
-                          _Badge(label: user.roles.first, color: primary),
+                          _Badge(label: user.roles.first, color: scheme.primary),
                       ],
                     ),
                   ),
@@ -626,194 +808,6 @@ class _Badge extends StatelessWidget {
   }
 }
 
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({
-    required this.currentPage,
-    required this.lastPage,
-    required this.total,
-  });
-
-  final int currentPage;
-  final int lastPage;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bloc = context.read<UserReportsBloc>();
-    final primary = theme.colorScheme.primary;
-
-    final pages = <int>{
-      for (var i = currentPage - 2; i <= currentPage + 2; i++)
-        if (i >= 1 && i <= lastPage) i,
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.02)
-            : const Color(0xFFF8FAFC),
-        border: Border(
-          top: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : const Color(0xFFE8ECF1),
-          ),
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 520;
-
-          final pageControls = SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _PageIconButton(
-                  icon: Icons.chevron_left_rounded,
-                  enabled: currentPage > 1,
-                  onTap: () => bloc.add(GoToPage(currentPage - 1)),
-                ),
-                const SizedBox(width: 6),
-                for (final page in pages)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 6),
-                    child: _PageNumberButton(
-                      page: page,
-                      isActive: page == currentPage,
-                      primary: primary,
-                      isDark: isDark,
-                      onTap: () => bloc.add(GoToPage(page)),
-                    ),
-                  ),
-                const SizedBox(width: 2),
-                _PageIconButton(
-                  icon: Icons.chevron_right_rounded,
-                  enabled: currentPage < lastPage,
-                  onTap: () => bloc.add(GoToPage(currentPage + 1)),
-                ),
-              ],
-            ),
-          );
-
-          final summary = Text(
-            '$total users · Page $currentPage of $lastPage',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
-            ),
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                summary,
-                const SizedBox(height: 10),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: pageControls,
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Flexible(child: summary),
-              const SizedBox(width: 12),
-              pageControls,
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PageNumberButton extends StatelessWidget {
-  const _PageNumberButton({
-    required this.page,
-    required this.isActive,
-    required this.primary,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final int page;
-  final bool isActive;
-  final Color primary;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        width: 32,
-        height: 32,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: isActive ? primary : (isDark ? Colors.white10 : Colors.white),
-          border: Border.all(
-            color: isActive
-                ? Colors.transparent
-                : (isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
-          ),
-        ),
-        child: Text(
-          '$page',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: isActive ? Colors.white : null,
-              ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PageIconButton extends StatelessWidget {
-  const _PageIconButton({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        width: 32,
-        height: 32,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: enabled ? Theme.of(context).colorScheme.primary : Colors.grey,
-        ),
-      ),
-    );
-  }
-}
-
 class _StatePanel extends StatelessWidget {
   const _StatePanel({
     required this.icon,
@@ -830,7 +824,8 @@ class _StatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final primary = scheme.primary;
 
     return Center(
       child: Padding(
@@ -845,7 +840,9 @@ class _StatePanel extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton(

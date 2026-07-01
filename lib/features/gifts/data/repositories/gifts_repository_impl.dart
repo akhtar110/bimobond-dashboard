@@ -1,6 +1,11 @@
+import '../../domain/entities/bulk_gift_action_request.dart';
+import '../../domain/entities/bulk_gift_action_result.dart';
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/enums/bulk_gift_action_type.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../datasources/gifts_remote_datasource.dart';
+import '../models/admin_bulk_gift_action.dart';
+import '../models/admin_bulk_gifts_dto.dart';
 
 class GiftsRepositoryImpl implements GiftsRepository {
   const GiftsRepositoryImpl(this._dataSource);
@@ -19,7 +24,7 @@ class GiftsRepositoryImpl implements GiftsRepository {
     return _dataSource.createGiftWithUrl(
       name: data.name,
       thumbnailUrl: thumbnailUrl,
-      priceUsd: data.priceUsd,
+      priceCoins: data.priceCoins,
       isActive: data.isActive,
       publishedAt: data.publishedAt,
     );
@@ -44,7 +49,7 @@ class GiftsRepositoryImpl implements GiftsRepository {
       name: data.name,
       thumbnailUrl: resolvedThumbnailUrl,
       animationUrl: data.animationUrl,
-      priceUsd: data.priceUsd,
+      priceCoins: data.priceCoins,
       isActive: data.isActive,
       publishedAt: data.publishedAt,
     );
@@ -54,4 +59,47 @@ class GiftsRepositoryImpl implements GiftsRepository {
 
   @override
   Future<void> deleteGift(String giftId) => _dataSource.deleteGift(giftId);
+
+  @override
+  Future<BulkGiftActionResult> executeBulkAction(
+    BulkGiftActionRequest request,
+  ) async {
+    if (request.giftIds.isEmpty) {
+      return const BulkGiftActionResult(
+        removedGiftIds: [],
+        failedGiftIds: [],
+      );
+    }
+
+    try {
+      final dto = AdminBulkGiftsDto(
+        giftIds: request.giftIds,
+        action: _toAdminAction(request.action),
+      );
+      final result = await _dataSource.executeAdminBulkAction(dto);
+
+      return BulkGiftActionResult(
+        succeededGiftIds: result.affectedGiftIds,
+        removedGiftIds:
+            result.isDelete ? result.affectedGiftIds : const [],
+        failedGiftIds: result.failedGiftIds,
+        errorMessage: result.isFullSuccess
+            ? null
+            : '${result.failedGiftIds.length} gift(s) could not be updated',
+      );
+    } catch (e) {
+      return BulkGiftActionResult(
+        removedGiftIds: const [],
+        failedGiftIds: request.giftIds,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  AdminBulkGiftAction _toAdminAction(BulkGiftActionType action) =>
+      switch (action) {
+        BulkGiftActionType.delete => AdminBulkGiftAction.delete,
+        BulkGiftActionType.activate => AdminBulkGiftAction.activate,
+        BulkGiftActionType.deactivate => AdminBulkGiftAction.deactivate,
+      };
 }

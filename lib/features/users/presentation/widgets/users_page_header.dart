@@ -3,66 +3,79 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../bloc/users_bloc.dart';
+import '../utils/responsive.dart';
 
 class UsersPageHeader extends StatelessWidget {
-  const UsersPageHeader({super.key, required this.onRefresh});
+  const UsersPageHeader({
+    super.key,
+    required this.onRefresh,
+    required this.metrics,
+  });
 
   final VoidCallback onRefresh;
+  final UsersLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final compact = metrics.isMobile;
 
-    return BlocBuilder<UsersBloc, UsersState>(
-      builder: (context, state) {
-        final total = state is UsersLoaded ? state.total : null;
-
+    return BlocSelector<UsersBloc, UsersState, int?>(
+      selector: (state) => state is UsersLoaded ? state.total : null,
+      builder: (context, total) {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(metrics.headerIconPadding),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(compact ? 12 : 14),
                 gradient: LinearGradient(
                   colors: [
-                    primary.withValues(alpha: 0.9),
-                    primary.withValues(alpha: 0.55),
+                    scheme.primary,
+                    scheme.primary.withValues(alpha: 0.55),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: primary.withValues(alpha: 0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: scheme.primary.withValues(alpha: 0.35),
+                    blurRadius: compact ? 12 : 16,
+                    offset: Offset(0, compact ? 4 : 6),
                   ),
                 ],
               ),
-              child: const Icon(Icons.people_alt_rounded, color: Colors.white, size: 26),
+              child: Icon(
+                Icons.people_alt_rounded,
+                color: scheme.onPrimary,
+                size: metrics.headerIconSize,
+              ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: metrics.headerTitleGap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     l10n.t('users'),
-                    style: theme.textTheme.headlineSmall?.copyWith(
+                    style: (compact
+                            ? theme.textTheme.titleLarge
+                            : theme.textTheme.headlineSmall)
+                        ?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.5,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      color: scheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: compact ? 2 : 4),
                   Text(
                     total != null
                         ? '${l10n.t('users')} · $total ${l10n.t('users').toLowerCase()}'
                         : l10n.t('manageAccountsSubtitle'),
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
+                      fontSize: compact ? 13 : null,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -71,10 +84,19 @@ class UsersPageHeader extends StatelessWidget {
             IconButton.filledTonal(
               onPressed: onRefresh,
               tooltip: l10n.t('retry'),
-              icon: const Icon(Icons.refresh_rounded),
+              icon: Icon(
+                Icons.refresh_rounded,
+                size: compact ? 20 : 24,
+              ),
               style: IconButton.styleFrom(
+                visualDensity:
+                    compact ? VisualDensity.compact : VisualDensity.standard,
+                minimumSize: Size(compact ? 36 : 40, compact ? 36 : 40),
+                tapTargetSize: compact
+                    ? MaterialTapTargetSize.shrinkWrap
+                    : MaterialTapTargetSize.padded,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(compact ? 10 : 12),
                 ),
               ),
             ),

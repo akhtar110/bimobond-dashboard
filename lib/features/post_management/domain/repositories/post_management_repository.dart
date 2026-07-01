@@ -1,5 +1,6 @@
 import '../entities/comment_entity.dart';
 import '../entities/managed_post_entity.dart';
+import '../entities/post_engagement_user_item.dart';
 
 abstract class PostManagementRepository {
   Future<ManagedPostEntity> getManagedPostById(String postId);
@@ -26,4 +27,12 @@ abstract class PostManagementRepository {
   });
 
   Future<void> deleteCommentAsAdmin(String commentId);
+
+  Future<PostEngagementUsersPageEntity> getPostEngagementUsers(
+    String postId, {
+    required PostEngagementKind kind,
+    required int page,
+    required int limit,
+    String? postAuthorId,
+  });
 }

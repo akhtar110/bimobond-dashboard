@@ -31,7 +31,6 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
   bool _hovered = false;
 
   ManagedPostEntity get post => widget.post;
-  bool get isDark => widget.isDark;
 
   void _navigate(BuildContext context) {
     if (post.userId.isEmpty) {
@@ -70,13 +69,12 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    final primary = theme.colorScheme.primary;
 
-    final cardColor = isDark ? const Color(0xFF1A1F2E) : Colors.white;
     final borderColor = _hovered
-        ? primary.withValues(alpha: 0.4)
-        : (isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0));
+        ? scheme.primary.withValues(alpha: 0.4)
+        : scheme.outlineVariant;
 
     return Tooltip(
       message: l10n.t('userProfile'),
@@ -91,22 +89,20 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
             curve: Curves.easeOutCubic,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardColor,
+              color: scheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: isDark
-                        ? (_hovered ? 0.22 : 0.10)
-                        : (_hovered ? 0.07 : 0.03),
+                  color: scheme.shadow.withValues(
+                    alpha: _hovered ? 0.18 : 0.08,
                   ),
                   blurRadius: _hovered ? 16 : 8,
                   offset: Offset(0, _hovered ? 4 : 2),
                 ),
                 if (_hovered)
                   BoxShadow(
-                    color: primary.withValues(alpha: 0.08),
+                    color: scheme.primary.withValues(alpha: 0.08),
                     blurRadius: 20,
                     offset: const Offset(0, 6),
                   ),
@@ -115,13 +111,13 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Card header ───────────────────────────────────────────
                 Row(
                   children: [
                     Text(
                       l10n.t('postAuthor'),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
                       ),
                     ),
                     const Spacer(),
@@ -131,41 +127,27 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                       child: Icon(
                         Icons.open_in_new_rounded,
                         size: 14,
-                        color: primary,
+                        color: scheme.primary,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
-
-                // ── Profile row ───────────────────────────────────────────
                 LayoutBuilder(builder: (context, constraints) {
                   final compact = constraints.maxWidth < 340;
                   return compact
-                      ? _CompactProfile(post: post, isDark: isDark)
-                      : _WideProfile(post: post, isDark: isDark);
+                      ? _CompactProfile(post: post)
+                      : _WideProfile(post: post);
                 }),
-
                 const SizedBox(height: 14),
-
-                // ── Stats row ─────────────────────────────────────────────
-                _AuthorStatsRow(post: post, isDark: isDark),
-
+                _AuthorStatsRow(post: post),
                 const SizedBox(height: 12),
-                Divider(
-                  height: 1,
-                  color: isDark
-                      ? const Color(0xFF2E3440)
-                      : const Color(0xFFE8ECF0),
-                ),
+                Divider(height: 1, color: scheme.outlineVariant),
                 const SizedBox(height: 10),
-
-                // ── Meta info ─────────────────────────────────────────────
                 _MetaRow(
                   icon: Icons.fingerprint_rounded,
                   label: l10n.t('userId'),
                   value: post.userId,
-                  isDark: isDark,
                   mono: true,
                 ),
                 if (post.userJoinedAt != null) ...[
@@ -175,7 +157,6 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                     label: l10n.t('joined'),
                     value: DateFormat('MMM dd, yyyy')
                         .format(post.userJoinedAt!),
-                    isDark: isDark,
                   ),
                 ],
                 if (post.userEmail != null) ...[
@@ -184,7 +165,6 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                     icon: Icons.email_outlined,
                     label: l10n.t('emailAddress'),
                     value: post.userEmail!,
-                    isDark: isDark,
                   ),
                 ],
                 const SizedBox(height: InvestigationTheme.s12),
@@ -196,13 +176,11 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                       icon: Icons.person_outline_rounded,
                       label: l10n.t('viewProfile'),
                       onTap: () => _navigate(context),
-                      isDark: isDark,
                     ),
                     _AuthorActionButton(
                       icon: Icons.timeline_outlined,
                       label: l10n.t('userActivityNav'),
                       onTap: () => _navigate(context),
-                      isDark: isDark,
                     ),
                     _AuthorActionButton(
                       icon: Icons.history_rounded,
@@ -215,7 +193,6 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                           ),
                         );
                       },
-                      isDark: isDark,
                       outlined: true,
                     ),
                   ],
@@ -229,13 +206,10 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
   }
 }
 
-// ── Wide profile (avatar left, details right) ─────────────────────────────────
-
 class _WideProfile extends StatelessWidget {
-  const _WideProfile({required this.post, required this.isDark});
+  const _WideProfile({required this.post});
 
   final ManagedPostEntity post;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -244,19 +218,16 @@ class _WideProfile extends StatelessWidget {
       children: [
         _AuthorAvatar(post: post, radius: 32),
         const SizedBox(width: 14),
-        Expanded(child: _AuthorDetails(post: post, isDark: isDark)),
+        Expanded(child: _AuthorDetails(post: post)),
       ],
     );
   }
 }
 
-// ── Compact profile (avatar + details stacked) ────────────────────────────────
-
 class _CompactProfile extends StatelessWidget {
-  const _CompactProfile({required this.post, required this.isDark});
+  const _CompactProfile({required this.post});
 
   final ManagedPostEntity post;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -264,13 +235,11 @@ class _CompactProfile extends StatelessWidget {
       children: [
         _AuthorAvatar(post: post, radius: 24),
         const SizedBox(height: 10),
-        _AuthorDetails(post: post, isDark: isDark),
+        _AuthorDetails(post: post),
       ],
     );
   }
 }
-
-// ── Avatar with initials fallback ─────────────────────────────────────────────
 
 class _AuthorAvatar extends StatelessWidget {
   const _AuthorAvatar({required this.post, required this.radius});
@@ -290,24 +259,24 @@ class _AuthorAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     final imageUrl = post.userProfileImage;
 
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
-        backgroundColor: primary.withValues(alpha: 0.1),
+        backgroundColor: scheme.primaryContainer,
         backgroundImage: CachedNetworkImageProvider(imageUrl),
       );
     }
 
     return CircleAvatar(
       radius: radius,
-      backgroundColor: primary.withValues(alpha: 0.15),
+      backgroundColor: scheme.primaryContainer,
       child: Text(
         _initials,
         style: TextStyle(
-          color: primary,
+          color: scheme.onPrimaryContainer,
           fontWeight: FontWeight.w800,
           fontSize: radius * 0.65,
         ),
@@ -316,17 +285,15 @@ class _AuthorAvatar extends StatelessWidget {
   }
 }
 
-// ── Name / username / badges ──────────────────────────────────────────────────
-
 class _AuthorDetails extends StatelessWidget {
-  const _AuthorDetails({required this.post, required this.isDark});
+  const _AuthorDetails({required this.post});
 
   final ManagedPostEntity post;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
 
     final displayName = post.userFullName?.isNotEmpty == true
@@ -345,7 +312,7 @@ class _AuthorDetails extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF111827),
+                  color: scheme.onSurface,
                 ),
               ),
             ),
@@ -353,10 +320,10 @@ class _AuthorDetails extends StatelessWidget {
               const SizedBox(width: 6),
               Tooltip(
                 message: l10n.t('verified'),
-                child: const Icon(
+                child: Icon(
                   Icons.verified_rounded,
                   size: 15,
-                  color: Colors.blue,
+                  color: scheme.primary,
                 ),
               ),
             ],
@@ -369,7 +336,7 @@ class _AuthorDetails extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -380,13 +347,10 @@ class _AuthorDetails extends StatelessWidget {
   }
 }
 
-// ── Followers / following / posts stats ──────────────────────────────────────
-
 class _AuthorStatsRow extends StatelessWidget {
-  const _AuthorStatsRow({required this.post, required this.isDark});
+  const _AuthorStatsRow({required this.post});
 
   final ManagedPostEntity post;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -398,23 +362,20 @@ class _AuthorStatsRow extends StatelessWidget {
           child: _StatTile(
             value: _compact(post.userFollowersCount),
             label: l10n.t('followers'),
-            isDark: isDark,
           ),
         ),
-        _VertDivider(isDark: isDark),
+        const _VertDivider(),
         Expanded(
           child: _StatTile(
             value: _compact(post.userFollowingCount),
             label: l10n.t('following'),
-            isDark: isDark,
           ),
         ),
-        _VertDivider(isDark: isDark),
+        const _VertDivider(),
         Expanded(
           child: _StatTile(
             value: _compact(post.userPostsCount),
             label: l10n.t('posts'),
-            isDark: isDark,
           ),
         ),
       ],
@@ -432,32 +393,30 @@ class _StatTile extends StatelessWidget {
   const _StatTile({
     required this.value,
     required this.label,
-    required this.isDark,
   });
 
   final String value;
   final String label;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Column(
       children: [
         Text(
           value,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            color: scheme.onSurface,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
+          style: theme.textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w500,
-            color: isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF),
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -466,20 +425,17 @@ class _StatTile extends StatelessWidget {
 }
 
 class _VertDivider extends StatelessWidget {
-  const _VertDivider({required this.isDark});
-  final bool isDark;
+  const _VertDivider();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 1,
       height: 32,
-      color: isDark ? const Color(0xFF2E3440) : const Color(0xFFE8ECF0),
+      color: Theme.of(context).colorScheme.outlineVariant,
     );
   }
 }
-
-// ── Account status badge ──────────────────────────────────────────────────────
 
 class _AccountStatusBadge extends StatelessWidget {
   const _AccountStatusBadge({required this.isBanned});
@@ -488,16 +444,12 @@ class _AccountStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     final label = isBanned ? l10n.t('banned') : l10n.t('active');
-    final fg = isBanned
-        ? (isDark ? const Color(0xFFFCA5A5) : Colors.red.shade700)
-        : (isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D));
-    final bg = isBanned
-        ? (isDark ? const Color(0xFF3B1D1D) : Colors.red.shade50)
-        : (isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7));
-    final dot = isBanned ? Colors.red.shade400 : const Color(0xFF22C55E);
+    final fg = isBanned ? scheme.onErrorContainer : scheme.onTertiaryContainer;
+    final bg = isBanned ? scheme.errorContainer : scheme.tertiaryContainer;
+    final dot = isBanned ? scheme.error : scheme.tertiary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -531,29 +483,27 @@ class _MetaRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
-    required this.isDark,
     this.mono = false,
   });
 
   final IconData icon;
   final String label;
   final String value;
-  final bool isDark;
   final bool mono;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF);
+    final scheme = theme.colorScheme;
 
     return Row(
       children: [
-        Icon(icon, size: 14, color: muted),
+        Icon(icon, size: 14, color: scheme.onSurfaceVariant),
         const SizedBox(width: 8),
         Text(
           '$label: ',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: muted,
+            color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -563,7 +513,7 @@ class _MetaRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: isDark ? Colors.grey.shade300 : const Color(0xFF374151),
+              color: scheme.onSurface,
               fontWeight: FontWeight.w600,
               fontFamily: mono ? 'monospace' : null,
               fontSize: mono ? 11 : null,
@@ -580,19 +530,16 @@ class _AuthorActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    required this.isDark,
     this.outlined = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool isDark;
   final bool outlined;
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
     if (outlined) {
       return OutlinedButton.icon(
         onPressed: onTap,
@@ -612,8 +559,6 @@ class _AuthorActionButton extends StatelessWidget {
       icon: Icon(icon, size: 14),
       label: Text(label),
       style: FilledButton.styleFrom(
-        backgroundColor: primary.withValues(alpha: isDark ? 0.15 : 0.08),
-        foregroundColor: primary,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(

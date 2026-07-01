@@ -96,15 +96,15 @@ class GiftReportCounts extends Equatable {
 
 class GiftReportRevenue extends Equatable {
   const GiftReportRevenue({
-    required this.spendUsd,
-    required this.contributionUsd,
+    required this.spendCoins,
+    required this.contributionCoins,
   });
 
-  final double spendUsd;
-  final double contributionUsd;
+  final double spendCoins;
+  final double contributionCoins;
 
   @override
-  List<Object?> get props => [spendUsd, contributionUsd];
+  List<Object?> get props => [spendCoins, contributionCoins];
 }
 
 class GiftReportListItemEntity extends Equatable {
@@ -113,7 +113,7 @@ class GiftReportListItemEntity extends Equatable {
     required this.name,
     required this.thumbnailUrl,
     this.animationUrl,
-    required this.priceUsd,
+    required this.priceCoins,
     required this.isActive,
     this.publishedAt,
     required this.counts,
@@ -124,7 +124,7 @@ class GiftReportListItemEntity extends Equatable {
   final String name;
   final String thumbnailUrl;
   final String? animationUrl;
-  final double priceUsd;
+  final double priceCoins;
   final bool isActive;
   final DateTime? publishedAt;
   final GiftReportCounts counts;
@@ -136,7 +136,7 @@ class GiftReportListItemEntity extends Equatable {
         name,
         thumbnailUrl,
         animationUrl,
-        priceUsd,
+        priceCoins,
         isActive,
         publishedAt,
         counts,
@@ -171,53 +171,60 @@ class GiftReportTopGiftSummary extends Equatable {
     required this.id,
     required this.name,
     this.thumbnailUrl,
-    required this.priceUsd,
+    required this.priceCoins,
     required this.transactions,
-    required this.spendUsd,
+    required this.spendCoins,
   });
 
   final String id;
   final String name;
   final String? thumbnailUrl;
-  final double priceUsd;
+  final double priceCoins;
   final int transactions;
-  final double spendUsd;
+  final double spendCoins;
+
+  String get displayName {
+    final trimmed = name.trim();
+    if (trimmed.isNotEmpty) return trimmed;
+    if (id.isNotEmpty) return 'Gift $id';
+    return 'Unknown gift';
+  }
 
   @override
   List<Object?> get props =>
-      [id, name, thumbnailUrl, priceUsd, transactions, spendUsd];
+      [id, name, thumbnailUrl, priceCoins, transactions, spendCoins];
 }
 
 class GiftReportTopUserActivity extends Equatable {
   const GiftReportTopUserActivity({
     required this.user,
     required this.sendCount,
-    required this.spendUsd,
-    required this.contributionUsd,
+    required this.spendCoins,
+    required this.contributionCoins,
   });
 
   final GiftReportUserSummary user;
   final int sendCount;
-  final double spendUsd;
-  final double contributionUsd;
+  final double spendCoins;
+  final double contributionCoins;
 
   @override
-  List<Object?> get props => [user, sendCount, spendUsd, contributionUsd];
+  List<Object?> get props => [user, sendCount, spendCoins, contributionCoins];
 }
 
 class GiftReportTopReceiverActivity extends Equatable {
   const GiftReportTopReceiverActivity({
     required this.user,
     required this.receiveCount,
-    required this.earnedUsd,
+    required this.earnedCoins,
   });
 
   final GiftReportUserSummary user;
   final int receiveCount;
-  final double earnedUsd;
+  final double earnedCoins;
 
   @override
-  List<Object?> get props => [user, receiveCount, earnedUsd];
+  List<Object?> get props => [user, receiveCount, earnedCoins];
 }
 
 class GiftReportOverviewEntity extends Equatable {
@@ -229,13 +236,13 @@ class GiftReportOverviewEntity extends Equatable {
     required this.totalTransactions,
     required this.transactionsInPeriod,
     required this.inventoryHeld,
-    required this.allTimeSpendUsd,
-    required this.allTimeContributionUsd,
-    required this.allTimeCommissionUsd,
+    required this.allTimeSpendCoins,
+    required this.allTimeContributionCoins,
+    required this.allTimeCommissionCoins,
     required this.periodTransactions,
-    required this.periodSpendUsd,
-    required this.periodContributionUsd,
-    required this.periodCommissionUsd,
+    required this.periodSpendCoins,
+    required this.periodContributionCoins,
+    required this.periodCommissionCoins,
     required this.toPost,
     required this.toLive,
     required this.toAuction,
@@ -253,13 +260,13 @@ class GiftReportOverviewEntity extends Equatable {
   final int totalTransactions;
   final int transactionsInPeriod;
   final int inventoryHeld;
-  final double allTimeSpendUsd;
-  final double allTimeContributionUsd;
-  final double allTimeCommissionUsd;
+  final double allTimeSpendCoins;
+  final double allTimeContributionCoins;
+  final double allTimeCommissionCoins;
   final int periodTransactions;
-  final double periodSpendUsd;
-  final double periodContributionUsd;
-  final double periodCommissionUsd;
+  final double periodSpendCoins;
+  final double periodContributionCoins;
+  final double periodCommissionCoins;
   final int toPost;
   final int toLive;
   final int toAuction;
@@ -278,13 +285,13 @@ class GiftReportOverviewEntity extends Equatable {
         totalTransactions,
         transactionsInPeriod,
         inventoryHeld,
-        allTimeSpendUsd,
-        allTimeContributionUsd,
-        allTimeCommissionUsd,
+        allTimeSpendCoins,
+        allTimeContributionCoins,
+        allTimeCommissionCoins,
         periodTransactions,
-        periodSpendUsd,
-        periodContributionUsd,
-        periodCommissionUsd,
+        periodSpendCoins,
+        periodContributionCoins,
+        periodCommissionCoins,
         toPost,
         toLive,
         toAuction,
@@ -320,8 +327,8 @@ class GiftReportTransactionEntity extends Equatable {
     this.postId,
     this.liveId,
     this.auctionId,
-    required this.priceUsd,
-    required this.contributionUsd,
+    required this.priceCoins,
+    required this.contributionCoins,
     required this.createdAt,
     this.sender,
     this.receiver,
@@ -335,8 +342,8 @@ class GiftReportTransactionEntity extends Equatable {
   final String? postId;
   final String? liveId;
   final String? auctionId;
-  final double priceUsd;
-  final double contributionUsd;
+  final double priceCoins;
+  final double contributionCoins;
   final DateTime createdAt;
   final GiftReportUserSummary? sender;
   final GiftReportUserSummary? receiver;
@@ -351,8 +358,8 @@ class GiftReportTransactionEntity extends Equatable {
         postId,
         liveId,
         auctionId,
-        priceUsd,
-        contributionUsd,
+        priceCoins,
+        contributionCoins,
         createdAt,
         sender,
         receiver,
@@ -365,14 +372,14 @@ class GiftReportDetailEntity extends Equatable {
     required this.period,
     required this.gift,
     required this.counts,
-    required this.priceUsd,
-    required this.allTimeSpendUsd,
-    required this.allTimeContributionUsd,
-    required this.allTimeCommissionUsd,
+    required this.priceCoins,
+    required this.allTimeSpendCoins,
+    required this.allTimeContributionCoins,
+    required this.allTimeCommissionCoins,
     required this.periodTransactions,
-    required this.periodSpendUsd,
-    required this.periodContributionUsd,
-    required this.periodCommissionUsd,
+    required this.periodSpendCoins,
+    required this.periodContributionCoins,
+    required this.periodCommissionCoins,
     required this.toPost,
     required this.toLive,
     required this.toAuction,
@@ -385,14 +392,14 @@ class GiftReportDetailEntity extends Equatable {
   final GiftReportPeriod period;
   final GiftReportListItemEntity gift;
   final GiftReportCounts counts;
-  final double priceUsd;
-  final double allTimeSpendUsd;
-  final double allTimeContributionUsd;
-  final double allTimeCommissionUsd;
+  final double priceCoins;
+  final double allTimeSpendCoins;
+  final double allTimeContributionCoins;
+  final double allTimeCommissionCoins;
   final int periodTransactions;
-  final double periodSpendUsd;
-  final double periodContributionUsd;
-  final double periodCommissionUsd;
+  final double periodSpendCoins;
+  final double periodContributionCoins;
+  final double periodCommissionCoins;
   final int toPost;
   final int toLive;
   final int toAuction;
@@ -406,14 +413,14 @@ class GiftReportDetailEntity extends Equatable {
         period,
         gift,
         counts,
-        priceUsd,
-        allTimeSpendUsd,
-        allTimeContributionUsd,
-        allTimeCommissionUsd,
+        priceCoins,
+        allTimeSpendCoins,
+        allTimeContributionCoins,
+        allTimeCommissionCoins,
         periodTransactions,
-        periodSpendUsd,
-        periodContributionUsd,
-        periodCommissionUsd,
+        periodSpendCoins,
+        periodContributionCoins,
+        periodCommissionCoins,
         toPost,
         toLive,
         toAuction,

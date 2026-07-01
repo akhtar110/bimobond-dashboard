@@ -46,7 +46,10 @@ Future<void> openOriginalRepostPost(
   return openPostInvestigation(
     context,
     postId: post.id,
-    post: managedPostFromUserPost(post, author: sourceUser),
+    post: managedPostFromUserPost(
+      post,
+      author: resolveProfileUserAsPostOwner(post, sourceUser),
+    ),
     sourceUser: sourceUser,
     activityContext: ActivityContext.post(
       activityDate: repost.repostedAt ?? post.createdAt,
@@ -144,8 +147,6 @@ class UserRepostDetailsSheet extends StatelessWidget {
     final authorFullName = postUser?['fullName']?.toString();
     final authorAvatar = postUser?['avatarUrl']?.toString();
 
-    final sheetBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-
     return DraggableScrollableSheet(
       initialChildSize: 0.72,
       minChildSize: 0.45,
@@ -153,11 +154,11 @@ class UserRepostDetailsSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: sheetBg,
+            color: scheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
+                color: scheme.shadow.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, -4),
               ),
@@ -185,7 +186,7 @@ class UserRepostDetailsSheet extends StatelessWidget {
                         l10n.tOr('repostDetails', 'Repost Details'),
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          color: scheme.onSurface,
                         ),
                       ),
                     ),
@@ -251,9 +252,7 @@ class UserRepostDetailsSheet extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF0F172A)
-                            : const Color(0xFFF8FAFC),
+                        color: scheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: scheme.outlineVariant),
                       ),
@@ -337,7 +336,7 @@ class UserRepostDetailsSheet extends StatelessWidget {
                                       label: formatRepostEngagement(
                                         post.likeCount,
                                       ),
-                                      color: Colors.red,
+                                      color: scheme.error,
                                     ),
                                     RepostStatBadge(
                                       icon: Icons.comment_rounded,
@@ -351,7 +350,7 @@ class UserRepostDetailsSheet extends StatelessWidget {
                                       label: formatRepostEngagement(
                                         post.viewCount,
                                       ),
-                                      color: Colors.blue,
+                                      color: scheme.secondary,
                                     ),
                                   ],
                                 ),
@@ -441,7 +440,7 @@ class ReposterProfileCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: scheme.outlineVariant),
       ),
@@ -476,20 +475,18 @@ class ReposterProfileCard extends StatelessWidget {
                             displayName,
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF111827),
+                              color: scheme.onSurface,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (reposter.isVerified)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
                             child: Icon(
                               Icons.verified_rounded,
                               size: 16,
-                              color: Colors.blue,
+                              color: scheme.primary,
                             ),
                           ),
                       ],
@@ -539,12 +536,12 @@ class ReposterProfileCard extends StatelessWidget {
                             label: formatRepostEngagement(
                               statsUser.followingCount,
                             ),
-                            color: Colors.teal,
+                            color: scheme.tertiary,
                           ),
                           RepostStatBadge(
                             icon: Icons.grid_view_rounded,
                             label: formatRepostEngagement(statsUser.postCount),
-                            color: Colors.orange,
+                            color: scheme.secondary,
                           ),
                         ],
                       ),

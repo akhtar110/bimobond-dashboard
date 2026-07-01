@@ -1,13 +1,11 @@
 import 'package:intl/intl.dart';
 
-final _currency = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
-final _compact = NumberFormat.compact();
+import '../../../../core/utils/coin_format.dart';
 
-String formatReportUsd(double value) => _currency.format(value);
+/// Formats in-app coin amounts for gift reports (never USD).
+String formatReportCoins(double value) => CoinFormat.coins(value);
 
-String formatReportCount(int value) => _compact.format(value);
+String formatReportCount(int value) => value.toString();
 
-String formatReportDate(DateTime? date) {
-  if (date == null) return '—';
-  return DateFormat.yMMMd().format(date.toLocal());
-}
+String formatReportDate(DateTime? date) =>
+    date == null ? '—' : DateFormat.yMMMd().format(date.toLocal());

@@ -9,13 +9,34 @@ class UserActivityItemModel extends UserActivityItemEntity {
   });
 
   factory UserActivityItemModel.fromJson(Map<String, dynamic> json) {
+    final details = json['details'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['details'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+
+    for (final key in [
+      'post',
+      'targetPost',
+      'user',
+      'postAuthor',
+      'postOwner',
+      'author',
+      'postId',
+    ]) {
+      if (json[key] != null && !details.containsKey(key)) {
+        details[key] = json[key];
+      }
+    }
+
+    final targetPost = details['targetPost'];
+    if (targetPost is Map<String, dynamic> && !details.containsKey('post')) {
+      details['post'] = targetPost;
+    }
+
     return UserActivityItemModel(
       id: json['id']?.toString() ?? '',
       type: json['type']?.toString() ?? '',
       createdAt: _date(json['createdAt']),
-      details: json['details'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['details'] as Map<String, dynamic>)
-          : const {},
+      details: details,
     );
   }
 

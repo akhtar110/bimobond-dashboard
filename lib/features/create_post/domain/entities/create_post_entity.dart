@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../post_management/domain/entities/post_media_entity.dart';
 import 'create_post_auction_entity.dart';
 import 'local_media_file.dart';
@@ -34,6 +36,7 @@ class CreatePostEntity {
     this.originalPostId,
     this.media = const [],
     this.localMedia = const [],
+    this.thumbnailBytes,
   });
 
   final String type;
@@ -64,6 +67,10 @@ class CreatePostEntity {
   final String? originalPostId;
   final List<PostMediaEntity> media;
   final List<LocalMediaFile> localMedia;
+  final Uint8List? thumbnailBytes;
+
+  bool get hasVideoMedia =>
+      localMedia.any((file) => file.mediaType == 'VIDEO');
 
   CreatePostEntity copyWith({
     String? type,
@@ -92,6 +99,7 @@ class CreatePostEntity {
     String? originalPostId,
     List<PostMediaEntity>? media,
     List<LocalMediaFile>? localMedia,
+    Uint8List? thumbnailBytes,
     bool clearCategory = false,
     bool clearDescription = false,
     bool clearLocationId = false,
@@ -101,12 +109,16 @@ class CreatePostEntity {
     bool clearVideoFields = false,
     bool clearMedia = false,
     bool clearAuction = false,
+    bool clearThumbnailBytes = false,
+    bool clearThumbnailUrl = false,
   }) {
     return CreatePostEntity(
       type: type ?? this.type,
       videoUrl: clearVideoFields ? null : (videoUrl ?? this.videoUrl),
       hlsUrl: clearVideoFields ? null : (hlsUrl ?? this.hlsUrl),
-      thumbnailUrl: clearVideoFields ? null : (thumbnailUrl ?? this.thumbnailUrl),
+      thumbnailUrl: clearVideoFields || clearThumbnailUrl
+          ? null
+          : (thumbnailUrl ?? this.thumbnailUrl),
       animatedCoverUrl:
           clearVideoFields ? null : (animatedCoverUrl ?? this.animatedCoverUrl),
       description: clearDescription ? null : (description ?? this.description),
@@ -133,6 +145,9 @@ class CreatePostEntity {
           clearOriginalPostId ? null : (originalPostId ?? this.originalPostId),
       media: clearMedia ? const [] : (media ?? this.media),
       localMedia: localMedia ?? this.localMedia,
+      thumbnailBytes: clearThumbnailBytes
+          ? null
+          : (thumbnailBytes ?? this.thumbnailBytes),
     );
   }
 
@@ -153,6 +168,9 @@ class CreatePostEntity {
       hasLocalMedia &&
       hasDescription &&
       (!isAuctionable || (auction?.isComplete ?? false));
+
+  /// Drafts only require attached media; description and auction can be finished later.
+  bool get canSaveDraft => hasLocalMedia;
 
   /// Inferred API post type from attached media (used when building payload).
   String get inferredType {

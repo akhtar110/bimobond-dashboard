@@ -1,4 +1,7 @@
 import '../../domain/entities/analytics_entities.dart';
+import '../../domain/entities/period_engagement_entity.dart';
+import '../../domain/entities/post_status_count_entity.dart';
+import '../../domain/entities/post_type_count_entity.dart';
 
 /// Shared JSON parsing helpers for analytics API responses.
 abstract final class AnalyticsJsonParser {
@@ -53,6 +56,69 @@ abstract final class AnalyticsJsonParser {
     if (value is! Map) return {};
     return value.map(
       (k, v) => MapEntry(k.toString(), asInt(v)),
+    );
+  }
+
+  static List<PostTypeCountEntity> postTypeCounts(
+    dynamic value, {
+    List<String> knownTypes = PostTypeCountEntity.knownTypes,
+  }) {
+    final counts = <String, int>{for (final type in knownTypes) type: 0};
+
+    if (value is List) {
+      for (final item in value) {
+        if (item is! Map) continue;
+        final m = Map<String, dynamic>.from(item);
+        final type = m['type']?.toString().toUpperCase() ?? '';
+        if (type.isEmpty) continue;
+        counts[type] = asInt(m['count']);
+      }
+    } else if (value is Map) {
+      for (final entry in intMap(value).entries) {
+        counts[entry.key.toUpperCase()] = entry.value;
+      }
+    }
+
+    return knownTypes
+        .map((type) => PostTypeCountEntity(type: type, count: counts[type] ?? 0))
+        .toList(growable: false);
+  }
+
+  static List<PostStatusCountEntity> postStatusCounts(
+    dynamic value, {
+    List<String> knownStatuses = PostStatusCountEntity.knownStatuses,
+  }) {
+    final counts = <String, int>{for (final status in knownStatuses) status: 0};
+
+    if (value is List) {
+      for (final item in value) {
+        if (item is! Map) continue;
+        final m = Map<String, dynamic>.from(item);
+        final status = m['status']?.toString().toUpperCase() ?? '';
+        if (status.isEmpty) continue;
+        counts[status] = asInt(m['count']);
+      }
+    } else if (value is Map) {
+      for (final entry in intMap(value).entries) {
+        counts[entry.key.toUpperCase()] = entry.value;
+      }
+    }
+
+    return knownStatuses
+        .map(
+          (status) =>
+              PostStatusCountEntity(status: status, count: counts[status] ?? 0),
+        )
+        .toList(growable: false);
+  }
+
+  static PeriodEngagementEntity periodEngagement(dynamic value) {
+    final map = value is Map ? Map<String, dynamic>.from(value) : const {};
+    return PeriodEngagementEntity(
+      views: asInt(map['views']),
+      likes: asInt(map['likes']),
+      comments: asInt(map['comments']),
+      reposts: asInt(map['reposts']),
     );
   }
 

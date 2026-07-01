@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
+import '../utils/responsive.dart';
+import 'users_card_row.dart';
+import 'users_load_more_indicators.dart';
 import 'users_pagination_bar.dart';
 import 'users_shimmer.dart';
 import 'users_table_config.dart';
@@ -13,38 +17,39 @@ class UsersTablePanel extends StatelessWidget {
   const UsersTablePanel({
     super.key,
     required this.horizontalScrollController,
+    required this.listScrollController,
+    required this.metrics,
+    required this.onUserTap,
   });
 
   final ScrollController horizontalScrollController;
+  final ScrollController listScrollController;
+  final UsersLayoutMetrics metrics;
+  final void Function(UserEntity user) onUserTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: isDark ? const Color(0xFF12151C) : Colors.white,
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : const Color(0xFFE6E8EC),
-        ),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.4)
-                : Colors.black.withValues(alpha: 0.06),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
+            color: scheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: BlocBuilder<UsersBloc, UsersState>(
+          buildWhen: (previous, current) =>
+              previous.runtimeType != current.runtimeType,
           builder: (context, state) {
             return AnimatedSwitcher(
               duration: const Duration(milliseconds: 280),
@@ -78,10 +83,11 @@ class UsersTablePanel extends StatelessWidget {
                         ),
                     isDestructive: false,
                   ),
-                UsersLoaded() => _LoadedTable(
-                    key: ValueKey('loaded-${state.currentPage}-${state.filter}'),
-                    state: state,
-                    horizontalScrollController: horizontalScrollController,
+                UsersLoaded() => _LoadedUsersContent(
+                    key: const ValueKey('loaded'),
+                    metrics: metrics,
+                    listScrollController: listScrollController,
+                    onUserTap: onUserTap,
                   ),
               },
             );
@@ -92,67 +98,349 @@ class UsersTablePanel extends StatelessWidget {
   }
 }
 
-class _LoadedTable extends StatelessWidget {
-  const _LoadedTable({
+class _LoadedUsersContent extends StatelessWidget {
+  const _LoadedUsersContent({
     super.key,
-    required this.state,
-    required this.horizontalScrollController,
+    required this.metrics,
+    required this.listScrollController,
+    required this.onUserTap,
   });
 
-  final UsersLoaded state;
-  final ScrollController horizontalScrollController;
+  final UsersLayoutMetrics metrics;
+  final ScrollController listScrollController;
+  final void Function(UserEntity user) onUserTap;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    return BlocSelector<UsersBloc, UsersState, int>(
+      selector: (state) => state is UsersLoaded ? state.total : 0,
+      builder: (context, total) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                metrics.cardPadding,
+                metrics.cardPadding - 4,
+                metrics.cardPadding,
+                8,
+              ),
+              child: Text(
+                '$total ${l10n.t('users')}',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ),
+            Expanded(
+              child: metrics.useCompactTable
+                  ? _MobileCardList(
+                      metrics: metrics,
+                      listScrollController: listScrollController,
+                      onUserTap: onUserTap,
+                    )
+                  : _DesktopTabletTable(
+                      metrics: metrics,
+                      listScrollController: listScrollController,
+                      onUserTap: onUserTap,
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MobileCardList extends StatelessWidget {
+  const _MobileCardList({
+    required this.metrics,
+    required this.listScrollController,
+    required this.onUserTap,
+  });
+
+  final UsersLayoutMetrics metrics;
+  final ScrollController listScrollController;
+  final void Function(UserEntity user) onUserTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<UsersBloc, UsersState, _UsersListData>(
+      selector: (state) {
+        if (state is! UsersLoaded) {
+          return const _UsersListData.empty();
+        }
+        return _UsersListData(
+          users: state.users,
+          selectedUserIds: state.selectedUserIds,
+          selectionEnabled: !state.isBulkActionLoading,
+          isLoadingMore: state.isLoadingMore,
+          hasReachedMax: state.hasReachedMax,
+        );
+      },
+      builder: (context, data) {
+        final itemCount = data.users.length +
+            (data.isLoadingMore ? 1 : 0) +
+            (data.hasReachedMax && data.users.isNotEmpty ? 1 : 0);
+
+        return ListView.builder(
+          controller: listScrollController,
+          physics: metrics.listScrollPhysics,
+          padding: EdgeInsets.fromLTRB(
+            metrics.cardPadding - 4,
+            0,
+            metrics.cardPadding - 4,
+            metrics.cardPadding,
+          ),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            if (index < data.users.length) {
+              final user = data.users[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: UsersCardRow(
+                  key: ValueKey(user.id),
+                  user: user,
+                  isSelected: data.selectedUserIds.contains(user.id),
+                  selectionEnabled: data.selectionEnabled,
+                  onUserTap: () => onUserTap(user),
+                ),
+              );
+            }
+
+            if (data.isLoadingMore) {
+              return const UsersLoadMoreIndicator();
+            }
+
+            return const UsersEndOfListLabel();
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DesktopTabletTable extends StatelessWidget {
+  const _DesktopTabletTable({
+    required this.metrics,
+    required this.listScrollController,
+    required this.onUserTap,
+  });
+
+  final UsersLayoutMetrics metrics;
+  final ScrollController listScrollController;
+  final void Function(UserEntity user) onUserTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final config =
-                  UsersTableConfig.fromConstraints(constraints.maxWidth);
-              final tableWidth = constraints.maxWidth < config.minWidth
-                  ? config.minWidth
-                  : constraints.maxWidth;
-              final needsHorizontalScroll = constraints.maxWidth < tableWidth;
+              final config = UsersTableConfig.fromConstraints(
+                constraints.maxWidth,
+                deviceType: metrics.deviceType,
+              );
 
-              return Scrollbar(
-                controller: horizontalScrollController,
-                thumbVisibility: needsHorizontalScroll,
-                child: SingleChildScrollView(
-                  controller: horizontalScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: tableWidth,
-                    height: constraints.maxHeight,
-                    child: Column(
-                      children: [
-                        UsersTableHeader(config: config),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: state.users.length,
-                            itemBuilder: (context, index) => UsersTableRow(
-                              user: state.users[index],
-                              config: config,
-                            ),
-                          ),
-                        ),
-                      ],
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                  border: Border(
+                    top: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: 0.5),
                     ),
                   ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    UsersTableHeader(config: config),
+                    Expanded(
+                      child: _TableBody(
+                        config: config,
+                        listScrollController: listScrollController,
+                        scrollPhysics: metrics.listScrollPhysics,
+                        useInfiniteScroll: metrics.useInfiniteScroll,
+                        onUserTap: onUserTap,
+                      ),
+                    ),
+                  ],
                 ),
               );
             },
           ),
         ),
-        UsersPaginationBar(
-          currentPage: state.currentPage,
-          lastPage: state.lastPage,
-          total: state.total,
-        ),
+        if (metrics.useDesktopPagination)
+          BlocSelector<UsersBloc, UsersState, _PaginationData>(
+            selector: (state) {
+              if (state is! UsersLoaded) {
+                return const _PaginationData.empty();
+              }
+              return _PaginationData(
+                currentPage: state.currentPage,
+                lastPage: state.lastPage,
+                total: state.total,
+              );
+            },
+            builder: (context, data) {
+              if (!data.visible) return const SizedBox.shrink();
+              return UsersPaginationBar(
+                currentPage: data.currentPage,
+                lastPage: data.lastPage,
+                total: data.total,
+              );
+            },
+          ),
       ],
     );
   }
+}
+
+class _TableBody extends StatelessWidget {
+  const _TableBody({
+    required this.config,
+    required this.listScrollController,
+    required this.scrollPhysics,
+    required this.useInfiniteScroll,
+    required this.onUserTap,
+  });
+
+  final UsersTableConfig config;
+  final ScrollController listScrollController;
+  final ScrollPhysics scrollPhysics;
+  final bool useInfiniteScroll;
+  final void Function(UserEntity user) onUserTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return BlocSelector<UsersBloc, UsersState, _UsersListData>(
+      selector: (state) {
+        if (state is! UsersLoaded) {
+          return const _UsersListData.empty();
+        }
+        return _UsersListData(
+          users: state.users,
+          selectedUserIds: state.selectedUserIds,
+          selectionEnabled: !state.isBulkActionLoading,
+          isLoadingMore: state.isLoadingMore,
+          hasReachedMax: state.hasReachedMax,
+        );
+      },
+      builder: (context, data) {
+        final trailingCount = useInfiniteScroll
+            ? (data.isLoadingMore ? 1 : 0) +
+                (data.hasReachedMax && data.users.isNotEmpty ? 1 : 0)
+            : 0;
+
+        return ListView.separated(
+          controller: listScrollController,
+          physics: scrollPhysics,
+          padding: EdgeInsets.zero,
+          itemCount: data.users.length + trailingCount,
+          separatorBuilder: (context, index) {
+            if (index >= data.users.length - 1) {
+              return const SizedBox.shrink();
+            }
+            return Divider(
+              height: 1,
+              color: scheme.outlineVariant.withValues(alpha: 0.35),
+            );
+          },
+          itemBuilder: (context, index) {
+            if (index < data.users.length) {
+              final user = data.users[index];
+              return UsersTableRow(
+                key: ValueKey(user.id),
+                user: user,
+                config: config,
+                striped: index.isOdd,
+                isSelected: data.selectedUserIds.contains(user.id),
+                selectionEnabled: data.selectionEnabled,
+                onToggleSelection: (id) => context
+                    .read<UsersBloc>()
+                    .add(ToggleUserSelectionEvent(id)),
+                onUserTap: () => onUserTap(user),
+              );
+            }
+
+            if (data.isLoadingMore) {
+              return const UsersLoadMoreIndicator();
+            }
+
+            return const UsersEndOfListLabel();
+          },
+        );
+      },
+    );
+  }
+}
+
+class _UsersListData {
+  const _UsersListData({
+    required this.users,
+    required this.selectedUserIds,
+    required this.selectionEnabled,
+    required this.isLoadingMore,
+    required this.hasReachedMax,
+  });
+
+  const _UsersListData.empty()
+      : users = const [],
+        selectedUserIds = const {},
+        selectionEnabled = true,
+        isLoadingMore = false,
+        hasReachedMax = true;
+
+  final List<UserEntity> users;
+  final Set<String> selectedUserIds;
+  final bool selectionEnabled;
+  final bool isLoadingMore;
+  final bool hasReachedMax;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _UsersListData &&
+        other.users == users &&
+        other.selectedUserIds == selectedUserIds &&
+        other.selectionEnabled == selectionEnabled &&
+        other.isLoadingMore == isLoadingMore &&
+        other.hasReachedMax == hasReachedMax;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        users,
+        selectedUserIds,
+        selectionEnabled,
+        isLoadingMore,
+        hasReachedMax,
+      );
+}
+
+class _PaginationData {
+  const _PaginationData({
+    required this.currentPage,
+    required this.lastPage,
+    required this.total,
+  }) : visible = true;
+
+  const _PaginationData.empty()
+      : currentPage = 1,
+        lastPage = 1,
+        total = 0,
+        visible = false;
+
+  final int currentPage;
+  final int lastPage;
+  final int total;
+  final bool visible;
 }
 
 class _StatePanel extends StatelessWidget {
@@ -176,8 +464,7 @@ class _StatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
 
     return Center(
       child: Padding(
@@ -189,16 +476,16 @@ class _StatePanel extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primary.withValues(alpha: isDark ? 0.12 : 0.08),
+                color: scheme.primaryContainer.withValues(alpha: 0.65),
               ),
-              child: Icon(icon, size: 40, color: primary),
+              child: Icon(icon, size: 40, color: scheme.primary),
             ),
             const SizedBox(height: 20),
             Text(
               title,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -206,7 +493,7 @@ class _StatePanel extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
+                color: scheme.onSurfaceVariant,
                 height: 1.5,
               ),
             ),

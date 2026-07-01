@@ -22,6 +22,8 @@ final class AnalyticsLoaded extends AnalyticsState {
   const AnalyticsLoaded({
     required this.query,
     required this.preset,
+    this.mode = AnalyticsDashboardMode.admin,
+    this.accessLevel = AnalyticsAccessLevel.admin,
     this.overview,
     this.users,
     this.posts,
@@ -37,6 +39,8 @@ final class AnalyticsLoaded extends AnalyticsState {
 
   final AnalyticsQuery query;
   final AnalyticsDatePreset preset;
+  final AnalyticsDashboardMode mode;
+  final AnalyticsAccessLevel accessLevel;
   final AnalyticsOverviewEntity? overview;
   final AnalyticsUsersEntity? users;
   final AnalyticsPostsEntity? posts;
@@ -60,11 +64,17 @@ final class AnalyticsLoaded extends AnalyticsState {
       categories != null ||
       growth != null;
 
+  bool get showMonetization => accessLevel == AnalyticsAccessLevel.admin;
+
+  bool get isAdminDashboard => mode == AnalyticsDashboardMode.admin;
+
   String? errorFor(String section) => sectionErrors[section];
 
   AnalyticsLoaded copyWith({
     AnalyticsQuery? query,
     AnalyticsDatePreset? preset,
+    AnalyticsDashboardMode? mode,
+    AnalyticsAccessLevel? accessLevel,
     AnalyticsOverviewEntity? overview,
     AnalyticsUsersEntity? users,
     AnalyticsPostsEntity? posts,
@@ -89,6 +99,8 @@ final class AnalyticsLoaded extends AnalyticsState {
     return AnalyticsLoaded(
       query: query ?? this.query,
       preset: preset ?? this.preset,
+      mode: mode ?? this.mode,
+      accessLevel: accessLevel ?? this.accessLevel,
       overview: clearOverview ? null : (overview ?? this.overview),
       users: clearUsers ? null : (users ?? this.users),
       posts: clearPosts ? null : (posts ?? this.posts),
@@ -108,6 +120,8 @@ final class AnalyticsLoaded extends AnalyticsState {
   List<Object?> get props => [
         query,
         preset,
+        mode,
+        accessLevel,
         overview,
         users,
         posts,

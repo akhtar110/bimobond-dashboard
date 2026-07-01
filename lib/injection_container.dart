@@ -2,11 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
+import 'core/config/api_config.dart';
 import 'core/utils/media_url_resolver.dart';
 import 'features/auth/data/datasource/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
+import 'features/auth/domain/usecases/logout_usecase.dart';
+import 'features/auth/domain/usecases/save_session_usecase.dart';
 import 'features/auth/domain/usecases/login_with_google_usecase.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -14,6 +17,17 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'features/auth/data/datasource/auth_local_data_source.dart';
 
 import 'features/settings/presentation/bloc/settings_cubit.dart';
+import 'features/settings/data/datasources/app_settings_remote_datasource.dart';
+import 'features/settings/data/datasources/economy_settings_remote_datasource.dart';
+import 'features/settings/data/repositories/app_settings_repository_impl.dart';
+import 'features/settings/data/repositories/economy_settings_repository_impl.dart';
+import 'features/settings/domain/repositories/app_settings_repository.dart';
+import 'features/settings/domain/repositories/economy_settings_repository.dart';
+import 'features/settings/domain/usecases/app_setting_usecases.dart';
+import 'features/settings/domain/usecases/economy_setting_usecases.dart';
+import 'features/settings/presentation/bloc/app_settings_bloc.dart';
+import 'features/settings/presentation/bloc/economy_settings_bloc.dart';
+import 'core/sidebar/bloc/sidebar_bloc.dart';
 
 import 'features/user_reports/data/datasources/user_reports_remote_data_source.dart';
 import 'features/user_reports/data/repositories/user_reports_repository_impl.dart';
@@ -47,16 +61,29 @@ import 'features/reports/presentation/bloc/reports_center_overview_cubit.dart';
 import 'features/users/data/datasources/users_remote_data_source.dart';
 import 'features/users/data/repositories/users_repository_impl.dart';
 import 'features/users/domain/repositories/users_repository.dart';
+import 'features/users/domain/usecases/bulk_activate_users.dart';
+import 'features/users/domain/usecases/bulk_delete_users.dart';
+import 'features/users/domain/usecases/bulk_demote_users.dart';
+import 'features/users/domain/usecases/bulk_promote_users.dart';
+import 'features/users/domain/usecases/bulk_suspend_users.dart';
 import 'features/users/domain/usecases/ban_user.dart';
 import 'features/users/domain/usecases/delete_user.dart';
 import 'features/users/domain/usecases/demote_user.dart';
 import 'features/users/domain/usecases/get_user_by_id.dart';
+import 'features/users/domain/usecases/get_user_follow_list.dart';
 import 'features/users/domain/usecases/get_user_posts.dart';
 import 'features/users/domain/usecases/get_users.dart';
 import 'features/users/domain/usecases/promote_to_admin.dart';
+import 'features/users/domain/usecases/updte_role.dart';
 import 'features/users/domain/usecases/unban_user.dart';
 import 'features/users/presentation/bloc/users_bloc.dart';
 import 'features/users/presentation/bloc/user_detail_bloc.dart';
+
+import 'features/search_history/data/datasources/search_history_remote_datasource.dart';
+import 'features/search_history/data/repositories/search_history_repository_impl.dart';
+import 'features/search_history/domain/repositories/search_history_repository.dart';
+import 'features/search_history/domain/usecases/search_history_usecases.dart';
+import 'features/search_history/presentation/bloc/search_history_bloc.dart';
 
 import 'features/user_activity/data/datasources/user_activity_remote_data_source.dart';
 import 'features/user_activity/data/repositories/user_activity_repository_impl.dart';
@@ -88,6 +115,7 @@ import 'features/post_management/domain/usecases/update_managed_post.dart';
 import 'features/post_management/domain/usecases/update_post_details_usecase.dart';
 import 'features/post_management/domain/usecases/delete_comment_admin.dart';
 import 'features/post_management/domain/usecases/get_post_comments.dart';
+import 'features/post_management/domain/usecases/get_post_engagement_users.dart';
 import 'features/post_management/domain/usecases/update_post_status_usecase.dart';
 import 'features/post_management/presentation/bloc/post_management_bloc.dart';
 
@@ -99,6 +127,13 @@ import 'features/categories/domain/usecases/delete_category_usecase.dart';
 import 'features/categories/domain/usecases/get_all_categories_usecase.dart';
 import 'features/categories/domain/usecases/update_category_usecase.dart';
 import 'features/categories/presentation/bloc/categories_bloc.dart';
+
+import 'features/chat_management/data/datasources/chat_management_remote_datasource.dart';
+import 'features/chat_management/data/datasources/chat_socket_service.dart';
+import 'features/chat_management/data/repositories/chat_management_repository_impl.dart';
+import 'features/chat_management/domain/repositories/chat_management_repository.dart';
+import 'features/chat_management/domain/usecases/chat_management_usecases.dart';
+import 'features/chat_management/presentation/bloc/chat_management_bloc.dart';
 
 import 'features/posts/data/datasources/bulk_posts_remote_datasource.dart';
 import 'features/posts/data/datasources/bulk_posts_remote_datasource_impl.dart';
@@ -113,14 +148,26 @@ import 'features/posts/domain/usecases/update_posts_status_usecase.dart';
 import 'features/posts/domain/usecases/update_posts_visibility_usecase.dart';
 import 'features/posts/presentation/bloc/posts_bloc.dart';
 
+import 'features/stories/data/datasources/stories_remote_data_source.dart';
+import 'features/stories/data/repositories/stories_repository_impl.dart';
+import 'features/stories/domain/repositories/stories_repository.dart';
+import 'features/stories/domain/usecases/get_active_stories.dart';
+import 'features/stories/presentation/bloc/stories_bloc.dart';
+
 import 'features/create_post/data/datasources/create_post_remote_data_source.dart';
 import 'features/create_post/data/repositories/create_post_repository_impl.dart';
 import 'features/create_post/domain/repositories/create_post_repository.dart';
 import 'features/create_post/domain/services/create_post_media_upload_service.dart';
+import 'features/create_post/domain/services/create_post_thumbnail_service.dart';
 import 'features/create_post/domain/usecases/create_post_usecase.dart';
 import 'features/create_post/domain/usecases/submit_create_post_usecase.dart';
 import 'features/create_post/domain/usecases/upload_post_media_usecase.dart';
 import 'features/create_post/presentation/bloc/create_post_bloc.dart';
+import 'features/posts/data/datasources/video_thumbnail_local_data_source.dart';
+import 'features/posts/data/datasources/video_thumbnail_local_data_source_impl.dart';
+import 'features/posts/data/repositories/video_thumbnail_repository_impl.dart';
+import 'features/posts/domain/repositories/video_thumbnail_repository.dart';
+import 'features/posts/domain/usecases/video_thumbnail_usecases.dart';
 
 import 'features/videos/data/datasources/videos_remote_data_source.dart';
 import 'features/videos/data/repositories/videos_repository_impl.dart';
@@ -133,10 +180,12 @@ import 'features/auctions/data/datasources/auction_socket_service.dart';
 import 'features/auctions/data/datasources/auctions_remote_datasource.dart';
 import 'features/auctions/data/repositories/auctions_repository_impl.dart';
 import 'features/auctions/domain/repositories/auctions_repository.dart';
+import 'features/auctions/domain/usecases/ban_auction_usecase.dart';
 import 'features/auctions/domain/usecases/cancel_auction_usecase.dart';
 import 'features/auctions/domain/usecases/get_all_auctions_usecase.dart';
 import 'features/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'features/auctions/domain/usecases/resolve_auction_usecase.dart';
+import 'features/auctions/domain/usecases/update_auction_usecase.dart';
 import 'features/auctions/presentation/bloc/auction_detail_bloc.dart';
 import 'features/auctions/presentation/bloc/auctions_bloc.dart';
 import 'features/auctions/presentation/services/auction_image_lookup.dart';
@@ -158,11 +207,50 @@ import 'features/analytics/presentation/bloc/analytics_bloc.dart';
 import 'features/gifts/data/datasources/gifts_remote_datasource.dart';
 import 'features/gifts/data/repositories/gifts_repository_impl.dart';
 import 'features/gifts/domain/repositories/gifts_repository.dart';
+import 'features/gifts/domain/usecases/bulk_gift_action_usecase.dart';
 import 'features/gifts/domain/usecases/create_gift_usecase.dart';
 import 'features/gifts/domain/usecases/delete_gift_usecase.dart';
 import 'features/gifts/domain/usecases/get_admin_gifts_usecase.dart';
 import 'features/gifts/domain/usecases/update_gift_usecase.dart';
 import 'features/gifts/presentation/bloc/gifts_bloc.dart';
+
+import 'features/wallets/data/datasources/wallets_remote_datasource.dart';
+import 'features/wallets/data/repositories/wallets_repository_impl.dart';
+import 'features/wallets/domain/repositories/wallets_repository.dart';
+import 'features/wallets/domain/usecases/wallet_usecases.dart';
+import 'features/wallets/presentation/bloc/coin_packages_bloc.dart';
+import 'features/wallets/presentation/bloc/economy_bloc.dart';
+import 'features/wallets/presentation/bloc/fiat_purchases_bloc.dart';
+import 'features/wallets/presentation/bloc/ledger_bloc.dart';
+import 'features/wallets/presentation/bloc/wallet_detail_bloc.dart';
+import 'features/wallets/presentation/bloc/wallet_overview_bloc.dart';
+import 'features/wallets/presentation/bloc/wallets_list_bloc.dart';
+import 'features/wallets/presentation/bloc/withdrawals_bloc.dart';
+import 'features/money_dashboard/domain/usecases/load_money_dashboard_usecase.dart';
+import 'features/money_dashboard/presentation/bloc/money_dashboard_bloc.dart';
+import 'features/users/domain/entities/user_entity.dart';
+
+import 'features/promotions/data/datasources/promotions_remote_datasource.dart';
+import 'features/promotions/data/repositories/promotions_repository_impl.dart';
+import 'features/promotions/domain/repositories/promotions_repository.dart';
+import 'features/promotions/domain/usecases/promotion_usecases.dart';
+import 'features/promotions/presentation/bloc/campaign_detail_bloc.dart';
+import 'features/promotions/presentation/bloc/campaigns_bloc.dart';
+import 'features/promotions/presentation/bloc/location_intelligence_bloc.dart';
+import 'features/promotions/presentation/bloc/packages_bloc.dart';
+import 'features/promotions/presentation/bloc/promoted_post_detail_bloc.dart';
+import 'features/promotions/presentation/bloc/promoted_posts_bloc.dart';
+import 'features/promotions/presentation/bloc/promotion_analytics_bloc.dart';
+import 'features/promotions/presentation/bloc/promotions_overview_bloc.dart';
+
+import 'features/sound_management/data/datasources/sound_management_remote_datasource.dart';
+import 'features/sound_management/data/repositories/sound_management_repository_impl.dart';
+import 'features/sound_management/domain/repositories/sound_management_repository.dart';
+import 'features/sound_management/domain/usecases/sound_usecases.dart';
+import 'features/sound_management/presentation/bloc/bulk_sound_action_bloc.dart';
+import 'features/sound_management/presentation/bloc/sound_crud_bloc.dart';
+import 'features/sound_management/presentation/bloc/sound_overview_bloc.dart';
+import 'features/sound_management/presentation/bloc/sounds_bloc.dart';
 
 import 'features/gift_reports/data/datasources/gift_reports_remote_datasource.dart';
 import 'features/gift_reports/data/repositories/gift_reports_repository_impl.dart';
@@ -192,24 +280,18 @@ import 'features/notifications/presentation/bloc/user_notifications_bloc.dart';
 
 final sl = GetIt.instance;
 
-const _apiBaseUrlFromEnv = String.fromEnvironment('API_BASE_URL');
+Future<void> init() async {
+  final apiBaseUrl = ApiConfig.resolve();
+  final socketBaseUrl = ApiConfig.resolveSocketBaseUrl();
 
-String _resolveApiBaseUrl() {
-  if (_apiBaseUrlFromEnv.isNotEmpty) {
-    return _apiBaseUrlFromEnv;
+  if (kDebugMode) {
+    debugPrint('API base URL: $apiBaseUrl');
+    debugPrint('Socket base URL: $socketBaseUrl');
   }
 
-  // if (kIsWeb) {
-  //   return Uri.base.origin;
-  // }
-
-  return 'http://192.168.1.123:3000';
-}
-
-Future<void> init() async {
   // Initialise media URL resolver so relative API paths become absolute URLs
   // before they reach CachedNetworkImage / VideoPlayerController.
-  MediaUrlResolver.init(_resolveApiBaseUrl());
+  MediaUrlResolver.init(apiBaseUrl);
 
   // =========================
   // Firebase
@@ -228,7 +310,7 @@ Future<void> init() async {
   sl.registerLazySingleton<Dio>(() {
     final dio = Dio(
       BaseOptions(
-        baseUrl: _resolveApiBaseUrl(),
+        baseUrl: apiBaseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         // Do NOT set Content-Type here — Dio sets it automatically:
@@ -242,12 +324,32 @@ Future<void> init() async {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          options.baseUrl = ApiConfig.resolve();
+
+          if (ApiConfig.requiresHostedApiSetup()) {
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.connectionError,
+                message: ApiConfig.missingConfigMessage,
+              ),
+            );
+            return;
+          }
+
           try {
             final user = FirebaseAuth.instance.currentUser;
 
             if (user != null) {
               final token = await user.getIdToken();
               options.headers['Authorization'] = 'Bearer $token';
+            }
+
+            // ngrok free tier returns an HTML interstitial unless this is set.
+            final base = options.baseUrl.toLowerCase();
+            final uri = options.uri.toString().toLowerCase();
+            if (base.contains('ngrok') || uri.contains('ngrok')) {
+              options.headers['ngrok-skip-browser-warning'] = 'true';
             }
           } catch (e) {
             debugPrint("Auth interceptor error: $e");
@@ -280,6 +382,52 @@ Future<void> init() async {
     SettingsCubit.new,
   );
 
+  sl.registerLazySingleton<EconomySettingsRemoteDataSource>(
+    () => EconomySettingsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<EconomySettingsRepository>(
+    () => EconomySettingsRepositoryImpl(sl<EconomySettingsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton<GetEconomySettingUseCase>(
+    () => GetEconomySettingUseCase(sl<EconomySettingsRepository>()),
+  );
+  sl.registerLazySingleton<UpdateEconomySettingUseCase>(
+    () => UpdateEconomySettingUseCase(sl<EconomySettingsRepository>()),
+  );
+  sl.registerFactory<EconomySettingsBloc>(
+    () => EconomySettingsBloc(
+      getSetting: sl<GetEconomySettingUseCase>(),
+      updateSetting: sl<UpdateEconomySettingUseCase>(),
+    ),
+  );
+
+  sl.registerLazySingleton<AppSettingsRemoteDataSource>(
+    () => AppSettingsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<AppSettingsRepository>(
+    () => AppSettingsRepositoryImpl(sl<AppSettingsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(
+    () => ListAppSettingsUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreateAppSettingUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateAppSettingUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteAppSettingUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerFactory<AppSettingsBloc>(
+    () => AppSettingsBloc(
+      listSettings: sl<ListAppSettingsUseCase>(),
+      createSetting: sl<CreateAppSettingUseCase>(),
+      updateSetting: sl<UpdateAppSettingUseCase>(),
+      deleteSetting: sl<DeleteAppSettingUseCase>(),
+    ),
+  );
+
   // =========================================================
   // AUTH MODULE
   // =========================================================
@@ -310,10 +458,20 @@ Future<void> init() async {
         () => LoginWithGoogleUseCase(sl<AuthRepository>()),
   );
 
+  sl.registerLazySingleton<LogoutUseCase>(
+        () => LogoutUseCase(sl<AuthRepository>()),
+  );
+
+  sl.registerLazySingleton<SaveSessionUseCase>(
+        () => SaveSessionUseCase(sl<AuthRepository>()),
+  );
+
   sl.registerFactory<LoginBloc>(
         () => LoginBloc(
-      sl<LoginUseCase>(),
-      sl<LoginWithGoogleUseCase>(),
+      loginUseCase: sl<LoginUseCase>(),
+      loginWithGoogleUseCase: sl<LoginWithGoogleUseCase>(),
+      saveSessionUseCase: sl<SaveSessionUseCase>(),
+      logoutUseCase: sl<LogoutUseCase>(),
     ),
   );
 
@@ -336,17 +494,25 @@ Future<void> init() async {
   /// USE CASES
   sl.registerLazySingleton(() => GetUserById(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUserPosts(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => GetUserFollowList(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BanUser(sl<UsersRepository>()));
   sl.registerLazySingleton(() => UnbanUser(sl<UsersRepository>()));
   sl.registerLazySingleton(() => PromoteUser(sl<UsersRepository>()));
   sl.registerLazySingleton(() => DemoteUser(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => UpdateUserRoles(sl<UsersRepository>()));
   sl.registerLazySingleton(() => DeleteUser(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => BulkSuspendUsers(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => BulkActivateUsers(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => BulkDeleteUsers(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => BulkPromoteUsers(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => BulkDemoteUsers(sl<UsersRepository>()));
 
   /// BLOC
   sl.registerFactory(
         () => UserDetailBloc(
       getUserById: sl<GetUserById>(),
+      getUserPosts: sl<GetUserPosts>(),
     ),
   );
 
@@ -425,7 +591,52 @@ Future<void> init() async {
       unbanUser: sl<UnbanUser>(),
       promoteUser: sl<PromoteUser>(),
       demoteUser: sl<DemoteUser>(),
+      updateUserRoles: sl<UpdateUserRoles>(),
       deleteUser: sl<DeleteUser>(),
+      bulkSuspendUsers: sl<BulkSuspendUsers>(),
+      bulkActivateUsers: sl<BulkActivateUsers>(),
+      bulkDeleteUsers: sl<BulkDeleteUsers>(),
+      bulkPromoteUsers: sl<BulkPromoteUsers>(),
+      bulkDemoteUsers: sl<BulkDemoteUsers>(),
+    ),
+  );
+
+  // =========================================================
+  // SEARCH HISTORY MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<SearchHistoryRemoteDataSource>(
+    () => SearchHistoryRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<SearchHistoryRepository>(
+    () => SearchHistoryRepositoryImpl(sl<SearchHistoryRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSearchHistoryOverviewUseCase(sl<SearchHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSearchHistoryUseCase(sl<SearchHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetUserSearchHistoryUseCase(sl<SearchHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteSearchHistoryUseCase(sl<SearchHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => ClearSearchHistoryUseCase(sl<SearchHistoryRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => BulkSearchHistoryUseCase(sl<SearchHistoryRepository>()),
+  );
+  sl.registerFactory(
+    () => SearchHistoryBloc(
+      getOverview: sl<GetSearchHistoryOverviewUseCase>(),
+      getSearchHistory: sl<GetSearchHistoryUseCase>(),
+      getUserSearchHistory: sl<GetUserSearchHistoryUseCase>(),
+      deleteSearchHistory: sl<DeleteSearchHistoryUseCase>(),
+      clearSearchHistory: sl<ClearSearchHistoryUseCase>(),
+      bulkSearchHistory: sl<BulkSearchHistoryUseCase>(),
     ),
   );
 
@@ -450,10 +661,12 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdatePostStatus(sl<PostManagementRepository>()));
   sl.registerLazySingleton(() => GetPostComments(sl<PostManagementRepository>()));
   sl.registerLazySingleton(() => DeleteCommentAdmin(sl<PostManagementRepository>()));
+  sl.registerLazySingleton(() => GetPostEngagementUsers(sl<PostManagementRepository>()));
 
   sl.registerFactory(
     () => PostManagementBloc(
       getManagedPostById: sl<GetManagedPostById>(),
+      getUserById: sl<GetUserById>(),
       updateManagedPost: sl<UpdateManagedPost>(),
       deleteManagedPost: sl<DeleteManagedPost>(),
       updatePostDetails: sl<UpdatePostDetails>(),
@@ -462,6 +675,7 @@ Future<void> init() async {
       updatePostStatus: sl<UpdatePostStatus>(),
       getPostComments: sl<GetPostComments>(),
       deleteCommentAdmin: sl<DeleteCommentAdmin>(),
+      getPostEngagementUsers: sl<GetPostEngagementUsers>(),
     ),
   );
 
@@ -530,6 +744,24 @@ Future<void> init() async {
   );
 
   // =========================================================
+  // STORIES MODULE (active stories on posts page)
+  // =========================================================
+
+  sl.registerLazySingleton<StoriesRemoteDataSource>(
+    () => StoriesRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<StoriesRepository>(
+    () => StoriesRepositoryImpl(sl<StoriesRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(() => GetActiveStories(sl<StoriesRepository>()));
+
+  sl.registerFactory(
+    () => StoriesBloc(getActiveStories: sl<GetActiveStories>()),
+  );
+
+  // =========================================================
   // CREATE POST MODULE
   // =========================================================
 
@@ -546,9 +778,30 @@ Future<void> init() async {
   sl.registerLazySingleton(
     () => CreatePostMediaUploadService(sl<UploadPostMedia>()),
   );
+
+  sl.registerLazySingleton<VideoThumbnailLocalDataSource>(
+    () => VideoThumbnailLocalDataSourceImpl(),
+  );
+  sl.registerLazySingleton<VideoThumbnailRepository>(
+    () => VideoThumbnailRepositoryImpl(
+      sl<VideoThumbnailLocalDataSource>(),
+      sl<CreatePostRepository>(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GenerateVideoThumbnailUseCase(sl<VideoThumbnailRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UploadThumbnailUseCase(sl<VideoThumbnailRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreatePostThumbnailService(sl<GenerateVideoThumbnailUseCase>()),
+  );
   sl.registerLazySingleton(
     () => SubmitCreatePost(
       uploadService: sl<CreatePostMediaUploadService>(),
+      thumbnailService: sl<CreatePostThumbnailService>(),
+      uploadThumbnail: sl<UploadThumbnailUseCase>(),
       createPost: sl<CreatePost>(),
     ),
   );
@@ -556,6 +809,7 @@ Future<void> init() async {
   sl.registerFactory(
     () => CreatePostBloc(
       uploadService: sl<CreatePostMediaUploadService>(),
+      thumbnailService: sl<CreatePostThumbnailService>(),
       submitCreatePost: sl<SubmitCreatePost>(),
     ),
   );
@@ -587,7 +841,7 @@ Future<void> init() async {
   // =========================================================
 
   sl.registerLazySingleton<AuctionSocketService>(
-    () => AuctionSocketService(_resolveApiBaseUrl()),
+    () => AuctionSocketService(socketBaseUrl),
   );
 
   sl.registerLazySingleton<AuctionsRemoteDataSource>(
@@ -601,6 +855,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetAllAuctions(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => GetAuctionDetails(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminCancelAuction(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => AdminBanAuction(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => AdminUpdateAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminResolveAuction(sl<AuctionsRepository>()));
 
   sl.registerLazySingleton(
@@ -618,6 +874,8 @@ Future<void> init() async {
     () => AuctionDetailBloc(
       getAuctionDetails: sl<GetAuctionDetails>(),
       cancelAuction: sl<AdminCancelAuction>(),
+      banAuction: sl<AdminBanAuction>(),
+      updateAuction: sl<AdminUpdateAuction>(),
       resolveAuction: sl<AdminResolveAuction>(),
       socketService: sl<AuctionSocketService>(),
     ),
@@ -639,6 +897,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => CreateGift(sl<GiftsRepository>()));
   sl.registerLazySingleton(() => UpdateGift(sl<GiftsRepository>()));
   sl.registerLazySingleton(() => DeleteGift(sl<GiftsRepository>()));
+  sl.registerLazySingleton(() => BulkGiftActionUseCase(sl<GiftsRepository>()));
 
   sl.registerFactory(
     () => GiftsBloc(
@@ -646,7 +905,238 @@ Future<void> init() async {
       createGift: sl<CreateGift>(),
       updateGift: sl<UpdateGift>(),
       deleteGift: sl<DeleteGift>(),
+      bulkGiftAction: sl<BulkGiftActionUseCase>(),
     ),
+  );
+
+  // =========================================================
+  // WALLETS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<WalletsRemoteDataSource>(
+    () => WalletsRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<WalletsRepository>(
+    () => WalletsRepositoryImpl(sl<WalletsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(() => GetEconomyUseCase(sl<WalletsRepository>()));
+  sl.registerLazySingleton(
+    () => GetWalletOverviewUseCase(sl<WalletsRepository>()),
+  );
+  sl.registerLazySingleton(() => GetWalletsUseCase(sl<WalletsRepository>()));
+  sl.registerLazySingleton(() => GetWalletDetailUseCase(sl<WalletsRepository>()));
+  sl.registerLazySingleton(
+    () => AdjustWalletBalanceUseCase(sl<WalletsRepository>()),
+  );
+  sl.registerLazySingleton(() => GetLedgerUseCase(sl<WalletsRepository>()));
+  sl.registerLazySingleton(
+    () => GetFiatPurchasesUseCase(sl<WalletsRepository>()),
+  );
+  sl.registerLazySingleton(() => GetWithdrawalsUseCase(sl<WalletsRepository>()));
+  sl.registerLazySingleton(() => GetCoinPackagesUseCase(sl<WalletsRepository>()));
+  sl.registerLazySingleton(
+    () => CreateCoinPackageUseCase(sl<WalletsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateCoinPackageUseCase(sl<WalletsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteCoinPackageUseCase(sl<WalletsRepository>()),
+  );
+
+  sl.registerFactory(() => EconomyBloc(getEconomy: sl<GetEconomyUseCase>()));
+
+  sl.registerLazySingleton(
+    () => LoadMoneyDashboardUseCase(
+      getEconomy: sl<GetEconomyUseCase>(),
+      getMonetization: sl<GetAdminMonetizationAnalytics>(),
+      getGiftReportsOverview: sl<GetGiftReportsOverview>(),
+      getPromotionsOverview: sl<GetPromotionsOverviewUseCase>(),
+      getAuctionReportsOverview: sl<GetAuctionReportsOverview>(),
+      getUserReportsOverview: sl<GetUserReportsOverview>(),
+      getEconomySetting: sl<GetEconomySettingUseCase>(),
+    ),
+  );
+  sl.registerFactoryParam<MoneyDashboardBloc, List<UserRole>, void>(
+    (roles, _) => MoneyDashboardBloc(
+      loadDashboard: sl<LoadMoneyDashboardUseCase>(),
+      roles: roles,
+    ),
+  );
+  sl.registerFactory(
+    () => WalletOverviewBloc(getOverview: sl<GetWalletOverviewUseCase>()),
+  );
+  sl.registerFactory(
+    () => WalletsListBloc(getWallets: sl<GetWalletsUseCase>()),
+  );
+  sl.registerFactory(
+    () => WalletDetailBloc(
+      getDetail: sl<GetWalletDetailUseCase>(),
+      adjustBalance: sl<AdjustWalletBalanceUseCase>(),
+    ),
+  );
+  sl.registerFactory(() => LedgerBloc(getLedger: sl<GetLedgerUseCase>()));
+  sl.registerFactory(
+    () => FiatPurchasesBloc(getPurchases: sl<GetFiatPurchasesUseCase>()),
+  );
+  sl.registerFactory(
+    () => WithdrawalsBloc(getWithdrawals: sl<GetWithdrawalsUseCase>()),
+  );
+  sl.registerFactory(
+    () => CoinPackagesBloc(
+      getPackages: sl<GetCoinPackagesUseCase>(),
+      createPackage: sl<CreateCoinPackageUseCase>(),
+      updatePackage: sl<UpdateCoinPackageUseCase>(),
+      deletePackage: sl<DeleteCoinPackageUseCase>(),
+    ),
+  );
+
+  // =========================================================
+  // PROMOTIONS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<PromotionsRemoteDataSource>(
+    () => PromotionsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<LocationIntelligenceRemoteDataSource>(
+    () => LocationIntelligenceRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<PromotionsRepository>(
+    () => PromotionsRepositoryImpl(sl<PromotionsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton<LocationIntelligenceRepository>(
+    () => LocationIntelligenceRepositoryImpl(
+      sl<LocationIntelligenceRemoteDataSource>(),
+    ),
+  );
+
+  sl.registerLazySingleton(() => GetPromotionsOverviewUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => GetCampaignsUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => GetCampaignDetailUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => GetCampaignStatsUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => GetCampaignImpressionsUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => UpdateCampaignUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => UpdateCampaignStatusUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => DeleteCampaignUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => BulkCampaignActionUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => GetPackagesUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => CreatePackageUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => UpdatePackageUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => TogglePackageStatusUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(
+    () => GetLocationHistoryUseCase(sl<LocationIntelligenceRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetMovementPathUseCase(sl<LocationIntelligenceRepository>()),
+  );
+  sl.registerLazySingleton(() => GetPromotedPostsUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(
+    () => GetPromotedPostDetailUseCase(sl<PromotionsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPromotedPostStatsUseCase(sl<PromotionsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminPromotedPostStatsUseCase(sl<PromotionsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSingleCampaignStatsUseCase(sl<PromotionsRepository>()),
+  );
+
+  sl.registerFactory(
+    () => PromotionsOverviewBloc(
+      getOverview: sl<GetPromotionsOverviewUseCase>(),
+      getCampaigns: sl<GetCampaignsUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => CampaignsBloc(
+      getCampaigns: sl<GetCampaignsUseCase>(),
+      updateStatus: sl<UpdateCampaignStatusUseCase>(),
+      deleteCampaign: sl<DeleteCampaignUseCase>(),
+    ),
+  );
+  sl.registerFactory(() => BulkActionsBloc(bulkAction: sl<BulkCampaignActionUseCase>()));
+  sl.registerFactory(
+    () => CampaignDetailBloc(
+      getDetail: sl<GetCampaignDetailUseCase>(),
+      getStats: sl<GetCampaignStatsUseCase>(),
+      getImpressions: sl<GetCampaignImpressionsUseCase>(),
+      updateCampaign: sl<UpdateCampaignUseCase>(),
+      updateStatus: sl<UpdateCampaignStatusUseCase>(),
+      deleteCampaign: sl<DeleteCampaignUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => PackagesBloc(
+      getPackages: sl<GetPackagesUseCase>(),
+      createPackage: sl<CreatePackageUseCase>(),
+      updatePackage: sl<UpdatePackageUseCase>(),
+      toggleStatus: sl<TogglePackageStatusUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => LocationIntelligenceBloc(
+      getUsers: sl<GetUsers>(),
+      getHistory: sl<GetLocationHistoryUseCase>(),
+      getMovement: sl<GetMovementPathUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => PromotedPostsBloc(getPromotedPosts: sl<GetPromotedPostsUseCase>()),
+  );
+  sl.registerFactory(
+    () => PromotedPostDetailBloc(getDetail: sl<GetPromotedPostDetailUseCase>()),
+  );
+  sl.registerFactory(
+    () => PromotionAnalyticsBloc(
+      getAdminStats: sl<GetAdminPromotedPostStatsUseCase>(),
+      updateStatus: sl<UpdateCampaignStatusUseCase>(),
+      getCampaignStats: sl<GetSingleCampaignStatsUseCase>(),
+    ),
+  );
+
+  // =========================================================
+  // SOUND MANAGEMENT MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<SoundManagementRemoteDataSource>(
+    () => SoundManagementRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<SoundManagementRepository>(
+    () => SoundManagementRepositoryImpl(sl<SoundManagementRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(() => GetSoundOverviewUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => GetSoundsUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => CreateSoundUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => UploadSoundUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => UpdateSoundUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => ActivateSoundUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => DeactivateSoundUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => DeleteSoundUseCase(sl<SoundManagementRepository>()));
+  sl.registerLazySingleton(() => BulkSoundActionUseCase(sl<SoundManagementRepository>()));
+
+  sl.registerFactory(
+    () => SoundOverviewBloc(getOverview: sl<GetSoundOverviewUseCase>()),
+  );
+  sl.registerFactory(
+    () => SoundsBloc(getSounds: sl<GetSoundsUseCase>()),
+  );
+  sl.registerFactory(
+    () => SoundCrudBloc(
+      createSound: sl<CreateSoundUseCase>(),
+      uploadSound: sl<UploadSoundUseCase>(),
+      updateSound: sl<UpdateSoundUseCase>(),
+      deleteSound: sl<DeleteSoundUseCase>(),
+      activateSound: sl<ActivateSoundUseCase>(),
+      deactivateSound: sl<DeactivateSoundUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => BulkSoundActionBloc(bulkAction: sl<BulkSoundActionUseCase>()),
   );
 
   // =========================================================
@@ -797,7 +1287,7 @@ Future<void> init() async {
   // =========================================================
 
   sl.registerLazySingleton(
-    () => NotificationsSocketService(_resolveApiBaseUrl()),
+    () => NotificationsSocketService(socketBaseUrl),
   );
 
   sl.registerLazySingleton<NotificationsRemoteDataSource>(
@@ -826,6 +1316,9 @@ Future<void> init() async {
   sl.registerLazySingleton(
     () => GetAllNotifications(sl<NotificationsRepository>()),
   );
+  sl.registerLazySingleton(
+    () => ScheduleNotification(sl<NotificationsRepository>()),
+  );
 
   sl.registerFactory(
     () => NotificationsBloc(
@@ -833,6 +1326,7 @@ Future<void> init() async {
       sendBulkNotification: sl<SendBulkNotification>(),
       broadcastNotification: sl<BroadcastNotification>(),
       broadcastAdminsNotification: sl<BroadcastAdminsNotification>(),
+      scheduleNotification: sl<ScheduleNotification>(),
       repository: sl<NotificationsRepository>(),
       getUsers: sl<GetUsers>(),
       getAllNotifications: sl<GetAllNotifications>(),
@@ -955,6 +1449,45 @@ Future<void> init() async {
   // =========================================================
   // REPORTS CENTER OVERVIEW
   // =========================================================
+
+  // =========================================================
+  // CHAT MANAGEMENT MODULE
+  // =========================================================
+
+  sl.registerLazySingleton(
+    () => ChatSocketService(socketBaseUrl),
+  );
+
+  sl.registerLazySingleton<ChatManagementRemoteDataSource>(
+    () => ChatManagementRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<ChatManagementRepository>(
+    () => ChatManagementRepositoryImpl(sl<ChatManagementRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(() => GetAllChats(sl<ChatManagementRepository>()));
+  sl.registerLazySingleton(() => GetChatById(sl<ChatManagementRepository>()));
+  sl.registerLazySingleton(() => GetChatMessages(sl<ChatManagementRepository>()));
+  sl.registerLazySingleton(() => UpdateChat(sl<ChatManagementRepository>()));
+  sl.registerLazySingleton(() => DeleteChat(sl<ChatManagementRepository>()));
+  sl.registerLazySingleton(() => DeleteChatMessage(sl<ChatManagementRepository>()));
+  sl.registerLazySingleton(() => BulkChatModeration(sl<ChatManagementRepository>()));
+
+  sl.registerFactory(
+    () => ChatManagementBloc(
+      getAllChats: sl<GetAllChats>(),
+      getChatById: sl<GetChatById>(),
+      getChatMessages: sl<GetChatMessages>(),
+      updateChat: sl<UpdateChat>(),
+      deleteChat: sl<DeleteChat>(),
+      deleteChatMessage: sl<DeleteChatMessage>(),
+      bulkChatModeration: sl<BulkChatModeration>(),
+      socketService: sl<ChatSocketService>(),
+    ),
+  );
+
+  sl.registerFactory(SidebarBloc.new);
 
   sl.registerFactory(
     () => ReportsCenterOverviewCubit(

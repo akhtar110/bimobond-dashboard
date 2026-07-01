@@ -93,6 +93,139 @@ class GiftReportPriceRangeDialog extends StatefulWidget {
       _GiftReportPriceRangeDialogState();
 }
 
+class GiftReportDateRangeDialog extends StatefulWidget {
+  const GiftReportDateRangeDialog({
+    super.key,
+    this.initialFrom,
+    this.initialTo,
+    required this.onApply,
+  });
+
+  final DateTime? initialFrom;
+  final DateTime? initialTo;
+  final void Function(DateTime? fromDate, DateTime? toDate) onApply;
+
+  @override
+  State<GiftReportDateRangeDialog> createState() =>
+      _GiftReportDateRangeDialogState();
+}
+
+class _GiftReportDateRangeDialogState extends State<GiftReportDateRangeDialog> {
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _fromDate = widget.initialFrom;
+    _toDate = widget.initialTo;
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Not set';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDate: _fromDate ?? _toDate ?? DateTime.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      _fromDate = picked;
+      if (_toDate != null && _toDate!.isBefore(_fromDate!)) {
+        _toDate = _fromDate;
+      }
+    });
+  }
+
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDate: _toDate ?? _fromDate ?? DateTime.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      _toDate = picked;
+      if (_fromDate != null && _fromDate!.isAfter(_toDate!)) {
+        _fromDate = _toDate;
+      }
+    });
+  }
+
+  void _clear() {
+    widget.onApply(null, null);
+    Navigator.of(context).pop();
+  }
+
+  void _apply() {
+    widget.onApply(_fromDate, _toDate);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      title: Text(l10n.t('dateRange')),
+      content: SizedBox(
+        width: 340,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton(
+              onPressed: _pickFromDate,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(42),
+                alignment: Alignment.centerLeft,
+                side: BorderSide(color: scheme.outlineVariant),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text('${l10n.t('from')}: ${_formatDate(_fromDate)}'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: _pickToDate,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(42),
+                alignment: Alignment.centerLeft,
+                side: BorderSide(color: scheme.outlineVariant),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text('${l10n.t('to')}: ${_formatDate(_toDate)}'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.t('cancel')),
+        ),
+        TextButton(
+          onPressed: _clear,
+          child: Text(l10n.t('clear')),
+        ),
+        FilledButton(
+          onPressed: _apply,
+          child: Text(l10n.t('apply')),
+        ),
+      ],
+    );
+  }
+}
+
 class _GiftReportPriceRangeDialogState extends State<GiftReportPriceRangeDialog> {
   late final TextEditingController _minCtrl;
   late final TextEditingController _maxCtrl;

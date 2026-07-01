@@ -39,6 +39,9 @@ class UserReportsBloc extends Bloc<UserReportsEvent, UserReportsState> {
 
   Timer? _searchDebounce;
   bool _listBusy = false;
+  bool _pendingListRefresh = false;
+  int? _pendingListPage;
+  bool _pendingListReplace = true;
 
   UserReportListQuery _query = const UserReportListQuery();
   final List<UserReportListItemEntity> _items = [];
@@ -164,7 +167,12 @@ class UserReportsBloc extends Bloc<UserReportsEvent, UserReportsState> {
     required int page,
     required bool replace,
   }) async {
-    if (_listBusy) return;
+    if (_listBusy) {
+      _pendingListRefresh = true;
+      _pendingListPage = page;
+      _pendingListReplace = replace;
+      return;
+    }
     if (page < 1) return;
 
     _listBusy = true;
@@ -223,6 +231,19 @@ class UserReportsBloc extends Bloc<UserReportsEvent, UserReportsState> {
       }
     } finally {
       _listBusy = false;
+      if (_pendingListRefresh) {
+        final pendingPage = _pendingListPage ?? page;
+        final pendingReplace = _pendingListReplace;
+        _pendingListRefresh = false;
+        _pendingListPage = null;
+        _pendingListReplace = true;
+
+        if (pendingReplace) {
+          add(GoToPage(pendingPage));
+        } else {
+          add(const LoadMore());
+        }
+      }
     }
   }
 

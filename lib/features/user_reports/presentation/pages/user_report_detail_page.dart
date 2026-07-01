@@ -502,7 +502,7 @@ class _MetricsGrid extends StatelessWidget {
         final cards = [
           _MetricCard(
             title: ReportDetailLabels.wallet(l10n),
-            value: currency.format(wallet.balanceUsd),
+            value: currency.format(wallet.balanceCoins),
           ),
           _MetricCard(title: l10n.t('devices'), value: '${counts.devices}'),
           _MetricCard(title: l10n.t('comments'), value: '${counts.comments}'),
@@ -632,7 +632,7 @@ class _WalletSection extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
           ),
           trailing: Text(
-            currency.format(tx.amountUsd),
+            currency.format(tx.amountCoins),
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
         );
@@ -816,7 +816,7 @@ class _GiftsList extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
           ),
           trailing: Text(
-            currency.format(gift.priceUsd),
+            currency.format(gift.priceCoins),
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
         );

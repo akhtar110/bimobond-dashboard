@@ -117,3 +117,44 @@ class FilterNotificationsChanged extends NotificationsEvent {
 class ClearNotificationFilters extends NotificationsEvent {
   const ClearNotificationFilters();
 }
+
+// ── Scheduling events ───────────────────────────────────────────────────────
+
+class NotificationScheduleModeChanged extends NotificationsEvent {
+  const NotificationScheduleModeChanged(this.isScheduled);
+  final bool isScheduled;
+}
+
+class NotificationScheduleUpdated extends NotificationsEvent {
+  const NotificationScheduleUpdated(this.scheduledDateTime);
+  final DateTime? scheduledDateTime;
+}
+
+class ScheduleNotificationRequested extends NotificationsEvent {
+  const ScheduleNotificationRequested({
+    required this.target,
+    required this.title,
+    required this.body,
+    required this.type,
+    required this.sendPush,
+    this.userId,
+    this.userIds,
+    this.data,
+    this.recurringRule,
+  });
+
+  final ScheduledNotificationTarget target;
+  final String title;
+  final String body;
+  final NotificationType type;
+  final bool sendPush;
+  final String? userId;
+  final List<String>? userIds;
+  final Map<String, dynamic>? data;
+  final RecurringScheduleRule? recurringRule;
+}
+
+class CancelScheduledNotification extends NotificationsEvent {
+  const CancelScheduledNotification(this.id);
+  final String id;
+}

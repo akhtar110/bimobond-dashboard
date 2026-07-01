@@ -15,6 +15,8 @@ class GoToCategoryReportsPageEvent extends CategoryReportsEvent {
   final int page;
 }
 
+class LoadMoreCategoryReportsEvent extends CategoryReportsEvent {}
+
 class UpdateCategoryReportsSearchEvent extends CategoryReportsEvent {
   UpdateCategoryReportsSearchEvent(this.query);
   final String query;

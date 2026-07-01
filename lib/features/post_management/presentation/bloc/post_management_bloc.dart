@@ -1,6 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../users/domain/entities/user_entity.dart';
+import '../../../users/domain/usecases/get_user_by_id.dart';
+import '../../data/models/comment_model.dart';
 import '../../domain/entities/activity_context.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/managed_post_author_enrichment.dart';
@@ -9,7 +11,9 @@ import '../../domain/usecases/ban_post_usecase.dart';
 import '../../domain/usecases/delete_comment_admin.dart';
 import '../../domain/usecases/delete_managed_post.dart';
 import '../../domain/usecases/get_managed_post_by_id.dart';
+import '../../domain/entities/post_engagement_user_item.dart';
 import '../../domain/usecases/get_post_comments.dart';
+import '../../domain/usecases/get_post_engagement_users.dart';
 import '../../domain/usecases/hide_post_usecase.dart';
 import '../../domain/usecases/update_managed_post.dart';
 import '../../domain/usecases/update_post_details_usecase.dart';
@@ -22,11 +26,13 @@ class LoadManagedPostEvent extends PostManagementEvent {
     this.post, {
     this.sourceUser,
     this.activityContext,
+    this.skipComments = false,
   });
 
   final ManagedPostEntity post;
   final UserEntity? sourceUser;
   final ActivityContext? activityContext;
+  final bool skipComments;
 }
 
 class ChangeManagedPostFieldEvent extends PostManagementEvent {
@@ -62,6 +68,57 @@ class DeletePostCommentAdminEvent extends PostManagementEvent {
   final String commentId;
 }
 
+class LoadPostEngagementUsersEvent extends PostManagementEvent {
+  LoadPostEngagementUsersEvent(this.kind);
+  final PostEngagementKind kind;
+}
+
+class LoadMorePostEngagementUsersEvent extends PostManagementEvent {
+  LoadMorePostEngagementUsersEvent(this.kind);
+  final PostEngagementKind kind;
+}
+
+class PostEngagementListState {
+  const PostEngagementListState({
+    this.items = const [],
+    this.page = 0,
+    this.hasMore = false,
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.error,
+    this.loaded = false,
+  });
+
+  final List<PostEngagementUserItem> items;
+  final int page;
+  final bool hasMore;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final String? error;
+  final bool loaded;
+
+  PostEngagementListState copyWith({
+    List<PostEngagementUserItem>? items,
+    int? page,
+    bool? hasMore,
+    bool? isLoading,
+    bool? isLoadingMore,
+    String? error,
+    bool? loaded,
+    bool clearError = false,
+  }) {
+    return PostEngagementListState(
+      items: items ?? this.items,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      error: clearError ? null : (error ?? this.error),
+      loaded: loaded ?? this.loaded,
+    );
+  }
+}
+
 sealed class PostManagementState {}
 
 class PostManagementInitial extends PostManagementState {}
@@ -86,6 +143,9 @@ class PostManagementLoaded extends PostManagementState {
     this.isCommentsLoadingMore = false,
     this.commentsError,
     this.deletingCommentId,
+    this.likes = const PostEngagementListState(),
+    this.views = const PostEngagementListState(),
+    this.mentions = const PostEngagementListState(),
   });
 
   final ManagedPostEntity post;
@@ -105,6 +165,17 @@ class PostManagementLoaded extends PostManagementState {
   final bool isCommentsLoadingMore;
   final String? commentsError;
   final String? deletingCommentId;
+  final PostEngagementListState likes;
+  final PostEngagementListState views;
+  final PostEngagementListState mentions;
+
+  PostEngagementListState engagementFor(PostEngagementKind kind) {
+    return switch (kind) {
+      PostEngagementKind.likes => likes,
+      PostEngagementKind.views => views,
+      PostEngagementKind.mentions => mentions,
+    };
+  }
 
   PostManagementLoaded copyWith({
     ManagedPostEntity? post,
@@ -126,6 +197,9 @@ class PostManagementLoaded extends PostManagementState {
     bool clearCommentsError = false,
     String? deletingCommentId,
     bool clearDeletingCommentId = false,
+    PostEngagementListState? likes,
+    PostEngagementListState? views,
+    PostEngagementListState? mentions,
   }) {
     return PostManagementLoaded(
       post: post ?? this.post,
@@ -150,6 +224,9 @@ class PostManagementLoaded extends PostManagementState {
       deletingCommentId: clearDeletingCommentId
           ? null
           : (deletingCommentId ?? this.deletingCommentId),
+      likes: likes ?? this.likes,
+      views: views ?? this.views,
+      mentions: mentions ?? this.mentions,
     );
   }
 }
@@ -164,6 +241,7 @@ class PostManagementError extends PostManagementState {
 class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> {
   PostManagementBloc({
     required this.getManagedPostById,
+    required this.getUserById,
     required this.updateManagedPost,
     required this.deleteManagedPost,
     required this.updatePostDetails,
@@ -172,6 +250,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     required this.updatePostStatus,
     required this.getPostComments,
     required this.deleteCommentAdmin,
+    required this.getPostEngagementUsers,
   }) : super(PostManagementInitial()) {
     on<LoadManagedPostEvent>(_onLoad);
     on<ChangeManagedPostFieldEvent>(_onChangeField);
@@ -184,11 +263,15 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     on<LoadPostCommentsEvent>(_onLoadComments);
     on<LoadMorePostCommentsEvent>(_onLoadMoreComments);
     on<DeletePostCommentAdminEvent>(_onDeleteComment);
+    on<LoadPostEngagementUsersEvent>(_onLoadEngagementUsers);
+    on<LoadMorePostEngagementUsersEvent>(_onLoadMoreEngagementUsers);
   }
 
   static const int _commentsLimit = 20;
+  static const int _engagementLimit = 20;
 
   final GetManagedPostById getManagedPostById;
+  final GetUserById getUserById;
   final UpdateManagedPost updateManagedPost;
   final DeleteManagedPost deleteManagedPost;
   final UpdatePostDetails updatePostDetails;
@@ -197,52 +280,130 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
   final UpdatePostStatus updatePostStatus;
   final GetPostComments getPostComments;
   final DeleteCommentAdmin deleteCommentAdmin;
+  final GetPostEngagementUsers getPostEngagementUsers;
 
   Future<void> _onLoad(
     LoadManagedPostEvent event,
     Emitter<PostManagementState> emit,
   ) async {
-    emit(PostManagementLoading());
+    var stub = prepareManagedPostForDetailNavigation(
+      event.post,
+      sourceUser: event.sourceUser,
+    );
+    stub = await _hydrateAuthorProfileIfNeeded(stub, event.sourceUser);
+
+    emit(
+      _loadedFromPost(
+        stub,
+        sourceUser: event.sourceUser,
+        activityContext: event.activityContext,
+        skipComments: event.skipComments,
+      ),
+    );
+    if (!event.skipComments) {
+      add(LoadPostCommentsEvent());
+    }
 
     try {
       final fresh = await getManagedPostById(event.post.id);
-      final hydrated = enrichManagedPostAuthor(
-        fresh,
-        fallback: event.post,
-        author: _authorHint(event.post, event.sourceUser),
-      );
-      emit(
-        PostManagementLoaded(
-          post: hydrated,
-          draft: hydrated,
-          sourceUser: event.sourceUser,
-          activityContext: event.activityContext,
-          isCommentsLoading: true,
+      var hydrated = hydrateManagedPostMedia(
+        enrichManagedPostAuthor(
+          enrichManagedPostContent(fresh, fallback: stub),
+          fallback: stub,
+          author: _authorHint(stub, event.sourceUser),
         ),
       );
-      add(LoadPostCommentsEvent());
+      hydrated = await _hydrateAuthorProfileIfNeeded(
+        hydrated,
+        event.sourceUser,
+      );
+      final current = state;
+      if (current is PostManagementLoaded) {
+        emit(
+          current.copyWith(
+            post: hydrated,
+            draft: hydrated,
+          ),
+        );
+      } else {
+        emit(
+          _loadedFromPost(
+            hydrated,
+            sourceUser: event.sourceUser,
+            activityContext: event.activityContext,
+            skipComments: event.skipComments,
+          ),
+        );
+        if (!event.skipComments) {
+          add(LoadPostCommentsEvent());
+        }
+      }
     } catch (_) {
-      final hydrated = enrichManagedPostAuthor(
-        event.post,
-        author: _authorHint(event.post, event.sourceUser),
-      );
-      emit(
-        PostManagementLoaded(
-          post: hydrated,
-          draft: hydrated,
-          sourceUser: event.sourceUser,
-          activityContext: event.activityContext,
-          isCommentsLoading: true,
-        ),
-      );
-      add(LoadPostCommentsEvent());
+      // Keep the navigation stub already shown above.
     }
   }
 
-  /// Uses route [sourceUser] or author fields already on the navigation stub.
+  PostManagementLoaded _loadedFromPost(
+    ManagedPostEntity post, {
+    UserEntity? sourceUser,
+    ActivityContext? activityContext,
+    bool skipComments = false,
+  }) {
+    return PostManagementLoaded(
+      post: post,
+      draft: post,
+      sourceUser: sourceUser,
+      activityContext: activityContext,
+      isCommentsLoading: !skipComments,
+      likes: PostEngagementListState(items: post.recentLikes),
+      views: PostEngagementListState(items: post.recentViews),
+      mentions: PostEngagementListState(items: post.recentMentions),
+    );
+  }
+
+  bool _authorStatsMissing(ManagedPostEntity post) {
+    return post.userFollowersCount == 0 &&
+        post.userFollowingCount == 0 &&
+        post.userPostsCount == 0;
+  }
+
+  Future<ManagedPostEntity> _hydrateAuthorProfileIfNeeded(
+    ManagedPostEntity post,
+    UserEntity? sourceUser,
+  ) async {
+    if (post.userId.isEmpty) return post;
+
+    final hinted = _authorHint(post, sourceUser);
+    if (hinted != null &&
+        (hinted.followerCount > 0 ||
+            hinted.followingCount > 0 ||
+            hinted.postCount > 0)) {
+      return enrichManagedPostAuthor(post, author: hinted);
+    }
+
+    if (!_authorStatsMissing(post)) return post;
+
+    try {
+      final detail = await getUserById(post.userId);
+      return enrichManagedPostAuthor(
+        post,
+        author: detail.user,
+        fallback: post,
+      );
+    } catch (_) {
+      if (hinted != null) {
+        return enrichManagedPostAuthor(post, author: hinted);
+      }
+      return post;
+    }
+  }
+
+  /// Uses route [sourceUser] only when the post belongs to them, otherwise
+  /// builds from author fields already hydrated on the navigation stub.
   UserEntity? _authorHint(ManagedPostEntity post, UserEntity? sourceUser) {
     if (sourceUser != null &&
-        (post.userId.isEmpty || post.userId == sourceUser.id)) {
+        post.userId.isNotEmpty &&
+        post.userId == sourceUser.id) {
       return sourceUser;
     }
     if (post.userId.isEmpty) return null;
@@ -288,7 +449,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     emit(current.copyWith(isSaving: true, clearMessages: true));
 
     try {
-      final updated = await updateManagedPost(
+      final raw = await updateManagedPost(
         current.draft.id,
         ManagedPostUpdateData(
           description: current.draft.description,
@@ -300,6 +461,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
           allowStitch: current.draft.allowStitch,
         ),
       );
+      final updated = mergeManagedPostForListDisplay(current.post, raw);
 
       emit(
         current.copyWith(
@@ -350,11 +512,12 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      final updated = await updatePostDetails(
+      final raw = await updatePostDetails(
         current.post.id,
         description: event.description,
         category: event.category,
       );
+      final updated = mergeManagedPostForListDisplay(current.post, raw);
       emit(
         current.copyWith(
           post: updated,
@@ -382,7 +545,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      final updated = await hidePost(current.post.id);
+      final raw = await hidePost(current.post.id);
+      final updated = mergeManagedPostForListDisplay(current.post, raw);
       emit(
         current.copyWith(
           post: updated,
@@ -410,7 +574,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      final updated = await banPost(current.post.id);
+      final raw = await banPost(current.post.id);
+      final updated = mergeManagedPostForListDisplay(current.post, raw);
       emit(
         current.copyWith(
           post: updated,
@@ -438,7 +603,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      final updated = await updatePostStatus(current.post.id, event.status);
+      final raw = await updatePostStatus(current.post.id, event.status);
+      final updated = mergeManagedPostForListDisplay(current.post, raw);
       emit(
         current.copyWith(
           post: updated,
@@ -476,27 +642,100 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     );
 
     try {
-      final page = await getPostComments(
-        current.post.id,
-        page: 1,
-        limit: _commentsLimit,
+      final highlightId = current.activityContext?.highlightCommentId;
+      final loaded = await _loadCommentsForPost(
+        postId: current.post.id,
+        highlightId: highlightId,
       );
+      var comments = loaded.comments;
+      comments = _ensureHighlightComment(
+        comments,
+        current.activityContext,
+        current.post.id,
+      );
+
       emit(
         (state as PostManagementLoaded).copyWith(
-          comments: page.comments,
-          commentsPage: page.page,
-          commentsHasMore: page.hasMore,
+          comments: comments,
+          commentsPage: loaded.page,
+          commentsHasMore: loaded.hasMore,
           isCommentsLoading: false,
         ),
       );
     } catch (e) {
+      final seeded = _ensureHighlightComment(
+        const [],
+        current.activityContext,
+        current.post.id,
+      );
       emit(
         (state as PostManagementLoaded).copyWith(
+          comments: seeded,
           isCommentsLoading: false,
-          commentsError: _messageFrom(e),
+          commentsError: seeded.isEmpty ? _messageFrom(e) : null,
         ),
       );
     }
+  }
+
+  Future<PostCommentsPageEntity> _loadCommentsForPost({
+    required String postId,
+    String? highlightId,
+  }) async {
+    var pageNum = 1;
+    var hasMore = true;
+    final allComments = <CommentEntity>[];
+
+    while (hasMore && pageNum <= 10) {
+      final page = await getPostComments(
+        postId,
+        page: pageNum,
+        limit: _commentsLimit,
+      );
+      allComments.addAll(page.comments);
+      hasMore = page.hasMore;
+      if (highlightId == null ||
+          highlightId.isEmpty ||
+          allComments.any((c) => c.id == highlightId)) {
+        return PostCommentsPageEntity(
+          comments: allComments,
+          page: page.page,
+          hasMore: hasMore,
+        );
+      }
+      pageNum++;
+    }
+
+    return PostCommentsPageEntity(
+      comments: allComments,
+      page: pageNum,
+      hasMore: hasMore,
+    );
+  }
+
+  List<CommentEntity> _ensureHighlightComment(
+    List<CommentEntity> comments,
+    ActivityContext? context,
+    String postId,
+  ) {
+    final highlightId = context?.highlightCommentId;
+    if (highlightId == null || highlightId.isEmpty) return comments;
+    if (comments.any((c) => c.id == highlightId)) return comments;
+
+    final text = context?.commentText?.trim();
+    if (text == null || text.isEmpty) return comments;
+
+    final seed = CommentModel(
+      id: highlightId,
+      content: text,
+      postId: postId,
+      userId: context?.commentUserId ?? '',
+      likeCount: 0,
+      replyCount: 0,
+      createdAt: context?.activityDate ?? DateTime.now(),
+      username: context?.commentUsername,
+    );
+    return [seed, ...comments];
   }
 
   Future<void> _onLoadMoreComments(
@@ -586,6 +825,168 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
           errorMessage: _messageFrom(e),
         ),
       );
+    }
+  }
+
+  Future<void> _onLoadEngagementUsers(
+    LoadPostEngagementUsersEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+
+    final existing = current.engagementFor(event.kind);
+    if (existing.isLoading) return;
+    if (existing.loaded && existing.items.isNotEmpty) return;
+
+    final resetLoaded = existing.loaded && existing.items.isEmpty;
+    final loadingState = existing.copyWith(
+      isLoading: true,
+      clearError: true,
+      loaded: resetLoaded ? false : existing.loaded,
+    );
+
+    emit(current.copyWith(
+      likes: event.kind == PostEngagementKind.likes ? loadingState : null,
+      views: event.kind == PostEngagementKind.views ? loadingState : null,
+      mentions: event.kind == PostEngagementKind.mentions ? loadingState : null,
+    ));
+
+    try {
+      final page = await getPostEngagementUsers(
+        current.post.id,
+        kind: event.kind,
+        page: 1,
+        limit: _engagementLimit,
+        postAuthorId: current.post.userId,
+      );
+      final loaded = (state as PostManagementLoaded);
+      final prior = loaded.engagementFor(event.kind);
+      final mergedItems =
+          page.items.isNotEmpty ? page.items : prior.items;
+      emit(loaded.copyWith(
+        likes: event.kind == PostEngagementKind.likes
+            ? prior.copyWith(
+                items: mergedItems,
+                page: page.page,
+                hasMore: page.hasMore,
+                isLoading: false,
+                loaded: true,
+              )
+            : null,
+        views: event.kind == PostEngagementKind.views
+            ? prior.copyWith(
+                items: mergedItems,
+                page: page.page,
+                hasMore: page.hasMore,
+                isLoading: false,
+                loaded: true,
+              )
+            : null,
+        mentions: event.kind == PostEngagementKind.mentions
+            ? prior.copyWith(
+                items: mergedItems,
+                page: page.page,
+                hasMore: page.hasMore,
+                isLoading: false,
+                loaded: true,
+              )
+            : null,
+      ));
+    } catch (e) {
+      final loaded = (state as PostManagementLoaded);
+      final prior = loaded.engagementFor(event.kind);
+      emit(loaded.copyWith(
+        likes: event.kind == PostEngagementKind.likes
+            ? prior.copyWith(isLoading: false, loaded: true, error: _messageFrom(e))
+            : null,
+        views: event.kind == PostEngagementKind.views
+            ? prior.copyWith(isLoading: false, loaded: true, error: _messageFrom(e))
+            : null,
+        mentions: event.kind == PostEngagementKind.mentions
+            ? prior.copyWith(isLoading: false, loaded: true, error: _messageFrom(e))
+            : null,
+      ));
+    }
+  }
+
+  Future<void> _onLoadMoreEngagementUsers(
+    LoadMorePostEngagementUsersEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+
+    final existing = current.engagementFor(event.kind);
+    if (!existing.hasMore ||
+        existing.isLoadingMore ||
+        existing.isLoading ||
+        !existing.loaded) {
+      return;
+    }
+
+    emit(current.copyWith(
+      likes: event.kind == PostEngagementKind.likes
+          ? existing.copyWith(isLoadingMore: true, clearError: true)
+          : null,
+      views: event.kind == PostEngagementKind.views
+          ? existing.copyWith(isLoadingMore: true, clearError: true)
+          : null,
+      mentions: event.kind == PostEngagementKind.mentions
+          ? existing.copyWith(isLoadingMore: true, clearError: true)
+          : null,
+    ));
+
+    try {
+      final page = await getPostEngagementUsers(
+        current.post.id,
+        kind: event.kind,
+        page: existing.page + 1,
+        limit: _engagementLimit,
+        postAuthorId: current.post.userId,
+      );
+      final loaded = (state as PostManagementLoaded);
+      final prior = loaded.engagementFor(event.kind);
+      emit(loaded.copyWith(
+        likes: event.kind == PostEngagementKind.likes
+            ? prior.copyWith(
+                items: [...prior.items, ...page.items],
+                page: page.page,
+                hasMore: page.hasMore,
+                isLoadingMore: false,
+              )
+            : null,
+        views: event.kind == PostEngagementKind.views
+            ? prior.copyWith(
+                items: [...prior.items, ...page.items],
+                page: page.page,
+                hasMore: page.hasMore,
+                isLoadingMore: false,
+              )
+            : null,
+        mentions: event.kind == PostEngagementKind.mentions
+            ? prior.copyWith(
+                items: [...prior.items, ...page.items],
+                page: page.page,
+                hasMore: page.hasMore,
+                isLoadingMore: false,
+              )
+            : null,
+      ));
+    } catch (e) {
+      final loaded = (state as PostManagementLoaded);
+      final prior = loaded.engagementFor(event.kind);
+      emit(loaded.copyWith(
+        likes: event.kind == PostEngagementKind.likes
+            ? prior.copyWith(isLoadingMore: false, error: _messageFrom(e))
+            : null,
+        views: event.kind == PostEngagementKind.views
+            ? prior.copyWith(isLoadingMore: false, error: _messageFrom(e))
+            : null,
+        mentions: event.kind == PostEngagementKind.mentions
+            ? prior.copyWith(isLoadingMore: false, error: _messageFrom(e))
+            : null,
+      ));
     }
   }
 

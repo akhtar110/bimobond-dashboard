@@ -54,10 +54,7 @@ class ModerationSidebar extends StatelessWidget {
             l10n.t('moderationSettings'),
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
-              color: InvestigationTheme.mutedText(
-                context,
-                theme.brightness == Brightness.dark,
-              ),
+              color: InvestigationTheme.mutedText(context),
             ),
           ),
           const SizedBox(height: InvestigationTheme.s8),

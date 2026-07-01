@@ -29,13 +29,13 @@ abstract final class GiftReportModels {
       totalTransactions: _int(totals['totalTransactions']),
       transactionsInPeriod: _int(totals['transactionsInPeriod']),
       inventoryHeld: _int(totals['inventoryHeld']),
-      allTimeSpendUsd: _double(totals['allTimeSpendUsd']),
-      allTimeContributionUsd: _double(totals['allTimeContributionUsd']),
-      allTimeCommissionUsd: _double(totals['allTimeCommissionUsd']),
+      allTimeSpendCoins: _double(totals['allTimeSpendCoins']),
+      allTimeContributionCoins: _double(totals['allTimeContributionCoins']),
+      allTimeCommissionCoins: _double(totals['allTimeCommissionCoins']),
       periodTransactions: _int(periodEngagement['transactions']),
-      periodSpendUsd: _double(periodEngagement['spendUsd']),
-      periodContributionUsd: _double(periodEngagement['contributionUsd']),
-      periodCommissionUsd: _double(periodEngagement['commissionUsd']),
+      periodSpendCoins: _double(periodEngagement['spendCoins']),
+      periodContributionCoins: _double(periodEngagement['contributionCoins']),
+      periodCommissionCoins: _double(periodEngagement['commissionCoins']),
       toPost: _int(periodEngagement['toPost']),
       toLive: _int(periodEngagement['toLive']),
       toAuction: _int(periodEngagement['toAuction']),
@@ -64,8 +64,8 @@ abstract final class GiftReportModels {
       ...giftJson,
       'counts': countsJson,
       'revenue': {
-        'spendUsd': metrics['allTimeSpendUsd'],
-        'contributionUsd': metrics['allTimeContributionUsd'],
+        'spendCoins': metrics['allTimeSpendCoins'],
+        'contributionCoins': metrics['allTimeContributionCoins'],
       },
     });
 
@@ -73,14 +73,14 @@ abstract final class GiftReportModels {
       period: parsePeriod(json),
       gift: gift,
       counts: _counts(countsJson),
-      priceUsd: _double(metrics['priceUsd'] ?? gift.priceUsd),
-      allTimeSpendUsd: _double(metrics['allTimeSpendUsd']),
-      allTimeContributionUsd: _double(metrics['allTimeContributionUsd']),
-      allTimeCommissionUsd: _double(metrics['allTimeCommissionUsd']),
+      priceCoins: _double(metrics['priceCoins'] ?? gift.priceCoins),
+      allTimeSpendCoins: _double(metrics['allTimeSpendCoins']),
+      allTimeContributionCoins: _double(metrics['allTimeContributionCoins']),
+      allTimeCommissionCoins: _double(metrics['allTimeCommissionCoins']),
       periodTransactions: _int(periodActivity['transactions']),
-      periodSpendUsd: _double(periodActivity['spendUsd']),
-      periodContributionUsd: _double(periodActivity['contributionUsd']),
-      periodCommissionUsd: _double(periodActivity['commissionUsd']),
+      periodSpendCoins: _double(periodActivity['spendCoins']),
+      periodContributionCoins: _double(periodActivity['contributionCoins']),
+      periodCommissionCoins: _double(periodActivity['commissionCoins']),
       toPost: _int(context['toPost']),
       toLive: _int(context['toLive']),
       toAuction: _int(context['toAuction']),
@@ -118,8 +118,8 @@ abstract final class GiftReportModels {
 
   static GiftReportRevenue _revenue(Map<String, dynamic> json) {
     return GiftReportRevenue(
-      spendUsd: _double(json['spendUsd']),
-      contributionUsd: _double(json['contributionUsd']),
+      spendCoins: _double(json['spendCoins']),
+      contributionCoins: _double(json['contributionCoins']),
     );
   }
 
@@ -137,16 +137,54 @@ abstract final class GiftReportModels {
 
   static List<GiftReportTopGiftSummary> _topGifts(dynamic raw) {
     if (raw is! List) return const [];
-    return raw.whereType<Map<String, dynamic>>().map((json) {
-      return GiftReportTopGiftSummary(
-        id: json['id']?.toString() ?? '',
-        name: json['name']?.toString() ?? '',
-        thumbnailUrl: resolveMediaUrl(json['thumbnailUrl']?.toString()),
-        priceUsd: _double(json['priceUsd']),
-        transactions: _int(json['transactions'] ?? json['sendCount']),
-        spendUsd: _double(json['spendUsd'] ?? json['revenue']),
-      );
-    }).toList();
+    return raw.whereType<Map<String, dynamic>>().map(_topGiftFromJson).toList();
+  }
+
+  static GiftReportTopGiftSummary _topGiftFromJson(Map<String, dynamic> json) {
+    final giftJson = json['gift'];
+    final gift = giftJson is Map<String, dynamic> ? giftJson : null;
+
+    return GiftReportTopGiftSummary(
+      id: _firstString(json, const ['id', 'giftId']) ??
+          _firstString(gift, const ['id']) ??
+          '',
+      name: _firstString(json, const ['name', 'giftName', 'title']) ??
+          _firstString(gift, const ['name', 'title']) ??
+          '',
+      thumbnailUrl: resolveMediaUrl(
+        _firstString(json, const ['thumbnailUrl', 'imageUrl']) ??
+            _firstString(gift, const ['thumbnailUrl', 'imageUrl']),
+      ),
+      priceCoins: _double(
+        json['priceCoins'] ??
+            gift?['priceCoins'] ??
+            json['price'] ??
+            gift?['price'],
+      ),
+      transactions: _int(
+        json['transactions'] ?? json['sendCount'] ?? json['count'],
+      ),
+      spendCoins: _double(
+        json['spendCoins'] ??
+            json['revenue'] ??
+            json['totalSpendCoins'] ??
+            json['grossCoins'],
+      ),
+    );
+  }
+
+  static String? _firstString(
+    Map<String, dynamic>? json,
+    List<String> keys,
+  ) {
+    if (json == null) return null;
+    for (final key in keys) {
+      final value = json[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return null;
   }
 
   static List<GiftReportTopUserActivity> _topSenders(dynamic raw) {
@@ -156,8 +194,8 @@ abstract final class GiftReportModels {
       return GiftReportTopUserActivity(
         user: _userSummary(userJson is Map<String, dynamic> ? userJson : json),
         sendCount: _int(json['sendCount']),
-        spendUsd: _double(json['spendUsd']),
-        contributionUsd: _double(json['contributionUsd']),
+        spendCoins: _double(json['spendCoins']),
+        contributionCoins: _double(json['contributionCoins']),
       );
     }).toList();
   }
@@ -169,7 +207,7 @@ abstract final class GiftReportModels {
       return GiftReportTopReceiverActivity(
         user: _userSummary(userJson is Map<String, dynamic> ? userJson : json),
         receiveCount: _int(json['receiveCount']),
-        earnedUsd: _double(json['earnedUsd']),
+        earnedCoins: _double(json['earnedCoins']),
       );
     }).toList();
   }
@@ -186,8 +224,8 @@ abstract final class GiftReportModels {
         postId: json['postId']?.toString(),
         liveId: json['liveId']?.toString(),
         auctionId: json['auctionId']?.toString(),
-        priceUsd: _double(json['priceUsd']),
-        contributionUsd: _double(json['contributionUsd']),
+        priceCoins: _double(json['priceCoins']),
+        contributionCoins: _double(json['contributionCoins']),
         createdAt: _date(json['createdAt']) ?? DateTime.now(),
         sender: json['sender'] != null ? _userSummary(json['sender']) : null,
         receiver:
@@ -220,7 +258,7 @@ class GiftReportListItemModel extends GiftReportListItemEntity {
     required super.name,
     required super.thumbnailUrl,
     super.animationUrl,
-    required super.priceUsd,
+    required super.priceCoins,
     required super.isActive,
     super.publishedAt,
     required super.counts,
@@ -237,8 +275,8 @@ class GiftReportListItemModel extends GiftReportListItemEntity {
       thumbnailUrl:
           resolveMediaUrl(json['thumbnailUrl']?.toString()) ?? '',
       animationUrl: resolveMediaUrl(json['animationUrl']?.toString()),
-      priceUsd: ApiPageParser.doubleVal(
-        json['priceUsd'] ?? json['price'] ?? json['price_usd'],
+      priceCoins: ApiPageParser.doubleVal(
+        json['priceCoins'] ?? json['price'] ?? json['price_usd'],
       ),
       isActive: json['isActive'] as bool? ?? true,
       publishedAt: GiftReportModels._date(json['publishedAt']),

@@ -7,8 +7,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../features/users/domain/entities/user_entity.dart';
 import '../../domain/entities/notification_type.dart';
+import '../../domain/entities/scheduled_notification_entity.dart';
 import '../bloc/notifications_bloc.dart';
 import 'bulk_user_selector.dart';
+import 'notification_scheduler_card.dart';
 import 'notification_type_dropdown.dart';
 import 'send_confirmation_dialog.dart';
 import 'user_selector.dart';
@@ -16,7 +18,9 @@ import 'user_selector.dart';
 enum _ComposerTab { single, bulk, broadcast, broadcastAdmins }
 
 class NotificationComposer extends StatefulWidget {
-  const NotificationComposer({super.key});
+  const NotificationComposer({super.key, this.expandVertically = false});
+
+  final bool expandVertically;
 
   @override
   State<NotificationComposer> createState() => _NotificationComposerState();
@@ -47,11 +51,20 @@ class _NotificationComposerState extends State<NotificationComposer>
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.65),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -104,20 +117,34 @@ class _NotificationComposerState extends State<NotificationComposer>
                 Tab(text: l10n.t('notificationTabBroadcastAdmins')),
               ],
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 520,
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: const [
-                  _SingleUserForm(),
-                  _BulkForm(),
-                  _BroadcastForm(adminsOnly: false),
-                  _BroadcastForm(adminsOnly: true),
-                ],
+            const SizedBox(height: 16),
+            if (widget.expandVertically)
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: const [
+                    _SingleUserForm(),
+                    _BulkForm(),
+                    _BroadcastForm(adminsOnly: false),
+                    _BroadcastForm(adminsOnly: true),
+                  ],
+                ),
+              )
+            else
+              SizedBox(
+                height: 560,
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: const [
+                    _SingleUserForm(),
+                    _BulkForm(),
+                    _BroadcastForm(adminsOnly: false),
+                    _BroadcastForm(adminsOnly: true),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -339,6 +366,128 @@ mixin _FormFields<T extends StatefulWidget> on State<T> {
       ),
     );
   }
+
+  Widget buildSchedulerSection() => const NotificationSchedulerCard();
+
+  void dispatchSingleSend(BuildContext context, {required String userId}) {
+    final bloc = context.read<NotificationsBloc>();
+    final state = bloc.state;
+    final title = titleCtrl.text.trim();
+    final body = bodyCtrl.text.trim();
+    final data = _parseData();
+
+    if (state.isScheduled) {
+      if (!state.isScheduleValid) return;
+      bloc.add(
+        ScheduleNotificationRequested(
+          target: ScheduledNotificationTarget.single,
+          userId: userId,
+          title: title,
+          body: body,
+          type: selectedType,
+          sendPush: sendPush,
+          data: data,
+        ),
+      );
+      return;
+    }
+
+    bloc.add(
+      SendNotificationRequested(
+        userId: userId,
+        title: title,
+        body: body,
+        type: selectedType,
+        sendPush: sendPush,
+        data: data,
+      ),
+    );
+  }
+
+  void dispatchBulkSend(BuildContext context, {required List<String> userIds}) {
+    final bloc = context.read<NotificationsBloc>();
+    final state = bloc.state;
+    final title = titleCtrl.text.trim();
+    final body = bodyCtrl.text.trim();
+    final data = _parseData();
+
+    if (state.isScheduled) {
+      if (!state.isScheduleValid) return;
+      bloc.add(
+        ScheduleNotificationRequested(
+          target: ScheduledNotificationTarget.bulk,
+          userIds: userIds,
+          title: title,
+          body: body,
+          type: selectedType,
+          sendPush: sendPush,
+          data: data,
+        ),
+      );
+      return;
+    }
+
+    bloc.add(
+      SendBulkNotificationRequested(
+        userIds: userIds,
+        title: title,
+        body: body,
+        type: selectedType,
+        sendPush: sendPush,
+        data: data,
+      ),
+    );
+  }
+
+  void dispatchBroadcastSend(
+    BuildContext context, {
+    required bool adminsOnly,
+  }) {
+    final bloc = context.read<NotificationsBloc>();
+    final state = bloc.state;
+    final title = titleCtrl.text.trim();
+    final body = bodyCtrl.text.trim();
+    final data = _parseData();
+
+    if (state.isScheduled) {
+      if (!state.isScheduleValid) return;
+      bloc.add(
+        ScheduleNotificationRequested(
+          target: adminsOnly
+              ? ScheduledNotificationTarget.broadcastAdmins
+              : ScheduledNotificationTarget.broadcastAll,
+          title: title,
+          body: body,
+          type: selectedType,
+          sendPush: sendPush,
+          data: data,
+        ),
+      );
+      return;
+    }
+
+    if (adminsOnly) {
+      bloc.add(
+        BroadcastAdminsRequested(
+          title: title,
+          body: body,
+          type: selectedType,
+          sendPush: sendPush,
+          data: data,
+        ),
+      );
+    } else {
+      bloc.add(
+        BroadcastNotificationRequested(
+          title: title,
+          body: body,
+          type: selectedType,
+          sendPush: sendPush,
+          data: data,
+        ),
+      );
+    }
+  }
 }
 
 // ──────────────────────────────────────────────────────────
@@ -363,41 +512,51 @@ class _SingleUserFormState extends State<_SingleUserForm>
     return BlocListener<NotificationsBloc, NotificationsState>(
       listenWhen: (a, b) => a.status != b.status,
       listener: (context, state) {
-        if (state.hasSent) _resetForm();
+        if (state.hasSent || state.hasScheduled) _resetForm();
       },
       child: Form(
         key: formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              UserSelector(
-                selectedUser: _selectedUser,
-                onUserSelected: (u) => setState(() => _selectedUser = u),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    UserSelector(
+                      selectedUser: _selectedUser,
+                      onUserSelected: (u) => setState(() => _selectedUser = u),
+                    ),
+                    const SizedBox(height: 16),
+                    buildTitleField(context),
+                    const SizedBox(height: 16),
+                    buildBodyField(context),
+                    const SizedBox(height: 16),
+                    NotificationTypeDropdown(
+                      value: selectedType,
+                      onChanged: (t) => setState(() => selectedType = t),
+                    ),
+                    const SizedBox(height: 16),
+                    buildSendPushToggle(),
+                    const SizedBox(height: 16),
+                    buildDataField(context),
+                    const SizedBox(height: 12),
+                    buildPreviewCard(context),
+                    const SizedBox(height: 16),
+                    buildSchedulerSection(),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              buildTitleField(context),
-              const SizedBox(height: 14),
-              buildBodyField(context),
-              const SizedBox(height: 14),
-              NotificationTypeDropdown(
-                value: selectedType,
-                onChanged: (t) => setState(() => selectedType = t),
-              ),
-              const SizedBox(height: 14),
-              buildSendPushToggle(),
-              const SizedBox(height: 14),
-              buildDataField(context),
-              const SizedBox(height: 10),
-              buildPreviewCard(context),
-              const SizedBox(height: 14),
-              _SendButton(
-                label: l10n.t('notificationSendButton'),
-                icon: Icons.send_rounded,
-                onSend: _onSend,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            _SendButton(
+              label: l10n.t('notificationSendButton'),
+              scheduledLabel: l10n.t('notificationScheduleButton'),
+              icon: Icons.send_rounded,
+              onSend: _onSend,
+            ),
+          ],
         ),
       ),
     );
@@ -417,17 +576,7 @@ class _SingleUserFormState extends State<_SingleUserForm>
   void _onSend() {
     if (!formKey.currentState!.validate()) return;
     if (_selectedUser == null) return;
-
-    context.read<NotificationsBloc>().add(
-          SendNotificationRequested(
-            userId: _selectedUser!.id,
-            title: titleCtrl.text.trim(),
-            body: bodyCtrl.text.trim(),
-            type: selectedType,
-            sendPush: sendPush,
-            data: _parseData(),
-          ),
-        );
+    dispatchSingleSend(context, userId: _selectedUser!.id);
   }
 }
 
@@ -453,45 +602,56 @@ class _BulkFormState extends State<_BulkForm>
     return BlocListener<NotificationsBloc, NotificationsState>(
       listenWhen: (a, b) => a.status != b.status,
       listener: (context, state) {
-        if (state.hasSent) _resetForm();
+        if (state.hasSent || state.hasScheduled) _resetForm();
       },
       child: Form(
         key: formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              BulkUserSelector(
-                selectedUsers: _selectedUsers,
-                onChanged: (users) => setState(() => _selectedUsers = users),
-              ),
-              const SizedBox(height: 14),
-              buildTitleField(context),
-              const SizedBox(height: 14),
-              buildBodyField(context),
-              const SizedBox(height: 14),
-              NotificationTypeDropdown(
-                value: selectedType,
-                onChanged: (t) => setState(() => selectedType = t),
-              ),
-              const SizedBox(height: 14),
-              buildSendPushToggle(),
-              const SizedBox(height: 14),
-              buildDataField(context),
-              const SizedBox(height: 10),
-              buildPreviewCard(context),
-              const SizedBox(height: 14),
-              _SendButton(
-                label: l10n.tArgs(
-                  'notificationSendBulkButtonCount',
-                  {'count': '${_selectedUsers.length}'},
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    BulkUserSelector(
+                      selectedUsers: _selectedUsers,
+                      onChanged: (users) =>
+                          setState(() => _selectedUsers = users),
+                    ),
+                    const SizedBox(height: 16),
+                    buildTitleField(context),
+                    const SizedBox(height: 16),
+                    buildBodyField(context),
+                    const SizedBox(height: 16),
+                    NotificationTypeDropdown(
+                      value: selectedType,
+                      onChanged: (t) => setState(() => selectedType = t),
+                    ),
+                    const SizedBox(height: 16),
+                    buildSendPushToggle(),
+                    const SizedBox(height: 16),
+                    buildDataField(context),
+                    const SizedBox(height: 12),
+                    buildPreviewCard(context),
+                    const SizedBox(height: 16),
+                    buildSchedulerSection(),
+                  ],
                 ),
-                icon: Icons.group_rounded,
-                onSend: _onSend,
-                disabled: _selectedUsers.isEmpty,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            _SendButton(
+              label: l10n.tArgs(
+                'notificationSendBulkButtonCount',
+                {'count': '${_selectedUsers.length}'},
+              ),
+              scheduledLabel: l10n.t('notificationScheduleButton'),
+              icon: Icons.group_rounded,
+              onSend: _onSend,
+              disabled: _selectedUsers.isEmpty,
+            ),
+          ],
         ),
       ),
     );
@@ -511,17 +671,10 @@ class _BulkFormState extends State<_BulkForm>
   void _onSend() {
     if (!formKey.currentState!.validate()) return;
     if (_selectedUsers.isEmpty) return;
-
-    context.read<NotificationsBloc>().add(
-          SendBulkNotificationRequested(
-            userIds: _selectedUsers.map((u) => u.id).toList(),
-            title: titleCtrl.text.trim(),
-            body: bodyCtrl.text.trim(),
-            type: selectedType,
-            sendPush: sendPush,
-            data: _parseData(),
-          ),
-        );
+    dispatchBulkSend(
+      context,
+      userIds: _selectedUsers.map((u) => u.id).toList(),
+    );
   }
 }
 
@@ -556,91 +709,106 @@ class _BroadcastFormState extends State<_BroadcastForm>
     return BlocListener<NotificationsBloc, NotificationsState>(
       listenWhen: (a, b) => a.status != b.status,
       listener: (context, state) {
-        if (state.hasSent) _resetForm();
+        if (state.hasSent || state.hasScheduled) _resetForm();
       },
       child: Form(
         key: formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Warning banner
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: (widget.adminsOnly
-                          ? scheme.primaryContainer
-                          : scheme.errorContainer)
-                      .withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: widget.adminsOnly
-                        ? scheme.primary.withValues(alpha: 0.4)
-                        : scheme.error.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      widget.adminsOnly
-                          ? Icons.admin_panel_settings_outlined
-                          : Icons.campaign_rounded,
-                      color: widget.adminsOnly
-                          ? scheme.primary
-                          : scheme.error,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.adminsOnly
-                            ? l10n.t('notificationBroadcastAdminsWarning')
-                            : l10n.t('notificationBroadcastAllWarning'),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: widget.adminsOnly
-                                  ? scheme.onPrimaryContainer
-                                  : scheme.onErrorContainer,
-                              fontWeight: FontWeight.w500,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: (widget.adminsOnly
+                                ? scheme.primaryContainer
+                                : scheme.errorContainer)
+                            .withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: widget.adminsOnly
+                              ? scheme.primary.withValues(alpha: 0.4)
+                              : scheme.error.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            widget.adminsOnly
+                                ? Icons.admin_panel_settings_outlined
+                                : Icons.campaign_rounded,
+                            color: widget.adminsOnly
+                                ? scheme.primary
+                                : scheme.error,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              widget.adminsOnly
+                                  ? l10n.t('notificationBroadcastAdminsWarning')
+                                  : l10n.t('notificationBroadcastAllWarning'),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: widget.adminsOnly
+                                        ? scheme.onPrimaryContainer
+                                        : scheme.onErrorContainer,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    buildTitleField(context),
+                    const SizedBox(height: 16),
+                    buildBodyField(context),
+                    const SizedBox(height: 16),
+                    NotificationTypeDropdown(
+                      value: selectedType,
+                      onChanged: (t) => setState(() => selectedType = t),
+                      types: widget.adminsOnly
+                          ? [
+                              NotificationType.adminMessage,
+                              NotificationType.system,
+                            ]
+                          : [
+                              NotificationType.broadcast,
+                              NotificationType.system,
+                            ],
+                    ),
+                    const SizedBox(height: 16),
+                    buildSendPushToggle(),
+                    const SizedBox(height: 16),
+                    buildDataField(context),
+                    const SizedBox(height: 12),
+                    buildPreviewCard(context),
+                    const SizedBox(height: 16),
+                    buildSchedulerSection(),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              buildTitleField(context),
-              const SizedBox(height: 14),
-              buildBodyField(context),
-              const SizedBox(height: 14),
-              NotificationTypeDropdown(
-                value: selectedType,
-                onChanged: (t) => setState(() => selectedType = t),
-                types: widget.adminsOnly
-                    ? [NotificationType.adminMessage, NotificationType.system]
-                    : [
-                        NotificationType.broadcast,
-                        NotificationType.system,
-                      ],
-              ),
-              const SizedBox(height: 14),
-              buildSendPushToggle(),
-              const SizedBox(height: 14),
-              buildDataField(context),
-              const SizedBox(height: 10),
-              buildPreviewCard(context),
-              const SizedBox(height: 14),
-              _SendButton(
-                label: widget.adminsOnly
-                    ? l10n.t('notificationBroadcastAdminsButton')
-                    : l10n.t('notificationBroadcastAllButton'),
-                icon: widget.adminsOnly
-                    ? Icons.admin_panel_settings_rounded
-                    : Icons.campaign_rounded,
-                onSend: _onSend,
-                isDanger: !widget.adminsOnly,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            _SendButton(
+              label: widget.adminsOnly
+                  ? l10n.t('notificationBroadcastAdminsButton')
+                  : l10n.t('notificationBroadcastAllButton'),
+              scheduledLabel: l10n.t('notificationScheduleButton'),
+              icon: widget.adminsOnly
+                  ? Icons.admin_panel_settings_rounded
+                  : Icons.campaign_rounded,
+              onSend: _onSend,
+              isDanger: !widget.adminsOnly,
+            ),
+          ],
         ),
       ),
     );
@@ -660,6 +828,12 @@ class _BroadcastFormState extends State<_BroadcastForm>
 
   Future<void> _onSend() async {
     if (!formKey.currentState!.validate()) return;
+    final bloc = context.read<NotificationsBloc>();
+    if (bloc.state.isScheduled) {
+      dispatchBroadcastSend(context, adminsOnly: widget.adminsOnly);
+      return;
+    }
+
     final l10n = context.l10n;
 
     final confirmed = await SendConfirmationDialog.show(
@@ -679,27 +853,7 @@ class _BroadcastFormState extends State<_BroadcastForm>
     if (!confirmed) return;
     if (!mounted) return;
 
-    if (widget.adminsOnly) {
-      context.read<NotificationsBloc>().add(
-            BroadcastAdminsRequested(
-              title: titleCtrl.text.trim(),
-              body: bodyCtrl.text.trim(),
-              type: selectedType,
-              sendPush: sendPush,
-              data: _parseData(),
-            ),
-          );
-    } else {
-      context.read<NotificationsBloc>().add(
-            BroadcastNotificationRequested(
-              title: titleCtrl.text.trim(),
-              body: bodyCtrl.text.trim(),
-              type: selectedType,
-              sendPush: sendPush,
-              data: _parseData(),
-            ),
-          );
-    }
+    dispatchBroadcastSend(context, adminsOnly: widget.adminsOnly);
   }
 }
 
@@ -712,11 +866,13 @@ class _SendButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onSend,
+    this.scheduledLabel,
     this.isDanger = false,
     this.disabled = false,
   });
 
   final String label;
+  final String? scheduledLabel;
   final IconData icon;
   final VoidCallback onSend;
   final bool isDanger;
@@ -727,33 +883,61 @@ class _SendButton extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
-    return BlocBuilder<NotificationsBloc, NotificationsState>(
-      buildWhen: (a, b) => a.isSending != b.isSending,
-      builder: (context, state) {
-        return FilledButton.icon(
-          style: isDanger
-              ? FilledButton.styleFrom(
-                  backgroundColor: scheme.error,
-                  foregroundColor: scheme.onError,
-                  minimumSize: const Size(double.infinity, 48),
-                )
-              : FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-          onPressed: (state.isSending || disabled) ? null : onSend,
-          icon: state.isSending
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : Icon(icon),
-          label: Text(
-            state.isSending ? l10n.t('notificationSending') : label,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+    return BlocSelector<
+        NotificationsBloc,
+        NotificationsState,
+        ({bool sending, bool isScheduled, bool scheduleValid})>(
+      selector: (state) => (
+        sending: state.isSending,
+        isScheduled: state.isScheduled,
+        scheduleValid: state.isScheduleValid,
+      ),
+      builder: (context, data) {
+        final blocked =
+            data.sending || disabled || (data.isScheduled && !data.scheduleValid);
+        final actionLabel = data.isScheduled
+            ? (scheduledLabel ?? l10n.t('notificationScheduleButton'))
+            : label;
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            border: Border(
+              top: BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: FilledButton.icon(
+              style: isDanger
+                  ? FilledButton.styleFrom(
+                      backgroundColor: scheme.error,
+                      foregroundColor: scheme.onError,
+                      minimumSize: const Size(double.infinity, 48),
+                    )
+                  : FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                    ),
+              onPressed: blocked ? null : onSend,
+              icon: data.sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(data.isScheduled ? Icons.schedule_send_rounded : icon),
+              label: Text(
+                data.sending
+                    ? l10n.t('notificationSending')
+                    : actionLabel,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
         );
       },

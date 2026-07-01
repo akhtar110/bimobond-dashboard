@@ -1,7 +1,9 @@
 import '../../../categories/domain/entities/category_entity.dart';
+import 'post_engagement_user_item.dart';
 import 'post_media_entity.dart';
 
 export '../../../categories/domain/entities/category_entity.dart';
+export 'post_engagement_user_item.dart';
 export 'post_media_entity.dart';
 
 class ManagedPostEntity {
@@ -34,6 +36,11 @@ class ManagedPostEntity {
     required this.likeCount,
     required this.commentCount,
     required this.saveCount,
+    this.repostCount = 0,
+    this.recentReposts = const [],
+    this.recentLikes = const [],
+    this.recentViews = const [],
+    this.recentMentions = const [],
     this.duration,
     this.videoWidth,
     this.videoHeight,
@@ -73,11 +80,65 @@ class ManagedPostEntity {
   final List<PostMediaEntity> media;
   final String? animatedCoverUrl;
 
+  /// Playable video URLs — excluded when picking a still preview image.
+  Iterable<String> get playableMediaUrls sync* {
+    final video = videoUrl?.trim();
+    if (video != null && video.isNotEmpty) yield video;
+    final hls = hlsUrl?.trim();
+    if (hls != null && hls.isNotEmpty) yield hls;
+    for (final item in media) {
+      if (item.isVideo) {
+        final url = item.url.trim();
+        if (url.isNotEmpty) yield url;
+      }
+    }
+  }
+
   /// First IMAGE from [media], otherwise [thumbnailUrl].
   String? get displayThumbnailUrl => resolvePostDisplayThumbnailUrl(
         media: media,
         thumbnailUrl: thumbnailUrl,
+        excludeUrls: playableMediaUrls,
       );
+
+  bool get isVideoPost => type.toUpperCase() == 'VIDEO';
+
+  bool get containsVideoMedia =>
+      isVideoPost || media.any((item) => item.isVideo);
+
+  /// List/card preview image. For video posts, prefers [thumbnailUrl] (never a playable video URL).
+  String? get previewThumbnailUrl {
+    final exclude = playableMediaUrls;
+
+    if (containsVideoMedia) {
+      for (final candidate in [thumbnailUrl, animatedCoverUrl]) {
+        if (isUsablePostThumbnailUrl(candidate, excludeUrls: exclude)) {
+          return candidate!.trim();
+        }
+      }
+      for (final item in media) {
+        if (!item.isVideo &&
+            isUsablePostThumbnailUrl(item.url, excludeUrls: exclude)) {
+          return item.url;
+        }
+      }
+      return null;
+    }
+
+    final resolved = displayThumbnailUrl;
+    if (isUsablePostThumbnailUrl(resolved, excludeUrls: exclude)) {
+      return resolved!.trim();
+    }
+
+    for (final candidate in [animatedCoverUrl, thumbnailUrl]) {
+      if (isUsablePostThumbnailUrl(candidate, excludeUrls: exclude)) {
+        return candidate!.trim();
+      }
+    }
+
+    return null;
+  }
+
   final String? description;
   final String? category;
   final CategoryEntity? categoryEntity;
@@ -88,6 +149,11 @@ class ManagedPostEntity {
   final int likeCount;
   final int commentCount;
   final int saveCount;
+  final int repostCount;
+  final List<Map<String, dynamic>> recentReposts;
+  final List<PostEngagementUserItem> recentLikes;
+  final List<PostEngagementUserItem> recentViews;
+  final List<PostEngagementUserItem> recentMentions;
   final int? duration;
   final int? videoWidth;
   final int? videoHeight;
@@ -134,6 +200,11 @@ class ManagedPostEntity {
     int? likeCount,
     int? commentCount,
     int? saveCount,
+    int? repostCount,
+    List<Map<String, dynamic>>? recentReposts,
+    List<PostEngagementUserItem>? recentLikes,
+    List<PostEngagementUserItem>? recentViews,
+    List<PostEngagementUserItem>? recentMentions,
     int? duration,
     int? videoWidth,
     int? videoHeight,
@@ -180,6 +251,11 @@ class ManagedPostEntity {
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
       saveCount: saveCount ?? this.saveCount,
+      repostCount: repostCount ?? this.repostCount,
+      recentReposts: recentReposts ?? this.recentReposts,
+      recentLikes: recentLikes ?? this.recentLikes,
+      recentViews: recentViews ?? this.recentViews,
+      recentMentions: recentMentions ?? this.recentMentions,
       duration: duration ?? this.duration,
       videoWidth: videoWidth ?? this.videoWidth,
       videoHeight: videoHeight ?? this.videoHeight,

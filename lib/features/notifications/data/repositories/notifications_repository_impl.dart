@@ -2,6 +2,7 @@ import '../../domain/entities/admin_notification_event_entity.dart';
 import '../../domain/entities/notification_filters.dart';
 import '../../domain/entities/notification_request_entity.dart';
 import '../../domain/entities/notification_send_result_entity.dart';
+import '../../domain/entities/scheduled_notification_entity.dart';
 import '../../domain/repositories/notifications_repository.dart';
 import '../datasources/notifications_remote_datasource.dart';
 import '../datasources/notifications_socket_service.dart';
@@ -63,5 +64,15 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
         page: page,
         limit: limit,
         filters: filters,
+      );
+
+  @override
+  Future<ScheduledNotificationEntity> scheduleNotification({
+    required NotificationRequestEntity request,
+    required ScheduledNotificationTarget target,
+  }) =>
+      remoteDataSource.scheduleNotification(
+        request: request,
+        target: target,
       );
 }

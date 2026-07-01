@@ -173,6 +173,7 @@ class _LikeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final post = like.post;
     final dateStr = DateFormat('MMM d, yyyy · HH:mm').format(like.createdAt);
 
@@ -190,7 +191,7 @@ class _LikeCard extends StatelessWidget {
               Icon(
                 isMade ? Icons.favorite : Icons.favorite_border,
                 size: 16,
-                color: Colors.red.shade400,
+                color: scheme.error,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -200,7 +201,7 @@ class _LikeCard extends StatelessWidget {
                       : context.l10n.t('receivedLike'),
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
+                    color: scheme.onSurface,
                   ),
                 ),
               ),
@@ -208,8 +209,7 @@ class _LikeCard extends StatelessWidget {
                 dateStr,
                 style: TextStyle(
                   fontSize: 11,
-                  color:
-                      isDark ? Colors.grey.shade500 : const Color(0xFF9CA3AF),
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -224,7 +224,7 @@ class _LikeCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.35,
-                color: isDark ? Colors.grey.shade200 : const Color(0xFF374151),
+                color: scheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -238,9 +238,7 @@ class _LikeCard extends StatelessWidget {
                   isMade ? 'By ' : 'From ',
                   style: TextStyle(
                     fontSize: 11,
-                    color: isDark
-                        ? Colors.grey.shade500
-                        : const Color(0xFF9CA3AF),
+                    color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -265,9 +263,7 @@ class _LikeCard extends StatelessWidget {
                   'Liked by ',
                   style: TextStyle(
                     fontSize: 11,
-                    color: isDark
-                        ? Colors.grey.shade500
-                        : const Color(0xFF9CA3AF),
+                    color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

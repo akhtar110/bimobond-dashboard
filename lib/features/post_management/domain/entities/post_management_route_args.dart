@@ -18,8 +18,23 @@ class PostManagementRouteArgs {
   bool get isInvestigation =>
       sourceUser != null || activityContext != null;
 
+  /// Returns null when [arguments] cannot be parsed (e.g. navigator restore on hot reload).
+  static PostManagementRouteArgs? tryResolve(Object? arguments) {
+    if (arguments == null) return null;
+    try {
+      return resolve(arguments);
+    } on ArgumentError {
+      return null;
+    }
+  }
+
   /// Accepts [PostManagementRouteArgs], [ManagedPostEntity], or deep-link [Map].
   static PostManagementRouteArgs resolve(Object? arguments) {
+    if (arguments == null) {
+      throw ArgumentError(
+        'Post management route expects PostManagementRouteArgs or ManagedPostEntity',
+      );
+    }
     if (arguments is PostManagementRouteArgs) return arguments;
     if (arguments is ManagedPostEntity) {
       return PostManagementRouteArgs(post: arguments);

@@ -64,7 +64,10 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
     await openPostInvestigation(
       context,
       postId: post.id,
-      post: managedPostFromUserPost(post, author: widget.sourceUser),
+      post: managedPostFromUserPost(
+        post,
+        author: resolveProfileUserAsPostOwner(post, widget.sourceUser),
+      ),
       sourceUser: widget.sourceUser,
       activityContext: ActivityContext.post(activityDate: post.createdAt),
     );
@@ -75,6 +78,7 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
 
     return BlocBuilder<UserActivityBloc, UserActivityState>(
@@ -114,9 +118,7 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
                           l10n.t('publishedPosts'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
-                            color: widget.isDark
-                                ? Colors.white
-                                : const Color(0xFF0F172A),
+                            color: scheme.onSurface,
                           ),
                         ),
                         Text(
@@ -134,9 +136,7 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
                     Text(
                       l10n.t('tapPostAdminHint'),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: widget.isDark
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -192,9 +192,7 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
                     child: Text(
                       l10n.t('allPostsLoaded'),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: widget.isDark
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade600,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -256,6 +254,7 @@ class _PostGridTileState extends State<_PostGridTile> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final post = widget.post;
     final mediaUrl = _mediaUrl;
@@ -284,21 +283,27 @@ class _PostGridTileState extends State<_PostGridTile> {
                               imageUrl: mediaUrl,
                               fit: BoxFit.cover,
                               placeholder: (_, __) => ColoredBox(
-                                color: Colors.grey.shade200,
+                                color: scheme.surfaceContainerHighest,
                                 child: const Center(
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                   ),
                                 ),
                               ),
-                              errorWidget: (_, __, ___) => const ColoredBox(
-                                color: Color(0xFFE2E8F0),
-                                child: Icon(Icons.broken_image_outlined),
+                              errorWidget: (_, __, ___) => ColoredBox(
+                                color: scheme.surfaceContainerHighest,
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
                             )
-                          : const ColoredBox(
-                              color: Color(0xFFE2E8F0),
-                              child: Icon(Icons.videocam_off_outlined),
+                          : ColoredBox(
+                              color: scheme.surfaceContainerHighest,
+                              child: Icon(
+                                Icons.videocam_off_outlined,
+                                color: scheme.onSurfaceVariant,
+                              ),
                             )),
               ),
               Container(
@@ -308,7 +313,7 @@ class _PostGridTileState extends State<_PostGridTile> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.65),
+                      scheme.scrim.withValues(alpha: 0.65),
                     ],
                   ),
                 ),
@@ -323,13 +328,13 @@ class _PostGridTileState extends State<_PostGridTile> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black54,
+                      color: scheme.inverseSurface.withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       post.status,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: scheme.onInverseSurface,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -342,16 +347,16 @@ class _PostGridTileState extends State<_PostGridTile> {
                 right: 12,
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.play_arrow_rounded,
-                      color: Colors.white,
+                      color: scheme.onInverseSurface,
                       size: 16,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       _formatCount(post.viewCount),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: scheme.onInverseSurface,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -361,7 +366,7 @@ class _PostGridTileState extends State<_PostGridTile> {
               ),
               if (_hovered)
                 Container(
-                  color: Colors.black.withValues(alpha: 0.35),
+                  color: scheme.scrim.withValues(alpha: 0.35),
                   alignment: Alignment.center,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -369,15 +374,9 @@ class _PostGridTileState extends State<_PostGridTile> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: widget.isDark
-                          ? const Color(0xFF1E293B)
-                          : Colors.white.withValues(alpha: 0.95),
+                      color: scheme.surface.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: widget.isDark
-                            ? Colors.white.withValues(alpha: 0.2)
-                            : Colors.transparent,
-                      ),
+                      border: Border.all(color: scheme.outlineVariant),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -385,9 +384,7 @@ class _PostGridTileState extends State<_PostGridTile> {
                         Icon(
                           Icons.edit_outlined,
                           size: 16,
-                          color: widget.isDark
-                              ? Colors.white
-                              : const Color(0xFF111827),
+                          color: scheme.onSurface,
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -395,9 +392,7 @@ class _PostGridTileState extends State<_PostGridTile> {
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
-                            color: widget.isDark
-                                ? Colors.white
-                                : const Color(0xFF111827),
+                            color: scheme.onSurface,
                           ),
                         ),
                       ],
@@ -448,8 +443,9 @@ class _VideoThumbnailWidgetState extends State<_VideoThumbnailWidget> {
       valueListenable: _controller,
       builder: (context, value, _) {
         if (!value.isInitialized) {
+          final scheme = Theme.of(context).colorScheme;
           return ColoredBox(
-            color: Colors.grey.shade200,
+            color: scheme.surfaceContainerHighest,
             child: const Center(
               child: CircularProgressIndicator(strokeWidth: 2),
             ),

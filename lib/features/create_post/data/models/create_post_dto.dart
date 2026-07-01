@@ -121,6 +121,10 @@ class CreatePostDto {
     putStr('type', type);
     putStr('privacyStatus', privacyStatus);
     putStr('description', description);
+    if (status == 'DRAFT' &&
+        (description == null || description!.trim().isEmpty)) {
+      map['description'] = '';
+    }
 
     // ── Optional string fields ────────────────────────────────────────────────
     // NOTE: `category` (free-text name) is NOT sent — the backend rejects

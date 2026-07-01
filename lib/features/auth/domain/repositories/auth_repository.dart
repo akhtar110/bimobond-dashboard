@@ -11,4 +11,5 @@ abstract class AuthRepository {
   Future<void> saveSession(DashboardUserEntity user);
   Future<DashboardUserEntity?> getSession();
   Future<void> clearSession();
+  Future<void> logout();
 }

@@ -33,7 +33,9 @@ abstract final class AnalyticsModels {
       pendingReports: AnalyticsJsonParser.asInt(moderation['pendingReports'] ?? moderation['pending']),
       giftsInPeriod: AnalyticsJsonParser.asInt(monetization['giftsInPeriod'] ?? monetization['gifts']),
       walletBalances: AnalyticsJsonParser.asDouble(
-        monetization['walletBalances'] ?? monetization['totalWalletBalanceUsd'],
+        monetization['walletBalances'] ??
+            monetization['totalBalanceCoins'] ??
+            monetization['totalWalletBalanceUsd'],
       ),
       activeAuctions: AnalyticsJsonParser.asInt(monetization['activeAuctions']),
     );
@@ -62,11 +64,23 @@ abstract final class AnalyticsModels {
       period: AnalyticsJsonParser.parsePeriod(json),
       total: AnalyticsJsonParser.asInt(totals['total']),
       inPeriod: AnalyticsJsonParser.asInt(totals['inPeriod'] ?? totals['newInPeriod']),
+      published: AnalyticsJsonParser.asInt(totals['published']),
+      hidden: AnalyticsJsonParser.asInt(totals['hidden']),
+      banned: AnalyticsJsonParser.asInt(totals['banned']),
+      expired: AnalyticsJsonParser.asInt(totals['expired']),
       stories: AnalyticsJsonParser.asInt(totals['stories']),
+      storiesInPeriod: AnalyticsJsonParser.asInt(totals['storiesInPeriod']),
       ads: AnalyticsJsonParser.asInt(totals['ads']),
       auctionable: AnalyticsJsonParser.asInt(totals['auctionable']),
-      byType: AnalyticsJsonParser.intMap(json['byType']),
-      byStatus: AnalyticsJsonParser.intMap(json['byStatus']),
+      byType: AnalyticsJsonParser.postTypeCounts(json['byType']),
+      byStatus: AnalyticsJsonParser.postStatusCounts(json['byStatus']),
+      byTypeInPeriod:
+          AnalyticsJsonParser.postTypeCounts(json['byTypeInPeriod']),
+      byStatusInPeriod:
+          AnalyticsJsonParser.postStatusCounts(json['byStatusInPeriod']),
+      periodEngagement: AnalyticsJsonParser.periodEngagement(
+        json['periodEngagement'],
+      ),
       dailyNewPosts: AnalyticsJsonParser.dailySeries(json['dailyNewPosts']),
     );
   }
@@ -101,13 +115,20 @@ abstract final class AnalyticsModels {
       giftTransactionCount: AnalyticsJsonParser.asInt(
         gifts['transactionCount'] ?? gifts['count'],
       ),
-      giftGrossUsd: AnalyticsJsonParser.asDouble(gifts['grossUsd'] ?? gifts['gross']),
-      giftContributionUsd: AnalyticsJsonParser.asDouble(
-        gifts['contributionUsd'] ?? gifts['contribution'],
+      giftGrossCoins: AnalyticsJsonParser.asDouble(
+        gifts['grossCoins'] ?? gifts['grossUsd'] ?? gifts['gross'],
+      ),
+      giftContributionCoins: AnalyticsJsonParser.asDouble(
+        gifts['contributionCoins'] ??
+            gifts['contributionUsd'] ??
+            gifts['contribution'],
       ),
       fiatPurchaseCount: AnalyticsJsonParser.asInt(fiat['count']),
-      fiatCompletedVolumeUsd: AnalyticsJsonParser.asDouble(
-        fiat['completedVolume'] ?? fiat['completedVolumeUsd'],
+      completedPurchaseVolume: AnalyticsJsonParser.asDouble(
+        fiat['completedPurchaseVolume'] ??
+            fiat['completedFiatVolumeUsd'] ??
+            fiat['completedVolume'] ??
+            fiat['completedVolumeUsd'],
       ),
       withdrawalRequestsInPeriod: AnalyticsJsonParser.asInt(
         withdrawals['requestsInPeriod'] ?? withdrawals['count'],
@@ -115,8 +136,10 @@ abstract final class AnalyticsModels {
       pendingWithdrawals: AnalyticsJsonParser.asInt(
         withdrawals['pendingCount'] ?? withdrawals['pending'],
       ),
-      totalWalletBalanceUsd: AnalyticsJsonParser.asDouble(
-        wallets['totalBalanceUsd'] ?? wallets['totalBalance'],
+      totalBalanceCoins: AnalyticsJsonParser.asDouble(
+        wallets['totalBalanceCoins'] ??
+            wallets['totalBalanceUsd'] ??
+            wallets['totalBalance'],
       ),
       accountingByType: AnalyticsJsonParser.doubleMap(json['accountingByType']),
     );

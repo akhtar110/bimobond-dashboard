@@ -19,8 +19,6 @@ class CategoryBulkActionsBar extends StatelessWidget {
         }
         return _BulkBarData(
           selectedIds: state.selectedCategoryIds.toList(),
-          allVisibleSelected: state.allVisibleSelected,
-          someVisibleSelected: state.someVisibleSelected,
           isSubmitting: state.isSubmitting,
           visible: true,
         );
@@ -42,27 +40,6 @@ class CategoryBulkActionsBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Checkbox(
-                tristate: true,
-                value: data.allVisibleSelected
-                    ? true
-                    : data.someVisibleSelected
-                        ? null
-                        : false,
-                visualDensity: VisualDensity.compact,
-                onChanged: data.isSubmitting
-                    ? null
-                    : (_) => bloc.add(SelectAllVisibleCategoriesEvent()),
-              ),
-              Text(
-                context.l10n.tOr(
-                  'categoriesSelectedCount',
-                  '${data.selectedIds.length} selected',
-                ).replaceAll('{count}', '${data.selectedIds.length}'),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
               const Spacer(),
               if (data.isSubmitting)
                 const Padding(
@@ -104,13 +81,6 @@ class CategoryBulkActionsBar extends StatelessWidget {
                 label: l10n.tOr('move', 'Move'),
                 enabled: !data.isSubmitting,
                 onTap: () => _showMoveDialog(context, data.selectedIds, roots),
-              ),
-              IconButton(
-                tooltip: l10n.tOr('clearSelection', 'Clear selection'),
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: data.isSubmitting
-                    ? null
-                    : () => bloc.add(ClearCategorySelectionEvent()),
               ),
             ],
           ),
@@ -211,22 +181,16 @@ class CategoryBulkActionsBar extends StatelessWidget {
 class _BulkBarData {
   const _BulkBarData({
     required this.selectedIds,
-    required this.allVisibleSelected,
-    required this.someVisibleSelected,
     required this.isSubmitting,
     required this.visible,
   });
 
   const _BulkBarData.hidden()
       : selectedIds = const [],
-        allVisibleSelected = false,
-        someVisibleSelected = false,
         isSubmitting = false,
         visible = false;
 
   final List<String> selectedIds;
-  final bool allVisibleSelected;
-  final bool someVisibleSelected;
   final bool isSubmitting;
   final bool visible;
 }

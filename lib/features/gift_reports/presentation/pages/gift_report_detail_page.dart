@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_report_entities.dart';
@@ -22,8 +24,10 @@ class GiftReportDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => di.sl<GiftReportDetailBloc>()
+    if (kDebugMode) debugPrint('GiftReportDetailPage rebuilt');
+    return PersistentBlocProvider<GiftReportDetailBloc>(
+      debugLabel: 'GiftReportDetailPage',
+      create: () => di.sl<GiftReportDetailBloc>()
         ..add(LoadGiftReportDetailEvent(giftId: giftId)),
       child: _GiftReportDetailView(giftId: giftId, onClose: onClose),
     );
@@ -179,7 +183,7 @@ class _DetailBody extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '${formatReportUsd(gift.priceUsd)} · '
+                          '${formatReportCoins(gift.priceCoins)} · '
                           '${gift.isActive ? l10n.t('active') : l10n.t('inactive')}',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,
@@ -197,7 +201,7 @@ class _DetailBody extends StatelessWidget {
                 children: [
                   _MetricCard(
                     label: ReportDetailLabels.allTimeSpend(l10n),
-                    value: formatReportUsd(detail.allTimeSpendUsd),
+                    value: formatReportCoins(detail.allTimeSpendCoins),
                   ),
                   _MetricCard(
                     label: ReportDetailLabels.periodSends(l10n, days),
@@ -205,7 +209,7 @@ class _DetailBody extends StatelessWidget {
                   ),
                   _MetricCard(
                     label: ReportDetailLabels.periodSpend(l10n),
-                    value: formatReportUsd(detail.periodSpendUsd),
+                    value: formatReportCoins(detail.periodSpendCoins),
                   ),
                   _MetricCard(
                     label: ReportDetailLabels.inventoryQty(l10n),
@@ -274,7 +278,7 @@ class _DetailBody extends StatelessWidget {
                                 '${tx.receiver?.displayName ?? tx.receiverId}',
                               ),
                               subtitle: Text(formatReportDate(tx.createdAt)),
-                              trailing: Text(formatReportUsd(tx.priceUsd)),
+                              trailing: Text(formatReportCoins(tx.priceCoins)),
                             ),
                         ],
                       ),
@@ -382,7 +386,7 @@ class _TopSendersList extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             title: Text(item.user.displayName),
             subtitle: Text(ReportDetailLabels.sendsCount(l10n, item.sendCount)),
-            trailing: Text(formatReportUsd(item.spendUsd)),
+            trailing: Text(formatReportCoins(item.spendCoins)),
           ),
       ],
     );
@@ -409,7 +413,7 @@ class _TopReceiversList extends StatelessWidget {
             subtitle: Text(
               ReportDetailLabels.receivesCount(l10n, item.receiveCount),
             ),
-            trailing: Text(formatReportUsd(item.earnedUsd)),
+            trailing: Text(formatReportCoins(item.earnedCoins)),
           ),
       ],
     );

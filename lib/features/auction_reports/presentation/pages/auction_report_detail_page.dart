@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../analytics/presentation/utils/analytics_format.dart';
 import '../../../analytics/presentation/widgets/analytics_kpi_card.dart';
@@ -225,7 +226,7 @@ class _AuctionHeader extends StatelessWidget {
                   label: Text(
                     ReportDetailLabels.targetPrice(
                       l10n,
-                      AnalyticsFormat.usd(auction.targetPriceUsd),
+                      CoinFormat.coinsAmount(auction.targetPriceCoins),
                     ),
                   ),
                   visualDensity: VisualDensity.compact,
@@ -234,7 +235,7 @@ class _AuctionHeader extends StatelessWidget {
                   label: Text(
                     ReportDetailLabels.startPrice(
                       l10n,
-                      AnalyticsFormat.usd(auction.startingPriceUsd),
+                      CoinFormat.coinsAmount(auction.startingPriceCoins),
                     ),
                   ),
                   visualDensity: VisualDensity.compact,
@@ -296,16 +297,16 @@ class _MetricsGrid extends StatelessWidget {
           children: [
             AnalyticsKpiCard(
               title: ReportDetailLabels.raised(l10n),
-              value: AnalyticsFormat.usd(m.currentTotalUsd),
+              value: CoinFormat.coinsAmount(m.currentTotalCoins),
               subtitle: ReportDetailLabels.remaining(
                 l10n,
-                AnalyticsFormat.usd(m.remainingUsd),
+                CoinFormat.coinsAmount(m.remainingCoins),
               ),
               icon: Icons.payments_outlined,
             ),
             AnalyticsKpiCard(
               title: ReportDetailLabels.target(l10n),
-              value: AnalyticsFormat.usd(m.targetPriceUsd),
+              value: CoinFormat.coinsAmount(m.targetPriceCoins),
               subtitle: ReportDetailLabels.percentComplete(
                 l10n,
                 m.progressPercent,
@@ -346,8 +347,8 @@ class _ProgressSection extends StatelessWidget {
       title: ReportDetailLabels.auctionProgress(l10n),
       subtitle: ReportDetailLabels.ofAmount(
         l10n,
-        AnalyticsFormat.usd(metrics.currentTotalUsd),
-        AnalyticsFormat.usd(metrics.targetPriceUsd),
+        CoinFormat.coinsAmount(metrics.currentTotalCoins),
+        CoinFormat.coinsAmount(metrics.targetPriceCoins),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -365,7 +366,7 @@ class _ProgressSection extends StatelessWidget {
             ReportDetailLabels.percentToTarget(
               l10n,
               metrics.progressPercent,
-              AnalyticsFormat.usd(metrics.remainingUsd),
+              CoinFormat.coinsAmount(metrics.remainingCoins),
             ),
             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
           ),
@@ -403,12 +404,12 @@ class _PeriodActivitySection extends StatelessWidget {
           ),
           AnalyticsMiniStat(
             label: ReportDetailLabels.contribution(l10n),
-            value: AnalyticsFormat.usd(activity.contributionUsd),
+            value: CoinFormat.coinsAmount(activity.contributionCoins),
             icon: Icons.savings_outlined,
           ),
           AnalyticsMiniStat(
             label: ReportDetailLabels.giftSpend(l10n),
-            value: AnalyticsFormat.usd(activity.giftSpendUsd),
+            value: CoinFormat.coinsAmount(activity.giftSpendCoins),
             icon: Icons.payments_outlined,
           ),
         ],
@@ -456,7 +457,7 @@ class _BidTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: _UserAvatar(user: bid.bidder),
-      title: Text(AnalyticsFormat.usd(bid.amountUsd)),
+      title: Text(CoinFormat.coinsAmount(bid.amountCoins)),
       subtitle: Text(
         '@${bid.bidder?.username ?? ReportDetailLabels.unknown(l10n)} · '
         '${DateFormat('MMM d, yyyy HH:mm').format(bid.createdAt)}',
@@ -482,8 +483,8 @@ class _GiftTile extends StatelessWidget {
       title: Text(gift.gift?.name ?? ReportDetailLabels.giftLabel(l10n)),
       subtitle: Text(
         '@${gift.sender?.username ?? ReportDetailLabels.unknown(l10n)} · '
-        '${AnalyticsFormat.usd(gift.priceUsd)} '
-        '(+${AnalyticsFormat.usd(gift.contributionUsd)})',
+        '${CoinFormat.coinsAmount(gift.priceCoins)} '
+        '(+${CoinFormat.coinsAmount(gift.contributionCoins)})',
       ),
       trailing: Text(DateFormat('MMM d').format(gift.createdAt)),
     );
@@ -521,7 +522,7 @@ class _ContributorsSection extends StatelessWidget {
                         '${ReportDetailLabels.giftsCount(l10n, c.giftCount)}',
                       ),
                       trailing: Text(
-                        AnalyticsFormat.usd(c.totalContributionUsd),
+                        CoinFormat.coinsAmount(c.totalContributionCoins),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
