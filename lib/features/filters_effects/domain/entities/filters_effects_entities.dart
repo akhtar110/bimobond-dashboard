@@ -280,7 +280,7 @@ class CreateFilterRequest extends Equatable {
   Map<String, dynamic> toJson() => {
         'slug': slug,
         'engineKey': engineKey,
-        'engineType': engineType,
+        'engineType': CameraFilterEngineTypeApi.forAdminApi(engineType),
         if (labelKey != null && labelKey!.isNotEmpty) 'labelKey': labelKey,
         if (customLabel != null && customLabel!.isNotEmpty)
           'customLabel': customLabel,
@@ -349,11 +349,29 @@ class UpdateFilterRequest extends Equatable {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
     if (engineKey != null) json['engineKey'] = engineKey;
-    if (engineType != null) json['engineType'] = engineType;
-    if (labelKey != null) json['labelKey'] = labelKey;
-    if (customLabel != null) json['customLabel'] = customLabel;
-    if (thumbnailUrl != null) json['thumbnailUrl'] = thumbnailUrl;
-    if (previewColorHex != null) json['previewColorHex'] = previewColorHex;
+    if (engineType != null) {
+      json['engineType'] = CameraFilterEngineTypeApi.forAdminApi(engineType!);
+    }
+    if (clearLabelKey) {
+      json['labelKey'] = null;
+    } else if (labelKey != null) {
+      json['labelKey'] = labelKey;
+    }
+    if (clearCustomLabel) {
+      json['customLabel'] = null;
+    } else if (customLabel != null) {
+      json['customLabel'] = customLabel;
+    }
+    if (clearThumbnailUrl) {
+      json['thumbnailUrl'] = null;
+    } else if (thumbnailUrl != null) {
+      json['thumbnailUrl'] = thumbnailUrl;
+    }
+    if (clearPreviewColorHex) {
+      json['previewColorHex'] = null;
+    } else if (previewColorHex != null) {
+      json['previewColorHex'] = previewColorHex;
+    }
     if (isOriginal != null) json['isOriginal'] = isOriginal;
     if (isBeautyDefault != null) json['isBeautyDefault'] = isBeautyDefault;
     if (sortOrder != null) json['sortOrder'] = sortOrder;
@@ -374,7 +392,68 @@ class UpdateFilterRequest extends Equatable {
         isBeautyDefault,
         sortOrder,
         isActive,
+        clearLabelKey,
+        clearCustomLabel,
+        clearThumbnailUrl,
+        clearPreviewColorHex,
       ];
+}
+
+/// Admin write enum (`CAMERAAWESOME`) vs catalog read value (`camerawesome`).
+abstract final class CameraFilterEngineTypeApi {
+  static const camerawesome = 'CAMERAAWESOME';
+
+  static String forAdminApi(String value) {
+    final normalized = value.trim().toUpperCase().replaceAll('-', '_');
+    switch (normalized) {
+      case 'CAMERAAWESOME':
+      case 'CAMERAWESOME':
+        return camerawesome;
+      default:
+        if (value.trim().toLowerCase() == 'camerawesome') return camerawesome;
+        return normalized.isEmpty ? camerawesome : normalized;
+    }
+  }
+}
+
+/// Admin API effect types (`FACE_AR`, `SCREEN_OVERLAY`) vs catalog snake_case.
+abstract final class CameraEffectTypeApi {
+  static const faceAr = 'FACE_AR';
+  static const screenOverlay = 'SCREEN_OVERLAY';
+
+  static const values = [faceAr, screenOverlay];
+
+  static String normalize(String value) {
+    final normalized = value.trim().toUpperCase().replaceAll('-', '_');
+    switch (normalized) {
+      case 'FACE_AR':
+      case 'FACEAR':
+        return faceAr;
+      case 'SCREEN_OVERLAY':
+      case 'SCREENOVERLAY':
+      case 'OVERLAY':
+        return screenOverlay;
+      default:
+        final lower = value.trim().toLowerCase();
+        if (lower == 'face_ar') return faceAr;
+        if (lower == 'screen_overlay') return screenOverlay;
+        return normalized.isEmpty ? faceAr : normalized;
+    }
+  }
+
+  static bool isScreenOverlay(String value) =>
+      normalize(value) == screenOverlay;
+
+  /// Keeps effect flags aligned with the selected admin enum.
+  static ({bool requiresFaceDetection, bool isScreenEffect}) flagsForType(
+    String value, {
+    bool requiresFaceDetection = false,
+  }) {
+    if (isScreenOverlay(value)) {
+      return (requiresFaceDetection: false, isScreenEffect: true);
+    }
+    return (requiresFaceDetection: requiresFaceDetection, isScreenEffect: false);
+  }
 }
 
 class CreateEffectRequest extends Equatable {
@@ -404,7 +483,7 @@ class CreateEffectRequest extends Equatable {
 
   Map<String, dynamic> toJson() => {
         'slug': slug,
-        'effectType': effectType,
+        'effectType': CameraEffectTypeApi.normalize(effectType),
         if (emoji != null && emoji!.isNotEmpty) 'emoji': emoji,
         if (assetUrl != null && assetUrl!.isNotEmpty) 'assetUrl': assetUrl,
         'previewColorHex': previewColorHex,
@@ -458,7 +537,9 @@ class UpdateEffectRequest extends Equatable {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
-    if (effectType != null) json['effectType'] = effectType;
+    if (effectType != null) {
+      json['effectType'] = CameraEffectTypeApi.normalize(effectType!);
+    }
     if (emoji != null) json['emoji'] = emoji;
     if (assetUrl != null) json['assetUrl'] = assetUrl;
     if (previewColorHex != null) json['previewColorHex'] = previewColorHex;
@@ -595,7 +676,6 @@ class PublishCatalogRequest extends Equatable {
 }
 
 enum FiltersEffectsTab {
-  overview,
   filters,
   filterCategories,
   effects,

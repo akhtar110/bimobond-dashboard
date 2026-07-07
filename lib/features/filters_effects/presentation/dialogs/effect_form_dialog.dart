@@ -7,6 +7,8 @@ import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
 import '../utils/fe_preview_color_utils.dart';
 import '../widgets/fe_catalog_item_preview.dart';
+import '../widgets/fe_effect_form_fields.dart';
+import '../widgets/fe_filter_form_fields.dart';
 import '../widgets/fe_form_preview_panel.dart';
 
 void showEffectFormDialog(
@@ -34,11 +36,11 @@ class EffectFormDialog extends StatefulWidget {
 class _EffectFormDialogState extends State<EffectFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _slugCtrl;
-  late final TextEditingController _typeCtrl;
   late final TextEditingController _emojiCtrl;
   late final TextEditingController _assetCtrl;
   late final TextEditingController _labelKeyCtrl;
   late final TextEditingController _sortOrderCtrl;
+  late String _selectedEffectType;
   late String _previewColorHex;
   late bool _requiresFaceDetection;
   late bool _isScreenEffect;
@@ -58,7 +60,8 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
     super.initState();
     final e = widget.editing;
     _slugCtrl = TextEditingController(text: e?.slug ?? '');
-    _typeCtrl = TextEditingController(text: e?.effectType ?? 'OVERLAY');
+    _selectedEffectType =
+        CameraEffectTypeApi.normalize(e?.effectType ?? CameraEffectTypeApi.faceAr);
     _emojiCtrl = TextEditingController(text: e?.emoji ?? '');
     _assetCtrl = TextEditingController(text: e?.assetUrl ?? '');
     _labelKeyCtrl = TextEditingController(text: e?.labelKey ?? '');
@@ -70,6 +73,13 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
     _isScreenEffect = e?.isScreenEffect ?? false;
     _isActive = e?.isActive ?? true;
 
+    final flags = CameraEffectTypeApi.flagsForType(
+      _selectedEffectType,
+      requiresFaceDetection: _requiresFaceDetection,
+    );
+    _requiresFaceDetection = flags.requiresFaceDetection;
+    _isScreenEffect = flags.isScreenEffect;
+
     for (final ctrl in [_slugCtrl, _labelKeyCtrl, _emojiCtrl, _assetCtrl]) {
       ctrl.addListener(() => setState(() {}));
     }
@@ -78,7 +88,6 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
   @override
   void dispose() {
     _slugCtrl.dispose();
-    _typeCtrl.dispose();
     _emojiCtrl.dispose();
     _assetCtrl.dispose();
     _labelKeyCtrl.dispose();
@@ -86,11 +95,38 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
     super.dispose();
   }
 
+  void _onEffectTypeChanged(String value) {
+    setState(() {
+      _selectedEffectType = value;
+      final flags = CameraEffectTypeApi.flagsForType(
+        value,
+        requiresFaceDetection: _requiresFaceDetection,
+      );
+      _requiresFaceDetection = flags.requiresFaceDetection;
+      _isScreenEffect = flags.isScreenEffect;
+    });
+  }
+
+  ({String effectType, bool requiresFaceDetection, bool isScreenEffect})
+      _resolvedEffectPayload() {
+    final effectType = CameraEffectTypeApi.normalize(_selectedEffectType);
+    final flags = CameraEffectTypeApi.flagsForType(
+      effectType,
+      requiresFaceDetection: _requiresFaceDetection,
+    );
+    return (
+      effectType: effectType,
+      requiresFaceDetection: flags.requiresFaceDetection,
+      isScreenEffect: flags.isScreenEffect,
+    );
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     if (_previewColorHex.trim().isEmpty) return;
     final bloc = context.read<FiltersEffectsBloc>();
     final sortOrder = int.tryParse(_sortOrderCtrl.text.trim()) ?? 0;
+    final payload = _resolvedEffectPayload();
 
     if (_isEditing) {
       bloc.add(
@@ -98,13 +134,13 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
           widget.editing!.id,
           UpdateEffectRequest(
             slug: _slugCtrl.text.trim(),
-            effectType: _typeCtrl.text.trim(),
+            effectType: payload.effectType,
             emoji: _emojiCtrl.text.trim().isEmpty ? null : _emojiCtrl.text.trim(),
             assetUrl: _assetCtrl.text.trim().isEmpty ? null : _assetCtrl.text.trim(),
             previewColorHex: _previewColorHex.trim(),
             labelKey: _labelKeyCtrl.text.trim(),
-            requiresFaceDetection: _requiresFaceDetection,
-            isScreenEffect: _isScreenEffect,
+            requiresFaceDetection: payload.requiresFaceDetection,
+            isScreenEffect: payload.isScreenEffect,
             sortOrder: sortOrder,
             isActive: _isActive,
           ),
@@ -115,13 +151,13 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
         CreateCameraEffectEvent(
           CreateEffectRequest(
             slug: _slugCtrl.text.trim(),
-            effectType: _typeCtrl.text.trim(),
+            effectType: payload.effectType,
             emoji: _emojiCtrl.text.trim().isEmpty ? null : _emojiCtrl.text.trim(),
             assetUrl: _assetCtrl.text.trim().isEmpty ? null : _assetCtrl.text.trim(),
             previewColorHex: _previewColorHex.trim(),
             labelKey: _labelKeyCtrl.text.trim(),
-            requiresFaceDetection: _requiresFaceDetection,
-            isScreenEffect: _isScreenEffect,
+            requiresFaceDetection: payload.requiresFaceDetection,
+            isScreenEffect: payload.isScreenEffect,
             sortOrder: sortOrder,
             isActive: _isActive,
           ),
@@ -151,9 +187,10 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
           children: [
             Expanded(
               flex: 11,
-              child: Form(
-                key: _formKey,
-                child: Column(
+              child: FeFilterFormTheme(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
@@ -181,15 +218,9 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
                                   : null,
                             ),
                             const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _typeCtrl,
-                              decoration: InputDecoration(
-                                labelText:
-                                    l10n.tOr('feFieldEffectType', 'Effect type'),
-                              ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? l10n.tOr('feRequired', 'Required')
-                                  : null,
+                            FeEffectTypeField(
+                              value: _selectedEffectType,
+                              onChanged: _onEffectTypeChanged,
                             ),
                             const SizedBox(height: 10),
                             TextFormField(
@@ -233,8 +264,12 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
                                 l10n.tOr('feFlagFaceDetection', 'Face detection'),
                               ),
                               value: _requiresFaceDetection,
-                              onChanged: (v) =>
-                                  setState(() => _requiresFaceDetection = v),
+                              onChanged: CameraEffectTypeApi.isScreenOverlay(
+                                _selectedEffectType,
+                              )
+                                  ? null
+                                  : (v) =>
+                                      setState(() => _requiresFaceDetection = v),
                             ),
                             SwitchListTile(
                               contentPadding: EdgeInsetsDirectional.zero,
@@ -242,8 +277,11 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
                                 l10n.tOr('feFlagScreenEffect', 'Screen effect'),
                               ),
                               value: _isScreenEffect,
-                              onChanged: (v) =>
-                                  setState(() => _isScreenEffect = v),
+                              onChanged: !CameraEffectTypeApi.isScreenOverlay(
+                                _selectedEffectType,
+                              )
+                                  ? null
+                                  : (v) => setState(() => _isScreenEffect = v),
                             ),
                             SwitchListTile(
                               contentPadding: EdgeInsetsDirectional.zero,
@@ -274,6 +312,7 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
                 ),
               ),
             ),
+            ),
             const SizedBox(width: 16),
             VerticalDivider(
               width: 1,
@@ -288,6 +327,9 @@ class _EffectFormDialogState extends State<EffectFormDialog> {
                 previewColorHex: _previewColorHex,
                 emoji: _emojiCtrl.text.trim(),
                 thumbnailUrl: _assetCtrl.text.trim(),
+                effectType: CameraEffectTypeApi.normalize(_selectedEffectType),
+                requiresFaceDetection: _requiresFaceDetection,
+                isScreenEffect: _isScreenEffect,
               ),
             ),
           ],

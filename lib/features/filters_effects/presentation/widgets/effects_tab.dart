@@ -86,7 +86,7 @@ class EffectsTab extends StatelessWidget {
             DataRow(
               cells: [
                 DataCell(Text(effect.slug)),
-                DataCell(Text(effect.effectType)),
+                DataCell(Text(_effectTypeLabel(context, effect.effectType))),
                 DataCell(Text(effect.labelKey)),
                 DataCell(Text(effect.emoji ?? '—')),
                 DataCell(_statusChip(context, effect.isActive)),
@@ -103,7 +103,11 @@ class EffectsTab extends StatelessWidget {
         ],
         mobileCards: [
           for (final effect in items)
-            _EffectMobileCard(effect: effect, canManage: canManage),
+            _EffectMobileCard(
+              effect: effect,
+              effectTypeLabel: _effectTypeLabel(context, effect.effectType),
+              canManage: canManage,
+            ),
         ],
       ),
     );
@@ -126,6 +130,15 @@ class EffectsTab extends StatelessWidget {
           : l10n.tOr('feInactive', 'Inactive'),
       tone: isActive ? DashboardStatusTone.success : DashboardStatusTone.neutral,
     );
+  }
+
+  String _effectTypeLabel(BuildContext context, String value) {
+    final l10n = context.l10n;
+    return switch (CameraEffectTypeApi.normalize(value)) {
+      CameraEffectTypeApi.screenOverlay =>
+        l10n.tOr('feEffectTypeScreenOverlay', 'Screen overlay'),
+      _ => l10n.tOr('feEffectTypeFaceAr', 'Face AR'),
+    };
   }
 
   String _flagsLabel(BuildContext context, CameraEffectEntity effect) {
@@ -201,10 +214,12 @@ class EffectsTab extends StatelessWidget {
 class _EffectMobileCard extends StatelessWidget {
   const _EffectMobileCard({
     required this.effect,
+    required this.effectTypeLabel,
     required this.canManage,
   });
 
   final CameraEffectEntity effect;
+  final String effectTypeLabel;
   final bool canManage;
 
   @override
@@ -219,7 +234,7 @@ class _EffectMobileCard extends StatelessWidget {
       ),
       child: ListTile(
         title: Text(effect.labelKey),
-        subtitle: Text('${effect.slug} · ${effect.effectType}'),
+        subtitle: Text('${effect.slug} · $effectTypeLabel'),
         trailing: canManage
             ? IconButton(
                 icon: const Icon(Icons.edit_outlined),

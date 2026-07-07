@@ -25,7 +25,6 @@ class FiltersEffectsTabBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     final tabs = <(FiltersEffectsTab, String)>[
-      (FiltersEffectsTab.overview, l10n.tOr('feTabOverview', 'Overview')),
       (FiltersEffectsTab.filters, l10n.tOr('feFilters', 'Filters')),
       (
         FiltersEffectsTab.filterCategories,

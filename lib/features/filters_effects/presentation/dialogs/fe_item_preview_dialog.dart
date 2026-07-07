@@ -33,6 +33,9 @@ void showEffectPreviewDialog(BuildContext context, CameraEffectEntity effect) {
       previewColorHex: effect.previewColorHex,
       emoji: effect.emoji,
       thumbnailUrl: effect.assetUrl,
+      effectType: effect.effectType,
+      requiresFaceDetection: effect.requiresFaceDetection,
+      isScreenEffect: effect.isScreenEffect,
       hexLabel: ctx.l10n.tOr('fePreviewColorHexLabel', 'Stored hex'),
       hexValue: effect.previewColorHex?.trim().toUpperCase() ?? '—',
     ),
@@ -50,6 +53,9 @@ class _FeItemPreviewDialog extends StatelessWidget {
     this.engineKey,
     this.emoji,
     this.thumbnailUrl,
+    this.effectType,
+    this.requiresFaceDetection = false,
+    this.isScreenEffect = false,
   });
 
   final String title;
@@ -59,6 +65,9 @@ class _FeItemPreviewDialog extends StatelessWidget {
   final String? engineKey;
   final String? emoji;
   final String? thumbnailUrl;
+  final String? effectType;
+  final bool requiresFaceDetection;
+  final bool isScreenEffect;
   final String hexLabel;
   final String hexValue;
 
@@ -82,6 +91,9 @@ class _FeItemPreviewDialog extends StatelessWidget {
               engineKey: engineKey,
               emoji: emoji,
               thumbnailUrl: thumbnailUrl,
+              effectType: effectType,
+              requiresFaceDetection: requiresFaceDetection,
+              isScreenEffect: isScreenEffect,
             ),
             const SizedBox(height: 12),
             DecoratedBox(

@@ -89,6 +89,7 @@ class PostMediaPreview extends StatefulWidget {
     this.autoplay = false,
     this.looping = true,
     this.fit = BoxFit.contain,
+    this.showSeekBar = true,
     this.onAspectRatioDetermined,
   });
 
@@ -100,6 +101,7 @@ class PostMediaPreview extends StatefulWidget {
   final bool autoplay;
   final bool looping;
   final BoxFit fit;
+  final bool showSeekBar;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -177,6 +179,7 @@ class _PostMediaPreviewState extends State<PostMediaPreview> {
             autoplay: widget.autoplay,
             looping: widget.looping,
             fit: widget.fit,
+            showSeekBar: widget.showSeekBar,
             onAspectRatioDetermined: widget.onAspectRatioDetermined,
           )
         : (_resolvedImageUrl != null
@@ -205,11 +208,13 @@ class PostAttachedSoundPreview extends StatefulWidget {
     required this.audioUrl,
     this.autoplay = true,
     this.looping = true,
+    this.showSeekBar = true,
   });
 
   final String audioUrl;
   final bool autoplay;
   final bool looping;
+  final bool showSeekBar;
 
   @override
   State<PostAttachedSoundPreview> createState() =>
@@ -291,6 +296,7 @@ class _PostAttachedSoundPreviewState extends State<PostAttachedSoundPreview> {
         return PostVideoControlsOverlay(
           controller: _controller,
           enableFullscreen: false,
+          showSeekBar: widget.showSeekBar,
         );
       },
     );
@@ -304,6 +310,7 @@ class PostVideoPreview extends StatefulWidget {
     this.autoplay = false,
     this.looping = true,
     this.fit = BoxFit.contain,
+    this.showSeekBar = true,
     this.onAspectRatioDetermined,
   });
 
@@ -311,6 +318,7 @@ class PostVideoPreview extends StatefulWidget {
   final bool autoplay;
   final bool looping;
   final BoxFit fit;
+  final bool showSeekBar;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -455,6 +463,7 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
               ),
               PostVideoControlsOverlay(
                 controller: _controller,
+                showSeekBar: widget.showSeekBar,
                 onFullscreenWillOpen: _onFullscreenWillOpen,
                 onFullscreenDidClose: _onFullscreenDidClose,
               ),

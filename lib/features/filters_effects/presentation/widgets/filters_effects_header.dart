@@ -98,7 +98,7 @@ class _FiltersEffectsHeaderState extends State<FiltersEffectsHeader> {
       (b) {
         final state = b.state;
         if (state is FiltersEffectsLoaded) return state.activeTab;
-        return FiltersEffectsTab.overview;
+        return FiltersEffectsTab.filters;
       },
     );
 

@@ -386,7 +386,9 @@ class CameraFilterModel extends CameraFilterEntity {
     return CameraFilterModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      engineType: json['engineType']?.toString() ?? 'camerawesome',
+      engineType: CameraFilterEngineTypeApi.forAdminApi(
+        json['engineType']?.toString() ?? '',
+      ),
       engineKey: json['engineKey']?.toString() ?? '',
       labelKey: json['labelKey']?.toString(),
       customLabel: json['customLabel']?.toString(),
@@ -452,7 +454,9 @@ class CameraEffectModel extends CameraEffectEntity {
     return CameraEffectModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      effectType: json['effectType']?.toString() ?? '',
+      effectType: CameraEffectTypeApi.normalize(
+        json['effectType']?.toString() ?? '',
+      ),
       emoji: json['emoji']?.toString(),
       assetUrl: json['assetUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),

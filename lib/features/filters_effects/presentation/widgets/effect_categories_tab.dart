@@ -37,41 +37,29 @@ class EffectCategoriesTab extends StatelessWidget {
     final categories = _filteredCategories(loaded);
     final dateFmt = DateFormat.yMMMd();
 
-    if (categories.isEmpty) {
-      return Center(
-        child: EmptyView(
-          message: l10n.tOr(
-            'feNoEffectCategories',
-            'No effect categories found.',
-          ),
-        ),
-      );
-    }
-
     return FeTabScaffold(
-      header: Row(
-        children: [
-          if (canManage)
-            FilledButton.icon(
-              onPressed: () => showCategoryFormDialog(
-                context,
-                isEffectCategory: true,
-              ),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(
-                l10n.tOr('feCreateEffectCategory', 'Create category'),
-              ),
-            ),
-          const Spacer(),
-          if (canManage)
-            OutlinedButton.icon(
-              onPressed: () => _showReorderDialog(context, categories),
-              icon: const Icon(Icons.swap_vert_rounded, size: 18),
-              label: Text(l10n.tOr('feReorderCategories', 'Reorder')),
-            ),
-        ],
+      header: _EffectCategoryTabHeader(
+        canManage: canManage,
+        showReorder: categories.length > 1,
+        createLabel: l10n.tOr('feCreateEffectCategory', 'Create effect category'),
+        onCreate: () => showCategoryFormDialog(
+          context,
+          isEffectCategory: true,
+        ),
+        onReorder: categories.isEmpty
+            ? null
+            : () => _showReorderDialog(context, categories),
       ),
-      child: ResponsiveDataTable(
+      child: categories.isEmpty
+          ? Center(
+              child: EmptyView(
+                message: l10n.tOr(
+                  'feNoEffectCategories',
+                  'No effect categories found.',
+                ),
+              ),
+            )
+          : ResponsiveDataTable(
         mobileBreakpoint: 900,
         columns: [
           DataColumn(label: Text(l10n.tOr('feColSlug', 'Slug'))),
@@ -230,6 +218,47 @@ class EffectCategoriesTab extends StatelessWidget {
         PopupMenuItem(
           value: 'delete',
           child: Text(l10n.tOr('feDelete', 'Delete')),
+        ),
+      ],
+    );
+  }
+}
+
+class _EffectCategoryTabHeader extends StatelessWidget {
+  const _EffectCategoryTabHeader({
+    required this.canManage,
+    required this.showReorder,
+    required this.createLabel,
+    required this.onCreate,
+    this.onReorder,
+  });
+
+  final bool canManage;
+  final bool showReorder;
+  final String createLabel;
+  final VoidCallback onCreate;
+  final VoidCallback? onReorder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canManage) return const SizedBox.shrink();
+    final l10n = context.l10n;
+
+    return Row(
+      children: [
+        const Spacer(),
+        if (showReorder && onReorder != null) ...[
+          OutlinedButton.icon(
+            onPressed: onReorder,
+            icon: const Icon(Icons.swap_vert_rounded, size: 18),
+            label: Text(l10n.tOr('feReorderCategories', 'Reorder')),
+          ),
+          const SizedBox(width: 8),
+        ],
+        FilledButton.icon(
+          onPressed: onCreate,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(createLabel),
         ),
       ],
     );

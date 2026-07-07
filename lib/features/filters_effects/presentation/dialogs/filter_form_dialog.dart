@@ -69,8 +69,10 @@ class _FilterFormDialogState extends State<FilterFormDialog> {
     _previewColorHex = e?.previewColorHex?.trim().isNotEmpty == true
         ? e!.previewColorHex!.trim().toUpperCase()
         : null;
-    _engineKey = e?.engineKey ?? kCameraAwesomeEngineKeys.first;
-    _engineType = e?.engineType ?? 'CAMERAAWESOME';
+    _engineKey = _resolveEngineKey(e?.engineKey);
+    _engineType = CameraFilterEngineTypeApi.forAdminApi(
+      e?.engineType ?? CameraFilterEngineTypeApi.camerawesome,
+    );
     _isOriginal = e?.isOriginal ?? false;
     _isBeautyDefault = e?.isBeautyDefault ?? false;
     _isActive = e?.isActive ?? true;
@@ -90,6 +92,45 @@ class _FilterFormDialogState extends State<FilterFormDialog> {
     super.dispose();
   }
 
+  String _resolveEngineKey(String? key) {
+    if (key == null || key.trim().isEmpty) {
+      return kCameraAwesomeEngineKeys.first;
+    }
+    return key.trim();
+  }
+
+  UpdateFilterRequest _buildUpdateRequest({
+    required int sortOrder,
+    required String? previewHex,
+  }) {
+    final editing = widget.editing!;
+    final labelKey = _labelKeyCtrl.text.trim();
+    final customLabel = _customLabelCtrl.text.trim();
+    final thumbnailUrl = _thumbnailCtrl.text.trim();
+
+    return UpdateFilterRequest(
+      slug: _slugCtrl.text.trim(),
+      engineKey: _engineKey,
+      engineType: _engineType,
+      labelKey: labelKey.isEmpty ? null : labelKey,
+      customLabel: customLabel.isEmpty ? null : customLabel,
+      thumbnailUrl: thumbnailUrl.isEmpty ? null : thumbnailUrl,
+      previewColorHex:
+          previewHex == null || previewHex.isEmpty ? null : previewHex,
+      clearLabelKey: labelKey.isEmpty && (editing.labelKey?.isNotEmpty ?? false),
+      clearCustomLabel:
+          customLabel.isEmpty && (editing.customLabel?.isNotEmpty ?? false),
+      clearThumbnailUrl:
+          thumbnailUrl.isEmpty && (editing.thumbnailUrl?.isNotEmpty ?? false),
+      clearPreviewColorHex: (previewHex == null || previewHex.isEmpty) &&
+          (editing.previewColorHex?.isNotEmpty ?? false),
+      isOriginal: _isOriginal,
+      isBeautyDefault: _isBeautyDefault,
+      sortOrder: sortOrder,
+      isActive: _isActive,
+    );
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final bloc = context.read<FiltersEffectsBloc>();
@@ -100,26 +141,7 @@ class _FilterFormDialogState extends State<FilterFormDialog> {
       bloc.add(
         UpdateCameraFilterEvent(
           widget.editing!.id,
-          UpdateFilterRequest(
-            slug: _slugCtrl.text.trim(),
-            engineKey: _engineKey,
-            engineType: _engineType,
-            labelKey: _labelKeyCtrl.text.trim().isEmpty
-                ? null
-                : _labelKeyCtrl.text.trim(),
-            customLabel: _customLabelCtrl.text.trim().isEmpty
-                ? null
-                : _customLabelCtrl.text.trim(),
-            thumbnailUrl: _thumbnailCtrl.text.trim().isEmpty
-                ? null
-                : _thumbnailCtrl.text.trim(),
-            previewColorHex:
-                previewHex == null || previewHex.isEmpty ? null : previewHex,
-            isOriginal: _isOriginal,
-            isBeautyDefault: _isBeautyDefault,
-            sortOrder: sortOrder,
-            isActive: _isActive,
-          ),
+          _buildUpdateRequest(sortOrder: sortOrder, previewHex: previewHex),
         ),
       );
     } else {

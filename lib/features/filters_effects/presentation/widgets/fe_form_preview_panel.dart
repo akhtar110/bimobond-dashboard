@@ -184,6 +184,9 @@ class FeFormPreviewPane extends StatelessWidget {
     this.emoji,
     this.thumbnailUrl,
     this.engineKey,
+    this.effectType,
+    this.requiresFaceDetection = false,
+    this.isScreenEffect = false,
   });
 
   final FeCatalogPreviewMode mode;
@@ -192,6 +195,9 @@ class FeFormPreviewPane extends StatelessWidget {
   final String? emoji;
   final String? thumbnailUrl;
   final String? engineKey;
+  final String? effectType;
+  final bool requiresFaceDetection;
+  final bool isScreenEffect;
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +221,9 @@ class FeFormPreviewPane extends StatelessWidget {
               emoji: emoji,
               thumbnailUrl: thumbnailUrl,
               engineKey: engineKey,
+              effectType: effectType,
+              requiresFaceDetection: requiresFaceDetection,
+              isScreenEffect: isScreenEffect,
             ),
           ),
         ),

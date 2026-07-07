@@ -368,6 +368,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
                                       fit: BoxFit.contain,
                                       videoLooping: false,
                                       soundLooping: false,
+                                      showSeekBar: false,
                                     ),
                                     Positioned(
                                       left: 12,

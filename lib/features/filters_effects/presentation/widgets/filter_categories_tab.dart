@@ -15,6 +15,7 @@ import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
 import '../bloc/filters_effects_state.dart';
 import '../dialogs/assign_items_dialog.dart';
+import '../dialogs/category_filters_dialog.dart';
 import '../dialogs/category_form_dialog.dart';
 import '../dialogs/fe_confirm_dialog.dart';
 import '../utils/filters_effects_responsive.dart';
@@ -37,41 +38,29 @@ class FilterCategoriesTab extends StatelessWidget {
     final categories = _filteredCategories(loaded);
     final dateFmt = DateFormat.yMMMd();
 
-    if (categories.isEmpty) {
-      return Center(
-        child: EmptyView(
-          message: l10n.tOr(
-            'feNoFilterCategories',
-            'No filter categories found.',
-          ),
-        ),
-      );
-    }
-
     return FeTabScaffold(
-      header: Row(
-        children: [
-          if (canManage)
-            FilledButton.icon(
-              onPressed: () => showCategoryFormDialog(
-                context,
-                isEffectCategory: false,
-              ),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(
-                l10n.tOr('feCreateFilterCategory', 'Create category'),
-              ),
-            ),
-          const Spacer(),
-          if (canManage)
-            OutlinedButton.icon(
-              onPressed: () => _showReorderDialog(context, categories),
-              icon: const Icon(Icons.swap_vert_rounded, size: 18),
-              label: Text(l10n.tOr('feReorderCategories', 'Reorder')),
-            ),
-        ],
+      header: _CategoryTabHeader(
+        canManage: canManage,
+        showReorder: categories.length > 1,
+        createLabel: l10n.tOr('feCreateFilterCategory', 'Create filter category'),
+        onCreate: () => showCategoryFormDialog(
+          context,
+          isEffectCategory: false,
+        ),
+        onReorder: categories.isEmpty
+            ? null
+            : () => _showReorderDialog(context, categories),
       ),
-      child: ResponsiveDataTable(
+      child: categories.isEmpty
+          ? Center(
+              child: EmptyView(
+                message: l10n.tOr(
+                  'feNoFilterCategories',
+                  'No filter categories found.',
+                ),
+              ),
+            )
+          : ResponsiveDataTable(
         mobileBreakpoint: 900,
         columns: [
           DataColumn(label: Text(l10n.tOr('feColSlug', 'Slug'))),
@@ -88,7 +77,12 @@ class FilterCategoriesTab extends StatelessWidget {
               cells: [
                 DataCell(Text(category.slug)),
                 DataCell(Text(category.labelKey)),
-                DataCell(Text('${category.filtersCount}')),
+                DataCell(
+                  _FiltersCountCell(
+                    count: category.filtersCount,
+                    onTap: () => showCategoryFiltersDialog(context, category),
+                  ),
+                ),
                 DataCell(Text('${category.sortOrder}')),
                 DataCell(_statusChip(context, category.isActive)),
                 DataCell(Text(
@@ -108,6 +102,7 @@ class FilterCategoriesTab extends StatelessWidget {
               countLabel: l10n.tOr('feColFiltersCount', 'Filters'),
               count: category.filtersCount,
               canManage: canManage,
+              onTap: () => showCategoryFiltersDialog(context, category),
               onEdit: () => showCategoryFormDialog(
                 context,
                 isEffectCategory: false,
@@ -236,6 +231,88 @@ class FilterCategoriesTab extends StatelessWidget {
   }
 }
 
+class _CategoryTabHeader extends StatelessWidget {
+  const _CategoryTabHeader({
+    required this.canManage,
+    required this.showReorder,
+    required this.createLabel,
+    required this.onCreate,
+    this.onReorder,
+  });
+
+  final bool canManage;
+  final bool showReorder;
+  final String createLabel;
+  final VoidCallback onCreate;
+  final VoidCallback? onReorder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canManage) return const SizedBox.shrink();
+    final l10n = context.l10n;
+
+    return Row(
+      children: [
+        const Spacer(),
+        if (showReorder && onReorder != null) ...[
+          OutlinedButton.icon(
+            onPressed: onReorder,
+            icon: const Icon(Icons.swap_vert_rounded, size: 18),
+            label: Text(l10n.tOr('feReorderCategories', 'Reorder')),
+          ),
+          const SizedBox(width: 8),
+        ],
+        FilledButton.icon(
+          onPressed: onCreate,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(createLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _FiltersCountCell extends StatelessWidget {
+  const _FiltersCountCell({
+    required this.count,
+    required this.onTap,
+  });
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$count',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.open_in_new_rounded,
+              size: 16,
+              color: scheme.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CategoryMobileCard extends StatelessWidget {
   const _CategoryMobileCard({
     required this.title,
@@ -243,6 +320,7 @@ class _CategoryMobileCard extends StatelessWidget {
     required this.countLabel,
     required this.count,
     required this.canManage,
+    required this.onTap,
     required this.onEdit,
   });
 
@@ -251,6 +329,7 @@ class _CategoryMobileCard extends StatelessWidget {
   final String countLabel;
   final int count;
   final bool canManage;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
 
   @override
@@ -263,6 +342,7 @@ class _CategoryMobileCard extends StatelessWidget {
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: ListTile(
+        onTap: onTap,
         title: Text(title),
         subtitle: Text('$subtitle · $countLabel: $count'),
         trailing: canManage

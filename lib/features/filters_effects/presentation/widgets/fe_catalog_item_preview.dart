@@ -4,6 +4,7 @@ import '../../../../core/localization/localization.dart';
 import '../constants/fe_preview_assets.dart';
 import '../utils/fe_engine_filter_preview.dart';
 import '../utils/fe_preview_color_utils.dart';
+import '../../domain/entities/filters_effects_entities.dart';
 
 enum FeCatalogPreviewMode { filter, effect }
 
@@ -17,6 +18,9 @@ class FeCatalogItemPreview extends StatelessWidget {
     this.emoji,
     this.thumbnailUrl,
     this.engineKey,
+    this.effectType,
+    this.requiresFaceDetection = false,
+    this.isScreenEffect = false,
   });
 
   final FeCatalogPreviewMode mode;
@@ -25,6 +29,9 @@ class FeCatalogItemPreview extends StatelessWidget {
   final String? emoji;
   final String? thumbnailUrl;
   final String? engineKey;
+  final String? effectType;
+  final bool requiresFaceDetection;
+  final bool isScreenEffect;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +39,12 @@ class FeCatalogItemPreview extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final gradient = previewGradientForHex(previewColorHex);
     final hasColor = previewColorHex != null && previewColorHex!.trim().isNotEmpty;
+    final isEffect = mode == FeCatalogPreviewMode.effect;
+    final isScreenOverlay = isEffect &&
+        CameraEffectTypeApi.isScreenOverlay(effectType ?? CameraEffectTypeApi.faceAr);
+    final trimmedEmoji = emoji?.trim();
+    final trimmedAsset = thumbnailUrl?.trim();
+    final hasAsset = trimmedAsset != null && trimmedAsset.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,21 +80,26 @@ class FeCatalogItemPreview extends StatelessWidget {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [
-                                  gradient.first.withValues(alpha: 0.15),
-                                  gradient.last.withValues(alpha: 0.55),
-                                ],
+                                colors: isScreenOverlay
+                                    ? [
+                                        gradient.first.withValues(alpha: 0.35),
+                                        gradient.last.withValues(alpha: 0.72),
+                                      ]
+                                    : [
+                                        gradient.first.withValues(alpha: 0.15),
+                                        gradient.last.withValues(alpha: 0.55),
+                                      ],
                               ),
                             ),
                           ),
-                        if (mode == FeCatalogPreviewMode.effect &&
-                            emoji != null &&
-                            emoji!.trim().isNotEmpty)
-                          Center(
-                            child: Text(
-                              emoji!,
-                              style: const TextStyle(fontSize: 56),
-                            ),
+                        if (isEffect && !isScreenOverlay)
+                          const _FaceArGuide(),
+                        if (isEffect)
+                          _EffectOverlayLayer(
+                            isScreenOverlay: isScreenOverlay,
+                            emoji: trimmedEmoji,
+                            assetUrl: hasAsset ? trimmedAsset : null,
+                            requiresFaceDetection: requiresFaceDetection,
                           ),
                         Positioned(
                           left: 0,
@@ -91,9 +109,15 @@ class FeCatalogItemPreview extends StatelessWidget {
                             label: label,
                             gradient: gradient,
                             hasColor: hasColor,
-                            emoji: mode == FeCatalogPreviewMode.effect ? emoji : null,
+                            emoji: isEffect ? trimmedEmoji : null,
                           ),
                         ),
+                        if (isEffect)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: _EffectTypeBadge(isScreenOverlay: isScreenOverlay),
+                          ),
                       ],
                     ),
                   ),
@@ -105,10 +129,15 @@ class FeCatalogItemPreview extends StatelessWidget {
                           'fePreviewFilterHint',
                           'How this filter tile appears in the app camera strip.',
                         )
-                      : l10n.tOr(
-                          'fePreviewEffectHint',
-                          'How this effect tile appears in the app camera strip.',
-                        ),
+                      : isScreenOverlay
+                          ? l10n.tOr(
+                              'fePreviewEffectScreenOverlayHint',
+                              'Full-screen overlay covering the camera preview.',
+                            )
+                          : l10n.tOr(
+                              'fePreviewEffectFaceArHint',
+                              'Face AR effect anchored on the detected face.',
+                            ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
@@ -221,6 +250,173 @@ class _PickerStripHighlight extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FaceArGuide extends StatelessWidget {
+  const _FaceArGuide();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: const Alignment(0, -0.22),
+      child: Container(
+        width: 92,
+        height: 118,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.75),
+            width: 2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EffectOverlayLayer extends StatelessWidget {
+  const _EffectOverlayLayer({
+    required this.isScreenOverlay,
+    this.emoji,
+    this.assetUrl,
+    this.requiresFaceDetection = false,
+  });
+
+  final bool isScreenOverlay;
+  final String? emoji;
+  final String? assetUrl;
+  final bool requiresFaceDetection;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasEmoji = emoji != null && emoji!.isNotEmpty;
+    final hasAsset = assetUrl != null && assetUrl!.isNotEmpty;
+
+    if (isScreenOverlay) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(color: Colors.black.withValues(alpha: 0.12)),
+          if (hasAsset)
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.85,
+                child: Image.network(
+                  assetUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          if (hasEmoji)
+            Center(
+              child: Text(
+                emoji!,
+                style: TextStyle(
+                  fontSize: hasAsset ? 64 : 78,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (!hasEmoji && !hasAsset)
+            Center(
+              child: Icon(
+                Icons.fullscreen_rounded,
+                size: 56,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (hasAsset)
+          Align(
+            alignment: const Alignment(0, -0.22),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: Image.network(
+                assetUrl!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        if (hasEmoji)
+          Align(
+            alignment: const Alignment(0, -0.22),
+            child: Text(
+              emoji!,
+              style: const TextStyle(fontSize: 48),
+            ),
+          ),
+        if (requiresFaceDetection)
+          Positioned(
+            top: 10,
+            right: 10,
+            child: Icon(
+              Icons.face_retouching_natural_rounded,
+              size: 18,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _EffectTypeBadge extends StatelessWidget {
+  const _EffectTypeBadge({required this.isScreenOverlay});
+
+  final bool isScreenOverlay;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final label = isScreenOverlay
+        ? l10n.tOr('feEffectTypeScreenOverlay', 'Screen overlay')
+        : l10n.tOr('feEffectTypeFaceAr', 'Face AR');
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isScreenOverlay
+                  ? Icons.fullscreen_rounded
+                  : Icons.face_retouching_natural_outlined,
+              size: 14,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

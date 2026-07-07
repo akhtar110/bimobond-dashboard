@@ -77,6 +77,9 @@ class FeFilterEngineKeyField extends StatelessWidget {
     final itemStyle = theme.textTheme.bodyLarge?.copyWith(
       color: scheme.onSurface,
     );
+    final engineKeys = kCameraAwesomeEngineKeys.contains(value)
+        ? kCameraAwesomeEngineKeys
+        : [value, ...kCameraAwesomeEngineKeys];
 
     return InputDecorator(
       decoration: InputDecoration(
@@ -96,7 +99,7 @@ class FeFilterEngineKeyField extends StatelessWidget {
           ),
           style: itemStyle,
           selectedItemBuilder: (context) => [
-            for (final key in kCameraAwesomeEngineKeys)
+            for (final key in engineKeys)
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: Text(
@@ -108,7 +111,7 @@ class FeFilterEngineKeyField extends StatelessWidget {
               ),
           ],
           items: [
-            for (final key in kCameraAwesomeEngineKeys)
+            for (final key in engineKeys)
               DropdownMenuItem<String>(
                 value: key,
                 child: Text(

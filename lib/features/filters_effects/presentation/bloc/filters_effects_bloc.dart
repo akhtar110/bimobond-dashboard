@@ -129,7 +129,7 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
   final SeedFiltersEffectsCatalogUseCase _seedCatalog;
 
   FiltersEffectsListQuery _query = const FiltersEffectsListQuery();
-  FiltersEffectsTab _activeTab = FiltersEffectsTab.overview;
+  FiltersEffectsTab _activeTab = FiltersEffectsTab.filters;
 
   FiltersEffectsLoaded? _currentLoaded() =>
       state is FiltersEffectsLoaded ? state as FiltersEffectsLoaded : null;
@@ -333,8 +333,14 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       await action();
       await _reloadCore(emit);
       final updated = _currentLoaded();
-      if (updated != null && successMessage != null) {
-        emit(updated.copyWith(message: successMessage, operationSuccess: true));
+      if (updated != null) {
+        emit(
+          updated.copyWith(
+            message: successMessage ?? 'feActionSuccess',
+            isErrorMessage: false,
+            operationSuccess: true,
+          ),
+        );
       }
     } catch (e) {
       final after = _currentLoaded();
@@ -352,40 +358,87 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
     CreateCameraFilterEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _createFilter(event.request));
+      _runAction(
+        emit,
+        () => _createFilter(event.request),
+        successMessage: 'feFilterCreatedSuccess',
+      );
 
   Future<void> _onUpdateFilter(
     UpdateCameraFilterEvent event,
     Emitter<FiltersEffectsState> emit,
-  ) =>
-      _runAction(
-        emit,
-        () => _updateFilter(event.id, event.request),
-      );
+  ) async {
+    final current = _currentLoaded();
+    if (current == null) return;
+    emit(current.copyWith(isActioning: true, clearMessage: true));
+    try {
+      final updatedFilter = await _updateFilter(event.id, event.request);
+      await _reloadCore(emit);
+      final after = _currentLoaded();
+      if (after != null) {
+        final filters = after.filters
+            .map((f) => f.id == updatedFilter.id ? updatedFilter : f)
+            .toList();
+        emit(
+          after.copyWith(
+            filters: filters,
+            message: 'feFilterUpdatedSuccess',
+            isErrorMessage: false,
+            operationSuccess: true,
+          ),
+        );
+      }
+    } catch (e) {
+      final after = _currentLoaded();
+      if (after != null) {
+        emit(after.copyWith(
+          isActioning: false,
+          message: e.toString(),
+          isErrorMessage: true,
+        ));
+      }
+    }
+  }
 
   Future<void> _onDeleteFilter(
     DeleteCameraFilterEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _deleteFilter(event.id));
+      _runAction(
+        emit,
+        () => _deleteFilter(event.id),
+        successMessage: 'feFilterDeletedSuccess',
+      );
 
   Future<void> _onActivateFilter(
     ActivateCameraFilterEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _activateFilter(event.id));
+      _runAction(
+        emit,
+        () => _activateFilter(event.id),
+        successMessage: 'feFilterActivatedSuccess',
+      );
 
   Future<void> _onDeactivateFilter(
     DeactivateCameraFilterEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _deactivateFilter(event.id));
+      _runAction(
+        emit,
+        () => _deactivateFilter(event.id),
+        successMessage: 'feFilterDeactivatedSuccess',
+      );
 
   Future<void> _onCreateFilterCategory(
     CreateCameraFilterCategoryEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _createFilterCategory(event.request));
+      _runAction(
+        emit,
+        () => _createFilterCategory(event.request),
+        successMessage: 'feFilterCategoryCreatedSuccess',
+      );
 
   Future<void> _onUpdateFilterCategory(
     UpdateCameraFilterCategoryEvent event,
@@ -394,13 +447,18 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       _runAction(
         emit,
         () => _updateFilterCategory(event.id, event.request),
+        successMessage: 'feFilterCategoryUpdatedSuccess',
       );
 
   Future<void> _onDeleteFilterCategory(
     DeleteCameraFilterCategoryEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _deleteFilterCategory(event.id));
+      _runAction(
+        emit,
+        () => _deleteFilterCategory(event.id),
+        successMessage: 'feFilterCategoryDeletedSuccess',
+      );
 
   Future<void> _onReorderFilterCategories(
     ReorderCameraFilterCategoriesEvent event,
@@ -409,6 +467,7 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       _runAction(
         emit,
         () => _reorderFilterCategories(event.items),
+        successMessage: 'feFilterCategoriesReorderedSuccess',
       );
 
   Future<void> _onAssignFilters(
@@ -418,46 +477,94 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       _runAction(
         emit,
         () => _assignFiltersToCategory(event.categoryId, event.filters),
+        successMessage: 'feFiltersAssignedSuccess',
       );
 
   Future<void> _onCreateEffect(
     CreateCameraEffectEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _createEffect(event.request));
+      _runAction(
+        emit,
+        () => _createEffect(event.request),
+        successMessage: 'feEffectCreatedSuccess',
+      );
 
   Future<void> _onUpdateEffect(
     UpdateCameraEffectEvent event,
     Emitter<FiltersEffectsState> emit,
-  ) =>
-      _runAction(
-        emit,
-        () => _updateEffect(event.id, event.request),
-      );
+  ) async {
+    final current = _currentLoaded();
+    if (current == null) return;
+    emit(current.copyWith(isActioning: true, clearMessage: true));
+    try {
+      final updatedEffect = await _updateEffect(event.id, event.request);
+      await _reloadCore(emit);
+      final after = _currentLoaded();
+      if (after != null) {
+        final effects = after.effects
+            .map((e) => e.id == updatedEffect.id ? updatedEffect : e)
+            .toList();
+        emit(
+          after.copyWith(
+            effects: effects,
+            message: 'feEffectUpdatedSuccess',
+            isErrorMessage: false,
+            operationSuccess: true,
+          ),
+        );
+      }
+    } catch (e) {
+      final after = _currentLoaded();
+      if (after != null) {
+        emit(after.copyWith(
+          isActioning: false,
+          message: e.toString(),
+          isErrorMessage: true,
+        ));
+      }
+    }
+  }
 
   Future<void> _onDeleteEffect(
     DeleteCameraEffectEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _deleteEffect(event.id));
+      _runAction(
+        emit,
+        () => _deleteEffect(event.id),
+        successMessage: 'feEffectDeletedSuccess',
+      );
 
   Future<void> _onActivateEffect(
     ActivateCameraEffectEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _activateEffect(event.id));
+      _runAction(
+        emit,
+        () => _activateEffect(event.id),
+        successMessage: 'feEffectActivatedSuccess',
+      );
 
   Future<void> _onDeactivateEffect(
     DeactivateCameraEffectEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _deactivateEffect(event.id));
+      _runAction(
+        emit,
+        () => _deactivateEffect(event.id),
+        successMessage: 'feEffectDeactivatedSuccess',
+      );
 
   Future<void> _onCreateEffectCategory(
     CreateCameraEffectCategoryEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _createEffectCategory(event.request));
+      _runAction(
+        emit,
+        () => _createEffectCategory(event.request),
+        successMessage: 'feEffectCategoryCreatedSuccess',
+      );
 
   Future<void> _onUpdateEffectCategory(
     UpdateCameraEffectCategoryEvent event,
@@ -466,13 +573,18 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       _runAction(
         emit,
         () => _updateEffectCategory(event.id, event.request),
+        successMessage: 'feEffectCategoryUpdatedSuccess',
       );
 
   Future<void> _onDeleteEffectCategory(
     DeleteCameraEffectCategoryEvent event,
     Emitter<FiltersEffectsState> emit,
   ) =>
-      _runAction(emit, () => _deleteEffectCategory(event.id));
+      _runAction(
+        emit,
+        () => _deleteEffectCategory(event.id),
+        successMessage: 'feEffectCategoryDeletedSuccess',
+      );
 
   Future<void> _onReorderEffectCategories(
     ReorderCameraEffectCategoriesEvent event,
@@ -481,6 +593,7 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       _runAction(
         emit,
         () => _reorderEffectCategories(event.items),
+        successMessage: 'feEffectCategoriesReorderedSuccess',
       );
 
   Future<void> _onAssignEffects(
@@ -490,6 +603,7 @@ class FiltersEffectsBloc extends Bloc<FiltersEffectsEvent, FiltersEffectsState> 
       _runAction(
         emit,
         () => _assignEffectsToCategory(event.categoryId, event.effects),
+        successMessage: 'feEffectsAssignedSuccess',
       );
 
   Future<void> _onPublishCatalog(

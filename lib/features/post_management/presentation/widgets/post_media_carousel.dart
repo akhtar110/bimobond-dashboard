@@ -12,6 +12,7 @@ class PostMediaCarousel extends StatefulWidget {
     this.fit = BoxFit.contain,
     this.videoLooping = true,
     this.soundLooping = true,
+    this.showSeekBar = true,
     this.onAspectRatioChanged,
   });
 
@@ -19,6 +20,7 @@ class PostMediaCarousel extends StatefulWidget {
   final BoxFit fit;
   final bool videoLooping;
   final bool soundLooping;
+  final bool showSeekBar;
   final ValueChanged<double>? onAspectRatioChanged;
 
   @override
@@ -168,6 +170,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       audioUrl: audioUrl,
       autoplay: true,
       looping: widget.soundLooping,
+      showSeekBar: widget.showSeekBar,
     );
   }
 
@@ -247,6 +250,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       height: mediaHeight,
       autoplay: true,
       looping: widget.videoLooping,
+      showSeekBar: widget.showSeekBar,
       onAspectRatioDetermined: widget.onAspectRatioChanged,
     );
 
@@ -281,6 +285,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
           fit: widget.fit,
           isActive: index == _currentIndex,
           videoLooping: widget.videoLooping,
+          showSeekBar: widget.showSeekBar,
           hlsUrl: widget.post.hlsUrl,
           onAspectRatioDetermined: (ratio) => _onRatioDetermined(index, ratio),
         );

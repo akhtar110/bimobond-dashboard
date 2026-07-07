@@ -14,6 +14,7 @@ class MediaCarouselItem extends StatefulWidget {
     this.fit = BoxFit.contain,
     this.isActive = false,
     this.videoLooping = true,
+    this.showSeekBar = true,
     this.onAspectRatioDetermined,
   });
 
@@ -23,6 +24,7 @@ class MediaCarouselItem extends StatefulWidget {
   final BoxFit fit;
   final bool isActive;
   final bool videoLooping;
+  final bool showSeekBar;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -51,6 +53,7 @@ class _MediaCarouselItemState extends State<MediaCarouselItem>
           autoplay: widget.isActive,
           looping: widget.videoLooping,
           fit: widget.fit,
+          showSeekBar: widget.showSeekBar,
           onAspectRatioDetermined: widget.onAspectRatioDetermined,
         ),
       );

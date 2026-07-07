@@ -10,6 +10,7 @@ class PostVideoControlsOverlay extends StatefulWidget {
     required this.controller,
     this.autoHideAfter = const Duration(seconds: 3),
     this.enableFullscreen = true,
+    this.showSeekBar = true,
     this.onFullscreenWillOpen,
     this.onFullscreenDidClose,
   });
@@ -17,6 +18,7 @@ class PostVideoControlsOverlay extends StatefulWidget {
   final VideoPlayerController controller;
   final Duration autoHideAfter;
   final bool enableFullscreen;
+  final bool showSeekBar;
   final VoidCallback? onFullscreenWillOpen;
   final VoidCallback? onFullscreenDidClose;
 
@@ -288,65 +290,66 @@ class _PostVideoControlsOverlayState extends State<PostVideoControlsOverlay> {
                       ),
                     ),
                     const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 3,
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6,
-                              ),
-                              overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 12,
-                              ),
-                              activeTrackColor: scheme.primary,
-                              inactiveTrackColor:
-                                  scheme.onSurface.withValues(alpha: 0.35),
-                              thumbColor: scheme.primary,
-                              overlayColor:
-                                  scheme.primary.withValues(alpha: 0.16),
-                            ),
-                            child: Slider(
-                              value: positionMs.clamp(0, maxMs),
-                              max: maxMs,
-                              onChangeStart: (_) {
-                                _hideTimer?.cancel();
-                                setState(() => _controlsVisible = true);
-                              },
-                              onChanged: (v) {
-                                setState(() => _dragPositionMs = v);
-                              },
-                              onChangeEnd: (v) {
-                                controller.seekTo(
-                                  Duration(milliseconds: v.round()),
-                                );
-                                setState(() => _dragPositionMs = null);
-                                _showControls();
-                              },
-                            ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _OverlayTimeLabel(
-                                text: _formatDuration(
-                                  Duration(
-                                    milliseconds: positionMs.round(),
-                                  ),
+                    if (widget.showSeekBar)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6,
                                 ),
-                                emphasized: true,
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 12,
+                                ),
+                                activeTrackColor: scheme.primary,
+                                inactiveTrackColor:
+                                    scheme.onSurface.withValues(alpha: 0.35),
+                                thumbColor: scheme.primary,
+                                overlayColor:
+                                    scheme.primary.withValues(alpha: 0.16),
                               ),
-                              _OverlayTimeLabel(
-                                text: _formatDuration(value.duration),
+                              child: Slider(
+                                value: positionMs.clamp(0, maxMs),
+                                max: maxMs,
+                                onChangeStart: (_) {
+                                  _hideTimer?.cancel();
+                                  setState(() => _controlsVisible = true);
+                                },
+                                onChanged: (v) {
+                                  setState(() => _dragPositionMs = v);
+                                },
+                                onChangeEnd: (v) {
+                                  controller.seekTo(
+                                    Duration(milliseconds: v.round()),
+                                  );
+                                  setState(() => _dragPositionMs = null);
+                                  _showControls();
+                                },
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _OverlayTimeLabel(
+                                  text: _formatDuration(
+                                    Duration(
+                                      milliseconds: positionMs.round(),
+                                    ),
+                                  ),
+                                  emphasized: true,
+                                ),
+                                _OverlayTimeLabel(
+                                  text: _formatDuration(value.duration),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

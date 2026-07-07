@@ -49,13 +49,19 @@ class FiltersEffectsManagementPage extends StatelessWidget {
               return;
             }
             final scheme = Theme.of(context).colorScheme;
+            final isError = state.isErrorMessage;
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(_resolveMessage(context, state.message!)),
+                  content: Text(
+                    _resolveMessage(context, state.message!),
+                    style: TextStyle(
+                      color: isError ? scheme.onError : Colors.white,
+                    ),
+                  ),
                   backgroundColor:
-                      state.isErrorMessage ? scheme.error : null,
+                      isError ? scheme.error : const Color(0xFF2E7D32),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -153,10 +159,6 @@ class _ManagementBody extends StatelessWidget {
     final loaded = state as FiltersEffectsLoaded;
 
     return switch (loaded.activeTab) {
-      FiltersEffectsTab.overview => _OverviewTabContent(
-          loaded: loaded,
-          metrics: metrics,
-        ),
       FiltersEffectsTab.filters => FiltersTab(
           loaded: loaded,
           metrics: metrics,
@@ -178,109 +180,5 @@ class _ManagementBody extends StatelessWidget {
           metrics: metrics,
         ),
     };
-  }
-}
-
-class _OverviewTabContent extends StatelessWidget {
-  const _OverviewTabContent({
-    required this.loaded,
-    required this.metrics,
-  });
-
-  final FiltersEffectsLoaded loaded;
-  final FiltersEffectsLayoutMetrics metrics;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final overview = loaded.overview;
-    final catalog = loaded.catalog;
-
-    return SingleChildScrollView(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: EdgeInsetsDirectional.all(
-            metrics.isMobile ? 12 : 18,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.tOr('feOverviewTitle', 'Module overview'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              SizedBox(height: metrics.filterGap),
-              Text(
-                l10n.tOr(
-                  'feOverviewHint',
-                  'Manage camera filters, effects, categories, and publish the mobile catalog.',
-                ),
-                textAlign: TextAlign.start,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-              ),
-              if (overview != null) ...[
-                SizedBox(height: metrics.sectionGap),
-                _OverviewRow(
-                  label: l10n.tOr('feCatalogVersion', 'Catalog version'),
-                  value: overview.catalogVersion,
-                ),
-                if (catalog != null) ...[
-                  SizedBox(height: metrics.filterGap),
-                  _OverviewRow(
-                    label: l10n.tOr('feLiveCatalogVersion', 'Live catalog'),
-                    value: catalog.version,
-                  ),
-                ],
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OverviewRow extends StatelessWidget {
-  const _OverviewRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            textAlign: TextAlign.start,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            textAlign: TextAlign.start,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ),
-      ],
-    );
   }
 }
