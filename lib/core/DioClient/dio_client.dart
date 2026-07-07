@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+
+import '../config/api_config.dart';
 
 class DioClient {
   static Dio create() {
@@ -25,11 +26,5 @@ class DioClient {
     return dio;
   }
 
-  static String get _baseUrl {
-    if (kIsWeb) {
-      return 'http://192.168.1.123:3000';
-    } else {
-      return 'http://192.168.1.123:3000';
-    }
-  }
+  static String get _baseUrl => ApiConfig.resolve();
 }

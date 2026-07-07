@@ -1,5 +1,7 @@
 import '../../domain/entities/comment_entity.dart';
+import '../../domain/entities/managed_post_author_enrichment.dart';
 import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/entities/post_engagement_user_item.dart';
 import '../../domain/repositories/post_management_repository.dart';
 import '../datasources/post_management_remote_datasource.dart';
 
@@ -9,8 +11,9 @@ class PostManagementRepositoryImpl implements PostManagementRepository {
   final PostManagementRemoteDataSource remoteDataSource;
 
   @override
-  Future<ManagedPostEntity> getManagedPostById(String postId) {
-    return remoteDataSource.getManagedPostById(postId);
+  Future<ManagedPostEntity> getManagedPostById(String postId) async {
+    final post = await remoteDataSource.getManagedPostById(postId);
+    return hydrateManagedPostMedia(enrichManagedPostAuthor(post));
   }
 
   @override
@@ -70,5 +73,22 @@ class PostManagementRepositoryImpl implements PostManagementRepository {
   @override
   Future<void> deleteCommentAsAdmin(String commentId) {
     return remoteDataSource.deleteCommentAsAdmin(commentId);
+  }
+
+  @override
+  Future<PostEngagementUsersPageEntity> getPostEngagementUsers(
+    String postId, {
+    required PostEngagementKind kind,
+    required int page,
+    required int limit,
+    String? postAuthorId,
+  }) {
+    return remoteDataSource.getPostEngagementUsers(
+      postId,
+      kind: kind,
+      page: page,
+      limit: limit,
+      postAuthorId: postAuthorId,
+    );
   }
 }

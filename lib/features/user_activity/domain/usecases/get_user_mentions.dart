@@ -11,7 +11,13 @@ class GetUserMentions {
     String userId, {
     required int page,
     int limit = 10,
+    String type = 'received',
   }) {
-    return _repository.getUserMentions(userId, page: page, limit: limit);
+    return _repository.getUserMentions(
+      userId,
+      page: page,
+      limit: limit,
+      type: type,
+    );
   }
 }

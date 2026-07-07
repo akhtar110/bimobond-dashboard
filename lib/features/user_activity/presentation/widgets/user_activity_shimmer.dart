@@ -39,9 +39,9 @@ class _UserActivityShimmerBoxState extends State<UserActivityShimmerBox>
 
   @override
   Widget build(BuildContext context) {
-    final base = widget.isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final highlight =
-        widget.isDark ? Colors.grey.shade700 : Colors.grey.shade100;
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerHighest;
+    final highlight = scheme.surfaceContainerHigh;
 
     return AnimatedBuilder(
       animation: _controller,
@@ -74,6 +74,8 @@ class UserActivityListShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       physics: const NeverScrollableScrollPhysics(),
@@ -82,11 +84,11 @@ class UserActivityListShimmer extends StatelessWidget {
       itemBuilder: (_, __) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: scheme.shadow.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),

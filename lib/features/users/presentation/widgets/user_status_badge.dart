@@ -11,37 +11,34 @@ class UserStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
 
-    final (bg, fg, label) = switch (true) {
+    final (Color bg, Color fg, String label) = switch (true) {
       _ when user.isBanned => (
-          const Color(0xFFFEE2E2),
-          const Color(0xFFB91C1C),
+          scheme.errorContainer,
+          scheme.onErrorContainer,
           l10n.t('banned').toUpperCase(),
         ),
       _ when user.isVerified => (
-          const Color(0xFFCCFBF1),
-          const Color(0xFF0F766E),
+          scheme.tertiaryContainer,
+          scheme.onTertiaryContainer,
           l10n.t('verified').toUpperCase(),
         ),
       _ => (
-          const Color(0xFFD1FAE5),
-          const Color(0xFF047857),
+          scheme.primaryContainer,
+          scheme.onPrimaryContainer,
           l10n.t('active').toUpperCase(),
         ),
     };
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final darkBg = fg.withValues(alpha: 0.15);
-    final darkFg = fg.withValues(alpha: 0.95);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         DecoratedBox(
           decoration: BoxDecoration(
-            color: isDark ? darkBg : bg,
+            color: bg,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: fg.withValues(alpha: isDark ? 0.35 : 0.2)),
+            border: Border.all(color: fg.withValues(alpha: 0.25)),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -51,7 +48,7 @@ class UserStatusBadge extends StatelessWidget {
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.4,
-                color: isDark ? darkFg : fg,
+                color: fg,
               ),
             ),
           ),

@@ -1,45 +1,22 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/localization/localization.dart';
+import '../../../core/bloc/persistent_bloc_provider.dart';
+import '../../../injection_container.dart' as di;
+import 'bloc/reports_bloc.dart';
+import 'reports_center_page.dart';
 
+/// Backward-compatible alias for shell navigation.
 class ReportsPage extends StatelessWidget {
   const ReportsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return ListView.builder(
-      padding: const EdgeInsetsDirectional.all(16),
-      itemCount: 10,
-      itemBuilder: (_, index) {
-        return Card(
-          margin: const EdgeInsetsDirectional.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${l10n.t('reportReason')}: Spam #$index'),
-                Text('${l10n.t('reporter')}: user_${100 + index}'),
-                Text('${l10n.t('target')}: video_${200 + index}'),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    OutlinedButton(onPressed: () {}, child: Text(l10n.t('ignore'))),
-                    const SizedBox(width: 8),
-                    FilledButton.tonal(
-                      onPressed: () {},
-                      child: Text(l10n.t('delete')),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(onPressed: () {}, child: Text(l10n.t('ban'))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    if (kDebugMode) debugPrint('ReportsPage rebuilt');
+    return PersistentBlocProvider<ReportsBloc>(
+      debugLabel: 'ReportsPage',
+      create: () => di.sl<ReportsBloc>(),
+      child: const ReportsCenterPage(),
     );
   }
 }

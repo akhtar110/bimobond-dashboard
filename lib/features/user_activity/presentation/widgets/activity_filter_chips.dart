@@ -16,8 +16,7 @@ class ActivityFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
 
     return Wrap(
       spacing: 8,
@@ -33,17 +32,12 @@ class ActivityFilterChips extends StatelessWidget {
             showCheckmark: false,
             labelStyle: TextStyle(
               fontWeight: FontWeight.w600,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+              color: isSelected ? scheme.onPrimary : scheme.onSurfaceVariant,
             ),
-            backgroundColor:
-                isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
-            selectedColor: primary,
+            backgroundColor: scheme.surfaceContainerHigh,
+            selectedColor: scheme.primary,
             side: BorderSide(
-              color: isSelected
-                  ? primary
-                  : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+              color: isSelected ? scheme.primary : scheme.outlineVariant,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),

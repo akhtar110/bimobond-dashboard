@@ -1,4 +1,68 @@
+import '../../../post_management/domain/entities/post_media_entity.dart';
+import '../../../../core/utils/media_url_resolver.dart';
+import 'auction_status.dart';
 import 'gift_transaction_entity.dart';
+
+/// Lightweight post snapshot returned with auction list/detail APIs.
+class AuctionPostSummary {
+  const AuctionPostSummary({
+    this.thumbnailUrl,
+    this.media = const [],
+  });
+
+  final String? thumbnailUrl;
+  final List<PostMediaEntity> media;
+}
+
+/// Server-computed pricing breakdown on auction responses.
+class AuctionPricingEntity {
+  const AuctionPricingEntity({
+    this.coinsPerPriceUnit,
+    this.commissionPercent,
+    this.currencyCode,
+    this.targetPrice,
+    this.targetPriceCoins,
+    this.startingPrice,
+    this.estimatedHostEarningsCoins,
+    this.estimatedHostEarningsPrice,
+    this.estimatedBidderSpendCoins,
+    this.estimatedBidderSpendPrice,
+    this.remainingCoins,
+    this.remainingPrice,
+    this.progressPercent,
+  });
+
+  final double? coinsPerPriceUnit;
+  final double? commissionPercent;
+  final String? currencyCode;
+  final double? targetPrice;
+  final double? targetPriceCoins;
+  final double? startingPrice;
+  final double? estimatedHostEarningsCoins;
+  final double? estimatedHostEarningsPrice;
+  final double? estimatedBidderSpendCoins;
+  final double? estimatedBidderSpendPrice;
+  final double? remainingCoins;
+  final double? remainingPrice;
+  final double? progressPercent;
+}
+
+String? resolveAuctionDisplayImageUrl({
+  String? itemImageUrl,
+  AuctionPostSummary? post,
+}) {
+  if (post != null) {
+    final fromPost = resolvePostDisplayThumbnailUrl(
+      media: post.media,
+      thumbnailUrl: post.thumbnailUrl,
+    );
+    if (fromPost != null && fromPost.isNotEmpty) return fromPost;
+  }
+
+  final resolvedItem = resolveMediaUrl(itemImageUrl);
+  if (resolvedItem != null && resolvedItem.isNotEmpty) return resolvedItem;
+  return null;
+}
 
 class AuctionEntity {
   const AuctionEntity({
@@ -8,9 +72,12 @@ class AuctionEntity {
     required this.hostId,
     this.itemName,
     this.itemImageUrl,
-    required this.startingPriceUsd,
-    required this.targetPriceUsd,
-    required this.currentTotalUsd,
+    required this.startingPriceCoins,
+    required this.targetPriceCoins,
+    this.startingPrice,
+    this.targetPrice,
+    this.currencyCode,
+    required this.currentTotalCoins,
     required this.status,
     this.winnerId,
     required this.startedAt,
@@ -18,6 +85,8 @@ class AuctionEntity {
     this.host,
     this.winner,
     this.giftTransactions,
+    this.post,
+    this.pricing,
   });
 
   final String id;
@@ -26,16 +95,28 @@ class AuctionEntity {
   final String hostId;
   final String? itemName;
   final String? itemImageUrl;
-  final double startingPriceUsd;
-  final double targetPriceUsd;
-  final double currentTotalUsd;
-  final String status; // ACTIVE | COMPLETED | CANCELLED
+  final double startingPriceCoins;
+  final double targetPriceCoins;
+  final double? startingPrice;
+  final double? targetPrice;
+  final String? currencyCode;
+  final double currentTotalCoins;
+  final String status; // ACTIVE | COMPLETED | CANCELLED | BANNED
   final String? winnerId;
   final DateTime startedAt;
   final DateTime? endedAt;
   final Map<String, dynamic>? host;
   final Map<String, dynamic>? winner;
   final List<GiftTransactionEntity>? giftTransactions;
+  final AuctionPostSummary? post;
+  final AuctionPricingEntity? pricing;
+
+  /// Post-attached media from the linked post, then [itemImageUrl] fallback.
+  String? get displayImageUrl =>
+      resolveAuctionDisplayImageUrl(itemImageUrl: itemImageUrl, post: post);
+
+  bool get hasMoneyTarget =>
+      targetPrice != null && (currencyCode?.isNotEmpty ?? false);
 
   // Convenience getters
   String get hostName =>
@@ -45,38 +126,87 @@ class AuctionEntity {
       winner?['username'] as String? ?? winner?['name'] as String?;
   String? get winnerAvatar => winner?['avatarUrl'] as String?;
 
-  double get progressPercent =>
-      targetPriceUsd > 0 ? (currentTotalUsd / targetPriceUsd).clamp(0, 1) : 0;
+  AuctionStatus get auctionStatus => AuctionStatus.parse(status);
 
-  bool get isActive => status == 'ACTIVE';
-  bool get isCompleted => status == 'COMPLETED';
-  bool get isCancelled => status == 'CANCELLED';
+  /// Coin goal for progress UI — nested pricing wins when the server sends it.
+  double get effectiveTargetPriceCoins {
+    final nested = pricing?.targetPriceCoins;
+    if (nested != null && nested > 0) return nested;
+    return targetPriceCoins;
+  }
+
+  /// Progress as 0.0–1.0 for progress bars from raised vs effective coin goal.
+  double get progressFraction {
+    final target = effectiveTargetPriceCoins;
+    if (target > 0) {
+      return (currentTotalCoins / target).clamp(0.0, 1.0);
+    }
+    final fromPricing = pricing?.progressPercent;
+    if (fromPricing != null) {
+      final normalized = fromPricing > 1 ? fromPricing / 100 : fromPricing;
+      return normalized.clamp(0.0, 1.0);
+    }
+    return 0;
+  }
+
+  /// Remaining coins toward the effective coin goal.
+  double get remainingCoins {
+    final target = effectiveTargetPriceCoins;
+    if (target > 0) {
+      return (target - currentTotalCoins).clamp(0, double.infinity);
+    }
+    return pricing?.remainingCoins ?? 0;
+  }
+
+  bool get isActive => status == AuctionStatus.active.apiValue;
+  bool get isCompleted => status == AuctionStatus.completed.apiValue;
+  bool get isCancelled => status == AuctionStatus.cancelled.apiValue;
+  bool get isBanned => status == AuctionStatus.banned.apiValue;
+
+  /// Whether a host may edit auction details (ACTIVE only).
+  bool get isHostEditable => isActive;
 
   AuctionEntity copyWith({
-    double? currentTotalUsd,
+    String? itemName,
+    String? itemImageUrl,
+    String? postId,
+    String? liveId,
+    double? startingPriceCoins,
+    double? targetPriceCoins,
+    double? startingPrice,
+    double? targetPrice,
+    String? currencyCode,
+    double? currentTotalCoins,
     String? status,
     String? winnerId,
+    DateTime? startedAt,
     DateTime? endedAt,
     Map<String, dynamic>? winner,
     List<GiftTransactionEntity>? giftTransactions,
+    AuctionPricingEntity? pricing,
   }) {
     return AuctionEntity(
       id: id,
-      postId: postId,
-      liveId: liveId,
+      postId: postId ?? this.postId,
+      liveId: liveId ?? this.liveId,
       hostId: hostId,
-      itemName: itemName,
-      itemImageUrl: itemImageUrl,
-      startingPriceUsd: startingPriceUsd,
-      targetPriceUsd: targetPriceUsd,
-      currentTotalUsd: currentTotalUsd ?? this.currentTotalUsd,
+      itemName: itemName ?? this.itemName,
+      itemImageUrl: itemImageUrl ?? this.itemImageUrl,
+      startingPriceCoins: startingPriceCoins ?? this.startingPriceCoins,
+      targetPriceCoins: targetPriceCoins ?? this.targetPriceCoins,
+      startingPrice: startingPrice ?? this.startingPrice,
+      targetPrice: targetPrice ?? this.targetPrice,
+      currencyCode: currencyCode ?? this.currencyCode,
+      currentTotalCoins: currentTotalCoins ?? this.currentTotalCoins,
       status: status ?? this.status,
       winnerId: winnerId ?? this.winnerId,
-      startedAt: startedAt,
+      startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       host: host,
       winner: winner ?? this.winner,
       giftTransactions: giftTransactions ?? this.giftTransactions,
+      post: post,
+      pricing: pricing ?? this.pricing,
     );
   }
 }

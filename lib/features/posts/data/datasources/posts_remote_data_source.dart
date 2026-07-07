@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/post_filters.dart';
 import '../models/post_model.dart';
@@ -28,10 +29,12 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       'sort': filters.sort ?? PostFilters.defaultSort,
     };
 
-    // The API expects a category slug/label (e.g. "music"), not a UUID.
-    final categorySlug = filters.categorySlug?.trim();
-    if (categorySlug != null && categorySlug.isNotEmpty) {
-      params['category'] = categorySlug;
+    // Send the category UUID so the backend filters by a stable ID instead
+    // of a mutable slug string.
+    final categoryId = filters.categoryId?.trim();
+    if (categoryId != null && categoryId.isNotEmpty) {
+      print('categoryId: $categoryId');
+      params['categoryId'] = categoryId;
     }
 
     final search = filters.search?.trim();
@@ -48,10 +51,36 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       params['isAuctionable'] = 'true';
     }
 
+    if (filters.isStory == true) {
+      params['isStory'] = 'true';
+    }
+
+    if (filters.isAd == true) {
+      params['isAd'] = 'true';
+    }
+
     final response = await _dio.get(
-      '/posts/feed',
+      '/posts/admin/all',
       queryParameters: params,
     );
-    return PostsPageModel.fromJson(response.data as Map<String, dynamic>);
+
+    final raw = response.data as Map<String, dynamic>;
+    final result = PostsPageModel.fromJson(raw);
+
+    if (kDebugMode) {
+      debugPrint('[Posts] fetched ${result.posts.length} posts '
+          '(page ${result.currentPage}/${result.lastPage})');
+      for (final p in result.posts.take(3)) {
+        debugPrint('  post ${p.id}: type=${p.type} '
+            'thumbnailUrl=${p.thumbnailUrl} '
+            'videoUrl=${p.videoUrl} '
+            'media.length=${p.media.length}');
+        for (final m in p.media) {
+          debugPrint('    media url=${m.url} type=${m.mediaType}');
+        }
+      }
+    }
+
+    return result;
   }
 }

@@ -1,5 +1,7 @@
 import '../../domain/entities/create_post_entity.dart';
+import '../../domain/services/create_post_payload_validator.dart';
 import 'create_auction_dto.dart';
+import 'create_post_nested_dtos.dart';
 import 'post_media_dto.dart';
 
 class CreatePostDto {
@@ -11,6 +13,7 @@ class CreatePostDto {
     this.animatedCoverUrl,
     this.description,
     this.category,
+    this.categoryId,
     this.status,
     this.duration,
     this.videoWidth,
@@ -24,8 +27,10 @@ class CreatePostDto {
     this.isAuctionable,
     this.auction,
     this.locationId,
+    this.location,
     this.playlistId,
     this.soundId,
+    this.newSound,
     this.originalPostId,
     this.media,
   });
@@ -37,6 +42,9 @@ class CreatePostDto {
   final String? animatedCoverUrl;
   final String? description;
   final String? category;
+  /// UUID of the selected category — the primary key the backend uses for
+  /// category association and for `GET /posts/feed?categoryId=` filtering.
+  final String? categoryId;
   final String? status;
   final int? duration;
   final int? videoWidth;
@@ -50,8 +58,10 @@ class CreatePostDto {
   final bool? isAuctionable;
   final CreateAuctionDto? auction;
   final String? locationId;
+  final CreateLocationDto? location;
   final String? playlistId;
   final String? soundId;
+  final CreateNewSoundDto? newSound;
   final String? originalPostId;
   final List<PostMediaDto>? media;
 
@@ -65,6 +75,7 @@ class CreatePostDto {
       animatedCoverUrl: entity.animatedCoverUrl,
       description: entity.description,
       category: entity.category,
+      categoryId: entity.categoryId,
       status: entity.status,
       duration: entity.duration,
       videoWidth: entity.videoWidth,
@@ -81,9 +92,21 @@ class CreatePostDto {
               auctionEntity.isComplete
           ? CreateAuctionDto.fromEntity(auctionEntity)
           : null,
-      locationId: entity.locationId,
+      locationId: CreatePostPayloadValidator.resolvesLocationId(entity)
+          ? entity.locationId
+          : null,
+      location: CreatePostPayloadValidator.resolvesInlineLocation(entity) != null
+          ? CreateLocationDto.fromEntity(
+              CreatePostPayloadValidator.resolvesInlineLocation(entity)!,
+            )
+          : null,
       playlistId: entity.playlistId,
       soundId: entity.soundId,
+      newSound: (entity.soundId == null || entity.soundId!.trim().isEmpty) &&
+              entity.newSound != null &&
+              entity.newSound!.isComplete
+          ? CreateNewSoundDto.fromEntity(entity.newSound!)
+          : null,
       originalPostId: entity.originalPostId,
       media: entity.media.isEmpty
           ? null
@@ -116,16 +139,30 @@ class CreatePostDto {
     putStr('type', type);
     putStr('privacyStatus', privacyStatus);
     putStr('description', description);
+    if (status == 'DRAFT' &&
+        (description == null || description!.trim().isEmpty)) {
+      map['description'] = '';
+    }
 
     // ── Optional string fields ────────────────────────────────────────────────
-    putStr('category', category);
+    // NOTE: `category` (free-text name) is NOT sent — the backend rejects
+    // unknown properties.  Only `categoryId` (UUID) is accepted by POST /posts.
+    putStr('categoryId', categoryId);
     putStr('videoUrl', videoUrl);
     putStr('thumbnailUrl', thumbnailUrl);
     putStr('hlsUrl', hlsUrl);
     putStr('animatedCoverUrl', animatedCoverUrl);
-    putStr('locationId', locationId);
+    if (location != null) {
+      map['location'] = location!.toJson();
+    } else {
+      putStr('locationId', locationId);
+    }
     putStr('playlistId', playlistId);
-    putStr('soundId', soundId);
+    if (newSound != null) {
+      map['newSound'] = newSound!.toJson();
+    } else {
+      putStr('soundId', soundId);
+    }
     putStr('originalPostId', originalPostId);
 
     // Only send status when explicitly DRAFT; PUBLISHED is the server default.

@@ -8,3 +8,5 @@ class LoginSubmitted extends LoginEvent {
 }
 
 class LoginWithGooglePressed extends LoginEvent {}
+
+class LoginGoogleSignInAborted extends LoginEvent {}

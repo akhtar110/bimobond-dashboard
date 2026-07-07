@@ -36,7 +36,10 @@ class UserModel extends UserEntity {
     required super.roles,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromJson(
+    Map<String, dynamic> json, {
+    Map<String, dynamic>? counts,
+  }) {
     return UserModel(
       id: json['id'],
       firebaseUid: json['firebaseUid'],
@@ -61,9 +64,13 @@ class UserModel extends UserEntity {
       country: json['country'],
       region: json['region'],
       city: json['city'],
-      followerCount: json['followerCount'] ?? 0,
-      followingCount: json['followingCount'] ?? 0,
-      postCount: json['postCount'] ?? 0,
+      followerCount:
+          json['followerCount'] ?? counts?['followers'] ?? counts?['follower'] ?? 0,
+      followingCount: json['followingCount'] ??
+          counts?['following'] ??
+          counts?['followings'] ??
+          0,
+      postCount: json['postCount'] ?? counts?['posts'] ?? counts?['post'] ?? 0,
       totalLikes: json['totalLikes'] ?? 0,
       isBanned: json['isBanned'] ?? false,
       banReason: json['banReason'],

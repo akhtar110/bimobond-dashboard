@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'create_post_media_filter_entity.dart';
+
 /// A file picked locally, optionally linked to an uploaded server URL.
 class LocalMediaFile {
   const LocalMediaFile({
@@ -8,6 +10,8 @@ class LocalMediaFile {
     required this.bytes,
     required this.mediaType,
     this.uploadedUrl,
+    this.filter = CreatePostMediaFilterEntity.neutral,
+    this.originalBytes,
   });
 
   final String id;
@@ -16,16 +20,37 @@ class LocalMediaFile {
   /// `IMAGE` or `VIDEO`
   final String mediaType;
   final String? uploadedUrl;
+  final CreatePostMediaFilterEntity filter;
+
+  /// Original bytes before filter processing (for reset).
+  final Uint8List? originalBytes;
 
   bool get isUploaded => uploadedUrl != null && uploadedUrl!.isNotEmpty;
 
-  LocalMediaFile copyWith({String? uploadedUrl}) {
+  bool get hasFilter => !filter.isNeutral;
+
+  Uint8List get sourceBytes => originalBytes ?? bytes;
+
+  LocalMediaFile copyWith({
+    Uint8List? bytes,
+    String? uploadedUrl,
+    CreatePostMediaFilterEntity? filter,
+    Uint8List? originalBytes,
+    bool clearUploadedUrl = false,
+    bool resetFilter = false,
+  }) {
     return LocalMediaFile(
       id: id,
       name: name,
-      bytes: bytes,
+      bytes: resetFilter ? (originalBytes ?? this.bytes) : (bytes ?? this.bytes),
       mediaType: mediaType,
-      uploadedUrl: uploadedUrl ?? this.uploadedUrl,
+      uploadedUrl: clearUploadedUrl ? null : (uploadedUrl ?? this.uploadedUrl),
+      filter: resetFilter
+          ? CreatePostMediaFilterEntity.neutral
+          : (filter ?? this.filter),
+      originalBytes: resetFilter
+          ? null
+          : (originalBytes ?? this.originalBytes ?? this.bytes),
     );
   }
 

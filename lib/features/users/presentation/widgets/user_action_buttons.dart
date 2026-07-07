@@ -16,8 +16,6 @@ class UserActionButtons extends StatelessWidget {
   final UserEntity user;
   final bool compact;
 
-  bool get _isAdmin => user.roles.contains(UserRole.admin);
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -26,11 +24,11 @@ class UserActionButtons extends StatelessWidget {
     if (compact) {
       return _CompactActionsMenu(
         user: user,
-        isAdmin: _isAdmin,
         onDetails: () => _openDetails(context),
-        onBan: () => bloc.add(ToggleBanUserEvent(user.id)),
-        onPromote: () => bloc.add(PromoteUserEvent(user.id)),
-        onDemote: () => bloc.add(DemoteUserEvent(user.id)),
+        onBan: () => _confirmBanToggle(context, bloc),
+        onSetRole: (role) => bloc.add(
+          SetUserRoleEvent(userId: user.id, role: role),
+        ),
         onDelete: () => UserDeleteDialog.show(context, user.id),
       );
     }
@@ -48,15 +46,12 @@ class UserActionButtons extends StatelessWidget {
         _ActionChip(
           label: user.isBanned ? l10n.t('unban') : l10n.t('ban'),
           icon: user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
-          onPressed: () => bloc.add(ToggleBanUserEvent(user.id)),
+          onPressed: () => _confirmBanToggle(context, bloc),
         ),
-        _ActionChip(
-          label: _isAdmin ? l10n.t('demote') : l10n.t('promote'),
-          icon: _isAdmin
-              ? Icons.arrow_downward_rounded
-              : Icons.arrow_upward_rounded,
-          onPressed: () => bloc.add(
-            _isAdmin ? DemoteUserEvent(user.id) : PromoteUserEvent(user.id),
+        _RoleActionButton(
+          user: user,
+          onSetRole: (role) => bloc.add(
+            SetUserRoleEvent(userId: user.id, role: role),
           ),
         ),
         _ActionChip(
@@ -71,6 +66,46 @@ class UserActionButtons extends StatelessWidget {
 
   void _openDetails(BuildContext context) {
     Navigator.pushNamed(context, AppRoutes.userDetail, arguments: user);
+  }
+
+  Future<void> _confirmBanToggle(BuildContext context, UsersBloc bloc) async {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final banning = !user.isBanned;
+    final title = banning ? l10n.t('ban') : l10n.t('unban');
+    final fallbackMessage = banning
+        ? 'Are you sure you want to ban this user?'
+        : 'Are you sure you want to unban this user?';
+    final message = l10n.tOr(
+      banning ? 'confirmBanUserMessage' : 'confirmUnbanUserMessage',
+      fallbackMessage,
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: banning
+                ? FilledButton.styleFrom(backgroundColor: scheme.error)
+                : null,
+            child: Text(l10n.t('confirmAction')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      bloc.add(ToggleBanUserEvent(user.id));
+    }
   }
 }
 
@@ -90,8 +125,8 @@ class _ActionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final color = isDestructive ? const Color(0xFFEF4444) : theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final color = isDestructive ? scheme.error : scheme.primary;
 
     return Material(
       color: Colors.transparent,
@@ -104,11 +139,9 @@ class _ActionChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: color.withValues(alpha: isDark ? 0.45 : 0.35),
+              color: color.withValues(alpha: 0.35),
             ),
-            color: isDark
-                ? color.withValues(alpha: 0.06)
-                : color.withValues(alpha: 0.04),
+            color: color.withValues(alpha: 0.06),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -136,25 +169,22 @@ class _ActionChip extends StatelessWidget {
 class _CompactActionsMenu extends StatelessWidget {
   const _CompactActionsMenu({
     required this.user,
-    required this.isAdmin,
     required this.onDetails,
     required this.onBan,
-    required this.onPromote,
-    required this.onDemote,
+    required this.onSetRole,
     required this.onDelete,
   });
 
   final UserEntity user;
-  final bool isAdmin;
   final VoidCallback onDetails;
   final VoidCallback onBan;
-  final VoidCallback onPromote;
-  final VoidCallback onDemote;
+  final ValueChanged<UserRole> onSetRole;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final isAdmin = user.roles.contains(UserRole.admin);
 
     return PopupMenuButton<String>(
       tooltip: l10n.t('actions'),
@@ -168,12 +198,22 @@ class _CompactActionsMenu extends StatelessWidget {
         switch (value) {
           case 'details':
             onDetails();
+            return;
           case 'ban':
             onBan();
-          case 'promote':
-            isAdmin ? onDemote() : onPromote();
+            return;
+          case 'set_role_user':
+            onSetRole(UserRole.user);
+            return;
+          case 'set_role_moderator':
+            onSetRole(UserRole.moderator);
+            return;
+          case 'set_role_admin':
+            onSetRole(UserRole.admin);
+            return;
           case 'delete':
             onDelete();
+            return;
         }
       },
       itemBuilder: (_) => [
@@ -188,22 +228,146 @@ class _CompactActionsMenu extends StatelessWidget {
             user.isBanned ? l10n.t('unban') : l10n.t('ban'),
           ),
         ),
-        PopupMenuItem(
-          value: 'promote',
-          child: _MenuRow(
-            isAdmin ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-            isAdmin ? l10n.t('demote') : l10n.t('promote'),
+        if (isAdmin) ...[
+          PopupMenuItem(
+            value: 'set_role_user',
+            child: _MenuRow(
+              Icons.person_outline_rounded,
+              l10n.t('roleUser'),
+            ),
           ),
-        ),
+          PopupMenuItem(
+            value: 'set_role_moderator',
+            child: _MenuRow(
+              Icons.shield_outlined,
+              l10n.t('roleModerator'),
+            ),
+          ),
+        ] else ...[
+          PopupMenuItem(
+            value: 'set_role_user',
+            child: _MenuRow(
+              Icons.person_outline_rounded,
+              l10n.t('roleUser'),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'set_role_moderator',
+            child: _MenuRow(
+              Icons.shield_outlined,
+              l10n.t('roleModerator'),
+            ),
+          ),
+          PopupMenuItem(
+            value: 'set_role_admin',
+            child: _MenuRow(
+              Icons.admin_panel_settings_outlined,
+              l10n.t('roleAdmin'),
+            ),
+          ),
+        ],
         PopupMenuItem(
           value: 'delete',
           child: _MenuRow(
             Icons.delete_outline_rounded,
             l10n.t('delete'),
-            color: Colors.red,
+            color: Theme.of(context).colorScheme.error,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RoleActionButton extends StatelessWidget {
+  const _RoleActionButton({
+    required this.user,
+    required this.onSetRole,
+  });
+
+  final UserEntity user;
+  final ValueChanged<UserRole> onSetRole;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final color = scheme.primary;
+    final isAdmin = user.roles.contains(UserRole.admin);
+
+    return PopupMenuButton<UserRole>(
+      tooltip: isAdmin
+          ? l10n.tOr('demote', 'Demote')
+          : l10n.tOr('promote', 'Promote'),
+      onSelected: onSetRole,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      offset: const Offset(0, 8),
+      itemBuilder: (_) => isAdmin
+          ? [
+              PopupMenuItem(
+                value: UserRole.user,
+                child: _MenuRow(
+                  Icons.person_outline_rounded,
+                  l10n.t('roleUser'),
+                ),
+              ),
+              PopupMenuItem(
+                value: UserRole.moderator,
+                child: _MenuRow(
+                  Icons.shield_outlined,
+                  l10n.t('roleModerator'),
+                ),
+              ),
+            ]
+          : [
+              PopupMenuItem(
+                value: UserRole.user,
+                child: _MenuRow(
+                  Icons.person_outline_rounded,
+                  l10n.t('roleUser'),
+                ),
+              ),
+              PopupMenuItem(
+                value: UserRole.moderator,
+                child: _MenuRow(
+                  Icons.shield_outlined,
+                  l10n.t('roleModerator'),
+                ),
+              ),
+              PopupMenuItem(
+                value: UserRole.admin,
+                child: _MenuRow(
+                  Icons.admin_panel_settings_outlined,
+                  l10n.t('roleAdmin'),
+                ),
+              ),
+            ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: color.withValues(alpha: 0.35),
+            width: 1,
+          ),
+          color: color.withValues(alpha: 0.06),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.manage_accounts_outlined, size: 14, color: color),
+            const SizedBox(width: 5),
+            Text(
+              isAdmin ? l10n.t('demote') : l10n.t('promote'),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -231,14 +395,14 @@ class UserDeleteDialog {
   static void show(BuildContext context, String userId) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
 
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
-        icon: Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 32),
+        backgroundColor: scheme.surface,
+        icon: Icon(Icons.warning_amber_rounded, color: scheme.error, size: 32),
         title: Text(
           l10n.t('deleteUserTitle'),
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -246,7 +410,7 @@ class UserDeleteDialog {
         content: Text(
           l10n.t('deleteUserMessage'),
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            color: scheme.onSurfaceVariant,
             height: 1.5,
           ),
         ),
@@ -258,7 +422,8 @@ class UserDeleteDialog {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),

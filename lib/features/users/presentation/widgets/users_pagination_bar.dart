@@ -19,9 +19,8 @@ class UsersPaginationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
     final bloc = context.read<UsersBloc>();
-    final l10n = context.l10n;
 
     final visiblePages = <int>{
       for (var i = currentPage - 2; i <= currentPage + 2; i++)
@@ -31,15 +30,9 @@ class UsersPaginationBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.02)
-            : const Color(0xFFF8FAFC),
+        color: scheme.surfaceContainerLow,
         border: Border(
-          top: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : const Color(0xFFE8ECF1),
-          ),
+          top: BorderSide(color: scheme.outlineVariant),
         ),
       ),
       child: LayoutBuilder(
@@ -83,7 +76,7 @@ class UsersPaginationBar extends StatelessWidget {
                     'last': '$lastPage',
                   })}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: isDark ? Colors.grey.shade400 : const Color(0xFF94A3B8),
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -98,7 +91,7 @@ class UsersPaginationBar extends StatelessWidget {
                 context.tr('usersCountSummary', {'count': '$total'}),
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),
@@ -108,7 +101,7 @@ class UsersPaginationBar extends StatelessWidget {
                   'last': '$lastPage',
                 })}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isDark ? Colors.grey.shade500 : const Color(0xFF94A3B8),
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
                 ),
               ),
               const Spacer(),
@@ -135,15 +128,14 @@ class _PageNumberButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        hoverColor: primary.withValues(alpha: 0.08),
+        hoverColor: scheme.primary.withValues(alpha: 0.08),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           width: 32,
@@ -153,25 +145,17 @@ class _PageNumberButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             gradient: isActive
                 ? LinearGradient(
-                    colors: [primary, primary.withValues(alpha: 0.8)],
+                    colors: [scheme.primary, scheme.primary.withValues(alpha: 0.8)],
                   )
                 : null,
-            color: isActive
-                ? null
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.04)
-                    : Colors.white),
+            color: isActive ? null : scheme.surface,
             border: Border.all(
-              color: isActive
-                  ? Colors.transparent
-                  : (isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : const Color(0xFFE2E8F0)),
+              color: isActive ? Colors.transparent : scheme.outlineVariant,
             ),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: primary.withValues(alpha: 0.3),
+                      color: scheme.primary.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -182,9 +166,7 @@ class _PageNumberButton extends StatelessWidget {
             '$page',
             style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: isActive
-                  ? Colors.white
-                  : (isDark ? Colors.grey.shade300 : const Color(0xFF64748B)),
+              color: isActive ? scheme.onPrimary : scheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -206,9 +188,7 @@ class _PageIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return Material(
       color: Colors.transparent,
@@ -223,20 +203,14 @@ class _PageIconButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: enabled
-                  ? (isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : const Color(0xFFE2E8F0))
-                  : (isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : const Color(0xFFE2E8F0).withValues(alpha: 0.6)),
+                  ? scheme.outlineVariant
+                  : scheme.outlineVariant.withValues(alpha: 0.45),
             ),
           ),
           child: Icon(
             icon,
             size: 20,
-            color: enabled
-                ? primary
-                : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+            color: enabled ? scheme.primary : scheme.onSurfaceVariant.withValues(alpha: 0.45),
           ),
         ),
       ),

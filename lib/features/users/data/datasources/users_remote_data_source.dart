@@ -1,9 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../domain/entities/user_entity.dart';
-import '../models/user_model.dart';
-import '../models/user_detail_model.dart';
-import '../models/user_post_model.dart';
 import 'package:dio/dio.dart';
+
+import '../../domain/entities/admin_bulk_user_action.dart';
+import '../../domain/entities/admin_bulk_users_result_entity.dart';
+import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/user_follow_entity.dart';
+import '../models/admin_bulk_users_result_model.dart';
+import '../models/user_detail_model.dart';
+import '../models/user_follow_model.dart';
+import '../models/user_model.dart';
+import '../models/user_post_model.dart';
 
 abstract class UsersRemoteDataSource {
   Future<UsersPageModel> getUsers({
@@ -31,9 +37,24 @@ abstract class UsersRemoteDataSource {
   Future<void> demoteFromAdmin(String userId);
 
   Future<void> deleteUser(String userId);
+  Future<AdminBulkUsersResultEntity> suspendUsers(
+    List<String> userIds, {
+    required String reason,
+    DateTime? until,
+  });
+  Future<AdminBulkUsersResultEntity> activateUsers(List<String> userIds);
+  Future<AdminBulkUsersResultEntity> deleteUsers(List<String> userIds);
+  Future<AdminBulkUsersResultEntity> promoteUsers(List<String> userIds);
+  Future<AdminBulkUsersResultEntity> demoteUsers(List<String> userIds);
   Future<void> verifyUser(String userId);
   Future<UserDetailModel> getUserById(String userId);
   Future<UserPostsResponseModel> getUserPosts(String userId, {int page = 1, int limit = 20});
+  Future<UserFollowListPageModel> getUserFollowList({
+    required String userId,
+    required UserFollowListKind kind,
+    int page = 1,
+    int limit = 20,
+  });
 }
 
 class UsersPageModel {
@@ -138,6 +159,173 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     await _dio.delete('/users/$userId');
   }
 
+  static const _bulkPath = '/users/admin/bulk';
+
+  Future<AdminBulkUsersResultModel> _bulkUsers({
+    required List<String> userIds,
+    required AdminBulkUserAction action,
+    String? reason,
+    DateTime? until,
+  }) async {
+    if (userIds.isEmpty) {
+      return AdminBulkUsersResultModel(
+        action: action,
+        successCount: 0,
+        failedCount: 0,
+        notFoundCount: 0,
+        userIds: const [],
+        notFoundIds: const [],
+      );
+    }
+
+    final body = <String, dynamic>{
+      'userIds': userIds,
+      'action': action.apiValue,
+    };
+
+    if (action == AdminBulkUserAction.ban) {
+      body['reason'] = reason ?? 'Bulk admin action';
+      if (until != null) {
+        body['until'] = until.toUtc().toIso8601String();
+      }
+    }
+
+    final response = await _dio.post(_bulkPath, data: body);
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return AdminBulkUsersResultModel.fromJson(data, action);
+    }
+
+    return _allSucceeded(userIds, action);
+  }
+
+  AdminBulkUsersResultModel _allSucceeded(
+    List<String> userIds,
+    AdminBulkUserAction action,
+  ) {
+    return AdminBulkUsersResultModel(
+      action: action,
+      successCount: userIds.length,
+      failedCount: 0,
+      notFoundCount: 0,
+      userIds: userIds,
+      notFoundIds: const [],
+    );
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> suspendUsers(
+    List<String> userIds, {
+    required String reason,
+    DateTime? until,
+  }) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.ban);
+    }
+    try {
+      return await _bulkUsers(
+        userIds: userIds,
+        action: AdminBulkUserAction.ban,
+        reason: reason,
+        until: until ?? DateTime.now().add(const Duration(days: 3650)),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404 && e.response?.statusCode != 405) {
+        rethrow;
+      }
+      final banUntil =
+          until ?? DateTime.now().add(const Duration(days: 3650));
+      for (final id in userIds) {
+        await blockUser(userId: id, reason: reason, until: banUntil);
+      }
+      return _allSucceeded(userIds, AdminBulkUserAction.ban);
+    }
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> activateUsers(List<String> userIds) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.unban);
+    }
+    try {
+      return await _bulkUsers(
+        userIds: userIds,
+        action: AdminBulkUserAction.unban,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404 && e.response?.statusCode != 405) {
+        rethrow;
+      }
+      for (final id in userIds) {
+        await unblockUser(id);
+      }
+      return _allSucceeded(userIds, AdminBulkUserAction.unban);
+    }
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> deleteUsers(List<String> userIds) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.delete);
+    }
+    try {
+      return await _bulkUsers(
+        userIds: userIds,
+        action: AdminBulkUserAction.delete,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404 && e.response?.statusCode != 405) {
+        rethrow;
+      }
+      for (final id in userIds) {
+        await deleteUser(id);
+      }
+      return _allSucceeded(userIds, AdminBulkUserAction.delete);
+    }
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> promoteUsers(List<String> userIds) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.promote);
+    }
+    try {
+      return await _bulkUsers(
+        userIds: userIds,
+        action: AdminBulkUserAction.promote,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404 && e.response?.statusCode != 405) {
+        rethrow;
+      }
+      for (final id in userIds) {
+        await promoteToAdmin(id);
+      }
+      return _allSucceeded(userIds, AdminBulkUserAction.promote);
+    }
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> demoteUsers(List<String> userIds) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.demote);
+    }
+    try {
+      return await _bulkUsers(
+        userIds: userIds,
+        action: AdminBulkUserAction.demote,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404 && e.response?.statusCode != 405) {
+        rethrow;
+      }
+      for (final id in userIds) {
+        await demoteFromAdmin(id);
+      }
+      return _allSucceeded(userIds, AdminBulkUserAction.demote);
+    }
+  }
+
   @override
   Future<void> verifyUser(String userId) async {
     await _dio.patch('/users/$userId/verify');
@@ -161,5 +349,25 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     print('posts response data for user id $userId ${response.data}');
     
     return UserPostsResponseModel.fromJson(response.data);
+  }
+
+  @override
+  Future<UserFollowListPageModel> getUserFollowList({
+    required String userId,
+    required UserFollowListKind kind,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final segment =
+        kind == UserFollowListKind.followers ? 'followers' : 'following';
+    final response = await _dio.get(
+      '/users/$userId/$segment',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+
+    return UserFollowListPageModel.fromJson(
+      response.data as Map<String, dynamic>,
+      kind,
+    );
   }
 }

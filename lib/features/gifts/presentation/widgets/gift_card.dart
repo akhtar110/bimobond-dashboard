@@ -1,10 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../bloc/gifts_bloc.dart';
+
+// ─── Main card ────────────────────────────────────────────────────────────────
 
 class GiftCard extends StatelessWidget {
   const GiftCard({
@@ -21,185 +25,331 @@ class GiftCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 220;
+        final bodyPadding = compact
+            ? const EdgeInsets.fromLTRB(10, 8, 10, 10)
+            : const EdgeInsets.fromLTRB(14, 12, 14, 14);
+        final sectionGap = compact ? 6.0 : 8.0;
+        final actionGap = compact ? 6.0 : 8.0;
+        final borderRadius = compact ? 10.0 : 14.0;
+        final actionSize = compact ? 32.0 : 36.0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(color: scheme.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.04),
+                blurRadius: compact ? 8 : 14,
+                offset: Offset(0, compact ? 2 : 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _GiftThumbnail(gift: gift),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          clipBehavior: Clip.hardEdge,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _GiftThumbnail(gift: gift, compact: compact),
+              Padding(
+                padding: bodyPadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        gift.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            gift.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                  fontSize: compact ? 13 : null,
+                                ),
+                            maxLines: compact ? 1 : 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        SizedBox(width: actionGap),
+                        _ActiveBadge(isActive: gift.isActive, compact: compact),
+                      ],
                     ),
-                    _ActiveBadge(isActive: gift.isActive),
+                    SizedBox(height: sectionGap),
+                    _PublishedDate(gift: gift, compact: compact),
+                    SizedBox(height: sectionGap),
+                    Wrap(
+                      spacing: actionGap,
+                      runSpacing: compact ? 4 : 6,
+                      children: [
+                        _PriceChip(priceCoins: gift.priceCoins, compact: compact),
+                        if (gift.animationUrl != null &&
+                            gift.animationUrl!.isNotEmpty)
+                          _MiniChip(
+                            icon: Icons.animation_rounded,
+                            label: compact ? '' : 'Animated',
+                            compact: compact,
+                          ),
+                      ],
+                    ),
+                    SizedBox(height: compact ? 8 : 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onEdit,
+                            icon: Icon(
+                              Icons.edit_rounded,
+                              size: compact ? 12 : 14,
+                            ),
+                            label: Text(
+                              l10n.t('edit'),
+                              style: TextStyle(fontSize: compact ? 11 : 12),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: compact ? 8 : 10,
+                                vertical: compact ? 6 : 8,
+                              ),
+                              minimumSize: Size(0, compact ? 32 : 36),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  compact ? 6 : 8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: actionGap),
+                        _ToggleButton(gift: gift, size: actionSize),
+                        SizedBox(width: actionGap),
+                        SizedBox(
+                          width: actionSize,
+                          height: actionSize,
+                          child: IconButton.outlined(
+                            onPressed: onDelete,
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              size: compact ? 14 : 16,
+                              color: scheme.error,
+                            ),
+                            padding: EdgeInsets.zero,
+                            style: IconButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  compact ? 6 : 8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '\$${gift.priceUsd.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    if (gift.animationUrl != null) ...[
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.animation_rounded,
-                        size: 14,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        'Animated',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onEdit,
-                        icon: const Icon(Icons.edit_rounded, size: 14),
-                        label: Text(l10n.t('edit'),
-                            style: const TextStyle(fontSize: 12)),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _ToggleButton(gift: gift),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: IconButton.outlined(
-                        onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline_rounded,
-                            size: 16, color: Colors.red),
-                        padding: EdgeInsets.zero,
-                        style: IconButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-class _GiftThumbnail extends StatelessWidget {
-  const _GiftThumbnail({required this.gift});
+// ─── Published date ───────────────────────────────────────────────────────────
+
+class _PublishedDate extends StatelessWidget {
+  const _PublishedDate({required this.gift, this.compact = false});
   final GiftEntity gift;
+  final bool compact;
+
+  static final _fmt = DateFormat('MMM d, yyyy · HH:mm');
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(
-      height: 130,
-      child: gift.thumbnailUrl.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: gift.thumbnailUrl,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => _ph(isDark),
-              errorWidget: (context, url, error) => _ph(isDark),
-            )
-          : _ph(isDark),
+    final scheme = Theme.of(context).colorScheme;
+    final date = gift.publishedAt;
+
+    return Row(
+      children: [
+        Icon(
+          Icons.calendar_today_outlined,
+          size: compact ? 11 : 12,
+          color: scheme.onSurfaceVariant,
+        ),
+        SizedBox(width: compact ? 4 : 5),
+        Expanded(
+          child: Text(
+            date != null
+                ? (compact
+                    ? DateFormat('MMM d, yyyy').format(date.toLocal())
+                    : 'Published ${_fmt.format(date.toLocal())}')
+                : 'Publish date unavailable',
+            style: TextStyle(
+              fontSize: compact ? 10 : 11,
+              color: scheme.onSurfaceVariant,
+              height: 1.3,
+            ),
+            maxLines: compact ? 1 : 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _ph(bool isDark) {
+// ─── Price chip ───────────────────────────────────────────────────────────────
+
+class _PriceChip extends StatelessWidget {
+  const _PriceChip({required this.priceCoins, this.compact = false});
+  final double priceCoins;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF4F5F7),
-      child: const Center(
-        child: Icon(Icons.card_giftcard_rounded,
-            size: 40, color: Color(0xFF9CA3AF)),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 4 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(compact ? 6 : 8),
+      ),
+      child: Text(
+        CoinFormat.coins(priceCoins),
+        style: TextStyle(
+          fontSize: compact ? 12 : 13,
+          fontWeight: FontWeight.w700,
+          color: scheme.onPrimaryContainer,
+        ),
       ),
     );
   }
 }
 
+// ─── Mini chip ────────────────────────────────────────────────────────────────
+
+class _MiniChip extends StatelessWidget {
+  const _MiniChip({
+    required this.icon,
+    required this.label,
+    this.compact = false,
+  });
+  final IconData icon;
+  final String label;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 3 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(compact ? 6 : 8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: compact ? 11 : 12, color: scheme.onSurfaceVariant),
+          if (label.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: compact ? 10 : 11,
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Thumbnail ────────────────────────────────────────────────────────────────
+
+class _GiftThumbnail extends StatelessWidget {
+  const _GiftThumbnail({required this.gift, this.compact = false});
+  final GiftEntity gift;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AspectRatio(
+      aspectRatio: compact ? 1.1 : 4 / 3,
+      child: gift.thumbnailUrl.isNotEmpty
+          ? ColoredBox(
+              color: scheme.surfaceContainerHighest,
+              child: CachedNetworkImage(
+                imageUrl: gift.thumbnailUrl,
+                fit: BoxFit.contain,
+                placeholder: (_, __) => _placeholder(scheme, compact),
+                errorWidget: (_, __, ___) => _placeholder(scheme, compact),
+              ),
+            )
+          : _placeholder(scheme, compact),
+    );
+  }
+
+  Widget _placeholder(ColorScheme scheme, bool compact) => ColoredBox(
+        color: scheme.surfaceContainerHighest,
+        child: Center(
+          child: Icon(
+            Icons.card_giftcard_rounded,
+            size: compact ? 28 : 40,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      );
+}
+
+// ─── Active badge ─────────────────────────────────────────────────────────────
+
 class _ActiveBadge extends StatelessWidget {
-  const _ActiveBadge({required this.isActive});
+  const _ActiveBadge({required this.isActive, this.compact = false});
   final bool isActive;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final fg = isActive ? scheme.primary : scheme.onSurfaceVariant;
+    final bg =
+        isActive ? scheme.primaryContainer : scheme.surfaceContainerHigh;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 3 : 4,
+      ),
       decoration: BoxDecoration(
-        color: isActive
-            ? const Color(0xFFDCFCE7)
-            : const Color(0xFFF3F4F6),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         isActive ? l10n.t('activeLabel') : l10n.t('inactive'),
         style: TextStyle(
-          color: isActive ? const Color(0xFF16A34A) : const Color(0xFF6B7280),
-          fontSize: 10,
+          color: fg,
+          fontSize: compact ? 9 : 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
         ),
@@ -208,35 +358,38 @@ class _ActiveBadge extends StatelessWidget {
   }
 }
 
+// ─── Toggle button ────────────────────────────────────────────────────────────
+
 class _ToggleButton extends StatelessWidget {
-  const _ToggleButton({required this.gift});
+  const _ToggleButton({required this.gift, this.size = 36});
   final GiftEntity gift;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
-      width: 36,
-      height: 36,
+      width: size,
+      height: size,
       child: Tooltip(
         message: gift.isActive ? l10n.t('deactivate') : l10n.t('activate'),
         child: IconButton.outlined(
-          onPressed: () {
-            context
-                .read<GiftsBloc>()
-                .add(ToggleGiftActiveEvent(gift.id, !gift.isActive));
-          },
+          onPressed: () => context
+              .read<GiftsBloc>()
+              .add(ToggleGiftActiveEvent(gift.id, !gift.isActive)),
           icon: Icon(
             gift.isActive
-                ? Icons.visibility_off_rounded
-                : Icons.visibility_rounded,
-            size: 16,
-            color: gift.isActive ? Colors.orange : Colors.green,
+                ? Icons.visibility_rounded
+                : Icons.visibility_off_rounded,
+            size: size <= 32 ? 14 : 16,
+            color: gift.isActive ? scheme.tertiary : scheme.primary,
           ),
           padding: EdgeInsets.zero,
           style: IconButton.styleFrom(
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
       ),
@@ -248,21 +401,23 @@ class _ToggleButton extends StatelessWidget {
 
 class GiftCardSkeleton extends StatefulWidget {
   const GiftCardSkeleton({super.key});
+
   @override
   State<GiftCardSkeleton> createState() => _GiftCardSkeletonState();
 }
 
 class _GiftCardSkeletonState extends State<GiftCardSkeleton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-          ..repeat(reverse: true);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
@@ -274,56 +429,66 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFEEEEF0);
-    final highlight =
-        isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF8F8FA);
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerHigh;
+    final hi = scheme.surfaceContainerLow;
 
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, child) {
-        final color = Color.lerp(base, highlight, _anim.value)!;
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF161622) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-            ),
-          ),
-          clipBehavior: Clip.hardEdge,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(height: 130, color: color),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sh(color, 140, 14),
-                    const SizedBox(height: 8),
-                    _sh(color, 80, 26, radius: 8),
-                    const SizedBox(height: 12),
-                    _sh(color, double.infinity, 36, radius: 8),
-                  ],
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 220;
+        final borderRadius = compact ? 10.0 : 14.0;
+        final bodyPadding = compact
+            ? const EdgeInsets.fromLTRB(10, 8, 10, 10)
+            : const EdgeInsets.fromLTRB(14, 12, 14, 14);
+
+        return AnimatedBuilder(
+          animation: _anim,
+          builder: (_, __) {
+            final c = Color.lerp(base, hi, _anim.value)!;
+            return Container(
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(color: scheme.outlineVariant),
               ),
-            ],
-          ),
+              clipBehavior: Clip.hardEdge,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AspectRatio(
+                    aspectRatio: compact ? 1.1 : 4 / 3,
+                    child: ColoredBox(color: c),
+                  ),
+                  Padding(
+                    padding: bodyPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _sh(c, compact ? 120 : 150, compact ? 12 : 14),
+                        SizedBox(height: compact ? 6 : 8),
+                        _sh(c, compact ? 90 : 110, compact ? 10 : 11),
+                        SizedBox(height: compact ? 6 : 8),
+                        _sh(c, compact ? 70 : 80, compact ? 22 : 26, r: 8),
+                        SizedBox(height: compact ? 8 : 12),
+                        _sh(c, double.infinity, compact ? 32 : 36, r: 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _sh(Color color, double width, double height, {double radius = 6}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
+  Widget _sh(Color color, double w, double h, {double r = 6}) => Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(r),
+        ),
+      );
 }

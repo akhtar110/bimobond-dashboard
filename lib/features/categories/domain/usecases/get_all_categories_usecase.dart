@@ -1,3 +1,4 @@
+import '../entities/categories_admin_list_query.dart';
 import '../entities/category_entity.dart';
 import '../repositories/categories_repository.dart';
 
@@ -6,5 +7,6 @@ class GetAllCategories {
 
   final CategoriesRepository repository;
 
-  Future<List<CategoryEntity>> call() => repository.getAllCategories();
+  Future<List<CategoryEntity>> call({CategoriesAdminListQuery? query}) =>
+      repository.getAllCategories(query: query);
 }

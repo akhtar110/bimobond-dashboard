@@ -1,5 +1,6 @@
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/utils/user_roles_parser.dart';
 import '../datasource/auth_local_data_source.dart';
 import '../datasource/auth_remote_data_source.dart';
 import '../models/login_request_model.dart';
@@ -20,17 +21,13 @@ class AuthRepositoryImpl implements AuthRepository {
       LoginRequestModel(email: email, password: password),
     );
 
-    final user = _mapUser(result);
-    await saveSession(user);
-    return user;
+    return _mapUser(result);
   }
 
   @override
   Future<DashboardUserEntity> loginWithGoogle() async {
     final result = await remote.loginWithGoogle();
-    final user = _mapUser(result);
-    await saveSession(user);
-    return user;
+    return _mapUser(result);
   }
 
   @override
@@ -42,6 +39,7 @@ class AuthRepositoryImpl implements AuthRepository {
       isVerified: user.isVerified,
       isNewUser: user.isNewUser,
       isProfileIncomplete: user.isProfileIncomplete,
+      roles: user.roles,
     ));
   }
 
@@ -55,14 +53,38 @@ class AuthRepositoryImpl implements AuthRepository {
     await local.clearSession();
   }
 
+  @override
+  Future<void> logout() async {
+    await remote.signOut();
+    await local.clearSession();
+  }
+
   DashboardUserEntity _mapUser(Map<String, dynamic> result) {
+    final userPayload = result['user'];
+    final rolesSource = result['roles'] ??
+        (userPayload is Map ? userPayload['roles'] : null);
+
     return DashboardUserEntity(
-      id: result['id'],
-      email: result['email'] ?? '',
-      username: result['username'] ?? '',
-      isVerified: result['isVerified'] ?? false,
-      isNewUser: result['isNewUser'] ?? false,
-      isProfileIncomplete: result['isProfileIncomplete'] ?? false,
+      id: (result['id'] ??
+              result['_id'] ??
+              (userPayload is Map ? userPayload['id'] : null) ??
+              (userPayload is Map ? userPayload['_id'] : null) ??
+              '')
+          .toString(),
+      email: result['email'] ?? (userPayload is Map ? userPayload['email'] : null) ?? '',
+      username: result['username'] ??
+          (userPayload is Map ? userPayload['username'] : null) ??
+          '',
+      isVerified: result['isVerified'] ??
+          (userPayload is Map ? userPayload['isVerified'] : null) ??
+          false,
+      isNewUser: result['isNewUser'] ??
+          (userPayload is Map ? userPayload['isNewUser'] : null) ??
+          false,
+      isProfileIncomplete: result['isProfileIncomplete'] ??
+          (userPayload is Map ? userPayload['isProfileIncomplete'] : null) ??
+          false,
+      roles: parseUserRoles(rolesSource),
     );
   }
 }

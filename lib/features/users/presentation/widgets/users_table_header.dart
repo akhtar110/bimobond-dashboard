@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import 'users_table_config.dart';
 
+const double kUsersTableHeaderHeight = 36;
+
 class UsersTableHeader extends StatelessWidget {
   const UsersTableHeader({super.key, required this.config});
 
@@ -11,70 +13,54 @@ class UsersTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
-    final labelStyle = theme.textTheme.labelSmall?.copyWith(
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.6,
-      color: isDark ? Colors.grey.shade500 : const Color(0xFF94A3B8),
-    );
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: scheme.onSurfaceVariant,
+          fontSize: 10,
+          letterSpacing: 0.2,
+        );
 
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : const Color(0xFFF8FAFC),
-        border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : const Color(0xFFE8ECF1),
-          ),
-        ),
-      ),
+      height: kUsersTableHeaderHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      color: scheme.surfaceContainerLow,
       child: Row(
         children: [
+          SizedBox(
+            width: config.checkboxWidth,
+            child: Text('', style: labelStyle),
+          ),
           Expanded(
             flex: config.showAccount ? 28 : 36,
-            child: Text(l10n.t('userColumn').toUpperCase(), style: labelStyle),
+            child: Text(l10n.t('userColumn'), style: labelStyle),
           ),
           if (config.showAccount)
             Expanded(
               flex: 22,
-              child: Text(
-                l10n.t('accountColumn').toUpperCase(),
-                style: labelStyle,
-              ),
+              child: Text(l10n.t('accountColumn'), style: labelStyle),
             ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             flex: 14,
             child: Align(
               alignment: AlignmentDirectional.centerStart,
-              child: Text(l10n.t('status').toUpperCase(), style: labelStyle),
+              child: Text(l10n.t('status'), style: labelStyle),
             ),
           ),
           if (config.showEngagement) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               flex: 16,
-              child: Text(
-                l10n.t('engagement').toUpperCase(),
-                style: labelStyle,
-              ),
+              child: Text(l10n.t('engagement'), style: labelStyle),
             ),
           ],
           Expanded(
             flex: config.showAccount ? 28 : 34,
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: Text(
-                l10n.t('actions').toUpperCase(),
-                style: labelStyle,
-              ),
+              child: Text(l10n.t('actions'), style: labelStyle),
             ),
           ),
         ],

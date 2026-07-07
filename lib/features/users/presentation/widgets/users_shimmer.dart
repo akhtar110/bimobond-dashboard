@@ -38,9 +38,9 @@ class _UsersShimmerBoxState extends State<UsersShimmerBox>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1E2433) : const Color(0xFFE8ECF1);
-    final highlight = isDark ? const Color(0xFF2D3548) : const Color(0xFFF4F6F9);
+    final scheme = Theme.of(context).colorScheme;
+    final base = scheme.surfaceContainerHighest;
+    final highlight = scheme.surfaceContainerHigh;
 
     return AnimatedBuilder(
       animation: _controller,
@@ -70,7 +70,7 @@ class UsersTableSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
@@ -78,15 +78,9 @@ class UsersTableSkeleton extends StatelessWidget {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.03)
-                : Colors.black.withValues(alpha: 0.02),
+            color: scheme.surfaceContainerLow,
             border: Border(
-              bottom: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.06),
-              ),
+              bottom: BorderSide(color: scheme.outlineVariant),
             ),
           ),
           child: Row(
@@ -112,9 +106,7 @@ class UsersTableSkeleton extends StatelessWidget {
             itemCount: rowCount,
             separatorBuilder: (_, index) => Divider(
               height: 1,
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : Colors.black.withValues(alpha: 0.05),
+              color: scheme.outlineVariant.withValues(alpha: 0.6),
             ),
             itemBuilder: (_, index) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),

@@ -1,5 +1,9 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/data/models/category_model.dart';
 import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/utils/post_status_utils.dart';
+import 'managed_post_sound_model.dart';
+import 'post_engagement_user_model.dart';
 
 class ManagedPostModel extends ManagedPostEntity {
   const ManagedPostModel({
@@ -7,7 +11,15 @@ class ManagedPostModel extends ManagedPostEntity {
     required super.userId,
     required super.type,
     super.userName,
+    super.userFullName,
+    super.userEmail,
     super.userProfileImage,
+    super.userIsVerified = false,
+    super.userFollowersCount = 0,
+    super.userFollowingCount = 0,
+    super.userPostsCount = 0,
+    super.userJoinedAt,
+    super.userIsBanned = false,
     super.videoUrl,
     super.hlsUrl,
     super.thumbnailUrl,
@@ -23,6 +35,11 @@ class ManagedPostModel extends ManagedPostEntity {
     required super.likeCount,
     required super.commentCount,
     required super.saveCount,
+    super.repostCount = 0,
+    super.recentReposts = const [],
+    super.recentLikes = const [],
+    super.recentViews = const [],
+    super.recentMentions = const [],
     super.duration,
     super.videoWidth,
     super.videoHeight,
@@ -38,47 +55,102 @@ class ManagedPostModel extends ManagedPostEntity {
     super.locationId,
     super.playlistId,
     super.soundId,
+    super.sound,
     super.originalPostId,
   });
 
   factory ManagedPostModel.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>?;
+    final userCounts = user?['_count'] as Map<String, dynamic>?;
 
-    // category can be a nested object or a plain string
+    // category can be a nested object, a plain string, or only categoryId.
     CategoryModel? parsedCategoryEntity;
     String? parsedCategory;
     final rawCategory = json['category'];
     if (rawCategory is Map<String, dynamic>) {
       parsedCategoryEntity = CategoryModel.fromJson(rawCategory);
       parsedCategory = parsedCategoryEntity.name;
-    } else if (rawCategory is String) {
+    } else if (rawCategory is String && rawCategory.isNotEmpty) {
       parsedCategory = rawCategory;
+    } else {
+      final categoryId = json['categoryId']?.toString();
+      if (categoryId != null && categoryId.isNotEmpty) {
+        parsedCategoryEntity = CategoryModel(
+          id: categoryId,
+          name: '',
+          slug: '',
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
     }
+
+    // Resolve user avatar — API field is "avatarUrl" (also accept legacy names).
+    final rawAvatar = user?['avatarUrl'] as String? ??
+        user?['avatar'] as String? ??
+        user?['profileImage'] as String? ??
+        user?['profilePicture'] as String?;
 
     return ManagedPostModel(
       id: json['id']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
+      userId: json['userId']?.toString() ??
+          user?['id']?.toString() ??
+          '',
       type: json['type']?.toString() ?? 'VIDEO',
-      userName: user?['username'] as String? ??
-          user?['name'] as String?,
-      userProfileImage: user?['avatar'] as String? ??
-          user?['profileImage'] as String? ??
-          user?['profilePicture'] as String?,
-      videoUrl: json['videoUrl'] as String?,
-      hlsUrl: json['hlsUrl'] as String?,
-      thumbnailUrl: json['thumbnailUrl'] as String?,
+      userName: user?['username'] as String? ?? user?['name'] as String?,
+      userFullName: user?['fullName'] as String?,
+      userEmail: user?['email'] as String?,
+      userProfileImage: resolveMediaUrl(rawAvatar),
+      userIsVerified: user?['isVerified'] as bool? ?? false,
+      userFollowersCount: _readInt(user?['followerCount']) ??
+          _readInt(userCounts?['followers']) ??
+          _readInt(userCounts?['follower']) ??
+          0,
+      userFollowingCount: _readInt(user?['followingCount']) ??
+          _readInt(userCounts?['following']) ??
+          _readInt(userCounts?['followings']) ??
+          0,
+      userPostsCount:
+          _readInt(user?['postCount']) ?? _readInt(userCounts?['posts']) ?? 0,
+      userJoinedAt: user?['createdAt'] != null
+          ? _readDate(user!['createdAt'])
+          : null,
+      userIsBanned: user?['isBanned'] as bool? ?? false,
+      // Resolve all media URL fields from relative → absolute.
+      videoUrl: resolveMediaUrl(json['videoUrl'] as String?),
+      hlsUrl: resolveMediaUrl(json['hlsUrl'] as String?),
+      thumbnailUrl: _readThumbnailUrl(json),
+      // PostMediaEntity.fromJson already resolves each item's URL internally.
       media: PostMediaEntity.listFromJson(json['media']),
-      animatedCoverUrl: json['animatedCoverUrl'] as String?,
-      description: json['description'] as String?,
+      animatedCoverUrl: resolveMediaUrl(json['animatedCoverUrl'] as String?),
+      description: _readDescription(json),
       category: parsedCategory,
       categoryEntity: parsedCategoryEntity,
-      status: json['status']?.toString() ?? 'PUBLISHED',
+      status: normalizePostStatus(readPostStatusFromJson(json)),
       viewCount: _readInt(json['viewCount']) ?? 0,
       shareCount: _readInt(json['shareCount']) ?? 0,
       downloadCount: _readInt(json['downloadCount']) ?? 0,
       likeCount: _readInt(json['likeCount']) ?? 0,
       commentCount: _readInt(json['commentCount']) ?? 0,
       saveCount: _readInt(json['saveCount']) ?? 0,
+      repostCount: _readInt(json['repostCount'] ?? json['reposts']) ?? 0,
+      recentReposts: (json['recentReposts'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
+      recentLikes: parseEngagementUserList(
+        json['recentLikes'] ?? json['likes'],
+        kind: PostEngagementKind.likes,
+      ),
+      recentViews: parseEngagementUserList(
+        json['recentViews'] ?? json['views'],
+        kind: PostEngagementKind.views,
+      ),
+      recentMentions: parseEngagementUserList(
+        json['recentMentions'] ?? json['mentions'],
+        kind: PostEngagementKind.mentions,
+      ),
       duration: _readInt(json['duration']),
       videoWidth: _readInt(json['videoWidth']),
       videoHeight: _readInt(json['videoHeight']),
@@ -94,6 +166,10 @@ class ManagedPostModel extends ManagedPostEntity {
       locationId: json['locationId'] as String?,
       playlistId: json['playlistId'] as String?,
       soundId: json['soundId'] as String?,
+      sound: parseManagedPostSound(
+        json['sound'],
+        soundId: json['soundId']?.toString(),
+      ),
       originalPostId: json['originalPostId'] as String?,
     );
   }
@@ -101,13 +177,46 @@ class ManagedPostModel extends ManagedPostEntity {
   static Map<String, dynamic> updatePayload(ManagedPostUpdateData data) {
     return {
       if (data.description != null) 'description': data.description,
-      if (data.category != null) 'category': data.category,
+      if (data.categoryId != null) 'categoryId': data.categoryId,
       if (data.privacyStatus != null) 'privacyStatus': data.privacyStatus,
       if (data.status != null) 'status': data.status,
       if (data.allowComments != null) 'allowComments': data.allowComments,
       if (data.allowDuets != null) 'allowDuets': data.allowDuets,
       if (data.allowStitch != null) 'allowStitch': data.allowStitch,
     };
+  }
+
+  static String? _readThumbnailUrl(Map<String, dynamic> json) {
+    for (final key in [
+      'thumbnailUrl',
+      'thumbnail',
+      'thumbUrl',
+      'coverUrl',
+      'posterUrl',
+    ]) {
+      final resolved = resolveMediaUrl(json[key] as String?);
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+    }
+
+    final video = json['video'];
+    if (video is Map<String, dynamic>) {
+      for (final key in ['thumbnailUrl', 'thumbnail', 'coverUrl']) {
+        final resolved = resolveMediaUrl(video[key] as String?);
+        if (resolved != null && resolved.isNotEmpty) return resolved;
+      }
+    }
+
+    return null;
+  }
+
+  static String? _readDescription(Map<String, dynamic> json) {
+    for (final key in ['description', 'caption']) {
+      final value = json[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
   }
 
   static int? _readInt(dynamic value) {

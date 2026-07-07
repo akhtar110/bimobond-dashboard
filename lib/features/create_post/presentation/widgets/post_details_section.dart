@@ -4,9 +4,12 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/create_post_entity.dart';
 import '../../domain/entities/create_post_field.dart';
 import 'create_post_category_selector.dart';
+import 'create_post_description_field.dart';
 import 'create_post_field_listener.dart';
+import 'create_post_location_card.dart';
+import 'create_post_sound_section.dart';
 
-class PostDetailsSection extends StatefulWidget {
+class PostDetailsSection extends StatelessWidget {
   const PostDetailsSection({
     super.key,
     required this.form,
@@ -17,66 +20,31 @@ class PostDetailsSection extends StatefulWidget {
   final CreatePostFieldUpdater onFieldUpdate;
 
   @override
-  State<PostDetailsSection> createState() => _PostDetailsSectionState();
-}
-
-class _PostDetailsSectionState extends State<PostDetailsSection> {
-  late final TextEditingController _descriptionController;
-
-  @override
-  void initState() {
-    super.initState();
-    _descriptionController =
-        TextEditingController(text: widget.form.description ?? '');
-  }
-
-  @override
-  void didUpdateWidget(covariant PostDetailsSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.form.description != widget.form.description &&
-        _descriptionController.text != (widget.form.description ?? '')) {
-      _descriptionController.text = widget.form.description ?? '';
-    }
-  }
-
-  @override
-  void dispose() {
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final inferred = widget.form.inferredType;
+    final inferred = form.inferredType;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          controller: _descriptionController,
-          maxLines: 4,
-          decoration: InputDecoration(
-            labelText: l10n.t('description'),
-            hintText: l10n.t('postDescriptionHint'),
-            alignLabelWithHint: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          onChanged: (v) => widget.onFieldUpdate(
-            CreatePostField.description,
-            v.trim().isEmpty ? null : v,
-          ),
+        CreatePostDescriptionField(
+          value: form.description,
+          onChanged: (v) => onFieldUpdate(CreatePostField.description, v),
         ),
         const SizedBox(height: 16),
         CreatePostCategorySelector(
-          form: widget.form,
-          onChanged: (slug) => widget.onFieldUpdate(
-            CreatePostField.category,
-            slug,
-          ),
+          form: form,
+          onCategorySelected: (id, name) {
+            onFieldUpdate(CreatePostField.categoryId, id);
+            if (id != null) {
+              onFieldUpdate(CreatePostField.category, name);
+            }
+          },
         ),
+        const SizedBox(height: 16),
+        CreatePostLocationCard(form: form),
+        const SizedBox(height: 16),
+        CreatePostSoundSection(form: form),
         const SizedBox(height: 16),
         InputDecorator(
           decoration: InputDecoration(

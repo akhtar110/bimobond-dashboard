@@ -2,22 +2,33 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../../core/routing/app_router.dart';
 import '../../domain/entities/user_entity.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
 import 'user_status_badge.dart';
 import 'users_table_config.dart';
 
+const double kUsersTableRowHeight = 56;
+
 class UsersTableRow extends StatelessWidget {
   const UsersTableRow({
     super.key,
     required this.user,
     required this.config,
+    required this.isSelected,
+    required this.onToggleSelection,
+    required this.onUserTap,
+    this.selectionEnabled = true,
+    this.striped = false,
   });
 
   final UserEntity user;
   final UsersTableConfig config;
+  final bool isSelected;
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onUserTap;
+  final bool selectionEnabled;
+  final bool striped;
 
   String _roleLabel(BuildContext context) {
     final l10n = context.l10n;
@@ -29,117 +40,130 @@ class UsersTableRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
-    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mutedColor = isDark ? Colors.grey.shade400 : const Color(0xFF64748B);
+    final scheme = theme.colorScheme;
     final isAdmin = user.roles.contains(UserRole.admin);
+    final cellStyle = theme.textTheme.bodySmall?.copyWith(
+      fontSize: 11.5,
+      height: 1.25,
+    );
 
     return _HoverableRow(
-      onTap: () => Navigator.pushNamed(
-        context,
-        AppRoutes.userDetail,
-        arguments: user,
-      ),
-      hoverColor: primary.withValues(alpha: isDark ? 0.06 : 0.04),
-      accentColor: primary,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              flex: config.showAccount ? 28 : 36,
-              child: Row(
-                children: [
-                  _UserAvatar(user: user, isAdmin: isAdmin, primary: primary),
-                  const SizedBox(width: 12),
-                  Expanded(
+      isSelected: isSelected,
+      striped: striped,
+      onTap: onUserTap,
+      child: SizedBox(
+        height: kUsersTableRowHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: config.checkboxWidth,
+                child: Checkbox(
+                  value: isSelected,
+                  tristate: false,
+                  onChanged: selectionEnabled
+                      ? (_) => onToggleSelection(user.id)
+                      : null,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              Expanded(
+                flex: config.showAccount ? 28 : 36,
+                child: Row(
+                  children: [
+                    _UserAvatar(user: user, isAdmin: isAdmin),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            user.fullName ?? user.username,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: cellStyle?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${user.username}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (config.showAccount)
+                Expanded(
+                  flex: 22,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          user.fullName ?? user.username,
+                          _roleLabel(context),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: textColor,
-                          ),
+                          style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '@${user.username}',
+                          user.email ?? '—',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: mutedColor,
-                            fontFamily: 'monospace',
+                          style: cellStyle?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 10.5,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            if (config.showAccount)
+                ),
+              const SizedBox(width: 8),
               Expanded(
-                flex: 22,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _roleLabel(context),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        user.email ?? '—',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: mutedColor,
-                        ),
-                      ),
-                    ],
+                flex: 14,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: UserStatusBadge(user: user),
+                ),
+              ),
+              if (config.showEngagement) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 16,
+                  child: UserEngagementBar(
+                    user: user,
+                    compact: config.compactActions,
+                  ),
+                ),
+              ],
+              Expanded(
+                flex: config.showAccount ? 28 : 34,
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: UserActionButtons(
+                    user: user,
+                    compact: config.compactActions,
                   ),
                 ),
               ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 14,
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: UserStatusBadge(user: user),
-              ),
-            ),
-            if (config.showEngagement) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 16,
-                child: UserEngagementBar(user: user),
-              ),
             ],
-            Expanded(
-              flex: config.showAccount ? 28 : 34,
-              child: Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: UserActionButtons(
-                  user: user,
-                  compact: config.compactActions,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -150,20 +174,18 @@ class _UserAvatar extends StatelessWidget {
   const _UserAvatar({
     required this.user,
     required this.isAdmin,
-    required this.primary,
   });
 
   final UserEntity user;
   final bool isAdmin;
-  final Color primary;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     final ringColors = isAdmin
-        ? [const Color(0xFFF59E0B), const Color(0xFFFBBF24)]
+        ? [scheme.tertiary, scheme.tertiaryContainer]
         : user.isVerified
-            ? [primary, primary.withValues(alpha: 0.5)]
+            ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
             : [Colors.transparent, Colors.transparent];
 
     return Container(
@@ -173,16 +195,16 @@ class _UserAvatar extends StatelessWidget {
         gradient: LinearGradient(colors: ringColors),
       ),
       child: CircleAvatar(
-        radius: 18,
-        backgroundColor: isDark ? const Color(0xFF1E2433) : const Color(0xFFF1F5F9),
+        radius: 16,
+        backgroundColor: scheme.surfaceContainerHighest,
         backgroundImage: user.avatarUrl != null
             ? CachedNetworkImageProvider(user.avatarUrl!)
             : null,
         child: user.avatarUrl == null
             ? Icon(
                 Icons.person_rounded,
-                size: 20,
-                color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                size: 18,
+                color: scheme.onSurfaceVariant,
               )
             : null,
       ),
@@ -193,15 +215,15 @@ class _UserAvatar extends StatelessWidget {
 class _HoverableRow extends StatefulWidget {
   const _HoverableRow({
     required this.child,
+    required this.isSelected,
+    required this.striped,
     required this.onTap,
-    required this.hoverColor,
-    required this.accentColor,
   });
 
   final Widget child;
+  final bool isSelected;
+  final bool striped;
   final VoidCallback onTap;
-  final Color hoverColor;
-  final Color accentColor;
 
   @override
   State<_HoverableRow> createState() => _HoverableRowState();
@@ -212,33 +234,27 @@ class _HoverableRowState extends State<_HoverableRow> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+
+    Color rowColor;
+    if (widget.isSelected) {
+      rowColor = scheme.primaryContainer.withValues(alpha: 0.18);
+    } else if (_hovered) {
+      rowColor = scheme.surfaceContainerHighest;
+    } else if (widget.striped) {
+      rowColor = scheme.surfaceContainerHighest.withValues(alpha: 0.35);
+    } else {
+      rowColor = scheme.surface;
+    }
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            color: _hovered ? widget.hoverColor : Colors.transparent,
-            border: Border(
-              bottom: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : const Color(0xFFE8ECF1),
-              ),
-              left: BorderSide(
-                color: _hovered
-                    ? widget.accentColor
-                    : Colors.transparent,
-                width: 3,
-              ),
-            ),
-          ),
+      child: Material(
+        color: rowColor,
+        child: InkWell(
+          onTap: widget.onTap,
           child: widget.child,
         ),
       ),

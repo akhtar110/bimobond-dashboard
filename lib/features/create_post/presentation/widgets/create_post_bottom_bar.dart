@@ -39,7 +39,7 @@ class CreatePostBottomBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _progressLabel(l10n, state.status),
+                  _progressLabel(l10n, state),
                   style: theme.textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -54,8 +54,11 @@ class CreatePostBottomBar extends StatelessWidget {
     );
   }
 
-  String _progressLabel(dynamic l10n, CreatePostStatus status) {
-    return switch (status) {
+  String _progressLabel(dynamic l10n, CreatePostState state) {
+    if (state.isGeneratingThumbnail) {
+      return l10n.tOr('generatingThumbnail', 'Generating thumbnail…');
+    }
+    return switch (state.status) {
       CreatePostStatus.uploadingMedia => l10n.t('uploadingMedia'),
       CreatePostStatus.creatingPost => l10n.t('submittingPost'),
       _ => l10n.t('submittingPost'),
@@ -78,7 +81,7 @@ class CreatePostBottomBar extends StatelessWidget {
           child: Text(l10n.t('publishPost')),
         );
         final draft = OutlinedButton(
-          onPressed: state.canPublish ? () => bloc.add(SaveDraft()) : null,
+          onPressed: state.canSaveDraft ? () => bloc.add(SaveDraft()) : null,
           child: Text(l10n.t('saveDraft')),
         );
         final back = OutlinedButton(
@@ -130,12 +133,6 @@ class CreatePostBottomBar extends StatelessWidget {
           child: Text(l10n.t('back')),
         ),
         const Spacer(),
-        if (state.step == 0 && state.form.hasLocalMedia && !state.form.allMediaUploaded)
-          TextButton(
-            onPressed: busy ? null : () => bloc.add(UploadMedia()),
-            child: Text(l10n.t('uploadMediaNow')),
-          ),
-        const SizedBox(width: 8),
         FilledButton(
           onPressed: busy || !canGoNext
               ? null

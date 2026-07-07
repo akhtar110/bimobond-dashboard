@@ -1,26 +1,45 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/state_widgets.dart';
+import '../../../../injection_container.dart' as di;
 import '../../domain/entities/video_entity.dart';
 import '../bloc/videos_bloc.dart';
 
-class VideosPage extends StatefulWidget {
+class VideosPage extends StatelessWidget {
   const VideosPage({super.key});
 
   @override
-  State<VideosPage> createState() => _VideosPageState();
+  Widget build(BuildContext context) {
+    if (kDebugMode) debugPrint('VideosPage rebuilt');
+    return PersistentBlocProvider<VideosBloc>(
+      debugLabel: 'VideosPage',
+      create: () {
+        if (kDebugMode) debugPrint('LoadVideos dispatched');
+        return di.sl<VideosBloc>()..add(LoadVideosEvent(refresh: true));
+      },
+      child: const _VideosPageView(),
+    );
+  }
 }
 
-class _VideosPageState extends State<VideosPage> {
+class _VideosPageView extends StatefulWidget {
+  const _VideosPageView();
+
+  @override
+  State<_VideosPageView> createState() => _VideosPageViewState();
+}
+
+class _VideosPageViewState extends State<_VideosPageView> {
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    context.read<VideosBloc>().add(LoadVideosEvent(refresh: true));
     _scrollController.addListener(_onScroll);
   }
 

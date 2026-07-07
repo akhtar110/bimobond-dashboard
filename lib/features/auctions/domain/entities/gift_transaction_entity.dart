@@ -7,8 +7,8 @@ class GiftTransactionEntity {
     this.postId,
     this.liveId,
     this.auctionId,
-    required this.priceUsd,
-    required this.contributionUsd,
+    required this.priceCoins,
+    required this.contributionCoins,
     required this.createdAt,
     this.sender,
     this.gift,
@@ -21,8 +21,8 @@ class GiftTransactionEntity {
   final String? postId;
   final String? liveId;
   final String? auctionId;
-  final double priceUsd;
-  final double contributionUsd;
+  final double priceCoins;
+  final double contributionCoins;
   final DateTime createdAt;
   final Map<String, dynamic>? sender;
   final Map<String, dynamic>? gift;

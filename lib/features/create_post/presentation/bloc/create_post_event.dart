@@ -36,6 +36,58 @@ class UpdateField extends CreatePostEvent {
   final Object? value;
 }
 
+class SelectSound extends CreatePostEvent {
+  SelectSound(this.sound);
+  final SoundEntity sound;
+}
+
+class ClearSound extends CreatePostEvent {}
+
+class UploadOriginalSound extends CreatePostEvent {
+  UploadOriginalSound({
+    required this.bytes,
+    required this.filename,
+    required this.name,
+    required this.duration,
+  });
+
+  final List<int> bytes;
+  final String filename;
+  final String name;
+  final int duration;
+}
+
+class SetLocation extends CreatePostEvent {
+  SetLocation(this.location);
+  final CreatePostLocationEntity location;
+}
+
+class ClearLocation extends CreatePostEvent {}
+
+class SearchSounds extends CreatePostEvent {
+  SearchSounds({this.query, this.trending = false});
+
+  final String? query;
+  final bool trending;
+}
+
+class SearchLocations extends CreatePostEvent {
+  SearchLocations(this.query);
+  final String query;
+}
+
+class ApplyMediaFilter extends CreatePostEvent {
+  ApplyMediaFilter({required this.mediaId, required this.filter});
+
+  final String mediaId;
+  final CreatePostMediaFilterEntity filter;
+}
+
+class ResetMediaFilter extends CreatePostEvent {
+  ResetMediaFilter(this.mediaId);
+  final String mediaId;
+}
+
 /// `POST /posts` with status PUBLISHED (uploads media first if needed).
 class CreatePostSubmitted extends CreatePostEvent {}
 

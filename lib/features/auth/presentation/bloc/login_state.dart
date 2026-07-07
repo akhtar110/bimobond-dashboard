@@ -4,7 +4,11 @@ abstract class LoginState {}
 
 class LoginInitial extends LoginState {}
 
-class LoginLoading extends LoginState {}
+class LoginLoading extends LoginState {
+  LoginLoading({this.isGoogle = false});
+
+  final bool isGoogle;
+}
 
 class LoginSuccess extends LoginState {
   final DashboardUserEntity user;
@@ -17,3 +21,5 @@ class LoginFailure extends LoginState {
 
   LoginFailure(this.message);
 }
+
+class LoginAccessDenied extends LoginState {}

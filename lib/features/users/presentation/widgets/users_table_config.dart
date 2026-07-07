@@ -1,3 +1,5 @@
+import '../utils/responsive.dart';
+
 /// Responsive column visibility for the users data table.
 class UsersTableConfig {
   const UsersTableConfig({
@@ -5,19 +7,27 @@ class UsersTableConfig {
     required this.showEngagement,
     required this.compactActions,
     required this.minWidth,
+    this.checkboxWidth = 44,
   });
 
   final bool showAccount;
   final bool showEngagement;
   final bool compactActions;
   final double minWidth;
+  final double checkboxWidth;
 
-  factory UsersTableConfig.fromConstraints(double width) {
+  factory UsersTableConfig.fromConstraints(
+    double width, {
+    DeviceType? deviceType,
+  }) {
+    final device = deviceType ?? getDeviceType(width);
+
     return UsersTableConfig(
-      showAccount: width >= 720,
-      showEngagement: width >= 900,
+      showAccount: width >= (device == DeviceType.tablet ? 640 : 720),
+      showEngagement: width >= (device == DeviceType.tablet ? 780 : 900),
       compactActions: width < 1100,
-      minWidth: width < 560 ? 560 : width,
+      minWidth: width,
+      checkboxWidth: device == DeviceType.tablet ? 36 : 34,
     );
   }
 }

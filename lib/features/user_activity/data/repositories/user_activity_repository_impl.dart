@@ -7,6 +7,7 @@ import '../../domain/entities/user_device_entity.dart';
 import '../../domain/entities/user_gift_transaction_entity.dart';
 import '../../domain/entities/user_like_entity.dart';
 import '../../domain/entities/user_mention_entity.dart';
+import '../../domain/entities/user_repost_entity.dart';
 import '../../domain/repositories/user_activity_repository.dart';
 import '../datasources/user_activity_remote_data_source.dart';
 
@@ -59,24 +60,32 @@ class UserActivityRepositoryImpl implements UserActivityRepository {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) =>
-      _remote.getUserComments(userId, page: page, limit: limit);
+      _remote.getUserComments(userId, page: page, limit: limit, type: type);
 
   @override
   Future<PaginatedPage<UserLikeEntity>> getUserLikes(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) =>
-      _remote.getUserLikes(userId, page: page, limit: limit);
+      _remote.getUserLikes(userId, page: page, limit: limit, type: type);
 
   @override
   Future<PaginatedPage<UserMentionEntity>> getUserMentions(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   }) =>
-      _remote.getUserMentions(userId, page: page, limit: limit);
+      _remote.getUserMentions(
+        userId,
+        page: page,
+        limit: limit,
+        type: type,
+      );
 
   @override
   Future<PaginatedPage<UserActivityItemEntity>> getUserActivityFeed(
@@ -85,4 +94,16 @@ class UserActivityRepositoryImpl implements UserActivityRepository {
     required int limit,
   }) =>
       _remote.getUserActivityFeed(userId, page: page, limit: limit);
+
+  @override
+  Future<PaginatedPage<UserRepostEntity>> getUserReposts(
+    String userId, {
+    required int page,
+    required int limit,
+  }) =>
+      _remote.getUserReposts(userId, page: page, limit: limit);
+
+  @override
+  Future<void> deleteRepostAsAdmin(String repostId) =>
+      _remote.deleteRepostAsAdmin(repostId);
 }

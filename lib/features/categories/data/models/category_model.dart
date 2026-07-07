@@ -1,3 +1,4 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/category_entity.dart';
 
 class CategoryModel extends CategoryEntity {
@@ -6,27 +7,54 @@ class CategoryModel extends CategoryEntity {
     required super.name,
     required super.slug,
     super.description,
+    super.iconUrl,
     required super.isActive,
-    required super.order,
+    super.order = 0,
     required super.createdAt,
     required super.updatedAt,
+    super.parentId,
+    super.children = const [],
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    // Parse nested children list recursively.
+    final parentId = json['parentId'] as String?;
+    final rawChildren = json['children'];
+    final List<CategoryEntity> children = rawChildren is List
+        ? rawChildren.map((e) {
+            final child =
+                CategoryModel.fromJson(e as Map<String, dynamic>);
+            return child.parentId == null
+                ? child.copyWith(parentId: json['id']?.toString())
+                : child;
+          }).toList()
+        : const [];
+
+    final rawIcon = json['iconUrl'] ??
+        json['icon'] ??
+        json['image'] ??
+        json['imageUrl'] ??
+        json['categoryIcon'];
+
     return CategoryModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
       description: json['description'] as String?,
+      iconUrl: resolveMediaUrl(rawIcon?.toString()),
       isActive: json['isActive'] as bool? ?? true,
       order: (json['order'] as num?)?.toInt() ?? 0,
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
+      parentId: parentId,
+      children: children,
     );
   }
 
   static DateTime _date(dynamic v) {
-    if (v is String && v.isNotEmpty) return DateTime.tryParse(v) ?? DateTime.now();
+    if (v is String && v.isNotEmpty) {
+      return DateTime.tryParse(v) ?? DateTime.now();
+    }
     return DateTime.now();
   }
 }

@@ -1,0 +1,523 @@
+import 'package:equatable/equatable.dart';
+
+import '../../../post_management/domain/entities/managed_post_entity.dart';
+import '../../../post_management/domain/entities/post_media_entity.dart';
+class ReportPeriod extends Equatable {
+  const ReportPeriod({required this.from, required this.to});
+
+  final DateTime from;
+  final DateTime to;
+
+  @override
+  List<Object?> get props => [from, to];
+}
+
+class ReportPeriodQuery extends Equatable {
+  const ReportPeriodQuery({
+    this.from,
+    this.to,
+    this.days = 30,
+  });
+
+  final DateTime? from;
+  final DateTime? to;
+  final int days;
+
+  Map<String, dynamic> toQueryParameters() {
+    if (from != null) {
+      return {
+        'from': from!.toUtc().toIso8601String(),
+        if (to != null) 'to': to!.toUtc().toIso8601String(),
+      };
+    }
+    return {'days': days};
+  }
+
+  @override
+  List<Object?> get props => [from, to, days];
+}
+
+class ReportAdminUser extends Equatable {
+  const ReportAdminUser({
+    required this.id,
+    required this.username,
+    this.fullName,
+    this.email,
+    this.avatarUrl,
+    this.isVerified = false,
+    this.isBanned = false,
+  });
+
+  final String id;
+  final String username;
+  final String? fullName;
+  final String? email;
+  final String? avatarUrl;
+  final bool isVerified;
+  final bool isBanned;
+
+  String get displayName {
+    if (fullName != null && fullName!.isNotEmpty) return fullName!;
+    return username;
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, username, fullName, email, avatarUrl, isVerified, isBanned];
+}
+
+class ReportCountPair extends Equatable {
+  const ReportCountPair({required this.key, required this.count});
+
+  final String key;
+  final int count;
+
+  @override
+  List<Object?> get props => [key, count];
+}
+
+class PostReportHashtag extends Equatable {
+  const PostReportHashtag({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  @override
+  List<Object?> get props => [id, name];
+}
+
+class PostReportCategory extends Equatable {
+  const PostReportCategory({
+    required this.id,
+    required this.name,
+    this.iconUrl,
+  });
+
+  final String id;
+  final String name;
+  final String? iconUrl;
+
+  @override
+  List<Object?> get props => [id, name, iconUrl];
+}
+
+class PostReportCounts extends Equatable {
+  const PostReportCounts({
+    this.views = 0,
+    this.postLikes = 0,
+    this.comments = 0,
+    this.saves = 0,
+    this.reposts = 0,
+    this.reports = 0,
+    this.giftTransactions = 0,
+    this.duets = 0,
+  });
+
+  final int views;
+  final int postLikes;
+  final int comments;
+  final int saves;
+  final int reposts;
+  final int reports;
+  final int giftTransactions;
+  final int duets;
+
+  @override
+  List<Object?> get props =>
+      [views, postLikes, comments, saves, reposts, reports, giftTransactions, duets];
+}
+
+class PostReportMetrics extends Equatable {
+  const PostReportMetrics({
+    this.viewCount = 0,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.saveCount = 0,
+    this.repostCount = 0,
+    this.shareCount = 0,
+    this.downloadCount = 0,
+  });
+
+  final int viewCount;
+  final int likeCount;
+  final int commentCount;
+  final int saveCount;
+  final int repostCount;
+  final int shareCount;
+  final int downloadCount;
+
+  @override
+  List<Object?> get props => [
+        viewCount,
+        likeCount,
+        commentCount,
+        saveCount,
+        repostCount,
+        shareCount,
+        downloadCount,
+      ];
+}
+
+class PostReportPeriodActivity extends Equatable {
+  const PostReportPeriodActivity({
+    this.views = 0,
+    this.likes = 0,
+    this.comments = 0,
+    this.saves = 0,
+    this.reposts = 0,
+  });
+
+  final int views;
+  final int likes;
+  final int comments;
+  final int saves;
+  final int reposts;
+
+  @override
+  List<Object?> get props => [views, likes, comments, saves, reposts];
+}
+
+class PostReportRepost extends Equatable {
+  const PostReportRepost({
+    required this.id,
+    required this.createdAt,
+    this.quote,
+    this.user,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final String? quote;
+  final ReportAdminUser? user;
+
+  @override
+  List<Object?> get props => [id, createdAt, quote, user];
+}
+
+class PostReportComment extends Equatable {
+  const PostReportComment({
+    required this.id,
+    required this.content,
+    required this.createdAt,
+    this.likeCount = 0,
+    this.user,
+  });
+
+  final String id;
+  final String content;
+  final DateTime createdAt;
+  final int likeCount;
+  final ReportAdminUser? user;
+
+  @override
+  List<Object?> get props => [id, content, createdAt, likeCount, user];
+}
+
+class PostReportLike extends Equatable {
+  const PostReportLike({
+    required this.id,
+    required this.createdAt,
+    this.user,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final ReportAdminUser? user;
+
+  @override
+  List<Object?> get props => [id, createdAt, user];
+}
+
+class PostReportView extends Equatable {
+  const PostReportView({
+    required this.id,
+    required this.createdAt,
+    this.watchedDuration = 0,
+    this.user,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final int watchedDuration;
+  final ReportAdminUser? user;
+
+  @override
+  List<Object?> get props => [id, createdAt, watchedDuration, user];
+}
+
+class PostReportGiftSummary extends Equatable {
+  const PostReportGiftSummary({
+    required this.id,
+    required this.name,
+    this.thumbnailUrl,
+  });
+
+  final String id;
+  final String name;
+  final String? thumbnailUrl;
+
+  @override
+  List<Object?> get props => [id, name, thumbnailUrl];
+}
+
+class PostReportGiftTransaction extends Equatable {
+  const PostReportGiftTransaction({
+    required this.id,
+    required this.createdAt,
+    this.priceCoins = 0,
+    this.contributionCoins = 0,
+    this.sender,
+    this.receiver,
+    this.gift,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final double priceCoins;
+  final double contributionCoins;
+  final ReportAdminUser? sender;
+  final ReportAdminUser? receiver;
+  final PostReportGiftSummary? gift;
+
+  @override
+  List<Object?> get props =>
+      [id, createdAt, priceCoins, contributionCoins, sender, receiver, gift];
+}
+
+class PostReportModerationFlag extends Equatable {
+  const PostReportModerationFlag({
+    required this.id,
+    required this.reason,
+    required this.status,
+    required this.createdAt,
+    this.reporter,
+  });
+
+  final String id;
+  final String reason;
+  final String status;
+  final DateTime createdAt;
+  final ReportAdminUser? reporter;
+
+  @override
+  List<Object?> get props => [id, reason, status, createdAt, reporter];
+}
+
+class PostReportModerationFlags extends Equatable {
+  const PostReportModerationFlags({
+    this.total = 0,
+    this.recent = const [],
+  });
+
+  final int total;
+  final List<PostReportModerationFlag> recent;
+
+  @override
+  List<Object?> get props => [total, recent];
+}
+
+class PostReportListItem extends Equatable {
+  const PostReportListItem({
+    required this.id,
+    required this.userId,
+    required this.type,
+    required this.status,
+    required this.createdAt,
+    this.description,
+    this.thumbnailUrl,
+    this.animatedCoverUrl,
+    this.videoUrl,
+    this.media = const [],
+    this.viewCount = 0,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.saveCount = 0,
+    this.repostCount = 0,
+    this.shareCount = 0,
+    this.isAd = false,
+    this.isStory = false,
+    this.isAuctionable = false,
+    this.privacyStatus,
+    this.user,
+    this.hashtags = const [],
+    this.categoryRelation,
+    this.recentReposts = const [],
+    this.counts = const PostReportCounts(),
+  });
+
+  final String id;
+  final String userId;
+  final String type;
+  final String status;
+  final DateTime createdAt;
+  final String? description;
+  final String? thumbnailUrl;
+  final String? animatedCoverUrl;
+  final String? videoUrl;
+  final List<PostMediaEntity> media;
+  final int viewCount;
+  final int likeCount;
+  final int commentCount;
+  final int saveCount;
+  final int repostCount;
+  final int shareCount;
+  final bool isAd;
+  final bool isStory;
+  final bool isAuctionable;
+  final String? privacyStatus;
+  final ReportAdminUser? user;
+  final List<PostReportHashtag> hashtags;
+  final PostReportCategory? categoryRelation;
+  final List<PostReportRepost> recentReposts;
+  final PostReportCounts counts;
+
+  /// First IMAGE in [media], otherwise [thumbnailUrl] — same as [ManagedPostEntity].
+  String? get displayThumbnailUrl => resolvePostDisplayThumbnailUrl(
+        media: media,
+        thumbnailUrl: thumbnailUrl,
+      );
+
+  /// Image URL suitable for [CachedNetworkImage] (excludes video file URLs).
+  String? get imagePreviewUrl {
+    final thumb = displayThumbnailUrl;
+    if (thumb != null && thumb.isNotEmpty && !isLikelyVideoFileUrl(thumb)) {
+      return thumb;
+    }
+    return null;
+  }
+
+  /// Preview URL used in list/detail thumbnails (matches [PostCard] behavior).
+  String? get previewMediaUrl {
+    final image = imagePreviewUrl;
+    if (image != null) return image;
+    final video = videoUrl;
+    if (video != null && video.isNotEmpty) return video;
+    return null;
+  }
+
+  bool get needsAdminMediaLookup => imagePreviewUrl == null;
+
+  @override
+  List<Object?> get props => [
+        id,
+        userId,
+        type,
+        status,
+        createdAt,
+        description,
+        thumbnailUrl,
+        animatedCoverUrl,
+        videoUrl,
+        media,
+        viewCount,
+        likeCount,
+        commentCount,
+        saveCount,
+        repostCount,
+        shareCount,
+        isAd,
+        isStory,
+        isAuctionable,
+        privacyStatus,
+        user,
+        hashtags,
+        categoryRelation,
+        recentReposts,
+        counts,
+      ];
+}
+
+class PostReportOverviewEntity extends Equatable {
+  const PostReportOverviewEntity({
+    required this.period,
+    required this.totalPosts,
+    required this.postsInPeriod,
+    required this.published,
+    required this.hidden,
+    required this.stories,
+    required this.ads,
+    required this.auctionable,
+    required this.byType,
+    required this.byStatus,
+    required this.periodEngagement,
+    required this.topByViews,
+    required this.topByLikes,
+    required this.topByReposts,
+  });
+
+  final ReportPeriod period;
+  final int totalPosts;
+  final int postsInPeriod;
+  final int published;
+  final int hidden;
+  final int stories;
+  final int ads;
+  final int auctionable;
+  final List<ReportCountPair> byType;
+  final List<ReportCountPair> byStatus;
+  final PostReportPeriodActivity periodEngagement;
+  final List<PostReportListItem> topByViews;
+  final List<PostReportListItem> topByLikes;
+  final List<PostReportListItem> topByReposts;
+
+  @override
+  List<Object?> get props => [
+        period,
+        totalPosts,
+        postsInPeriod,
+        published,
+        hidden,
+        stories,
+        ads,
+        auctionable,
+        byType,
+        byStatus,
+        periodEngagement,
+        topByViews,
+        topByLikes,
+        topByReposts,
+      ];
+}
+
+class PostReportDetailEntity extends Equatable {
+  const PostReportDetailEntity({
+    required this.period,
+    required this.post,
+    required this.counts,
+    required this.metrics,
+    required this.periodActivity,
+    required this.recentReposts,
+    required this.recentComments,
+    required this.recentLikes,
+    required this.recentViews,
+    required this.recentGifts,
+    required this.moderationFlags,
+  });
+
+  final ReportPeriod period;
+  final PostReportListItem post;
+  final PostReportCounts counts;
+  final PostReportMetrics metrics;
+  final PostReportPeriodActivity periodActivity;
+  final List<PostReportRepost> recentReposts;
+  final List<PostReportComment> recentComments;
+  final List<PostReportLike> recentLikes;
+  final List<PostReportView> recentViews;
+  final List<PostReportGiftTransaction> recentGifts;
+  final PostReportModerationFlags moderationFlags;
+
+  @override
+  List<Object?> get props => [
+        period,
+        post,
+        counts,
+        metrics,
+        periodActivity,
+        recentReposts,
+        recentComments,
+        recentLikes,
+        recentViews,
+        recentGifts,
+        moderationFlags,
+      ];
+}

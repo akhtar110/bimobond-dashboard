@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../../auctions/domain/entities/auction_entity.dart';
 
 class UserAuctionCard extends StatefulWidget {
@@ -26,10 +27,11 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final auction = widget.auction;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
-    final progress = auction.progressPercent;
+    final progress = auction.progressFraction;
     final isEnded = !auction.isActive;
 
     return MouseRegion(
@@ -46,13 +48,11 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
             child: Ink(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: widget.isDark
-                    ? const Color(0xFF1E293B)
-                    : Colors.white,
+                color: scheme.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(
+                    color: scheme.shadow.withValues(
                       alpha: _hovered ? 0.08 : 0.04,
                     ),
                     blurRadius: _hovered ? 16 : 12,
@@ -72,9 +72,9 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                           ? CachedNetworkImage(
                               imageUrl: auction.itemImageUrl!,
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => _placeholder(),
+                              errorWidget: (_, __, ___) => _placeholder(scheme),
                             )
-                          : _placeholder(),
+                          : _placeholder(scheme),
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -89,9 +89,7 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                                 auction.itemName ?? l10n.t('untitledAuction'),
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: widget.isDark
-                                      ? Colors.white
-                                      : const Color(0xFF0F172A),
+                                  color: scheme.onSurface,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -100,7 +98,7 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                             const SizedBox(width: 8),
                             _StatusBadge(
                               status: auction.status,
-                              isDark: widget.isDark,
+                              scheme: scheme,
                             ),
                           ],
                         ),
@@ -108,18 +106,16 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                         Row(
                           children: [
                             Text(
-                              '\$${auction.currentTotalUsd.toStringAsFixed(2)}',
+                              CoinFormat.coinsAmount(auction.currentTotalCoins),
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: theme.colorScheme.primary,
+                                color: scheme.primary,
                               ),
                             ),
                             Text(
-                              ' / \$${auction.targetPriceUsd.toStringAsFixed(2)}',
+                              ' / ${CoinFormat.coinsAmount(auction.targetPriceCoins)}',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: widget.isDark
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600,
+                                color: scheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -130,9 +126,8 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                           child: LinearProgressIndicator(
                             value: progress,
                             minHeight: 6,
-                            backgroundColor: widget.isDark
-                                ? Colors.grey.shade700
-                                : Colors.grey.shade200,
+                            backgroundColor: scheme.surfaceContainerHighest,
+                            color: scheme.primary,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -142,7 +137,7 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                               label: auction.hostName,
                               avatarUrl: auction.hostAvatar,
                               caption: l10n.t('host'),
-                              isDark: widget.isDark,
+                              scheme: scheme,
                             ),
                             if (auction.winnerId != null) ...[
                               const SizedBox(width: 16),
@@ -150,7 +145,7 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                                 label: auction.winnerName ?? '—',
                                 avatarUrl: auction.winnerAvatar,
                                 caption: l10n.t('winner'),
-                                isDark: widget.isDark,
+                                scheme: scheme,
                               ),
                             ],
                           ],
@@ -160,9 +155,7 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
                           '${l10n.t('started')}: ${dateFormat.format(auction.startedAt)}'
                           '${auction.endedAt != null ? '\n${isEnded ? l10n.t('ended') : l10n.t('ended')}: ${dateFormat.format(auction.endedAt!)}' : ''}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: widget.isDark
-                                ? Colors.grey.shade500
-                                : Colors.grey.shade600,
+                            color: scheme.onSurfaceVariant,
                             height: 1.4,
                           ),
                         ),
@@ -178,42 +171,46 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
     );
   }
 
-  Widget _placeholder() {
+  Widget _placeholder(ColorScheme scheme) {
     return ColoredBox(
-      color: widget.isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-      child: const Icon(Icons.gavel_outlined, size: 32),
+      color: scheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.gavel_outlined,
+        size: 32,
+        color: scheme.onSurfaceVariant,
+      ),
     );
   }
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, required this.isDark});
+  const _StatusBadge({required this.status, required this.scheme});
 
   final String status;
-  final bool isDark;
+  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
-    Color bg;
-    Color fg;
-    String label;
+    late Color bg;
+    late Color fg;
+    late String label;
 
     switch (status) {
       case 'ACTIVE':
-        bg = Colors.green.withValues(alpha: 0.15);
-        fg = Colors.green.shade700;
+        bg = scheme.tertiaryContainer;
+        fg = scheme.onTertiaryContainer;
         label = 'ACTIVE';
       case 'COMPLETED':
-        bg = Colors.blue.withValues(alpha: 0.15);
-        fg = Colors.blue.shade700;
+        bg = scheme.primaryContainer;
+        fg = scheme.onPrimaryContainer;
         label = 'ENDED';
       case 'CANCELLED':
-        bg = Colors.red.withValues(alpha: 0.15);
-        fg = Colors.red.shade700;
+        bg = scheme.errorContainer;
+        fg = scheme.onErrorContainer;
         label = 'CANCELLED';
       default:
-        bg = Colors.grey.withValues(alpha: 0.15);
-        fg = Colors.grey.shade700;
+        bg = scheme.surfaceContainerHighest;
+        fg = scheme.onSurfaceVariant;
         label = status;
     }
 
@@ -241,13 +238,13 @@ class _UserAvatarChip extends StatelessWidget {
     required this.label,
     this.avatarUrl,
     required this.caption,
-    required this.isDark,
+    required this.scheme,
   });
 
   final String label;
   final String? avatarUrl;
   final String caption;
-  final bool isDark;
+  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
@@ -256,10 +253,11 @@ class _UserAvatarChip extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 14,
+          backgroundColor: scheme.surfaceContainerHighest,
           backgroundImage:
               avatarUrl != null ? CachedNetworkImageProvider(avatarUrl!) : null,
           child: avatarUrl == null
-              ? Icon(Icons.person, size: 16, color: Colors.grey.shade400)
+              ? Icon(Icons.person, size: 16, color: scheme.onSurfaceVariant)
               : null,
         ),
         const SizedBox(width: 8),
@@ -270,7 +268,7 @@ class _UserAvatarChip extends StatelessWidget {
               caption,
               style: TextStyle(
                 fontSize: 10,
-                color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                color: scheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -279,7 +277,7 @@ class _UserAvatarChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF1E293B),
+                color: scheme.onSurface,
               ),
               overflow: TextOverflow.ellipsis,
             ),

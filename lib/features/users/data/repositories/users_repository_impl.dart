@@ -1,5 +1,7 @@
-import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/admin_bulk_users_result_entity.dart';
 import '../../domain/entities/user_detail_entity.dart';
+import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/user_follow_entity.dart';
 import '../../domain/entities/user_post_entity.dart';
 import '../../domain/repositories/users_repository.dart';
 import '../datasources/users_remote_data_source.dart';
@@ -75,6 +77,39 @@ class UsersRepositoryImpl implements UsersRepository {
   }
 
   @override
+  Future<AdminBulkUsersResultEntity> suspendUsers(
+    List<String> userIds, {
+    required String reason,
+    DateTime? until,
+  }) {
+    return remoteDataSource.suspendUsers(
+      userIds,
+      reason: reason,
+      until: until,
+    );
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> activateUsers(List<String> userIds) {
+    return remoteDataSource.activateUsers(userIds);
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> deleteUsers(List<String> userIds) {
+    return remoteDataSource.deleteUsers(userIds);
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> promoteUsers(List<String> userIds) {
+    return remoteDataSource.promoteUsers(userIds);
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> demoteUsers(List<String> userIds) {
+    return remoteDataSource.demoteUsers(userIds);
+  }
+
+  @override
   Future<void> verifyUser(String userId) {
     return remoteDataSource.verifyUser(userId);
   }
@@ -87,5 +122,20 @@ class UsersRepositoryImpl implements UsersRepository {
   @override
   Future<UserPostsResponseEntity> getUserPosts(String userId, {int page = 1, int limit = 20}) {
     return remoteDataSource.getUserPosts(userId, page: page, limit: limit);
+  }
+
+  @override
+  Future<UserFollowListPageEntity> getUserFollowList({
+    required String userId,
+    required UserFollowListKind kind,
+    int page = 1,
+    int limit = 20,
+  }) {
+    return remoteDataSource.getUserFollowList(
+      userId: userId,
+      kind: kind,
+      page: page,
+      limit: limit,
+    );
   }
 }

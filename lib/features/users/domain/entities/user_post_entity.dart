@@ -8,6 +8,7 @@ class UserPostEntity {
   final String? animatedCoverUrl;
   final String? description;
   final String? category;
+  final String? categoryId;
   final String status;
   final int viewCount;
   final int shareCount;
@@ -15,6 +16,7 @@ class UserPostEntity {
   final int likeCount;
   final int commentCount;
   final int saveCount;
+  final int repostCount;
   final int? duration;
   final int? videoWidth;
   final int? videoHeight;
@@ -25,19 +27,24 @@ class UserPostEntity {
   final bool allowStitch;
   final bool isStory;
   final bool isAuctionable;
+  final bool isLiked;
+  final bool isSaved;
+  final bool isReposted;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? storyExpiresAt;
   final String? locationId;
   final String? playlistId;
   final String? soundId;
   final String? originalPostId;
-  
-  // Relations (Keep as Map for simplicity or create entities if needed)
+
+  // Relations kept as raw maps to avoid cascading model changes.
   final Map<String, dynamic>? user;
   final List<Map<String, dynamic>>? media;
   final List<Map<String, dynamic>>? hashtags;
   final Map<String, dynamic>? sound;
   final Map<String, dynamic>? counts; // _count
+  final List<Map<String, dynamic>>? recentReposts;
 
   const UserPostEntity({
     required this.id,
@@ -49,6 +56,7 @@ class UserPostEntity {
     this.animatedCoverUrl,
     this.description,
     this.category,
+    this.categoryId,
     required this.status,
     required this.viewCount,
     required this.shareCount,
@@ -56,6 +64,7 @@ class UserPostEntity {
     required this.likeCount,
     required this.commentCount,
     required this.saveCount,
+    this.repostCount = 0,
     this.duration,
     this.videoWidth,
     this.videoHeight,
@@ -66,8 +75,12 @@ class UserPostEntity {
     required this.allowStitch,
     required this.isStory,
     required this.isAuctionable,
+    this.isLiked = false,
+    this.isSaved = false,
+    this.isReposted = false,
     required this.createdAt,
     required this.updatedAt,
+    this.storyExpiresAt,
     this.locationId,
     this.playlistId,
     this.soundId,
@@ -77,6 +90,7 @@ class UserPostEntity {
     this.hashtags,
     this.sound,
     this.counts,
+    this.recentReposts,
   });
 }
 

@@ -7,6 +7,7 @@ import '../entities/user_device_entity.dart';
 import '../entities/user_gift_transaction_entity.dart';
 import '../entities/user_like_entity.dart';
 import '../entities/user_mention_entity.dart';
+import '../entities/user_repost_entity.dart';
 
 abstract class UserActivityRepository {
   Future<PaginatedPage<UserPostEntity>> getUserPosts(
@@ -39,18 +40,21 @@ abstract class UserActivityRepository {
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserLikeEntity>> getUserLikes(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserMentionEntity>> getUserMentions(
     String userId, {
     required int page,
     required int limit,
+    String type = 'received',
   });
 
   Future<PaginatedPage<UserActivityItemEntity>> getUserActivityFeed(
@@ -58,4 +62,12 @@ abstract class UserActivityRepository {
     required int page,
     required int limit,
   });
+
+  Future<PaginatedPage<UserRepostEntity>> getUserReposts(
+    String userId, {
+    required int page,
+    required int limit,
+  });
+
+  Future<void> deleteRepostAsAdmin(String repostId);
 }

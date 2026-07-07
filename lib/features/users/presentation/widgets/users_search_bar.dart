@@ -1,59 +1,61 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../bloc/users_bloc.dart';
+import '../utils/responsive.dart';
 
 class UsersSearchBar extends StatelessWidget {
   const UsersSearchBar({
     super.key,
     required this.controller,
+    required this.onChanged,
     required this.onSubmitted,
+    required this.metrics,
   });
 
   final TextEditingController controller;
+  final ValueChanged<String> onChanged;
   final ValueChanged<String> onSubmitted;
+  final UsersLayoutMetrics metrics;
+
+  static const _borderRadius = 14.0;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final compact = metrics.isMobile;
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 48),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white,
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          if (!isDark)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-        ],
-      ),
+    final borderRadius = BorderRadius.circular(_borderRadius);
+    final enabledBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: scheme.outlineVariant),
+    );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: scheme.primary, width: 1.5),
+    );
+
+    final verticalPadding = (metrics.searchFieldHeight - 20) / 2;
+
+    return SizedBox(
+      height: metrics.searchFieldHeight,
       child: TextField(
         controller: controller,
         textInputAction: TextInputAction.search,
-        style: theme.textTheme.bodyMedium,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: compact ? 14 : null,
+        ),
         decoration: InputDecoration(
           hintText: l10n.t('searchUsers'),
           hintStyle: theme.textTheme.bodyMedium?.copyWith(
-            color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+            color: scheme.onSurfaceVariant,
+            fontSize: compact ? 14 : null,
           ),
           prefixIcon: Icon(
             Icons.search_rounded,
-            color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+            color: scheme.onSurfaceVariant,
+            size: compact ? 20 : 22,
           ),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
@@ -63,27 +65,32 @@ class UsersSearchBar extends StatelessWidget {
                 tooltip: l10n.t('clear'),
                 icon: Icon(
                   Icons.close_rounded,
-                  size: 20,
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  size: compact ? 18 : 20,
+                  color: scheme.onSurfaceVariant,
                 ),
+                visualDensity: VisualDensity.compact,
                 onPressed: () {
                   controller.clear();
-                  context.read<UsersBloc>().add(SearchUsersEvent(''));
+                  onSubmitted('');
                 },
               );
             },
           ),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: primary.withValues(alpha: 0.6)),
+          filled: true,
+          fillColor: scheme.surface,
+          isDense: true,
+          contentPadding: EdgeInsetsDirectional.symmetric(
+            horizontal: compact ? 12 : 16,
+            vertical: verticalPadding,
           ),
-          contentPadding: const EdgeInsetsDirectional.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
+          border: enabledBorder,
+          enabledBorder: enabledBorder,
+          focusedBorder: focusedBorder,
+          disabledBorder: enabledBorder,
+          errorBorder: enabledBorder,
+          focusedErrorBorder: focusedBorder,
         ),
+        onChanged: onChanged,
         onSubmitted: onSubmitted,
       ),
     );
