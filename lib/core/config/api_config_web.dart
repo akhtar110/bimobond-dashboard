@@ -37,5 +37,16 @@ String? readWebStoredApiBaseUrl() {
   }
 }
 
+String? readWebStoredSocketBaseUrl() {
+  try {
+    final value =
+        (localStorageGetItem('BIMO_SOCKET_BASE_URL') ?? '').trim();
+    if (value.isEmpty) return null;
+    return value;
+  } on Object {
+    return null;
+  }
+}
+
 @JS('localStorage.getItem')
 external String? localStorageGetItem(String key);

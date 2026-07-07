@@ -1,8 +1,10 @@
 # Build Flutter web and deploy to Firebase Hosting + API proxy function.
 #
-# The hosted app (https://bomibondapp.web.app) calls same-origin /api/* which is
-# proxied by the `apiProxy` Cloud Function to http://134.209.2.225.
-# Cloud Functions require the Firebase Blaze (pay-as-you-go) plan.
+# Hosted app (https://bomibondapp.web.app) calls same-origin /api/* which is proxied
+# to http://134.209.2.225. Cloud Functions require the Firebase Blaze plan.
+#
+# Without Blaze, host on the droplet instead (same base URL as local):
+#   .\scripts\deploy_droplet.ps1
 #
 # Usage:
 #   .\scripts\deploy_firebase.ps1
@@ -40,16 +42,18 @@ try {
     Write-Host "  Hosting: https://bomibondapp.web.app"
     if (-not $HostingOnly) {
         Write-Host "  API proxy: https://bomibondapp.web.app/api/* -> http://134.209.2.225"
+    } else {
+        Write-Host "  Note: login on Firebase needs the apiProxy function (Blaze plan)."
+        Write-Host "  Or deploy to droplet: .\scripts\deploy_droplet.ps1"
     }
 }
 catch {
     if ($_.Exception.Message -match "Blaze") {
         Write-Host ""
-        Write-Host "ERROR: Firebase Blaze plan is required to deploy the API proxy function." -ForegroundColor Red
-        Write-Host "  1. Upgrade: https://console.firebase.google.com/project/bomibondapp/usage/details"
-        Write-Host "  2. Re-run:  .\scripts\deploy_firebase.ps1"
-        Write-Host ""
-        Write-Host "Hosting-only deploy (UI without API login): .\scripts\deploy_firebase.ps1 -HostingOnly"
+        Write-Host "ERROR: Firebase Blaze plan is required for the API proxy function." -ForegroundColor Red
+        Write-Host "  Option A — Upgrade Blaze: https://console.firebase.google.com/project/bomibondapp/usage/details"
+        Write-Host "            Then re-run: .\scripts\deploy_firebase.ps1"
+        Write-Host "  Option B — Droplet (same base URL as local, no Blaze): .\scripts\deploy_droplet.ps1"
     }
     throw
 }

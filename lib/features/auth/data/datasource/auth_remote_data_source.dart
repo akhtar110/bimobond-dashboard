@@ -129,13 +129,14 @@ class AuthRemoteDataSource {
       if (response.statusCode == 404) {
         if (ApiConfig.usesHostedApiProxy) {
           throw Exception(
-            'API proxy not deployed. Upgrade Firebase to Blaze and run '
-            'firebase deploy --only functions, or host the dashboard at '
+            'API proxy not deployed. Run firebase deploy --only functions '
+            '(requires Blaze plan), or host the dashboard at '
             '${ApiConfig.backendUrl} (see scripts/deploy_droplet.ps1).',
           );
         }
         throw Exception(
-          "404 NOT FOUND → Backend route mismatch. Check /auth/login",
+          "404 NOT FOUND → Backend route mismatch. Check /auth/login "
+          '(API base: ${ApiConfig.resolve()})',
         );
       }
 
