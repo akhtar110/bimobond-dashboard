@@ -1,24 +1,27 @@
 import 'package:flutter/foundation.dart';
 
+import 'api_config_stub.dart'
+    if (dart.library.js_interop) 'api_config_web.dart' as runtime;
+
 /// Resolves the REST API base URL for Dio and media URL resolution.
 abstract final class ApiConfig {
   static const _fromEnv = String.fromEnvironment('API_BASE_URL');
 
-  /// Single backend URL for local dev, mobile, and Firebase proxy target.
+  /// Canonical backend URL (local dev, mobile, media URLs, sockets).
   static const productionApiUrl = 'http://134.209.2.225';
+
+  static const hostedApiProxyPath = '/api';
 
   static const missingConfigMessage =
       'Backend API URL is not configured. '
       'Set API_BASE_URL via --dart-define=API_BASE_URL=$productionApiUrl';
-
-  static const hostedApiProxyPath = '/api';
 
   static bool requiresHostedApiSetup() => false;
 
   static bool isConfigured() => resolve().isNotEmpty;
 
   /// Firebase Hosting is HTTPS; browsers block direct HTTP calls to [productionApiUrl].
-  /// Requests go to same-origin `/api`, proxied server-side to [productionApiUrl].
+  /// REST calls go to same-origin `/api`, proxied server-side to [productionApiUrl].
   static bool get usesHostedApiProxy =>
       kIsWeb && Uri.base.scheme == 'https';
 
@@ -30,13 +33,45 @@ abstract final class ApiConfig {
   }
 
   static String resolve() {
+    if (_fromEnv.isNotEmpty) {
+      return normalize(_fromEnv);
+    }
+
     if (usesHostedApiProxy) {
       return '${Uri.base.origin}$hostedApiProxyPath';
     }
+
+    final stored = runtime.readWebStoredApiBaseUrl();
+    if (stored != null) {
+      return normalize(stored);
+    }
+
+    final runtimeApi = runtime.readWebRuntimeApiBaseUrl();
+    if (runtimeApi != null && runtimeApi.isNotEmpty) {
+      return normalize(runtimeApi);
+    }
+
     return backendUrl;
   }
 
-  static String resolveSocketBaseUrl() => backendUrl;
+  /// Socket.IO must talk to the real backend host (not the `/api` REST prefix).
+  static String resolveSocketBaseUrl() {
+    if (_fromEnv.isNotEmpty) {
+      return normalize(_fromEnv);
+    }
+
+    final storedSocket = runtime.readWebStoredSocketBaseUrl();
+    if (storedSocket != null) {
+      return normalize(storedSocket);
+    }
+
+    final runtimeSocket = runtime.readWebRuntimeSocketBaseUrl();
+    if (runtimeSocket != null && runtimeSocket.isNotEmpty) {
+      return normalize(runtimeSocket);
+    }
+
+    return backendUrl;
+  }
 
   static String normalize(String url) {
     final trimmed = url.trim().replaceAll(RegExp(r'/+$'), '');

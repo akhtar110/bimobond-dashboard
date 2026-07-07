@@ -307,7 +307,7 @@ Future<void> init() async {
 
   // Initialise media URL resolver so relative API paths become absolute URLs
   // before they reach CachedNetworkImage / VideoPlayerController.
-  MediaUrlResolver.init(apiBaseUrl);
+  MediaUrlResolver.init(ApiConfig.backendUrl);
 
   // =========================
   // Firebase
