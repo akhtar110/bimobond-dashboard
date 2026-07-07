@@ -325,43 +325,23 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
   ) {
     final current = state;
     if (current is! SoundsLoaded) {
-      if (event.mutation == SoundLibraryMutation.created) {
-        add(const LoadSoundsEvent(refresh: true));
-      }
+      add(const LoadSoundsEvent(refresh: true));
       return;
     }
 
     switch (event.mutation) {
       case SoundLibraryMutation.created:
-        final sound = event.sound;
-        if (sound == null || !_matchesQuery(sound, current.query)) return;
-        if (current.query.page != 1) {
-          emit(
-            current.copyWith(
-              meta: _metaWithTotal(current.meta, current.meta.total + 1),
-              clearSelection: true,
-            ),
-          );
-          return;
-        }
-        final sounds = [sound, ...current.sounds];
-        final limit = current.query.limit;
-        emit(
-          current.copyWith(
-            sounds: sounds.length > limit ? sounds.sublist(0, limit) : sounds,
-            meta: _metaWithTotal(current.meta, current.meta.total + 1),
-            clearSelection: true,
-          ),
-        );
+        _applyCreated(emit, current, event.sound);
       case SoundLibraryMutation.updated:
       case SoundLibraryMutation.activated:
       case SoundLibraryMutation.deactivated:
-        final sound = event.sound;
-        if (sound == null) return;
-        _upsertOrRemoveSound(emit, current, sound);
+        _upsertOrRemoveSound(emit, current, event.sound, event.soundIds);
       case SoundLibraryMutation.deleted:
-        final id = event.soundIds.isNotEmpty ? event.soundIds.first : null;
-        if (id == null || id.isEmpty) return;
+        final id = _resolveSoundId(event.sound, event.soundIds);
+        if (id == null) {
+          add(const LoadSoundsEvent(refresh: true));
+          return;
+        }
         _removeSounds(emit, current, {id});
       case SoundLibraryMutation.bulkDeleted:
         if (event.soundIds.isEmpty) return;
@@ -373,6 +353,70 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
         if (event.soundIds.isEmpty) return;
         _bulkSetActive(emit, current, event.soundIds.toSet(), active);
     }
+  }
+
+  String? _resolveSoundId(SoundEntity? sound, List<String> soundIds) {
+    if (sound != null && sound.id.isNotEmpty) return sound.id;
+    if (soundIds.isNotEmpty && soundIds.first.isNotEmpty) {
+      return soundIds.first;
+    }
+    return null;
+  }
+
+  void _applyCreated(
+    Emitter<SoundsState> emit,
+    SoundsLoaded current,
+    SoundEntity? sound,
+  ) {
+    if (sound == null || sound.id.isEmpty) {
+      add(const LoadSoundsEvent(refresh: true));
+      return;
+    }
+    if (!_matchesQuery(sound, current.query)) {
+      emit(
+        current.copyWith(
+          meta: _metaWithTotal(current.meta, current.meta.total + 1),
+          clearSelection: true,
+        ),
+      );
+      return;
+    }
+
+    _query = current.query.copyWith(page: 1);
+    final limit = current.query.limit;
+    final withoutDuplicate =
+        current.sounds.where((s) => s.id != sound.id).toList();
+    final sounds = [sound, ...withoutDuplicate];
+    final visible =
+        sounds.length > limit ? sounds.sublist(0, limit) : sounds;
+
+    emit(
+      SoundsLoaded(
+        sounds: visible,
+        meta: _metaWithTotal(current.meta, current.meta.total + 1),
+        query: _query,
+        selectedIds: const {},
+      ),
+    );
+  }
+
+  SoundEntity _mergeSound(SoundEntity existing, SoundEntity updated) {
+    return SoundEntity(
+      id: existing.id,
+      name: updated.name.isNotEmpty ? updated.name : existing.name,
+      author: updated.author.isNotEmpty ? updated.author : existing.author,
+      audioUrl:
+          updated.audioUrl.isNotEmpty ? updated.audioUrl : existing.audioUrl,
+      coverUrl: updated.coverUrl ?? existing.coverUrl,
+      duration: updated.duration > 0 ? updated.duration : existing.duration,
+      useCount: updated.useCount,
+      isOriginal: updated.isOriginal,
+      isActive: updated.isActive,
+      originalSoundId: updated.originalSoundId ?? existing.originalSoundId,
+      creatorId: updated.creatorId ?? existing.creatorId,
+      createdAt: updated.createdAt ?? existing.createdAt,
+      creator: updated.creator ?? existing.creator,
+    );
   }
 
   bool _matchesQuery(SoundEntity sound, SoundsQuery query) {
@@ -404,17 +448,30 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
   void _upsertOrRemoveSound(
     Emitter<SoundsState> emit,
     SoundsLoaded current,
-    SoundEntity sound,
+    SoundEntity? sound,
+    List<String> soundIds,
   ) {
-    final index = current.sounds.indexWhere((s) => s.id == sound.id);
-    if (!_matchesQuery(sound, current.query)) {
-      if (index >= 0) {
-        _removeSounds(emit, current, {sound.id});
-      }
+    final id = _resolveSoundId(sound, soundIds);
+    if (id == null) {
+      add(const LoadSoundsEvent(refresh: true));
       return;
     }
-    if (index < 0) return;
-    final next = List<SoundEntity>.from(current.sounds)..[index] = sound;
+
+    final index = current.sounds.indexWhere((s) => s.id == id);
+    if (index < 0) {
+      add(const LoadSoundsEvent(refresh: true));
+      return;
+    }
+
+    final existing = current.sounds[index];
+    final merged = sound != null ? _mergeSound(existing, sound) : existing;
+
+    if (!_matchesQuery(merged, current.query)) {
+      _removeSounds(emit, current, {id});
+      return;
+    }
+
+    final next = List<SoundEntity>.from(current.sounds)..[index] = merged;
     emit(current.copyWith(sounds: next, clearSelection: true));
   }
 

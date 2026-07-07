@@ -6,9 +6,12 @@ import '../../../auth/domain/utils/dashboard_permissions.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../../core/bloc/persistent_bloc_provider.dart';
+import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../../../injection_container.dart' as di;
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../bloc/wallet_detail_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import '../widgets/adjust_balance_dialog.dart';
 import '../widgets/wallet_detail_page_widgets.dart';
@@ -61,6 +64,8 @@ class _WalletDetailViewState extends State<WalletDetailView>
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final dateFmt = DateFormat.yMMMd().add_Hm();
     final metrics = walletsMetricsOf(context);
@@ -70,7 +75,7 @@ class _WalletDetailViewState extends State<WalletDetailView>
         if (state is WalletDetailLoaded && state.message != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.message!),
+              content: Text(resolveWalletMessage(context, state.message!)),
               backgroundColor: state.isError ? scheme.error : null,
             ),
           );
@@ -101,7 +106,7 @@ class _WalletDetailViewState extends State<WalletDetailView>
               onPressed: () => Navigator.maybePop(context),
             ),
             title: Text(
-              'Wallet detail',
+              walletL10nOr(context, 'walletTitleWalletDetail', 'Wallet detail'),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: scheme.onSurface,
@@ -115,7 +120,9 @@ class _WalletDetailViewState extends State<WalletDetailView>
                   child: FilledButton.tonalIcon(
                     onPressed: state.isAdjusting ? null : _openAdjustDialog,
                     icon: const Icon(Icons.tune_rounded, size: 18),
-                    label: const Text('Adjust balance'),
+                    label: Text(
+                      walletL10nOr(context, 'walletAdjustBalance', 'Adjust balance'),
+                    ),
                   ),
                 ),
             ],
@@ -124,7 +131,7 @@ class _WalletDetailViewState extends State<WalletDetailView>
             WalletDetailLoading() => const LoadingView(),
             WalletDetailError(:final message) => ErrorView(
                 message: message,
-                retryLabel: 'Retry',
+                retryLabel: walletL10nOr(context, 'retry', 'Retry'),
                 onRetry: () => context
                     .read<WalletDetailBloc>()
                     .add(LoadWalletDetailEvent(widget.userId)),

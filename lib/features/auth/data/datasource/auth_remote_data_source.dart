@@ -52,21 +52,53 @@ class AuthRemoteDataSource {
     try {
       final googleProvider = GoogleAuthProvider();
 
-      final userCredential =
-      await _auth.signInWithPopup(googleProvider);
+      final userCredential = await _auth.signInWithPopup(googleProvider);
 
       final user = userCredential.user;
 
       if (user == null) {
-        throw Exception("Firebase user is null after Google login");
+        throw Exception('googleSignInCancelled');
       }
 
       final idToken = await user.getIdToken(true);
 
       return await _sendToBackend(idToken!);
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.message ?? "Google auth error");
+      throw Exception(_googleAuthErrorMessage(e));
+    } catch (e) {
+      throw Exception(_googleAuthErrorMessage(e));
     }
+  }
+
+  String _googleAuthErrorMessage(Object e) {
+    if (e is FirebaseAuthException) {
+      if (_isGoogleSignInCancelled(e.code)) {
+        return 'googleSignInCancelled';
+      }
+      return e.message ?? 'Google auth error';
+    }
+
+    if (e is Exception) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      if (_isGoogleSignInCancelled(message)) {
+        return 'googleSignInCancelled';
+      }
+      return message;
+    }
+
+    final message = e.toString();
+    if (_isGoogleSignInCancelled(message)) {
+      return 'googleSignInCancelled';
+    }
+
+    return message;
+  }
+
+  bool _isGoogleSignInCancelled(String value) {
+    return value.contains('popup-closed-by-user') ||
+        value.contains('popup_closed') ||
+        value.contains('cancelled-popup-request') ||
+        value == 'googleSignInCancelled';
   }
 
   /// ================================
@@ -95,6 +127,13 @@ class AuthRemoteDataSource {
       );
 
       if (response.statusCode == 404) {
+        if (ApiConfig.usesHostedApiProxy) {
+          throw Exception(
+            'API proxy not deployed. Upgrade Firebase to Blaze and run '
+            'firebase deploy --only functions, or host the dashboard at '
+            '${ApiConfig.backendUrl} (see scripts/deploy_droplet.ps1).',
+          );
+        }
         throw Exception(
           "404 NOT FOUND → Backend route mismatch. Check /auth/login",
         );
@@ -120,10 +159,13 @@ class AuthRemoteDataSource {
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionError) {
         final base = ApiConfig.resolve();
-        final hint = base.isEmpty
-            ? 'API URL is not configured for this host. Set API_BASE_URL via '
-                '--dart-define or web/app_config.js, then rebuild and redeploy.'
-            : 'Check that $base is reachable and CORS allows this site.';
+        final hint = ApiConfig.usesHostedApiProxy
+            ? 'The API proxy could not reach ${ApiConfig.backendUrl}. '
+                'Deploy Firebase Functions (apiProxy) and ensure the server is online.'
+            : base.isEmpty
+                ? 'API URL is not configured for this host. Set API_BASE_URL via '
+                    '--dart-define or web/app_config.js, then rebuild and redeploy.'
+                : 'Check that $base is reachable and CORS allows this site.';
         throw Exception('Connection failed → $hint');
       }
 

@@ -1,5 +1,6 @@
 import '../../post_management/domain/entities/post_media_entity.dart';
 import 'entities/create_post_entity.dart';
+import 'services/create_post_payload_validator.dart';
 
 /// Builds a [CreatePostEntity] that matches `POST /posts` contract from the API docs.
 class CreatePostPayloadBuilder {
@@ -34,6 +35,8 @@ class CreatePostPayloadBuilder {
 
   /// Maps uploaded [localMedia] (in display order) to API-ready entity.
   static CreatePostEntity build(CreatePostEntity form) {
+    CreatePostPayloadValidator.validate(form);
+
     final uploaded = <({LocalMediaFile file, String url})>[];
     for (final file in form.localMedia) {
       final url = file.uploadedUrl;
@@ -78,9 +81,15 @@ class CreatePostPayloadBuilder {
       isStory: form.isStory,
       isAuctionable: form.isAuctionable,
       auction: form.isAuctionable ? form.auction : null,
-      locationId: form.locationId,
+      locationId: CreatePostPayloadValidator.resolvesLocationId(form)
+          ? form.locationId
+          : null,
+      location: CreatePostPayloadValidator.resolvesInlineLocation(form),
       playlistId: form.playlistId,
       soundId: form.soundId,
+      newSound: (form.soundId == null || form.soundId!.trim().isEmpty)
+          ? form.newSound
+          : null,
       originalPostId: form.originalPostId,
       hlsUrl: form.hlsUrl,
       animatedCoverUrl: form.animatedCoverUrl,

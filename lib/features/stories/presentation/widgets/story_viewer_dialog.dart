@@ -1,10 +1,11 @@
-import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../post_management/domain/entities/managed_post_entity.dart';
+import '../../../post_management/presentation/widgets/post_media_carousel.dart';
 import '../../../posts/presentation/utils/posts_responsive.dart';
+import '../../../../core/widgets/post_media_preview.dart';
 import '../../domain/entities/active_story_entity.dart';
 import '../utils/stories_l10n.dart';
 
@@ -12,6 +13,21 @@ const Duration _kImageStoryDuration = Duration(seconds: 5);
 
 typedef StoryIndexChanged = void Function(int index);
 typedef StoryViewDetailsCallback = Future<void> Function(ActiveStoryEntity story);
+
+String? storyProgressMediaUrl(ManagedPostEntity post) {
+  if (post.containsVideoMedia) {
+    for (final candidate in [
+      post.videoUrl,
+      post.hlsUrl,
+      ...post.playableMediaUrls,
+    ]) {
+      final value = candidate?.trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+  }
+  if (post.shouldPlayAttachedSound) return post.attachedSoundPlayUrl;
+  return null;
+}
 
 Future<bool?> showStoryViewerDialog(
   BuildContext context, {
@@ -75,9 +91,8 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
   late int _currentIndex;
   late final AnimationController _imageProgressController;
 
-  VideoPlayerController? _videoController;
-  Timer? _imageTimer;
-  bool _videoReady = false;
+  VideoPlayerController? _trackedController;
+  int _setupGeneration = 0;
   bool _isPaused = false;
   double _dragOffset = 0;
 
@@ -96,11 +111,11 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
 
   @override
   void dispose() {
-    _imageTimer?.cancel();
+    _detachMediaListener();
+    PostVideoControllerCache.instance.pauseAll();
     _imageProgressController
       ..removeStatusListener(_onImageProgressStatus)
       ..dispose();
-    _disposeVideoController();
     super.dispose();
   }
 
@@ -113,37 +128,18 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
   }
 
   Future<void> _loadCurrentStory() async {
-    _imageTimer?.cancel();
+    _detachMediaListener();
     _imageProgressController.stop();
     _imageProgressController.reset();
-    await _disposeVideoController();
     if (!mounted) return;
 
-    setState(() {
-      _videoReady = false;
-      _isPaused = false;
-    });
+    setState(() => _isPaused = false);
 
-    final story = _currentStory;
-    if (story.isVideo && story.mediaUrl.isNotEmpty) {
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(story.mediaUrl),
-      );
-      _videoController = controller;
+    final generation = ++_setupGeneration;
+    final mediaUrl = storyProgressMediaUrl(_currentStory.postData);
 
-      try {
-        await controller.initialize();
-        if (!mounted || _videoController != controller) {
-          await controller.dispose();
-          return;
-        }
-
-        controller.addListener(_onVideoTick);
-        await controller.play();
-        setState(() => _videoReady = true);
-      } catch (_) {
-        if (mounted) setState(() => _videoReady = false);
-      }
+    if (mediaUrl != null) {
+      await _attachProgressTracking(mediaUrl, generation: generation);
       return;
     }
 
@@ -151,14 +147,36 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     _imageProgressController.forward(from: 0);
   }
 
-  void _onVideoTick() {
-    final controller = _videoController;
-    if (controller == null || !controller.value.isInitialized || !mounted) {
-      return;
+  Future<void> _attachProgressTracking(
+    String url, {
+    required int generation,
+  }) async {
+    for (var attempt = 0; attempt < 40; attempt++) {
+      if (!mounted || generation != _setupGeneration) return;
+
+      await PostVideoControllerCache.instance.waitForInitialize(url);
+      final controller = PostVideoControllerCache.instance.controllerFor(url);
+      if (controller != null && controller.value.isInitialized) {
+        _trackedController = controller;
+        controller.addListener(_onMediaTick);
+        if (mounted) setState(() {});
+        return;
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
+  }
+
+  void _onMediaTick() {
+    if (!mounted || _isPaused) return;
+
+    final controller = _trackedController;
+    if (controller == null || !controller.value.isInitialized) return;
 
     final value = controller.value;
-    if (value.position >= value.duration && value.duration > Duration.zero) {
+    final duration = value.duration;
+    if (duration > Duration.zero &&
+        value.position >= duration - const Duration(milliseconds: 250)) {
       _goNext(auto: true);
       return;
     }
@@ -166,28 +184,26 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     setState(() {});
   }
 
-  Future<void> _disposeVideoController() async {
-    final controller = _videoController;
-    _videoController = null;
-    if (controller != null) {
-      controller.removeListener(_onVideoTick);
-      await controller.dispose();
-    }
+  void _detachMediaListener() {
+    _trackedController?.removeListener(_onMediaTick);
+    _trackedController = null;
   }
 
   void _pauseStory() {
     if (_isPaused) return;
     _isPaused = true;
     _imageProgressController.stop();
-    _videoController?.pause();
+    _trackedController?.pause();
     setState(() {});
   }
 
   void _resumeStory() {
     if (!_isPaused) return;
     _isPaused = false;
-    if (_currentStory.isVideo) {
-      _videoController?.play();
+
+    final mediaUrl = storyProgressMediaUrl(_currentStory.postData);
+    if (mediaUrl != null) {
+      _trackedController?.play();
     } else if (_imageProgressController.value < 1) {
       _imageProgressController.forward();
     }
@@ -230,14 +246,16 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     if (index < _currentIndex) return 1;
     if (index > _currentIndex) return 0;
 
-    final story = _currentStory;
-    if (story.isVideo) {
-      final controller = _videoController;
-      if (controller == null || !controller.value.isInitialized) return 0;
+    final post = _currentStory.postData;
+    final controller = _trackedController;
+    if (controller != null && controller.value.isInitialized) {
       final duration = controller.value.duration.inMilliseconds;
       if (duration <= 0) return 0;
-      return (controller.value.position.inMilliseconds / duration).clamp(0.0, 1.0);
+      return (controller.value.position.inMilliseconds / duration)
+          .clamp(0.0, 1.0);
     }
+
+    if (storyProgressMediaUrl(post) != null) return 0;
 
     return _imageProgressController.value.clamp(0.0, 1.0);
   }
@@ -326,14 +344,17 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
                                 onTapUp: (details) {
-                                  final width = context.size?.width ?? maxWidth;
+                                  final tapWidth =
+                                      context.size?.width ?? maxWidth;
                                   final dx = details.localPosition.dx;
-                                  if (dx < width * 0.35) {
+                                  if (dx < tapWidth * 0.35) {
                                     _goPrevious();
-                                  } else if (dx > width * 0.65) {
+                                  } else if (dx > tapWidth * 0.65) {
                                     _goNext();
                                   } else {
-                                    _isPaused ? _resumeStory() : _pauseStory();
+                                    _isPaused
+                                        ? _resumeStory()
+                                        : _pauseStory();
                                   }
                                 },
                                 onLongPressStart: (_) => _pauseStory(),
@@ -341,10 +362,12 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    _StoryMediaView(
-                                      story: _currentStory,
-                                      videoController: _videoController,
-                                      videoReady: _videoReady,
+                                    PostMediaCarousel(
+                                      key: ValueKey(_currentStory.postData.id),
+                                      post: _currentStory.postData,
+                                      fit: BoxFit.contain,
+                                      videoLooping: false,
+                                      soundLooping: false,
                                     ),
                                     Positioned(
                                       left: 12,
@@ -527,84 +550,6 @@ class _StorySegmentBar extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _StoryMediaView extends StatelessWidget {
-  const _StoryMediaView({
-    required this.story,
-    required this.videoController,
-    required this.videoReady,
-  });
-
-  final ActiveStoryEntity story;
-  final VideoPlayerController? videoController;
-  final bool videoReady;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    if (story.isVideo) {
-      final controller = videoController;
-      if (controller != null && controller.value.isInitialized && videoReady) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            return SizedBox(
-              width: constraints.maxWidth,
-              height: constraints.maxHeight,
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: controller.value.size.width,
-                  height: controller.value.size.height,
-                  child: VideoPlayer(controller),
-                ),
-              ),
-            );
-          },
-        );
-      }
-
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: scheme.primary),
-            const SizedBox(height: 12),
-            Text(
-              StoriesL10n.loading(context),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          child: CachedNetworkImage(
-            imageUrl: story.mediaUrl,
-            fit: BoxFit.contain,
-            placeholder: (_, _) => Center(
-              child: CircularProgressIndicator(color: scheme.primary),
-            ),
-            errorWidget: (_, _, _) => Center(
-              child: Icon(
-                Icons.broken_image_outlined,
-                color: scheme.onSurfaceVariant,
-                size: 42,
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -11,6 +11,7 @@ import '../bloc/promoted_posts_bloc.dart';
 import 'analytics_chart.dart';
 import '../utils/promotions_responsive.dart';
 import 'promotions_dashboard_widgets.dart';
+import 'promotions_data_display_widgets.dart';
 import 'promotions_shared_widgets.dart';
 
 String _formatCampaignDateRange(
@@ -748,7 +749,7 @@ class _AnalyticsKpiTile extends StatelessWidget {
   }
 }
 
-const double kPromotedPostsTableHeaderHeight = 40;
+const double kPromotedPostsTableHeaderHeight = kPromotionsDataTableHeaderHeight;
 const double kCampaignHistoryHeaderHeight = 40;
 const double _kCellHPad = 10;
 const double _kRowVPad = 10;
@@ -758,8 +759,38 @@ enum PromotedPostsTableDensity { wide, medium, narrow, compact }
 PromotedPostsTableDensity promotedPostsTableDensityForWidth(double width) {
   if (width >= 1180) return PromotedPostsTableDensity.wide;
   if (width >= 880) return PromotedPostsTableDensity.medium;
-  if (width >= 560) return PromotedPostsTableDensity.narrow;
+  if (width >= 640) return PromotedPostsTableDensity.narrow;
   return PromotedPostsTableDensity.compact;
+}
+
+bool promotedPostsUseCompactCards(PromotedPostsTableDensity density) =>
+    density == PromotedPostsTableDensity.compact;
+
+double promotedPostsTableRowHeight(PromotedPostsTableDensity density) {
+  return switch (density) {
+    PromotedPostsTableDensity.wide => 72,
+    PromotedPostsTableDensity.medium => 68,
+    PromotedPostsTableDensity.narrow => 56,
+    PromotedPostsTableDensity.compact => 0,
+  };
+}
+
+double promotedPostsTableMinWidth(PromotedPostsTableDensity density) {
+  return switch (density) {
+    PromotedPostsTableDensity.wide => 1120,
+    PromotedPostsTableDensity.medium => 920,
+    PromotedPostsTableDensity.narrow => 620,
+    PromotedPostsTableDensity.compact => 0,
+  };
+}
+
+double promotedPostsThumbSize(PromotedPostsTableDensity density) {
+  return switch (density) {
+    PromotedPostsTableDensity.wide => 46,
+    PromotedPostsTableDensity.medium => 42,
+    PromotedPostsTableDensity.narrow => 38,
+    PromotedPostsTableDensity.compact => 52,
+  };
 }
 
 enum CampaignHistoryDensity { wide, medium, narrow }
@@ -1217,20 +1248,7 @@ class PromotedPostsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (posts.isEmpty) {
-      final scheme = Theme.of(context).colorScheme;
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: PromotionsSpace.xl),
-            child: Text(context.l10n.t('noData')),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return LayoutBuilder(
@@ -1239,48 +1257,342 @@ class PromotedPostsTable extends StatelessWidget {
             promotedPostsTableDensityForWidth(constraints.maxWidth);
         final scheme = Theme.of(context).colorScheme;
 
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: scheme.outlineVariant),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _PromotedPostsTableHeader(
-                  density: density,
-                  sortField: sortField,
-                  onSort: onSort,
-                ),
-                for (var i = 0; i < posts.length; i++)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: i == posts.length - 1
-                          ? null
-                          : Border(
-                              bottom: BorderSide(
-                                color: scheme.outlineVariant.withValues(
-                                  alpha: 0.45,
-                                ),
-                              ),
-                            ),
-                    ),
-                    child: _PromotedPostsTableRow(
+        if (promotedPostsUseCompactCards(density)) {
+          return DecoratedBox(
+            decoration: promotionsInnerTableDecoration(scheme),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < posts.length; i++) ...[
+                    _PromotedPostCompactCard(
                       row: posts[i],
-                      density: density,
                       onViewAnalytics: () => onViewAnalytics(posts[i].post.id),
                       onViewHistory: () => onViewHistory(posts[i].post.id),
                     ),
+                    if (i < posts.length - 1)
+                      Divider(
+                        height: 1,
+                        color: scheme.outlineVariant.withValues(alpha: 0.35),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }
+
+        final minWidth = promotedPostsTableMinWidth(density);
+        final tableWidth = constraints.maxWidth >= minWidth
+            ? constraints.maxWidth
+            : minWidth;
+
+        Widget table = DecoratedBox(
+          decoration: promotionsInnerTableDecoration(scheme),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: tableWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _PromotedPostsTableHeader(
+                    density: density,
+                    sortField: sortField,
+                    onSort: onSort,
                   ),
-              ],
+                  for (var i = 0; i < posts.length; i++) ...[
+                    _PromotedPostsTableRow(
+                      row: posts[i],
+                      density: density,
+                      striped: i.isOdd,
+                      onViewAnalytics: () => onViewAnalytics(posts[i].post.id),
+                      onViewHistory: () => onViewHistory(posts[i].post.id),
+                    ),
+                    if (i < posts.length - 1)
+                      Divider(
+                        height: 1,
+                        color: scheme.outlineVariant.withValues(alpha: 0.35),
+                      ),
+                  ],
+                ],
+              ),
             ),
           ),
         );
+
+        if (constraints.maxWidth < minWidth) {
+          table = SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.hardEdge,
+            child: table,
+          );
+        }
+
+        return table;
       },
+    );
+  }
+}
+
+class _PromotedPostPrimaryCell extends StatelessWidget {
+  const _PromotedPostPrimaryCell({
+    required this.primary,
+    required this.density,
+    required this.cellStyle,
+    required this.percent,
+    required this.scheme,
+  });
+
+  final PrimaryCampaignEntity? primary;
+  final PromotedPostsTableDensity density;
+  final TextStyle? cellStyle;
+  final NumberFormat percent;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    if (primary == null) {
+      return Text(
+        '—',
+        style: TextStyle(color: scheme.onSurfaceVariant),
+      );
+    }
+
+    final progressLabel = '${percent.format(primary!.progressPercent)}%';
+
+    if (density == PromotedPostsTableDensity.wide) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CampaignStatusBadge(status: primary!.status),
+          const SizedBox(height: 4),
+          Text(
+            primary!.objective,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          Text(
+            progressLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              color: scheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            CampaignStatusBadge(status: primary!.status),
+            Text(
+              progressLabel,
+              style: TextStyle(
+                fontSize: 11,
+                color: scheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          primary!.objective,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+}
+
+class _PromotedPostCompactCard extends StatelessWidget {
+  const _PromotedPostCompactCard({
+    required this.row,
+    required this.onViewAnalytics,
+    required this.onViewHistory,
+  });
+
+  final PromotedPostEntity row;
+  final VoidCallback onViewAnalytics;
+  final VoidCallback onViewHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final compact = NumberFormat.compact();
+    final percent = NumberFormat('#0.##');
+    final primary = row.primaryCampaign;
+    final thumbSize = promotedPostsThumbSize(PromotedPostsTableDensity.compact);
+
+    Widget statChip(String label, String value) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 10,
+                    height: 1.1,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Material(
+      color: scheme.surface,
+      child: InkWell(
+        onTap: onViewAnalytics,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: thumbSize,
+                      height: thumbSize,
+                      child: _PostThumbnail(post: row.post),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.post.description?.trim().isNotEmpty == true
+                              ? row.post.description!.trim()
+                              : l10n.t('noDescription'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          row.post.id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _PromotedPostRowActions(
+                    onViewAnalytics: onViewAnalytics,
+                    onViewHistory: onViewHistory,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  statChip(
+                    l10n.t('promoMetricViews'),
+                    compact.format(row.statistics.views),
+                  ),
+                  statChip(
+                    l10n.t('promoMetricLikes'),
+                    compact.format(row.statistics.likes),
+                  ),
+                  statChip(
+                    l10n.t('promoImpressions'),
+                    compact.format(row.promotion.totalImpressions),
+                  ),
+                  statChip(
+                    l10n.t('promoSpent'),
+                    CoinFormat.coins(row.promotion.totalSpentCoins),
+                  ),
+                  statChip(
+                    l10n.t('promoMetricEngagementRate'),
+                    '${percent.format(row.statistics.engagementRate)}%',
+                  ),
+                  statChip(
+                    l10n.t('promoCampaignCount'),
+                    '${row.promotion.totalCampaigns}',
+                  ),
+                ],
+              ),
+              if (primary != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Flexible(
+                      child: CampaignStatusBadge(status: primary.status),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${primary.objective} · ${percent.format(primary.progressPercent)}%',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1337,7 +1649,9 @@ class _PromotedPostsTableHeader extends StatelessWidget {
         );
 
     return Container(
-      height: kPromotedPostsTableHeaderHeight,
+      height: density == PromotedPostsTableDensity.wide
+          ? kPromotedPostsTableHeaderHeight
+          : kPromotedPostsTableHeaderHeight + 4,
       color: scheme.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: _PromotedPostsRowLayout(
@@ -1381,149 +1695,149 @@ class _PromotedPostsTableHeader extends StatelessWidget {
   }
 }
 
-class _PromotedPostsTableRow extends StatelessWidget {
+class _PromotedPostsTableRow extends StatefulWidget {
   const _PromotedPostsTableRow({
     required this.row,
     required this.density,
+    required this.striped,
     required this.onViewAnalytics,
     required this.onViewHistory,
   });
 
   final PromotedPostEntity row;
   final PromotedPostsTableDensity density;
+  final bool striped;
   final VoidCallback onViewAnalytics;
   final VoidCallback onViewHistory;
+
+  @override
+  State<_PromotedPostsTableRow> createState() => _PromotedPostsTableRowState();
+}
+
+class _PromotedPostsTableRowState extends State<_PromotedPostsTableRow> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final density = widget.density;
+    final row = widget.row;
     final compact = NumberFormat.compact();
     final percent = NumberFormat('#0.##');
     final primary = row.primaryCampaign;
     final cellStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize: 12,
+          fontSize: 11.5,
           height: 1.25,
         );
     final numericStyle = cellStyle?.copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    final thumbSize =
-        density == PromotedPostsTableDensity.narrow ? 40.0 : 46.0;
+    final thumbSize = promotedPostsThumbSize(density);
+    final rowHeight = promotedPostsTableRowHeight(density);
 
-    return Material(
-      color: scheme.surface,
-      child: InkWell(
-        onTap: onViewAnalytics,
-        hoverColor: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        mouseCursor: SystemMouseCursors.click,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: _kRowVPad,
-          ),
-          child: _PromotedPostsRowLayout(
-            density: density,
-            thumb: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                width: thumbSize,
-                height: thumbSize,
-                child: _PostThumbnail(post: row.post),
-              ),
-            ),
-            post: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  row.post.description?.trim().isNotEmpty == true
-                      ? row.post.description!.trim()
-                      : l10n.t('noDescription'),
-                  maxLines: density == PromotedPostsTableDensity.narrow
-                      ? 1
-                      : 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  row.post.id,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: cellStyle?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 11,
+    Color rowColor;
+    if (_hovered) {
+      rowColor = scheme.surfaceContainerHighest;
+    } else if (widget.striped) {
+      rowColor = scheme.surfaceContainerHighest.withValues(alpha: 0.35);
+    } else {
+      rowColor = scheme.surface;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: rowColor,
+        child: InkWell(
+          onTap: widget.onViewAnalytics,
+          mouseCursor: SystemMouseCursors.click,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: rowHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: _PromotedPostsRowLayout(
+                density: density,
+                thumb: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
+                    width: thumbSize,
+                    height: thumbSize,
+                    child: _PostThumbnail(post: row.post),
                   ),
                 ),
-              ],
-            ),
-            views: Text(
-              compact.format(row.statistics.views),
-              style: numericStyle,
-            ),
-            likes: density != PromotedPostsTableDensity.narrow
-                ? Text(
-                    compact.format(row.statistics.likes),
-                    style: numericStyle,
-                  )
-                : const SizedBox.shrink(),
-            engagement: density == PromotedPostsTableDensity.wide
-                ? Text(
-                    '${percent.format(row.statistics.engagementRate)}%',
-                    style: numericStyle?.copyWith(fontWeight: FontWeight.w700),
-                  )
-                : const SizedBox.shrink(),
-            impressions: Text(
-              compact.format(row.promotion.totalImpressions),
-              style: numericStyle,
-            ),
-            spent: Text(
-              CoinFormat.coins(row.promotion.totalSpentCoins),
-              style: numericStyle,
-            ),
-            campaigns: density == PromotedPostsTableDensity.wide
-                ? Text(
-                    '${row.promotion.totalCampaigns}',
-                    style: numericStyle,
-                  )
-                : const SizedBox.shrink(),
-            primary: density != PromotedPostsTableDensity.narrow
-                ? (primary == null
+                post: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      row.post.description?.trim().isNotEmpty == true
+                          ? row.post.description!.trim()
+                          : l10n.t('noDescription'),
+                      maxLines: density == PromotedPostsTableDensity.narrow
+                          ? 1
+                          : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      row.post.id,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: cellStyle?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                views: Text(
+                  compact.format(row.statistics.views),
+                  style: numericStyle,
+                ),
+                likes: density != PromotedPostsTableDensity.narrow
                     ? Text(
-                        '—',
-                        style: TextStyle(color: scheme.onSurfaceVariant),
+                        compact.format(row.statistics.likes),
+                        style: numericStyle,
                       )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CampaignStatusBadge(status: primary.status),
-                          const SizedBox(height: 4),
-                          Text(
-                            primary.objective,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: cellStyle?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '${percent.format(primary.progressPercent)}%',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: scheme.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ))
-                : const SizedBox.shrink(),
-            actions: _PromotedPostRowActions(
-              onViewAnalytics: onViewAnalytics,
-              onViewHistory: onViewHistory,
+                    : const SizedBox.shrink(),
+                engagement: density == PromotedPostsTableDensity.wide
+                    ? Text(
+                        '${percent.format(row.statistics.engagementRate)}%',
+                        style: numericStyle?.copyWith(fontWeight: FontWeight.w700),
+                      )
+                    : const SizedBox.shrink(),
+                impressions: Text(
+                  compact.format(row.promotion.totalImpressions),
+                  style: numericStyle,
+                ),
+                spent: Text(
+                  CoinFormat.coins(row.promotion.totalSpentCoins),
+                  style: numericStyle,
+                ),
+                campaigns: density == PromotedPostsTableDensity.wide
+                    ? Text(
+                        '${row.promotion.totalCampaigns}',
+                        style: numericStyle,
+                      )
+                    : const SizedBox.shrink(),
+                primary: density != PromotedPostsTableDensity.narrow
+                    ? _PromotedPostPrimaryCell(
+                        primary: primary,
+                        density: density,
+                        cellStyle: cellStyle,
+                        percent: percent,
+                        scheme: scheme,
+                      )
+                    : const SizedBox.shrink(),
+                actions: _PromotedPostRowActions(
+                  onViewAnalytics: widget.onViewAnalytics,
+                  onViewHistory: widget.onViewHistory,
+                ),
+              ),
             ),
           ),
         ),
@@ -1576,18 +1890,81 @@ class _PromotedPostsRowLayout extends StatelessWidget {
       children: [
         SizedBox(width: thumbWidth, child: thumb),
         Expanded(flex: isCompact ? 6 : 5, child: _cell(post, cellHPad)),
-        Expanded(flex: 1, child: _cell(views, cellHPad, alignEnd: true)),
-        if (showLikes)
-          Expanded(flex: 1, child: _cell(likes, cellHPad, alignEnd: true)),
-        if (showEngagement)
-          Expanded(flex: 1, child: _cell(engagement, cellHPad, alignEnd: true)),
         Expanded(
           flex: 1,
-          child: _cell(impressions, cellHPad, alignEnd: true),
+          child: _cell(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerEnd,
+              child: views,
+            ),
+            cellHPad,
+            alignEnd: true,
+          ),
         ),
-        Expanded(flex: 1, child: _cell(spent, cellHPad, alignEnd: true)),
+        if (showLikes)
+          Expanded(
+            flex: 1,
+            child: _cell(
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerEnd,
+                child: likes,
+              ),
+              cellHPad,
+              alignEnd: true,
+            ),
+          ),
+        if (showEngagement)
+          Expanded(
+            flex: 1,
+            child: _cell(
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerEnd,
+                child: engagement,
+              ),
+              cellHPad,
+              alignEnd: true,
+            ),
+          ),
+        Expanded(
+          flex: 1,
+          child: _cell(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerEnd,
+              child: impressions,
+            ),
+            cellHPad,
+            alignEnd: true,
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: _cell(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerEnd,
+              child: spent,
+            ),
+            cellHPad,
+            alignEnd: true,
+          ),
+        ),
         if (showCampaigns)
-          Expanded(flex: 1, child: _cell(campaigns, cellHPad, alignEnd: true)),
+          Expanded(
+            flex: 1,
+            child: _cell(
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerEnd,
+                child: campaigns,
+              ),
+              cellHPad,
+              alignEnd: true,
+            ),
+          ),
         if (showPrimary) Expanded(flex: 2, child: _cell(primary, cellHPad)),
         SizedBox(width: actionsWidth, child: Center(child: actions)),
       ],

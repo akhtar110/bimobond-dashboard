@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/state_widgets.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../bloc/fiat_purchases_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import '../widgets/fiat_purchases_page_widgets.dart';
 import '../widgets/wallets_dashboard_widgets.dart';
@@ -23,11 +26,13 @@ class _FiatPurchasesPageState extends State<FiatPurchasesPage> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final dateFmt = DateFormat.yMMMd().add_Hm();
     final metrics = walletsMetricsOf(context);
 
     return BlocBuilder<FiatPurchasesBloc, FiatPurchasesState>(
       builder: (context, state) {
+        final l10n = context.l10n;
         if (state is FiatPurchasesLoading) {
           return const WalletsDashboardShell(
             scrollable: false,
@@ -38,7 +43,7 @@ class _FiatPurchasesPageState extends State<FiatPurchasesPage> {
           return WalletsDashboardShell(
             child: ErrorView(
               message: state.message,
-              retryLabel: 'Retry',
+              retryLabel: walletL10nOr(context, 'retry', 'Retry'),
               onRetry: () =>
                   context.read<FiatPurchasesBloc>().add(LoadFiatPurchasesEvent()),
             ),
@@ -55,9 +60,11 @@ class _FiatPurchasesPageState extends State<FiatPurchasesPage> {
             children: [
               WalletsPageHeader(
                 metrics: metrics,
-                title: 'Fiat purchases',
-                subtitle:
-                    'Find purchases by user, then filter by status or payment provider.',
+                title: walletL10nOr(context, 'walletTitleFiatPurchases', 'Fiat purchases'),
+                subtitle: walletL10nOr(context,
+                  'walletSubtitleFiatPurchases',
+                  'Find purchases by user, then filter by status or payment provider.',
+                ),
               ),
               SizedBox(height: metrics.sectionGap),
               FiatPurchasesToolbar(

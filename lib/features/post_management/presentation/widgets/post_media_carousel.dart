@@ -10,11 +10,15 @@ class PostMediaCarousel extends StatefulWidget {
     super.key,
     required this.post,
     this.fit = BoxFit.contain,
+    this.videoLooping = true,
+    this.soundLooping = true,
     this.onAspectRatioChanged,
   });
 
   final ManagedPostEntity post;
   final BoxFit fit;
+  final bool videoLooping;
+  final bool soundLooping;
   final ValueChanged<double>? onAspectRatioChanged;
 
   @override
@@ -152,6 +156,21 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
     );
   }
 
+  bool get _hasAttachedSound =>
+      widget.post.shouldPlayAttachedSound &&
+      widget.post.attachedSoundPlayUrl != null;
+
+  Widget _buildAttachedSoundOverlay() {
+    if (!_hasAttachedSound) return const SizedBox.shrink();
+    final audioUrl = widget.post.attachedSoundPlayUrl!;
+    return PostAttachedSoundPreview(
+      key: ValueKey('attached_sound_${widget.post.id}_$audioUrl'),
+      audioUrl: audioUrl,
+      autoplay: true,
+      looping: widget.soundLooping,
+    );
+  }
+
   Widget _buildCarouselWithControls(double mediaHeight, ColorScheme scheme) {
     final hasMultiple = _media.length > 1;
 
@@ -159,6 +178,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       fit: StackFit.expand,
       children: [
         _buildPageView(mediaHeight),
+        _buildAttachedSoundOverlay(),
         if (hasMultiple) ...[
           _buildCarouselNavButton(
             scheme: scheme,
@@ -218,7 +238,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
 
   Widget _buildFallbackMedia(double mediaHeight) {
     final isVideoPost = widget.post.type.toUpperCase() == 'VIDEO';
-    return PostMediaPreview(
+    final preview = PostMediaPreview(
       thumbnailUrl: isVideoPost ? null : widget.post.displayThumbnailUrl,
       videoUrl: widget.post.videoUrl,
       hlsUrl: widget.post.hlsUrl,
@@ -226,7 +246,19 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       fit: widget.fit,
       height: mediaHeight,
       autoplay: true,
+      looping: widget.videoLooping,
       onAspectRatioDetermined: widget.onAspectRatioChanged,
+    );
+
+    final soundOverlay = _buildAttachedSoundOverlay();
+    if (!_hasAttachedSound) return preview;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        preview,
+        soundOverlay,
+      ],
     );
   }
 
@@ -248,6 +280,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
           height: mediaHeight,
           fit: widget.fit,
           isActive: index == _currentIndex,
+          videoLooping: widget.videoLooping,
           hlsUrl: widget.post.hlsUrl,
           onAspectRatioDetermined: (ratio) => _onRatioDetermined(index, ratio),
         );

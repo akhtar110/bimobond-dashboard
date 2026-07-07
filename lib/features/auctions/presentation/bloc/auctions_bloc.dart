@@ -120,6 +120,7 @@ class AuctionsLoaded extends AuctionsState {
       auctions.where((a) => a.status == 'COMPLETED').length;
   int get cancelledCount =>
       auctions.where((a) => a.status == 'CANCELLED').length;
+  int get bannedCount => auctions.where((a) => a.status == 'BANNED').length;
 
   AuctionsLoaded copyWith({
     List<AuctionEntity>? auctions,

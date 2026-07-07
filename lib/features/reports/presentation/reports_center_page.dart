@@ -1,8 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../../injection_container.dart' as di;
 import '../../auction_reports/presentation/bloc/auction_reports_bloc.dart';
 import '../../auction_reports/presentation/pages/auction_reports_tab.dart';

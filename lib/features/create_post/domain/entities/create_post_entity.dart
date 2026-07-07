@@ -2,9 +2,16 @@ import 'dart:typed_data';
 
 import '../../../post_management/domain/entities/post_media_entity.dart';
 import 'create_post_auction_entity.dart';
+import 'create_post_location_entity.dart';
+import 'create_post_new_sound_entity.dart';
+import 'create_post_sound_selection_entity.dart';
 import 'local_media_file.dart';
 
 export 'create_post_auction_entity.dart';
+export 'create_post_location_entity.dart';
+export 'create_post_media_filter_entity.dart';
+export 'create_post_new_sound_entity.dart';
+export 'create_post_sound_selection_entity.dart';
 export 'local_media_file.dart';
 
 /// Domain model for creating a post via `POST /posts`.
@@ -31,8 +38,11 @@ class CreatePostEntity {
     this.isAuctionable = false,
     this.auction,
     this.locationId,
+    this.location,
     this.playlistId,
     this.soundId,
+    this.newSound,
+    this.selectedSound,
     this.originalPostId,
     this.media = const [],
     this.localMedia = const [],
@@ -62,8 +72,11 @@ class CreatePostEntity {
   final bool isAuctionable;
   final CreatePostAuctionEntity? auction;
   final String? locationId;
+  final CreatePostLocationEntity? location;
   final String? playlistId;
   final String? soundId;
+  final CreatePostNewSoundEntity? newSound;
+  final CreatePostSoundSelectionEntity? selectedSound;
   final String? originalPostId;
   final List<PostMediaEntity> media;
   final List<LocalMediaFile> localMedia;
@@ -94,8 +107,11 @@ class CreatePostEntity {
     bool? isAuctionable,
     CreatePostAuctionEntity? auction,
     String? locationId,
+    CreatePostLocationEntity? location,
     String? playlistId,
     String? soundId,
+    CreatePostNewSoundEntity? newSound,
+    CreatePostSoundSelectionEntity? selectedSound,
     String? originalPostId,
     List<PostMediaEntity>? media,
     List<LocalMediaFile>? localMedia,
@@ -103,8 +119,11 @@ class CreatePostEntity {
     bool clearCategory = false,
     bool clearDescription = false,
     bool clearLocationId = false,
+    bool clearLocation = false,
     bool clearPlaylistId = false,
     bool clearSoundId = false,
+    bool clearNewSound = false,
+    bool clearSelectedSound = false,
     bool clearOriginalPostId = false,
     bool clearVideoFields = false,
     bool clearMedia = false,
@@ -139,8 +158,12 @@ class CreatePostEntity {
       isAuctionable: isAuctionable ?? this.isAuctionable,
       auction: clearAuction ? null : (auction ?? this.auction),
       locationId: clearLocationId ? null : (locationId ?? this.locationId),
+      location: clearLocation ? null : (location ?? this.location),
       playlistId: clearPlaylistId ? null : (playlistId ?? this.playlistId),
       soundId: clearSoundId ? null : (soundId ?? this.soundId),
+      newSound: clearNewSound ? null : (newSound ?? this.newSound),
+      selectedSound:
+          clearSelectedSound ? null : (selectedSound ?? this.selectedSound),
       originalPostId:
           clearOriginalPostId ? null : (originalPostId ?? this.originalPostId),
       media: clearMedia ? const [] : (media ?? this.media),
@@ -171,6 +194,14 @@ class CreatePostEntity {
 
   /// Drafts only require attached media; description and auction can be finished later.
   bool get canSaveDraft => hasLocalMedia;
+
+  bool get hasLocation =>
+      (locationId != null && locationId!.trim().isNotEmpty) ||
+      (location?.isComplete ?? false);
+
+  bool get hasSound =>
+      (soundId != null && soundId!.trim().isNotEmpty) ||
+      (newSound?.isComplete ?? false);
 
   /// Inferred API post type from attached media (used when building payload).
   String get inferredType {

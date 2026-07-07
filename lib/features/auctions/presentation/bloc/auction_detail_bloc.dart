@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/auction_entity.dart';
+import '../../domain/entities/auction_update_body.dart';
 import '../../domain/entities/auction_update_entity.dart';
 import '../../domain/usecases/ban_auction_usecase.dart';
 import '../../domain/usecases/cancel_auction_usecase.dart';
 import '../../domain/usecases/get_auction_details_usecase.dart';
+import '../../domain/usecases/preview_auction_pricing_usecase.dart';
 import '../../domain/usecases/resolve_auction_usecase.dart';
 import '../../domain/usecases/update_auction_usecase.dart';
 import '../../data/datasources/auction_socket_service.dart';
@@ -36,8 +38,8 @@ class AdminCancelDetailAuctionEvent extends AuctionDetailEvent {}
 class AdminBanDetailAuctionEvent extends AuctionDetailEvent {}
 
 class AdminUpdateAuctionEvent extends AuctionDetailEvent {
-  AdminUpdateAuctionEvent({this.itemName});
-  final String? itemName;
+  AdminUpdateAuctionEvent(this.body);
+  final AuctionUpdateBody body;
 }
 
 class AdminResolveAuctionEvent extends AuctionDetailEvent {
@@ -108,12 +110,14 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     required AdminBanAuction banAuction,
     required AdminUpdateAuction updateAuction,
     required AdminResolveAuction resolveAuction,
+    required PreviewAuctionPricing previewPricing,
     required AuctionSocketService socketService,
   })  : _getAuctionDetails = getAuctionDetails,
         _cancelAuction = cancelAuction,
         _banAuction = banAuction,
         _updateAuction = updateAuction,
         _resolveAuction = resolveAuction,
+        _previewPricing = previewPricing,
         _socketService = socketService,
         super(AuctionDetailInitial()) {
     on<LoadAuctionDetailsEvent>(_onLoad);
@@ -131,6 +135,7 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
   final AdminBanAuction _banAuction;
   final AdminUpdateAuction _updateAuction;
   final AdminResolveAuction _resolveAuction;
+  final PreviewAuctionPricing _previewPricing;
   final AuctionSocketService _socketService;
   StreamSubscription<AuctionUpdateEntity>? _socketSub;
   String? _currentAuctionId;
@@ -141,7 +146,6 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     try {
       final auction = await _getAuctionDetails(event.auctionId);
       emit(AuctionDetailLoaded(auction: auction, isLive: false));
-      // Auto-join room if auction is active
       if (auction.isActive) {
         add(JoinAuctionRoomEvent(auction.id));
       }
@@ -186,8 +190,10 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     final update = event.update;
     final updated = current.auction.copyWith(
       currentTotalCoins: update.currentTotalCoins,
+      targetPriceCoins: update.targetPriceCoins,
       status: update.status,
       winnerId: update.winnerId,
+      pricing: update.pricing ?? current.auction.pricing,
     );
     emit(current.copyWith(
       auction: updated,
@@ -203,11 +209,10 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     if (current is! AuctionDetailLoaded) return;
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      await _cancelAuction(current.auction.id);
-      final updated = current.auction.copyWith(
-          status: 'CANCELLED', endedAt: DateTime.now());
+      final updated = await _cancelAuction(current.auction.id);
+      final refreshed = await _getAuctionDetails(updated.id);
       emit(current.copyWith(
-        auction: updated,
+        auction: refreshed,
         isActioning: false,
         isLive: false,
         successMessage: 'Auction cancelled successfully',
@@ -225,10 +230,10 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     if (current is! AuctionDetailLoaded) return;
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      await _banAuction(current.auction.id);
-      final updated = current.auction.copyWith(status: 'BANNED');
+      final updated = await _banAuction(current.auction.id);
+      final refreshed = await _getAuctionDetails(updated.id);
       emit(current.copyWith(
-        auction: updated,
+        auction: refreshed,
         isActioning: false,
         isLive: false,
         successMessage: 'Auction banned',
@@ -243,14 +248,17 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
       AdminUpdateAuctionEvent event, Emitter<AuctionDetailState> emit) async {
     final current = state;
     if (current is! AuctionDetailLoaded) return;
+    if (event.body.isEmpty) {
+      emit(current.copyWith(errorMessage: 'No changes to save'));
+      return;
+    }
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      final updated = await _updateAuction(
-        current.auction.id,
-        itemName: event.itemName,
-      );
+      await _updateAuction(current.auction.id, event.body);
+      var refreshed = await _getAuctionDetails(current.auction.id);
+      refreshed = await _applyResolvedCoinGoal(refreshed, event.body);
       emit(current.copyWith(
-        auction: updated,
+        auction: refreshed,
         isActioning: false,
         successMessage: 'Auction updated',
       ));
@@ -267,8 +275,9 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     try {
       final resolved =
           await _resolveAuction(current.auction.id, event.winnerId);
+      final refreshed = await _getAuctionDetails(resolved.id);
       emit(current.copyWith(
-        auction: resolved,
+        auction: refreshed,
         isActioning: false,
         isLive: false,
         successMessage: 'Auction resolved successfully',
@@ -278,6 +287,28 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
       emit(current.copyWith(
           isActioning: false, errorMessage: e.toString()));
     }
+  }
+
+  Future<AuctionEntity> _applyResolvedCoinGoal(
+    AuctionEntity auction,
+    AuctionUpdateBody body,
+  ) async {
+    if (body.targetPrice == null && body.startingPrice == null) {
+      return auction;
+    }
+
+    final moneyTarget = body.targetPrice ?? auction.targetPrice;
+    if (moneyTarget == null || moneyTarget <= 0) return auction;
+
+    try {
+      final preview = await _previewPricing(targetPrice: moneyTarget);
+      final resolved = preview.resolvedTargetPriceCoins;
+      if (resolved != null && resolved > 0) {
+        return auction.copyWith(targetPriceCoins: resolved);
+      }
+    } catch (_) {}
+
+    return auction;
   }
 
   @override

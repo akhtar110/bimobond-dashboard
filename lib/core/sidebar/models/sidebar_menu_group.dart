@@ -38,12 +38,12 @@ const kSidebarMenuGroups = <SidebarMenuGroupConfig>[
     id: 'content',
     titleL10nKey: 'sidebarGroupContent',
     fallbackTitle: 'Content Management',
-    itemIndices: [4, 5, 6, 7, 8, 9, 10],
+    itemIndices: [4, 14, 5, 6, 7, 8, 9, 10],
   ),
   SidebarMenuGroupConfig(
     id: 'platform',
     titleL10nKey: 'sidebarGroupPlatform',
     fallbackTitle: 'Platform',
-    itemIndices: [11, 12, 13, 14],
+    itemIndices: [11, 12, 13, 15],
   ),
 ];

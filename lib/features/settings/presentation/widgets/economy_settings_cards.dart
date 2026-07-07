@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../domain/entities/economy_setting_entity.dart';
 import '../bloc/economy_settings_bloc.dart';
+import '../bloc/settings_cubit.dart';
 import 'settings_section.dart';
 
 class EconomySettingsCards extends StatefulWidget {
@@ -42,6 +44,8 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
         }
       },
       builder: (context, state) {
+        context.select<SettingsCubit, Locale>((c) => c.state.locale);
+        final l10n = context.l10n;
         final scheme = Theme.of(context).colorScheme;
         final body = state.isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -50,15 +54,16 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
                 children: [
                   _EconomySettingCard(
                     icon: Icons.percent_outlined,
-                    title: 'Auction commission',
-                    subtitle: 'Platform cut on gift bids (default 25%)',
+                    title: l10n.t('auctionCommission'),
+                    subtitle: l10n.t('auctionCommissionSubtitle'),
                     value: state.commissionPercent ?? '—',
+                    editTooltip: l10n.t('edit'),
                     onEdit: !widget.canManage || state.isSaving
                         ? null
                         : () => _editSetting(
                               context,
                               key: EconomySettingKeys.auctionCommissionPercent,
-                              title: 'Auction commission %',
+                              title: l10n.t('auctionCommissionPercent'),
                               current: state.commissionPercent ?? '25',
                               suffix: '%',
                             ),
@@ -66,15 +71,16 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
                   const SizedBox(height: 16),
                   _EconomySettingCard(
                     icon: Icons.currency_exchange_outlined,
-                    title: 'Coins per price unit',
-                    subtitle: 'Coins credited per 1 unit of host currency',
+                    title: l10n.t('coinsPerPriceUnit'),
+                    subtitle: l10n.t('coinsPerPriceUnitSubtitle'),
                     value: state.coinsPerPriceUnit ?? '—',
+                    editTooltip: l10n.t('edit'),
                     onEdit: !widget.canManage || state.isSaving
                         ? null
                         : () => _editSetting(
                               context,
                               key: EconomySettingKeys.coinsPerPriceUnit,
-                              title: 'Coins per price unit',
+                              title: l10n.t('coinsPerPriceUnit'),
                               current: state.coinsPerPriceUnit ?? '100',
                             ),
                   ),
@@ -88,8 +94,8 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
         if (widget.embedded) return body;
 
         return SettingsSection(
-          title: 'Economy settings',
-          description: 'Auction commission and coin conversion rate',
+          title: l10n.t('economySettings'),
+          description: l10n.t('economySettingsDescription'),
           child: body,
         );
       },
@@ -103,17 +109,19 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
     required String current,
     String? suffix,
   }) async {
+    final l10n = context.l10n;
     final controller = TextEditingController(text: current);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) {
         final scheme = Theme.of(ctx).colorScheme;
+        final dialogL10n = ctx.l10n;
         return AlertDialog(
           title: Text(title),
           content: TextField(
             controller: controller,
             decoration: InputDecoration(
-              labelText: 'Value',
+              labelText: dialogL10n.t('settingValue'),
               suffixText: suffix,
               border: const OutlineInputBorder(),
             ),
@@ -127,13 +135,13 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: Text(
-                'Cancel',
+                dialogL10n.t('cancel'),
                 style: TextStyle(color: scheme.onSurface),
               ),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('Save'),
+              child: Text(dialogL10n.t('save')),
             ),
           ],
         );
@@ -144,7 +152,7 @@ class _EconomySettingsCardsState extends State<EconomySettingsCards> {
     final parsed = double.tryParse(result);
     if (parsed == null || parsed <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a positive number')),
+        SnackBar(content: Text(l10n.t('enterPositiveNumber'))),
       );
       return;
     }
@@ -160,6 +168,7 @@ class _EconomySettingCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.value,
+    required this.editTooltip,
     this.onEdit,
   });
 
@@ -167,6 +176,7 @@ class _EconomySettingCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String value;
+  final String editTooltip;
   final VoidCallback? onEdit;
 
   @override
@@ -218,7 +228,7 @@ class _EconomySettingCard extends StatelessWidget {
                 ),
                 if (onEdit != null)
                   IconButton(
-                    tooltip: 'Edit',
+                    tooltip: editTooltip,
                     onPressed: onEdit,
                     icon: Icon(
                       Icons.edit_outlined,
@@ -264,7 +274,7 @@ class _EconomySettingCard extends StatelessWidget {
             if (onEdit != null) ...[
               const SizedBox(width: 8),
               IconButton(
-                tooltip: 'Edit',
+                tooltip: editTooltip,
                 onPressed: onEdit,
                 icon: Icon(Icons.edit_outlined, color: scheme.onSurfaceVariant),
               ),

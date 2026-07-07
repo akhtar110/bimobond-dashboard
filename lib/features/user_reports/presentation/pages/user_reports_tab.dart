@@ -416,44 +416,48 @@ class _SortDropdown extends StatelessWidget {
   String _label(UserReportSort sort) => switch (sort) {
         UserReportSort.newest => 'New Users',
         UserReportSort.oldest => 'Old Users',
-        UserReportSort.mostFollowers => 'Most followers',
-        UserReportSort.mostPosts => 'Most posts',
-        UserReportSort.mostLikes => 'Most likes',
+        UserReportSort.mostFollowers => 'Most Followers',
+        UserReportSort.mostPosts => 'Most Posts',
+        UserReportSort.mostLikes => 'Most Likes',
       };
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isSelected = value != UserReportSort.newest;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: isSelected ? scheme.primaryContainer : Colors.transparent,
-        border: Border.all(
-          color: isSelected ? scheme.primary : scheme.outlineVariant,
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<UserReportSort>(
-          value: value,
-          isDense: compact,
-          borderRadius: BorderRadius.circular(12),
-          items: UserReportSort.values
-              .map(
-                (sort) => DropdownMenuItem(
-                  value: sort,
-                  child: Text(
-                    _label(sort),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    final isActive = value != UserReportSort.newest;
+
+    return PopupMenuButton<UserReportSort>(
+      tooltip: 'Sort users',
+      onSelected: onChanged,
+      itemBuilder: (context) => UserReportSort.values
+          .map(
+            (sort) => PopupMenuItem(
+              value: sort,
+              child: Text(
+                _label(sort),
+                style: TextStyle(
+                  fontWeight:
+                      value == sort ? FontWeight.w600 : FontWeight.normal,
                 ),
-              )
-              .toList(),
-          onChanged: (sort) {
-            if (sort != null) onChanged(sort);
-          },
+              ),
+            ),
+          )
+          .toList(),
+      child: Chip(
+        avatar: Icon(
+          Icons.swap_vert_rounded,
+          size: 18,
+          color: isActive ? scheme.primary : scheme.onSurfaceVariant,
         ),
+        label: Text(
+          _label(value),
+          style: TextStyle(
+            color: isActive ? scheme.primary : scheme.onSurface,
+          ),
+        ),
+        backgroundColor:
+            isActive ? scheme.primaryContainer : scheme.surface,
+        side: BorderSide(color: scheme.outlineVariant),
       ),
     );
   }

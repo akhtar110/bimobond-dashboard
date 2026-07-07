@@ -16,6 +16,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../bloc/persistent_bloc_provider.dart';
 import '../localization/localization.dart';
+import '../settings/app_settings_wrapper.dart';
 import '../routing/admin_detail_page_route.dart';
 import '../sidebar/bloc/sidebar_bloc.dart';
 import '../widgets/web_dashboard_layout.dart';
@@ -42,10 +43,12 @@ import '../../features/post_reports/presentation/pages/post_report_detail_page.d
 import '../../features/promotions/presentation/pages/campaign_detail_page.dart';
 import '../../features/promotions/presentation/pages/promoted_post_analytics_page.dart';
 import '../../features/sound_management/presentation/pages/sound_management_page.dart';
+import '../../features/filters_effects/presentation/pages/filters_effects_page.dart';
 import '../../features/auction_reports/presentation/bloc/auction_report_detail_bloc.dart';
 import '../../features/auction_reports/presentation/pages/auction_report_detail_page.dart';
 import '../../features/user_reports/presentation/bloc/user_reports_bloc.dart';
 import '../../features/user_reports/presentation/pages/user_report_detail_page.dart';
+import '../../features/settings/presentation/bloc/settings_cubit.dart';
 import '../../injection_container.dart' as di;
 
 class AppRoutes {
@@ -195,7 +198,7 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const _tabCount = 15;
+  static const _tabCount = 16;
   int _index = 0;
 
   List<UserRole> _roles(BuildContext context) {
@@ -272,6 +275,8 @@ class _HomeShellChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild sidebar labels when language changes.
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final l10n = context.l10n;
     bool tabVisible(int tabIndex) => canAccessDashboardTab(tabIndex, roles);
     return WebDashboardLayout(
@@ -331,7 +336,7 @@ class _HomeShellChrome extends StatelessWidget {
         DashboardNavItem(
           icon: Icons.account_balance_wallet_outlined,
           selectedIcon: Icons.account_balance_wallet,
-          label: l10n.tOr('wallets', 'Wallets'),
+          label: l10n.t('wallets'),
         ),
         DashboardNavItem(
           icon: Icons.campaign_outlined,
@@ -354,6 +359,11 @@ class _HomeShellChrome extends StatelessWidget {
           label: l10n.t('notifications'),
         ),
         DashboardNavItem(
+          icon: Icons.auto_awesome_outlined,
+          selectedIcon: Icons.auto_awesome,
+          label: l10n.t('filtersEffects'),
+        ),
+        DashboardNavItem(
           icon: Icons.settings_outlined,
           selectedIcon: Icons.settings,
           label: l10n.t('settings'),
@@ -373,12 +383,46 @@ class _DashboardTabStack extends StatefulWidget {
 }
 
 class _DashboardTabStackState extends State<_DashboardTabStack> {
-  static const _tabCount = 15;
+  static const _tabCount = 16;
   final List<Widget?> _tabCache = List<Widget?>.filled(_tabCount, null);
+  Locale? _cachedLocale;
+  Brightness? _cachedBrightness;
+
+  void _invalidateTabCacheIfNeeded() {
+    final locale = Localizations.localeOf(context);
+    final brightness = Theme.of(context).brightness;
+    final localeChanged =
+        _cachedLocale != null && _cachedLocale != locale;
+    final themeChanged =
+        _cachedBrightness != null && _cachedBrightness != brightness;
+
+    if (localeChanged || themeChanged) {
+      AppSettingsWrapper.releaseFocus();
+      for (var i = 0; i < _tabCount; i++) {
+        _tabCache[i] = null;
+      }
+    }
+
+    _cachedLocale = locale;
+    _cachedBrightness = brightness;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _invalidateTabCacheIfNeeded();
+  }
+
+  String get _tabKeySuffix {
+    final locale = Localizations.localeOf(context).languageCode;
+    final brightness = Theme.of(context).brightness.name;
+    return '${locale}_$brightness';
+  }
 
   @override
   void didUpdateWidget(covariant _DashboardTabStack oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _invalidateTabCacheIfNeeded();
     if (widget.index == postsDashboardTabIndex &&
         oldWidget.index != widget.index &&
         _tabCache[postsDashboardTabIndex] != null) {
@@ -389,23 +433,35 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
   }
 
   Widget _buildTabPage(int index) {
+    final suffix = _tabKeySuffix;
     return switch (index) {
-      0 => const AnalyticsPage(key: ValueKey('dashboard_tab_analytics')),
-      1 => const UsersPage(key: ValueKey('dashboard_tab_users')),
-      2 => const UserLocationsPage(key: ValueKey('dashboard_tab_user_locations')),
-      3 => const SearchHistoryPage(key: ValueKey('dashboard_tab_search_history')),
-      4 => const PostsPage(key: ValueKey('dashboard_tab_posts')),
-      5 => const CategoriesPage(key: ValueKey('dashboard_tab_categories')),
-      6 => const ChatManagementPage(key: ValueKey('dashboard_tab_chat')),
-      7 => const AuctionsPage(key: ValueKey('dashboard_tab_auctions')),
-      8 => const GiftsPage(key: ValueKey('dashboard_tab_gifts')),
-      9 => const WalletsShellPage(key: ValueKey('dashboard_tab_wallets')),
-      10 => const PromotionsShellPage(key: ValueKey('dashboard_tab_promotions')),
-      11 => const SoundManagementPage(key: ValueKey('dashboard_tab_sounds')),
-      12 => const ReportsPage(key: ValueKey('dashboard_tab_reports')),
-      13 => const NotificationsPage(key: ValueKey('dashboard_tab_notifications')),
-      14 => const SettingsPage(key: ValueKey('dashboard_tab_settings')),
-      _ => const SizedBox.shrink(),
+      0 => AnalyticsPage(key: ValueKey('dashboard_tab_analytics_$suffix')),
+      1 => UsersPage(key: ValueKey('dashboard_tab_users_$suffix')),
+      2 => UserLocationsPage(
+          key: ValueKey('dashboard_tab_user_locations_$suffix'),
+        ),
+      3 => SearchHistoryPage(
+          key: ValueKey('dashboard_tab_search_history_$suffix'),
+        ),
+      4 => PostsPage(key: ValueKey('dashboard_tab_posts_$suffix')),
+      5 => CategoriesPage(key: ValueKey('dashboard_tab_categories_$suffix')),
+      6 => ChatManagementPage(key: ValueKey('dashboard_tab_chat_$suffix')),
+      7 => AuctionsPage(key: ValueKey('dashboard_tab_auctions_$suffix')),
+      8 => GiftsPage(key: ValueKey('dashboard_tab_gifts_$suffix')),
+      9 => WalletsShellPage(key: ValueKey('dashboard_tab_wallets_$suffix')),
+      10 => PromotionsShellPage(
+          key: ValueKey('dashboard_tab_promotions_$suffix'),
+        ),
+      11 => SoundManagementPage(key: ValueKey('dashboard_tab_sounds_$suffix')),
+      12 => ReportsPage(key: ValueKey('dashboard_tab_reports_$suffix')),
+      13 => NotificationsPage(
+          key: ValueKey('dashboard_tab_notifications_$suffix'),
+        ),
+      14 => FiltersEffectsPage(
+          key: ValueKey('dashboard_tab_filters_effects_$suffix'),
+        ),
+      15 => SettingsPage(key: ValueKey('dashboard_tab_settings_$suffix')),
+      _ => SizedBox.shrink(key: ValueKey('dashboard_tab_empty_$suffix')),
     };
   }
 

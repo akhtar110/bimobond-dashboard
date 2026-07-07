@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/widgets/dashboard/analytics_card.dart';
 import '../../../../core/widgets/state_widgets.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
+import '../../../wallets/presentation/utils/wallet_labels.dart';
 import '../../../wallets/presentation/utils/wallets_responsive.dart';
 import '../../../wallets/presentation/widgets/wallets_dashboard_widgets.dart';
 import '../../../wallets/presentation/widgets/wallets_overview_widgets.dart';
@@ -16,8 +19,11 @@ class MoneyDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+
     return BlocBuilder<MoneyDashboardBloc, MoneyDashboardState>(
       builder: (context, state) {
+        final l10n = context.l10n;
         if (state is MoneyDashboardLoading || state is MoneyDashboardInitial) {
           return const WalletsDashboardShell(child: LoadingView());
         }
@@ -25,7 +31,7 @@ class MoneyDashboardPage extends StatelessWidget {
           return WalletsDashboardShell(
             child: ErrorView(
               message: state.message,
-              retryLabel: 'Retry',
+              retryLabel: walletL10nOr(context, 'retry', 'Retry'),
               onRetry: () => context
                   .read<MoneyDashboardBloc>()
                   .add(const LoadMoneyDashboardEvent()),
@@ -46,6 +52,7 @@ class _MoneyDashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final overview = data.economy.overview;
     final gifts = data.giftReports;
     final promos = data.promotions;
@@ -59,36 +66,44 @@ class _MoneyDashboardBody extends StatelessWidget {
         children: [
           WalletOverviewHeader(
             metrics: metrics,
-            title: 'Money Dashboard',
-            subtitle:
-                'Unified view of wallets, purchases, gifts, promotions, and auctions.',
+            title: walletL10nOr(context, 'walletTitleMoneyDashboard', 'Money Dashboard'),
+            subtitle: walletL10nOr(context,
+              'walletSubtitleMoneyDashboard',
+              'Unified view of wallets, purchases, gifts, promotions, and auctions.',
+            ),
           ),
           SizedBox(height: gap),
           MoneyDashboardMetricsBlock(
             metrics: metrics,
-            title: 'Wallet KPIs',
-            subtitle: 'Core wallet health and fiat purchase metrics.',
+            title: walletL10nOr(context, 'walletTitleWalletKpis', 'Wallet KPIs'),
+            subtitle: walletL10nOr(context,
+              'walletSubtitleWalletKpisMoneyDashboard',
+              'Core wallet health and fiat purchase metrics.',
+            ),
             cards: [
               AnalyticsCard(
-                label: 'Total wallets',
+                label: walletL10nOr(context, 'walletKpiTotalWallets', 'Total wallets'),
                 value: '${overview.walletsTotal}',
                 icon: Icons.account_balance_wallet_outlined,
               ),
               AnalyticsCard(
-                label: 'Total balance',
+                label: walletL10nOr(context, 'walletKpiTotalBalance', 'Total balance'),
                 value: CoinFormat.coins(overview.totalBalanceCoins),
                 icon: Icons.monetization_on_outlined,
                 highlight: true,
               ),
               AnalyticsCard(
-                label: 'Purchase volume',
+                label: walletL10nOr(context, 'walletKpiPurchaseVolume', 'Purchase volume'),
                 value: CoinFormat.purchaseVolume(
                   overview.completedPurchaseVolume,
                 ),
                 icon: Icons.payments_outlined,
               ),
               AnalyticsCard(
-                label: 'Pending withdrawals',
+                label: walletL10nOr(context,
+                  'walletKpiPendingWithdrawals',
+                  'Pending withdrawals',
+                ),
                 value: '${overview.withdrawalsPending}',
                 icon: Icons.hourglass_top_outlined,
               ),
@@ -97,39 +112,58 @@ class _MoneyDashboardBody extends StatelessWidget {
           SizedBox(height: gap),
           MoneyDashboardMetricsBlock(
             metrics: metrics,
-            title: 'Revenue streams',
-            subtitle: 'Gift, commission, promotion, and auction coin flows.',
+            title: walletL10nOr(context, 'walletTitleRevenueStreams', 'Revenue streams'),
+            subtitle: walletL10nOr(context,
+              'walletSubtitleRevenueStreams',
+              'Gift, commission, promotion, and auction coin flows.',
+            ),
             cards: [
               AnalyticsCard(
-                label: 'Gift gross (period)',
+                label: walletL10nOr(context, 'walletMetricGiftGross', 'Gift gross (period)'),
                 value: CoinFormat.coins(gifts.periodSpendCoins),
                 icon: Icons.card_giftcard_outlined,
               ),
               AnalyticsCard(
-                label: 'Gift contribution',
+                label: walletL10nOr(context,
+                  'walletMetricGiftContribution',
+                  'Gift contribution',
+                ),
                 value: CoinFormat.coins(gifts.periodContributionCoins),
                 icon: Icons.volunteer_activism_outlined,
               ),
               AnalyticsCard(
-                label: 'Commission earnings',
+                label: walletL10nOr(context,
+                  'walletMetricCommissionEarnings',
+                  'Commission earnings',
+                ),
                 value: CoinFormat.coins(data.commissionEarningsCoins),
                 subtitle: data.commissionPercent != null
-                    ? '${data.commissionPercent}% commission'
+                    ? walletL10nArgs(context,
+                        'walletCommissionPercent',
+                        {'percent': '${data.commissionPercent}'},
+                        '${data.commissionPercent}% commission',
+                      )
                     : null,
                 icon: Icons.percent_outlined,
               ),
               AnalyticsCard(
-                label: 'Promotion spend',
+                label: walletL10nOr(context, 'walletMetricPromotionSpend', 'Promotion spend'),
                 value: CoinFormat.coins(promos.totalSpentCoins),
                 icon: Icons.campaign_outlined,
               ),
               AnalyticsCard(
-                label: 'Auction gift spend',
+                label: walletL10nOr(context,
+                  'walletMetricAuctionGiftSpend',
+                  'Auction gift spend',
+                ),
                 value: CoinFormat.coins(auctions.totalGiftSpendCoins),
                 icon: Icons.gavel_outlined,
               ),
               AnalyticsCard(
-                label: 'Active promo budget',
+                label: walletL10nOr(context,
+                  'walletMetricActivePromoBudget',
+                  'Active promo budget',
+                ),
                 value: CoinFormat.coins(promos.activeBudgetCoins),
                 icon: Icons.trending_up_outlined,
               ),
@@ -139,23 +173,29 @@ class _MoneyDashboardBody extends StatelessWidget {
             SizedBox(height: gap),
             MoneyDashboardMetricsBlock(
               metrics: metrics,
-              title: 'Fiat & ledger',
-              subtitle: 'Fiat purchase counts and platform-wide balances.',
+              title: walletL10nOr(context, 'walletTitleFiatLedger', 'Fiat & ledger'),
+              subtitle: walletL10nOr(context,
+                'walletSubtitleFiatLedger',
+                'Fiat purchase counts and platform-wide balances.',
+              ),
               cards: [
                 AnalyticsCard(
-                  label: 'Fiat purchases',
+                  label: walletL10nOr(context, 'walletKpiFiatPurchases', 'Fiat purchases'),
                   value: '${data.monetization!.fiatPurchaseCount}',
                   icon: Icons.shopping_cart_outlined,
                 ),
                 AnalyticsCard(
-                  label: 'Purchase volume',
+                  label: walletL10nOr(context, 'walletKpiPurchaseVolume', 'Purchase volume'),
                   value: CoinFormat.purchaseVolume(
                     data.monetization!.completedPurchaseVolume,
                   ),
                   icon: Icons.attach_money,
                 ),
                 AnalyticsCard(
-                  label: 'Wallet balances (platform)',
+                  label: walletL10nOr(context,
+                    'walletMetricWalletBalancesPlatform',
+                    'Wallet balances (platform)',
+                  ),
                   value: CoinFormat.coins(
                     data.monetization!.totalBalanceCoins,
                   ),

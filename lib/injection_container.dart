@@ -14,9 +14,11 @@ import 'features/auth/domain/usecases/login_with_google_usecase.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'features/auth/data/datasource/auth_local_data_source.dart';
 
 import 'features/settings/presentation/bloc/settings_cubit.dart';
+import 'features/settings/data/datasources/app_preferences_local_datasource.dart';
 import 'features/settings/data/datasources/app_settings_remote_datasource.dart';
 import 'features/settings/data/datasources/economy_settings_remote_datasource.dart';
 import 'features/settings/data/repositories/app_settings_repository_impl.dart';
@@ -84,6 +86,12 @@ import 'features/search_history/data/repositories/search_history_repository_impl
 import 'features/search_history/domain/repositories/search_history_repository.dart';
 import 'features/search_history/domain/usecases/search_history_usecases.dart';
 import 'features/search_history/presentation/bloc/search_history_bloc.dart';
+
+import 'features/filters_effects/data/datasources/filters_effects_remote_datasource.dart';
+import 'features/filters_effects/data/repositories/filters_effects_repository_impl.dart';
+import 'features/filters_effects/domain/repositories/filters_effects_repository.dart';
+import 'features/filters_effects/domain/usecases/filters_effects_usecases.dart';
+import 'features/filters_effects/presentation/bloc/filters_effects_bloc.dart';
 
 import 'features/user_activity/data/datasources/user_activity_remote_data_source.dart';
 import 'features/user_activity/data/repositories/user_activity_repository_impl.dart';
@@ -154,11 +162,14 @@ import 'features/stories/domain/repositories/stories_repository.dart';
 import 'features/stories/domain/usecases/get_active_stories.dart';
 import 'features/stories/presentation/bloc/stories_bloc.dart';
 
+import 'features/create_post/data/datasources/create_post_auxiliary_remote_data_source.dart';
 import 'features/create_post/data/datasources/create_post_remote_data_source.dart';
 import 'features/create_post/data/repositories/create_post_repository_impl.dart';
 import 'features/create_post/domain/repositories/create_post_repository.dart';
+import 'features/create_post/domain/services/create_post_media_filter_service.dart';
 import 'features/create_post/domain/services/create_post_media_upload_service.dart';
 import 'features/create_post/domain/services/create_post_thumbnail_service.dart';
+import 'features/create_post/domain/usecases/create_post_auxiliary_usecases.dart';
 import 'features/create_post/domain/usecases/create_post_usecase.dart';
 import 'features/create_post/domain/usecases/submit_create_post_usecase.dart';
 import 'features/create_post/domain/usecases/upload_post_media_usecase.dart';
@@ -182,8 +193,13 @@ import 'features/auctions/data/repositories/auctions_repository_impl.dart';
 import 'features/auctions/domain/repositories/auctions_repository.dart';
 import 'features/auctions/domain/usecases/ban_auction_usecase.dart';
 import 'features/auctions/domain/usecases/cancel_auction_usecase.dart';
+import 'features/auctions/domain/usecases/create_auction_usecase.dart';
+import 'features/auctions/domain/usecases/get_active_auctions_usecase.dart';
 import 'features/auctions/domain/usecases/get_all_auctions_usecase.dart';
 import 'features/auctions/domain/usecases/get_auction_details_usecase.dart';
+import 'features/auctions/domain/usecases/host_cancel_auction_usecase.dart';
+import 'features/auctions/domain/usecases/host_update_auction_usecase.dart';
+import 'features/auctions/domain/usecases/preview_auction_pricing_usecase.dart';
 import 'features/auctions/domain/usecases/resolve_auction_usecase.dart';
 import 'features/auctions/domain/usecases/update_auction_usecase.dart';
 import 'features/auctions/presentation/bloc/auction_detail_bloc.dart';
@@ -304,6 +320,9 @@ Future<void> init() async {
         () => const FlutterSecureStorage(),
   );
 
+  final sharedPreferences = await SharedPreferences.getInstance();
+  sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+
   // =========================
   // Dio (GLOBAL API CLIENT)
   // =========================
@@ -378,8 +397,12 @@ Future<void> init() async {
   // =========================
   // Settings
   // =========================
+  sl.registerLazySingleton<AppPreferencesLocalDataSource>(
+    () => AppPreferencesLocalDataSourceImpl(sl<SharedPreferences>()),
+  );
+
   sl.registerLazySingleton<SettingsCubit>(
-    SettingsCubit.new,
+    () => SettingsCubit(sl<AppPreferencesLocalDataSource>()),
   );
 
   sl.registerLazySingleton<EconomySettingsRemoteDataSource>(
@@ -472,6 +495,7 @@ Future<void> init() async {
       loginWithGoogleUseCase: sl<LoginWithGoogleUseCase>(),
       saveSessionUseCase: sl<SaveSessionUseCase>(),
       logoutUseCase: sl<LogoutUseCase>(),
+      firebaseAuth: sl<FirebaseAuth>(),
     ),
   );
 
@@ -641,6 +665,133 @@ Future<void> init() async {
   );
 
   // =========================================================
+  // FILTERS & EFFECTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<FiltersEffectsRemoteDataSource>(
+    () => FiltersEffectsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<FiltersEffectsRepository>(
+    () => FiltersEffectsRepositoryImpl(sl<FiltersEffectsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(
+    () => GetFiltersEffectsOverviewUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetFiltersEffectsCatalogUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCameraFiltersUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreateCameraFilterUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateCameraFilterUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteCameraFilterUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => ActivateCameraFilterUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeactivateCameraFilterUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCameraFilterCategoriesUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreateCameraFilterCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateCameraFilterCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteCameraFilterCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => ReorderCameraFilterCategoriesUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => AssignFiltersToCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCameraEffectsUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreateCameraEffectUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateCameraEffectUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteCameraEffectUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => ActivateCameraEffectUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeactivateCameraEffectUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCameraEffectCategoriesUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreateCameraEffectCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateCameraEffectCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteCameraEffectCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => ReorderCameraEffectCategoriesUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => AssignEffectsToCategoryUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => PublishFiltersEffectsCatalogUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => SeedFiltersEffectsCatalogUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerFactory(
+    () => FiltersEffectsBloc(
+      getOverview: sl<GetFiltersEffectsOverviewUseCase>(),
+      getCatalog: sl<GetFiltersEffectsCatalogUseCase>(),
+      getFilters: sl<GetCameraFiltersUseCase>(),
+      createFilter: sl<CreateCameraFilterUseCase>(),
+      updateFilter: sl<UpdateCameraFilterUseCase>(),
+      deleteFilter: sl<DeleteCameraFilterUseCase>(),
+      activateFilter: sl<ActivateCameraFilterUseCase>(),
+      deactivateFilter: sl<DeactivateCameraFilterUseCase>(),
+      getFilterCategories: sl<GetCameraFilterCategoriesUseCase>(),
+      createFilterCategory: sl<CreateCameraFilterCategoryUseCase>(),
+      updateFilterCategory: sl<UpdateCameraFilterCategoryUseCase>(),
+      deleteFilterCategory: sl<DeleteCameraFilterCategoryUseCase>(),
+      reorderFilterCategories: sl<ReorderCameraFilterCategoriesUseCase>(),
+      assignFiltersToCategory: sl<AssignFiltersToCategoryUseCase>(),
+      getEffects: sl<GetCameraEffectsUseCase>(),
+      createEffect: sl<CreateCameraEffectUseCase>(),
+      updateEffect: sl<UpdateCameraEffectUseCase>(),
+      deleteEffect: sl<DeleteCameraEffectUseCase>(),
+      activateEffect: sl<ActivateCameraEffectUseCase>(),
+      deactivateEffect: sl<DeactivateCameraEffectUseCase>(),
+      getEffectCategories: sl<GetCameraEffectCategoriesUseCase>(),
+      createEffectCategory: sl<CreateCameraEffectCategoryUseCase>(),
+      updateEffectCategory: sl<UpdateCameraEffectCategoryUseCase>(),
+      deleteEffectCategory: sl<DeleteCameraEffectCategoryUseCase>(),
+      reorderEffectCategories: sl<ReorderCameraEffectCategoriesUseCase>(),
+      assignEffectsToCategory: sl<AssignEffectsToCategoryUseCase>(),
+      publishCatalog: sl<PublishFiltersEffectsCatalogUseCase>(),
+      seedCatalog: sl<SeedFiltersEffectsCatalogUseCase>(),
+    ),
+  );
+
+  // =========================================================
   // POST MANAGEMENT MODULE (admin edit/moderate user posts)
   // =========================================================
 
@@ -769,14 +920,34 @@ Future<void> init() async {
     () => CreatePostRemoteDataSourceImpl(sl<Dio>()),
   );
 
+  sl.registerLazySingleton<CreatePostAuxiliaryRemoteDataSource>(
+    () => CreatePostAuxiliaryRemoteDataSourceImpl(sl<Dio>()),
+  );
+
   sl.registerLazySingleton<CreatePostRepository>(
-    () => CreatePostRepositoryImpl(sl<CreatePostRemoteDataSource>()),
+    () => CreatePostRepositoryImpl(
+      sl<CreatePostRemoteDataSource>(),
+      sl<CreatePostAuxiliaryRemoteDataSource>(),
+    ),
   );
 
   sl.registerLazySingleton(() => UploadPostMedia(sl<CreatePostRepository>()));
   sl.registerLazySingleton(() => CreatePost(sl<CreatePostRepository>()));
   sl.registerLazySingleton(
     () => CreatePostMediaUploadService(sl<UploadPostMedia>()),
+  );
+  sl.registerLazySingleton(() => const CreatePostMediaFilterService());
+  sl.registerLazySingleton(
+    () => SearchCreatePostSounds(sl<CreatePostRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetTrendingCreatePostSounds(sl<CreatePostRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UploadCreatePostSound(sl<CreatePostRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => SearchCreatePostLocations(sl<CreatePostRepository>()),
   );
 
   sl.registerLazySingleton<VideoThumbnailLocalDataSource>(
@@ -803,6 +974,7 @@ Future<void> init() async {
       thumbnailService: sl<CreatePostThumbnailService>(),
       uploadThumbnail: sl<UploadThumbnailUseCase>(),
       createPost: sl<CreatePost>(),
+      mediaFilterService: sl<CreatePostMediaFilterService>(),
     ),
   );
 
@@ -811,6 +983,11 @@ Future<void> init() async {
       uploadService: sl<CreatePostMediaUploadService>(),
       thumbnailService: sl<CreatePostThumbnailService>(),
       submitCreatePost: sl<SubmitCreatePost>(),
+      mediaFilterService: sl<CreatePostMediaFilterService>(),
+      searchSounds: sl<SearchCreatePostSounds>(),
+      getTrendingSounds: sl<GetTrendingCreatePostSounds>(),
+      uploadSound: sl<UploadCreatePostSound>(),
+      searchLocations: sl<SearchCreatePostLocations>(),
     ),
   );
 
@@ -856,6 +1033,11 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetAuctionDetails(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminCancelAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminBanAuction(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => PreviewAuctionPricing(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => GetActiveAuctions(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => CreateAuction(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => HostUpdateAuction(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => HostCancelAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminUpdateAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminResolveAuction(sl<AuctionsRepository>()));
 
@@ -877,6 +1059,7 @@ Future<void> init() async {
       banAuction: sl<AdminBanAuction>(),
       updateAuction: sl<AdminUpdateAuction>(),
       resolveAuction: sl<AdminResolveAuction>(),
+      previewPricing: sl<PreviewAuctionPricing>(),
       socketService: sl<AuctionSocketService>(),
     ),
   );

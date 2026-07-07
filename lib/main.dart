@@ -17,6 +17,7 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await di.init();
+  await di.sl<SettingsCubit>().load();
   await AppLocalizations.preloadBundles();
   runApp(const AdminDashboardApp());
 }
@@ -24,55 +25,55 @@ Future<void> main() async {
 class AdminDashboardApp extends StatelessWidget {
   const AdminDashboardApp({super.key});
 
-  static const _bootstrapLocale = Locale('en');
-
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<SettingsCubit>()),
-
         BlocProvider(
           create: (_) => di.sl<AuthBloc>()..add(AuthCheckRequested()),
         ),
       ],
+      child: BlocBuilder<SettingsCubit, SettingsState>(
+        buildWhen: (previous, current) =>
+            previous.locale != current.locale ||
+            previous.themeMode != current.themeMode,
+        builder: (context, settings) {
+          final locale = settings.locale;
+          final textDirection = locale.languageCode == 'ar'
+              ? TextDirection.rtl
+              : TextDirection.ltr;
 
-      child: MaterialApp(
-        navigatorKey: AppRouter.rootNavigatorKey,
-
-        debugShowCheckedModeBanner: false,
-
-        restorationScopeId: null,
-
-        onGenerateTitle: (context) =>
-            AppLocalizations.ofLocale(_bootstrapLocale).t('appTitle'),
-
-        theme: AppTheme.lightTheme(_bootstrapLocale),
-
-        darkTheme: AppTheme.darkTheme(_bootstrapLocale),
-
-        themeMode: ThemeMode.light,
-
-        locale: _bootstrapLocale,
-
-        supportedLocales: AppLocalizations.supportedLocales,
-
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-
-          GlobalMaterialLocalizations.delegate,
-
-          GlobalWidgetsLocalizations.delegate,
-
-          GlobalCupertinoLocalizations.delegate,
-        ],
-
-        onGenerateRoute: AppRouter.onGenerateRoute,
-
-        initialRoute: AppRoutes.root,
-
-        builder: (context, child) {
-          return AppSettingsWrapper(child: AuthGate(navigator: child ?? const SizedBox.shrink()));
+          return MaterialApp(
+            navigatorKey: AppRouter.rootNavigatorKey,
+            debugShowCheckedModeBanner: false,
+            restorationScopeId: null,
+            onGenerateTitle: (context) =>
+                AppLocalizations.ofLocale(locale).t('appTitle'),
+            theme: AppTheme.lightTheme(locale),
+            darkTheme: AppTheme.darkTheme(locale),
+            themeMode: settings.themeMode,
+            locale: locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            onGenerateRoute: AppRouter.onGenerateRoute,
+            initialRoute: AppRoutes.root,
+            builder: (context, child) {
+              return AppSettingsWrapper(
+                child: Directionality(
+                  textDirection: textDirection,
+                  child: AuthGate(
+                    navigator: child ?? const SizedBox.shrink(),
+                  ),
+                ),
+              );
+            },
+          );
         },
       ),
     );

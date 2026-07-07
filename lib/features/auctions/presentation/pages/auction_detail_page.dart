@@ -16,6 +16,7 @@ import '../bloc/auction_detail_bloc.dart';
 import '../bloc/auctions_bloc.dart';
 import '../utils/auction_detail_labels.dart';
 import '../widgets/auction_card.dart';
+import '../widgets/auction_edit_dialog.dart';
 import '../widgets/auction_detail_dashboard_widgets.dart';
 
 class AuctionDetailPage extends StatefulWidget {
@@ -27,8 +28,6 @@ class AuctionDetailPage extends StatefulWidget {
 }
 
 class _AuctionDetailPageState extends State<AuctionDetailPage> {
-  String? _lastKnownStatus;
-
   @override
   void initState() {
     super.initState();
@@ -74,13 +73,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
       body: BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
         listener: (context, state) {
           if (state is AuctionDetailLoaded) {
-            final newStatus = state.auction.status;
-            if (newStatus != _lastKnownStatus &&
-                (state.auction.isCancelled || state.auction.isCompleted)) {
-              _syncToListBloc(context, state.auction);
-            }
-            _lastKnownStatus = newStatus;
-
+            _syncToListBloc(context, state.auction);
             if (state.successMessage != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -127,39 +120,24 @@ class _DetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final auction = state.auction;
     final showWinner = auction.winner != null || auction.isCompleted;
-    final showActions = auction.isActive || auction.isCompleted;
-    final showTransactions = auction.giftTransactions?.isNotEmpty == true;
     const gap = DashboardSpace.xl;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final tier = dashboardLayoutTier(constraints.maxWidth);
-        final useFixedHeight =
-            (tier == DashboardLayoutTier.desktop ||
-                    tier == DashboardLayoutTier.largeDesktop) &&
-                showTransactions &&
-                constraints.maxHeight.isFinite;
+        final isDesktop =
+            tier == DashboardLayoutTier.desktop ||
+            tier == DashboardLayoutTier.largeDesktop;
 
-        Widget column({
-          required List<Widget> children,
-          bool expanded = false,
-        }) {
-          final col = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          );
-          if (expanded) {
-            return Expanded(child: col);
+        Widget spaced(List<Widget> sections) {
+          final items = <Widget>[];
+          for (var i = 0; i < sections.length; i++) {
+            if (i > 0) items.add(const SizedBox(height: gap));
+            items.add(sections[i]);
           }
-          return col;
-        }
-
-        Widget scrollColumn(List<Widget> children) {
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
-            ),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: items,
           );
         }
 
@@ -176,144 +154,58 @@ class _DetailBody extends StatelessWidget {
         final winner = showWinner
             ? _AuctionWinnerSection(auction: auction)
             : null;
-        final admin = showActions
-            ? _AuctionAdminSection(state: state)
-            : null;
-        final gifts = showTransactions
-            ? _AuctionGiftTransactionsSection(
-                auction: auction,
-                transactions: auction.giftTransactions!,
-                expanded: useFixedHeight,
-              )
-            : null;
-
-        Widget spaced(List<Widget> sections) {
-          final items = <Widget>[];
-          for (var i = 0; i < sections.length; i++) {
-            if (i > 0) items.add(const SizedBox(height: gap));
-            items.add(sections[i]);
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: items,
-          );
-        }
-
-        if (tier == DashboardLayoutTier.desktop ||
-            tier == DashboardLayoutTier.largeDesktop) {
-          final col1 = spaced([
-            hero,
-            progress,
-            if (admin != null) admin,
-          ]);
-          final col2 = spaced([stats, host]);
-          final col3Sections = <Widget>[
-            if (winner != null) winner,
-            if (gifts != null) gifts,
-          ];
-
-          if (useFixedHeight) {
-            final tierPadding = dashboardHorizontalPadding(tier);
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                tierPadding,
-                DashboardSpace.xl,
-                tierPadding,
-                DashboardSpace.xxl,
-              ),
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: DashboardBreakpoints.maxContentWidth,
-                  ),
-                  child: SizedBox(
-                    height: constraints.maxHeight -
-                        DashboardSpace.xl -
-                        DashboardSpace.xxl,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 5, child: scrollColumn([col1])),
-                        const SizedBox(width: gap),
-                        Expanded(flex: 4, child: scrollColumn([col2])),
-                        const SizedBox(width: gap),
-                        Expanded(
-                          flex: 4,
-                          child: column(
-                            expanded: true,
-                            children: col3Sections.length == 1
-                                ? [Expanded(child: col3Sections.first)]
-                                : [
-                                    if (winner != null) winner,
-                                    if (winner != null && gifts != null)
-                                      const SizedBox(height: gap),
-                                    if (gifts != null)
-                                      Expanded(child: gifts),
-                                  ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          return DashboardShell(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: col1),
-                const SizedBox(width: gap),
-                Expanded(flex: 4, child: col2),
-                const SizedBox(width: gap),
-                Expanded(
-                  flex: 4,
-                  child: spaced(col3Sections),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (tier == DashboardLayoutTier.tablet) {
-          final left = spaced([
-            hero,
-            progress,
-            stats,
-            if (admin != null) admin,
-          ]);
-          final right = spaced([
-            host,
-            if (winner != null) winner,
-            if (gifts != null) gifts,
-          ]);
-
-          return DashboardShell(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: left),
-                const SizedBox(width: gap),
-                Expanded(child: right),
-              ],
-            ),
-          );
-        }
-
-        return DashboardShell(
-          child: spaced([
-            hero,
-            progress,
-            stats,
-            host,
-            if (winner != null) winner,
-            if (admin != null) admin,
-            if (gifts != null) gifts,
-          ]),
+        final admin = _AuctionAdminSection(state: state);
+        final gifts = _AuctionGiftTransactionsSection(
+          auction: auction,
+          transactions: auction.giftTransactions ?? const [],
         );
+
+        final Widget pageContent;
+
+        if (isDesktop) {
+          // Desktop: full-width hero + progress, asymmetric 2-column body,
+          // gift transactions last inside the same scroll.
+          pageContent = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              hero,
+              const SizedBox(height: gap),
+              progress,
+              const SizedBox(height: gap),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: spaced([stats, admin]),
+                  ),
+                  const SizedBox(width: gap),
+                  Expanded(
+                    flex: 2,
+                    child: spaced([
+                      host,
+                      if (winner != null) winner,
+                    ]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: gap),
+              gifts,
+            ],
+          );
+        } else {
+          pageContent = spaced([
+            hero,
+            progress,
+            stats,
+            host,
+            if (winner != null) winner,
+            admin,
+            gifts,
+          ]);
+        }
+
+        return DashboardShell(child: pageContent);
       },
     );
   }
@@ -402,7 +294,10 @@ class _AuctionHeroSection extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: DashboardSpace.lg),
-              Row(
+              Wrap(
+                spacing: DashboardSpace.xl,
+                runSpacing: DashboardSpace.md,
+                crossAxisAlignment: WrapCrossAlignment.end,
                 children: [
                   _QuickStat(
                     label: AuctionDetailLabels.raised(l10n),
@@ -410,12 +305,11 @@ class _AuctionHeroSection extends StatelessWidget {
                         CoinFormat.coinsAmount(auction.currentTotalCoins),
                     highlight: true,
                   ),
-                  const SizedBox(width: DashboardSpace.xl),
                   _QuickStat(
                     label: AuctionDetailLabels.goal(l10n),
                     value: CoinFormat.coinsProgress(
                       current: auction.currentTotalCoins,
-                      target: auction.targetPriceCoins,
+                      target: auction.effectiveTargetPriceCoins,
                     ),
                   ),
                 ],
@@ -648,7 +542,7 @@ class _AuctionStatsSection extends StatelessWidget {
             MetricCard(
               icon: Icons.flag_outlined,
               label: l10n.t('auctionTargetPrice'),
-              value: CoinFormat.coins(auction.targetPriceCoins),
+              value: CoinFormat.coins(auction.effectiveTargetPriceCoins),
             ),
             MetricCard(
               icon: Icons.trending_up_rounded,
@@ -725,10 +619,10 @@ class _AuctionProgressSection extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    final pct = auction.progressPercent;
+    final pct = auction.progressFraction;
     final color = auctionProgressColor(scheme, auction);
-    final remaining = (auction.targetPriceCoins - auction.currentTotalCoins)
-        .clamp(0, double.infinity);
+    final remaining = auction.remainingCoins;
+    final goal = auction.effectiveTargetPriceCoins;
 
     return DashboardCard(
       backgroundColor: Color.alphaBlend(
@@ -737,84 +631,122 @@ class _AuctionProgressSection extends StatelessWidget {
       ),
       child: DashboardSection(
         title: AuctionDetailLabels.progressTitle(l10n),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _ProgressHighlight(
-                    label: AuctionDetailLabels.raised(l10n),
-                    value: CoinFormat.coins(auction.currentTotalCoins),
-                    color: color,
-                  ),
-                ),
-                Expanded(
-                  child: _ProgressHighlight(
-                    label: AuctionDetailLabels.remaining(l10n, context),
-                    value: CoinFormat.coins(remaining),
-                  ),
-                ),
-                Expanded(
-                  child: _ProgressHighlight(
-                    label: AuctionDetailLabels.goal(l10n),
-                    value: CoinFormat.coins(auction.targetPriceCoins),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DashboardSpace.lg,
-                    vertical: DashboardSpace.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${(pct * 100).toStringAsFixed(1)}%',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: DashboardSpace.xl),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0, end: pct),
-                duration: const Duration(milliseconds: 800),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, child) {
-                  return LinearProgressIndicator(
-                    value: value,
-                    minHeight: 14,
-                    backgroundColor: scheme.surfaceContainerHighest,
-                    color: color,
-                  );
-                },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 640;
+
+            final stats = [
+              _ProgressHighlight(
+                label: AuctionDetailLabels.raised(l10n),
+                value: CoinFormat.coins(auction.currentTotalCoins),
+                color: color,
               ),
-            ),
-            if (lastGiftName != null) ...[
-              const SizedBox(height: DashboardSpace.lg),
-              Row(
-                children: [
-                  Icon(Icons.card_giftcard_rounded,
-                      size: 16, color: scheme.primary),
-                  const SizedBox(width: DashboardSpace.sm),
-                  Text(
-                    AuctionDetailLabels.latestGift(l10n, lastGiftName!),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w600,
+              _ProgressHighlight(
+                label: AuctionDetailLabels.remaining(l10n, context),
+                value: CoinFormat.coins(remaining),
+              ),
+              _ProgressHighlight(
+                label: AuctionDetailLabels.goal(l10n),
+                value: CoinFormat.coins(goal),
+              ),
+            ];
+
+            final percentBadge = Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DashboardSpace.lg,
+                vertical: DashboardSpace.sm,
+              ),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${(pct * 100).toStringAsFixed(1)}%',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (compact)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ...stats.map(
+                        (stat) => Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: DashboardSpace.md,
+                          ),
+                          child: stat,
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: percentBadge,
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < stats.length; i++) ...[
+                        if (i > 0) const SizedBox(width: DashboardSpace.md),
+                        Expanded(child: stats[i]),
+                      ],
+                      const SizedBox(width: DashboardSpace.md),
+                      Flexible(child: percentBadge),
+                    ],
+                  ),
+                const SizedBox(height: DashboardSpace.xl),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: TweenAnimationBuilder<double>(
+                    key: ValueKey(
+                      'auction-progress-${goal.toStringAsFixed(0)}-'
+                      '${auction.currentTotalCoins.toStringAsFixed(0)}',
                     ),
+                    tween: Tween<double>(begin: 0, end: pct),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return LinearProgressIndicator(
+                        value: value,
+                        minHeight: 14,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                        color: color,
+                      );
+                    },
+                  ),
+                ),
+                if (lastGiftName != null) ...[
+                  const SizedBox(height: DashboardSpace.lg),
+                  Row(
+                    children: [
+                      Icon(Icons.card_giftcard_rounded,
+                          size: 16, color: scheme.primary),
+                      const SizedBox(width: DashboardSpace.sm),
+                      Expanded(
+                        child: Text(
+                          AuctionDetailLabels.latestGift(l10n, lastGiftName!),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -849,6 +781,8 @@ class _ProgressHighlight extends StatelessWidget {
         const SizedBox(height: DashboardSpace.xs),
         Text(
           value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: color ?? scheme.onSurface,
@@ -1045,11 +979,28 @@ class _AuctionAdminSection extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: DashboardSpace.md),
+          ActionPanelButton(
+            label: l10n.tOr('editAuction', 'Edit auction'),
+            icon: Icons.edit_outlined,
+            onTap: () => _showEditDialog(context, auction),
+          ),
         ],
       );
     }
 
-    if (!auction.isActive) return const SizedBox.shrink();
+    if (!auction.isActive) {
+      return ActionPanel(
+        title: l10n.t('actions'),
+        children: [
+          ActionPanelButton(
+            label: l10n.tOr('editAuction', 'Edit auction'),
+            icon: Icons.edit_outlined,
+            onTap: () => _showEditDialog(context, auction),
+          ),
+        ],
+      );
+    }
 
     return ActionPanel(
       title: l10n.t('actions'),
@@ -1125,7 +1076,7 @@ class _AuctionAdminSection extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Ban auction'),
         content: const Text(
-          'This will mark the auction as BANNED and remove it from active bidding.',
+          'This will mark the auction as BANNED and remove it from active gift activity.',
         ),
         actions: [
           TextButton(
@@ -1150,36 +1101,10 @@ class _AuctionAdminSection extends StatelessWidget {
     );
   }
 
-  void _showEditDialog(BuildContext context, AuctionEntity auction) {
-    final controller = TextEditingController(text: auction.itemName ?? '');
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit auction'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Item name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AuctionDetailBloc>().add(
-                    AdminUpdateAuctionEvent(itemName: controller.text.trim()),
-                  );
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showEditDialog(BuildContext context, AuctionEntity auction) async {
+    final body = await showAuctionEditDialog(context, auction: auction);
+    if (body == null || !context.mounted) return;
+    context.read<AuctionDetailBloc>().add(AdminUpdateAuctionEvent(body));
   }
 
   void _showResolveDialog(BuildContext context) {
@@ -1268,12 +1193,10 @@ class _AuctionGiftTransactionsSection extends StatefulWidget {
   const _AuctionGiftTransactionsSection({
     required this.auction,
     required this.transactions,
-    this.expanded = false,
   });
 
   final AuctionEntity auction;
   final List<GiftTransactionEntity> transactions;
-  final bool expanded;
 
   @override
   State<_AuctionGiftTransactionsSection> createState() =>
@@ -1318,7 +1241,6 @@ class _AuctionGiftTransactionsSectionState
     return ActivityFeed(
       title: l10n.t('giftTransactions'),
       count: widget.transactions.length,
-      expanded: widget.expanded,
       emptyMessage: l10n.t('noData'),
       children: items,
     );

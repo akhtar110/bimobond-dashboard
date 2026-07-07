@@ -181,7 +181,15 @@ ManagedPostEntity normalizeManagedPostMediaFields(ManagedPostEntity post) {
     thumbnailUrl: resolveMediaUrl(post.thumbnailUrl),
     animatedCoverUrl: resolveMediaUrl(post.animatedCoverUrl),
     media: media,
+    sound: _resolveSoundAudioUrl(post.sound),
   );
+}
+
+ManagedPostSoundEntity? _resolveSoundAudioUrl(ManagedPostSoundEntity? sound) {
+  if (sound == null || !sound.hasPlayableAudio) return sound;
+  final resolved = resolveMediaUrl(sound.audioUrl) ?? sound.audioUrl;
+  if (resolved == sound.audioUrl) return sound;
+  return sound.copyWith(audioUrl: resolved);
 }
 
 /// Same hydration pipeline used by [PostsPage] before opening post management.
@@ -401,6 +409,12 @@ ManagedPostEntity enrichManagedPostContent(
     excludeUrls: thumbnailExclude,
   );
   final type = _pickNonEmptyStr(primary.type, fallback.type) ?? primary.type;
+  final soundId = _pickNonEmptyStr(primary.soundId, fallback.soundId);
+  final sound = _mergeSound(
+    primary.sound,
+    fallback.sound,
+    soundId: soundId,
+  );
 
   if (description == primary.description &&
       category == primary.category &&
@@ -410,7 +424,9 @@ ManagedPostEntity enrichManagedPostContent(
       thumbnailUrl == primary.thumbnailUrl &&
       animatedCoverUrl == primary.animatedCoverUrl &&
       media == primary.media &&
-      type == primary.type) {
+      type == primary.type &&
+      soundId == primary.soundId &&
+      sound == primary.sound) {
     return hydrateManagedPostMedia(primary);
   }
 
@@ -425,8 +441,29 @@ ManagedPostEntity enrichManagedPostContent(
       animatedCoverUrl: animatedCoverUrl,
       media: media,
       type: type,
+      soundId: soundId,
+      sound: sound,
     ),
   );
+}
+
+ManagedPostSoundEntity? _mergeSound(
+  ManagedPostSoundEntity? primary,
+  ManagedPostSoundEntity? fallback, {
+  String? soundId,
+}) {
+  final id = soundId?.trim();
+  if (id == null || id.isEmpty) return null;
+
+  if (primary != null && primary.hasPlayableAudio) {
+    return primary.id == id ? primary : primary.copyWith(id: id);
+  }
+  if (fallback != null && fallback.hasPlayableAudio) {
+    return fallback.id == id ? fallback : fallback.copyWith(id: id);
+  }
+  if (primary != null) return primary.id == id ? primary : primary.copyWith(id: id);
+  if (fallback != null) return fallback.id == id ? fallback : fallback.copyWith(id: id);
+  return ManagedPostSoundEntity(id: id);
 }
 
 String? _pickNonEmptyStr(String? primary, String? fallback) {

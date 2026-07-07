@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../../domain/enums/wallet_enums.dart';
 import '../bloc/fiat_purchases_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_dashboard_widgets.dart';
 import 'wallets_page_widgets.dart';
@@ -46,25 +49,36 @@ class FiatPurchasesToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final gap = metrics.filterGap;
     final controlHeight = metrics.filterControlHeight;
+    final allStatuses = walletL10nOr(context, 'walletAllStatuses', 'All statuses');
+    final allProviders = walletL10nOr(context, 'walletAllProviders', 'All providers');
 
     final userSearch = AdminUserSearchField(
       compact: true,
       compactFilterStyle: true,
-      hintText: 'Search by username, name, or email',
+      hintText: walletL10nOr(context,
+        'walletSearchUserHint',
+        'Search by username, name, or email',
+      ),
       selectedUser: selectedUser,
       onUserSelected: onUserSelected,
     );
 
     final statusFilter = WalletsToolbarDropdown<String?>(
       value: status,
-      hint: 'All statuses',
+      hint: allStatuses,
       icon: Icons.flag_outlined,
       items: [
-        const DropdownMenuItem(value: null, child: Text('All statuses')),
+        DropdownMenuItem(value: null, child: Text(allStatuses)),
         ...FiatPurchaseStatus.values.map(
-          (s) => DropdownMenuItem(value: s.apiValue, child: Text(s.apiValue)),
+          (s) => DropdownMenuItem(
+            value: s.apiValue,
+            child: Text(fiatPurchaseStatusLabel(context, s.apiValue)),
+          ),
         ),
       ],
       onChanged: onStatusChanged,
@@ -72,12 +86,15 @@ class FiatPurchasesToolbar extends StatelessWidget {
 
     final providerFilter = WalletsToolbarDropdown<String?>(
       value: provider,
-      hint: 'All providers',
+      hint: allProviders,
       icon: Icons.payments_outlined,
       items: [
-        const DropdownMenuItem(value: null, child: Text('All providers')),
+        DropdownMenuItem(value: null, child: Text(allProviders)),
         ...FiatProvider.values.map(
-          (p) => DropdownMenuItem(value: p.apiValue, child: Text(p.apiValue)),
+          (p) => DropdownMenuItem(
+            value: p.apiValue,
+            child: Text(fiatProviderLabel(context, p.apiValue)),
+          ),
         ),
       ],
       onChanged: onProviderChanged,
@@ -169,14 +186,19 @@ class FiatPurchasesTableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDataListCard(
       total: state.meta.total,
-      totalLabel: 'purchases',
+      totalLabel: walletL10nOr(context, 'walletCountPurchases', 'purchases'),
       isEmpty: state.purchases.isEmpty,
       emptyIcon: Icons.shopping_cart_outlined,
-      emptyTitle: 'No purchases',
-      emptySubtitle:
-          'Try another user or adjust status and provider filters.',
+      emptyTitle: walletL10nOr(context, 'walletEmptyPurchases', 'No purchases'),
+      emptySubtitle: walletL10nOr(context,
+        'walletEmptyMsgPurchases',
+        'Try another user or adjust status and provider filters.',
+      ),
       page: state.meta.page,
       totalPages: state.meta.totalPages,
       onPage: (page) => context
@@ -212,6 +234,9 @@ class _FiatPurchasesCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return WalletsCompactListFrame(
@@ -221,7 +246,7 @@ class _FiatPurchasesCompactList extends StatelessWidget {
         final package = p.package?.name;
         final subtitle = [
           if (package != null && package.isNotEmpty) package,
-          '${p.provider} · ${_txnLabel(p)}',
+          '${fiatProviderLabel(context, p.provider)} · ${_txnLabel(p)}',
         ].join(' · ');
 
         return WalletsCompactCard(
@@ -244,7 +269,7 @@ class _FiatPurchasesCompactList extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               WalletsStatusChip(
-                label: p.status,
+                label: fiatPurchaseStatusLabel(context, p.status),
                 tone: statusChipTone(p.status),
               ),
             ],
@@ -266,17 +291,57 @@ class _FiatPurchasesDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDesktopTableFrame(
       header: Row(
         children: [
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Date')),
-          Expanded(flex: 3, child: WalletsTableHeaderLabel('User')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Package')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Provider ref')),
-          Expanded(child: WalletsTableHeaderLabel('Coins')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Fiat')),
-          Expanded(child: WalletsTableHeaderLabel('Provider')),
-          Expanded(child: WalletsTableHeaderLabel('Status')),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColDate', 'Date'),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColUser', 'User'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColPackage', 'Package'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColProviderRef', 'Provider ref'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColCoins', 'Coins'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColFiat', 'Fiat'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColProvider', 'Provider'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColStatus', 'Status'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -304,6 +369,9 @@ class _FiatPurchaseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final cellStyle = walletsTableCellStyle(context);
     final scheme = Theme.of(context).colorScheme;
     final p = purchase;
@@ -369,10 +437,12 @@ class _FiatPurchaseRow extends StatelessWidget {
               style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
-          Expanded(child: Text(p.provider, style: cellStyle)),
+          Expanded(
+            child: Text(fiatProviderLabel(context, p.provider), style: cellStyle),
+          ),
           Expanded(
             child: WalletsStatusChip(
-              label: p.status,
+              label: fiatPurchaseStatusLabel(context, p.status),
               tone: statusChipTone(p.status),
             ),
           ),

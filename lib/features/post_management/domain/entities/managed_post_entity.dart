@@ -1,8 +1,10 @@
 import '../../../categories/domain/entities/category_entity.dart';
+import 'managed_post_sound_entity.dart';
 import 'post_engagement_user_item.dart';
 import 'post_media_entity.dart';
 
 export '../../../categories/domain/entities/category_entity.dart';
+export 'managed_post_sound_entity.dart';
 export 'post_engagement_user_item.dart';
 export 'post_media_entity.dart';
 
@@ -56,6 +58,7 @@ class ManagedPostEntity {
     this.locationId,
     this.playlistId,
     this.soundId,
+    this.sound,
     this.originalPostId,
   });
 
@@ -105,6 +108,20 @@ class ManagedPostEntity {
 
   bool get containsVideoMedia =>
       isVideoPost || media.any((item) => item.isVideo);
+
+  bool get hasAttachedSound =>
+      soundId != null && soundId!.trim().isNotEmpty;
+
+  String? get attachedSoundPlayUrl {
+    final url = sound?.audioUrl;
+    if (url != null && url.trim().isNotEmpty) return url.trim();
+    return null;
+  }
+
+  bool get shouldPlayAttachedSound =>
+      !containsVideoMedia &&
+      hasAttachedSound &&
+      attachedSoundPlayUrl != null;
 
   /// List/card preview image. For video posts, prefers [thumbnailUrl] (never a playable video URL).
   String? get previewThumbnailUrl {
@@ -169,6 +186,7 @@ class ManagedPostEntity {
   final String? locationId;
   final String? playlistId;
   final String? soundId;
+  final ManagedPostSoundEntity? sound;
   final String? originalPostId;
 
   ManagedPostEntity copyWith({
@@ -220,6 +238,7 @@ class ManagedPostEntity {
     String? locationId,
     String? playlistId,
     String? soundId,
+    ManagedPostSoundEntity? sound,
     String? originalPostId,
   }) {
     return ManagedPostEntity(
@@ -271,6 +290,7 @@ class ManagedPostEntity {
       locationId: locationId ?? this.locationId,
       playlistId: playlistId ?? this.playlistId,
       soundId: soundId ?? this.soundId,
+      sound: sound ?? this.sound,
       originalPostId: originalPostId ?? this.originalPostId,
     );
   }

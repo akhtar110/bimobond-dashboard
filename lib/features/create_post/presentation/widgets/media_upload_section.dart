@@ -6,6 +6,7 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/create_post_entity.dart';
 import '../bloc/create_post_bloc.dart';
 import '../utils/media_file_picker.dart';
+import 'create_post_media_filter_sheet.dart';
 
 /// Step 1: attach media locally; upload runs on publish/draft (or explicit [UploadMedia]).
 class MediaUploadSection extends StatelessWidget {
@@ -148,6 +149,10 @@ class MediaUploadSection extends StatelessWidget {
                     ? form.thumbnailBytes
                     : null,
                 onRemove: () => onRemove(file.id),
+                onEditFilter: () => showCreatePostMediaFilterSheet(
+                  context: context,
+                  file: file,
+                ),
                 onMoveUp: index > 0
                     ? () => onReorder(index, index - 1)
                     : null,
@@ -171,6 +176,7 @@ class _MediaListTile extends StatelessWidget {
     required this.total,
     required this.isDark,
     required this.onRemove,
+    required this.onEditFilter,
     this.videoThumbnailBytes,
     this.onMoveUp,
     this.onMoveDown,
@@ -182,6 +188,7 @@ class _MediaListTile extends StatelessWidget {
   final bool isDark;
   final Uint8List? videoThumbnailBytes;
   final VoidCallback onRemove;
+  final VoidCallback onEditFilter;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
 
@@ -216,7 +223,11 @@ class _MediaListTile extends StatelessWidget {
                 width: 56,
                 height: 56,
                 child: isImage
-                    ? Image.memory(file.bytes, fit: BoxFit.cover)
+                    ? buildFilteredImagePreview(
+                        bytes: file.bytes,
+                        filter: file.filter,
+                        fit: BoxFit.cover,
+                      )
                     : videoThumbnailBytes != null &&
                             videoThumbnailBytes!.isNotEmpty
                         ? Image.memory(
@@ -248,7 +259,8 @@ class _MediaListTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     file.mediaType +
-                        (file.isUploaded ? ' · ✓' : ''),
+                        (file.isUploaded ? ' · ✓' : '') +
+                        (file.hasFilter ? ' · ✦' : ''),
                     style: TextStyle(
                       fontSize: 11,
                       color: file.isUploaded
@@ -258,6 +270,12 @@ class _MediaListTile extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.tune, size: 18),
+              tooltip: context.l10n.t('createPostMediaFilterEdit'),
+              onPressed: onEditFilter,
+              visualDensity: VisualDensity.compact,
             ),
             if (onMoveUp != null)
               IconButton(

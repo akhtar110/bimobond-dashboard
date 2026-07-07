@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
+import '../utils/wallet_labels.dart';
 
 class CoinPackageDialog extends StatefulWidget {
   const CoinPackageDialog({super.key, this.existing});
@@ -80,9 +84,16 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+
     return AlertDialog(
-      title: Text(isEditing ? 'Edit coin package' : 'Create coin package'),
+      title: Text(
+        isEditing
+            ? walletL10nOr(context, 'walletEditCoinPackage', 'Edit coin package')
+            : walletL10nOr(context, 'walletCreateCoinPackage', 'Create coin package'),
+      ),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -92,19 +103,20 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: walletL10nOr(context, 'walletColName', 'Name'),
+                  border: const OutlineInputBorder(),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? walletL10nOr(context, 'walletNameRequired', 'Name is required')
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _coinAmountController,
-                decoration: const InputDecoration(
-                  labelText: 'Coin amount',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: walletL10nOr(context, 'walletCoinAmount', 'Coin amount'),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -112,7 +124,7 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
-                validator: _positiveNumberValidator,
+                validator: (v) => _positiveNumberValidator(context, v),
               ),
               const SizedBox(height: 12),
               Row(
@@ -121,9 +133,12 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
                     flex: 2,
                     child: TextFormField(
                       controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Store price',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: walletL10nOr(context,
+                          'walletStorePrice',
+                          'Store price',
+                        ),
+                        border: const OutlineInputBorder(),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -131,17 +146,17 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                       ],
-                      validator: _positiveNumberValidator,
+                      validator: (v) => _positiveNumberValidator(context, v),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
                       controller: _currencyController,
-                      decoration: const InputDecoration(
-                        labelText: 'Currency',
+                      decoration: InputDecoration(
+                        labelText: walletL10nOr(context, 'walletCurrency', 'Currency'),
                         hintText: 'USD',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                       textCapitalization: TextCapitalization.characters,
                       inputFormatters: [
@@ -150,7 +165,12 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
                       ],
                       validator: (v) {
                         final code = v?.trim() ?? '';
-                        if (code.length != 3) return 'ISO 4217 code';
+                        if (code.length != 3) {
+                          return walletL10nOr(context,
+                            'walletCurrencyIso',
+                            'ISO 4217 code',
+                          );
+                        }
                         return null;
                       },
                     ),
@@ -159,7 +179,10 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Format price with currency code — never hardcode \$',
+                walletL10nOr(context,
+                  'walletPriceFormatHint',
+                  'Format price with currency code — never hardcode \$',
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -167,7 +190,9 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
               const SizedBox(height: 8),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Active'),
+                title: Text(
+                  walletL10nOr(context, 'active', 'Active'),
+                ),
                 value: _isActive,
                 onChanged: (v) => setState(() => _isActive = v),
               ),
@@ -178,19 +203,29 @@ class _CoinPackageDialogState extends State<CoinPackageDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(walletL10nOr(context, 'cancel', 'Cancel')),
         ),
         FilledButton(
           onPressed: _submit,
-          child: Text(isEditing ? 'Save' : 'Create'),
+          child: Text(
+            isEditing
+                ? walletL10nOr(context, 'save', 'Save')
+                : walletL10nOr(context, 'create', 'Create'),
+          ),
         ),
       ],
     );
   }
 
-  String? _positiveNumberValidator(String? value) {
+  String? _positiveNumberValidator(BuildContext context, String? value) {
     final parsed = double.tryParse(value?.trim() ?? '');
-    if (parsed == null || parsed <= 0) return 'Enter a positive number';
+    if (parsed == null || parsed <= 0) {
+      return walletL10nOr(
+        context,
+        'walletPositiveNumber',
+        'Enter a positive number',
+      );
+    }
     return null;
   }
 }

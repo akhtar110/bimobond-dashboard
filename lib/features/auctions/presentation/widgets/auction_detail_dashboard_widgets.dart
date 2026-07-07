@@ -90,13 +90,16 @@ class DashboardShell extends StatelessWidget {
               DashboardSpace.xxl,
             );
 
-        final content = Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: DashboardBreakpoints.maxContentWidth,
+        final content = SizedBox(
+          width: double.infinity,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: DashboardBreakpoints.maxContentWidth,
+              ),
+              child: child,
             ),
-            child: child,
           ),
         );
 
@@ -697,49 +700,58 @@ class ActivityFeed extends StatelessWidget {
 
     final card = DashboardCard(
       padding: const EdgeInsets.all(DashboardSpace.xl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: scheme.onSurface,
-                    letterSpacing: -0.3,
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DashboardSpace.md,
-                  vertical: DashboardSpace.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$count',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: DashboardSpace.sm),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DashboardSpace.md,
+                    vertical: DashboardSpace.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: DashboardSpace.lg),
-          if (expanded) Expanded(child: body) else body,
-        ],
+              ],
+            ),
+            const SizedBox(height: DashboardSpace.lg),
+            if (expanded) Expanded(child: body) else body,
+          ],
+        ),
       ),
     );
 
-    if (!expanded) return card;
-    return SizedBox(height: double.infinity, child: card);
+    if (!expanded) {
+      return SizedBox(width: double.infinity, child: card);
+    }
+    return SizedBox(width: double.infinity, child: card);
   }
 }
 
@@ -790,6 +802,7 @@ class _ActivityFeedItemState extends State<ActivityFeedItem> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
               radius: 20,
@@ -812,6 +825,8 @@ class _ActivityFeedItemState extends State<ActivityFeedItem> {
                 children: [
                   Text(
                     widget.primaryText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: scheme.onSurface,
@@ -828,10 +843,11 @@ class _ActivityFeedItemState extends State<ActivityFeedItem> {
                         Expanded(
                           child: Text(
                             widget.secondaryText!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -840,29 +856,43 @@ class _ActivityFeedItemState extends State<ActivityFeedItem> {
                 ],
               ),
             ),
-            if (widget.amount != null || widget.timestamp != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (widget.amount != null)
-                    Text(
-                      widget.amount!,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: scheme.primary,
+            if (widget.amount != null || widget.timestamp != null) ...[
+              const SizedBox(width: DashboardSpace.sm),
+              Flexible(
+                fit: FlexFit.loose,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 148),
+                  child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (widget.amount != null)
+                      Text(
+                        widget.amount!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: scheme.primary,
+                        ),
                       ),
-                    ),
-                  if (widget.timestamp != null) ...[
-                    const SizedBox(height: DashboardSpace.xs),
-                    Text(
-                      widget.timestamp!,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                    if (widget.timestamp != null) ...[
+                      const SizedBox(height: DashboardSpace.xs),
+                      Text(
+                        widget.timestamp!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
+            ),
+            ],
           ],
         ),
       ),

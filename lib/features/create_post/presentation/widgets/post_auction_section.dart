@@ -319,6 +319,7 @@ class _AuctionSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
+    final auction = this.auction;
 
     final String summary;
     final String subtitle;
@@ -329,7 +330,7 @@ class _AuctionSummaryCard extends StatelessWidget {
       });
       subtitle = l10n.tOr(
         'auctionMoneyConversionHint',
-        'Server converts to coins using COINS_PER_PRICE_UNIT',
+        'Server converts to coins using COINS_PER_PRICE_UNIT on save',
       );
     } else {
       final starting = auction.startingPriceCoins ?? 0;

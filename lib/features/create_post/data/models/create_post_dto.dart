@@ -1,5 +1,7 @@
 import '../../domain/entities/create_post_entity.dart';
+import '../../domain/services/create_post_payload_validator.dart';
 import 'create_auction_dto.dart';
+import 'create_post_nested_dtos.dart';
 import 'post_media_dto.dart';
 
 class CreatePostDto {
@@ -25,8 +27,10 @@ class CreatePostDto {
     this.isAuctionable,
     this.auction,
     this.locationId,
+    this.location,
     this.playlistId,
     this.soundId,
+    this.newSound,
     this.originalPostId,
     this.media,
   });
@@ -54,8 +58,10 @@ class CreatePostDto {
   final bool? isAuctionable;
   final CreateAuctionDto? auction;
   final String? locationId;
+  final CreateLocationDto? location;
   final String? playlistId;
   final String? soundId;
+  final CreateNewSoundDto? newSound;
   final String? originalPostId;
   final List<PostMediaDto>? media;
 
@@ -86,9 +92,21 @@ class CreatePostDto {
               auctionEntity.isComplete
           ? CreateAuctionDto.fromEntity(auctionEntity)
           : null,
-      locationId: entity.locationId,
+      locationId: CreatePostPayloadValidator.resolvesLocationId(entity)
+          ? entity.locationId
+          : null,
+      location: CreatePostPayloadValidator.resolvesInlineLocation(entity) != null
+          ? CreateLocationDto.fromEntity(
+              CreatePostPayloadValidator.resolvesInlineLocation(entity)!,
+            )
+          : null,
       playlistId: entity.playlistId,
       soundId: entity.soundId,
+      newSound: (entity.soundId == null || entity.soundId!.trim().isEmpty) &&
+              entity.newSound != null &&
+              entity.newSound!.isComplete
+          ? CreateNewSoundDto.fromEntity(entity.newSound!)
+          : null,
       originalPostId: entity.originalPostId,
       media: entity.media.isEmpty
           ? null
@@ -134,9 +152,17 @@ class CreatePostDto {
     putStr('thumbnailUrl', thumbnailUrl);
     putStr('hlsUrl', hlsUrl);
     putStr('animatedCoverUrl', animatedCoverUrl);
-    putStr('locationId', locationId);
+    if (location != null) {
+      map['location'] = location!.toJson();
+    } else {
+      putStr('locationId', locationId);
+    }
     putStr('playlistId', playlistId);
-    putStr('soundId', soundId);
+    if (newSound != null) {
+      map['newSound'] = newSound!.toJson();
+    } else {
+      putStr('soundId', soundId);
+    }
     putStr('originalPostId', originalPostId);
 
     // Only send status when explicitly DRAFT; PUBLISHED is the server default.

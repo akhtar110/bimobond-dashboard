@@ -1,19 +1,6 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const { defineString } = require("firebase-functions/params");
 
-/**
- * Public URL that Cloud Functions can reach.
- * For a LAN API (e.g. http://192.168.1.123:3000), expose it with ngrok or
- * Cloudflare Tunnel and set this to the HTTPS tunnel URL.
- *
- * Configure in functions/.env.bomibondapp:
- *   BACKEND_URL=https://your-tunnel-or-api.example.com
- */
-const backendUrl = defineString("BACKEND_URL", {
-  description:
-    "Reachable HTTPS URL for the NestJS/Express API (ngrok/Cloudflare tunnel for LAN)",
-  default: "http://192.168.1.123:3000",
-});
+const BACKEND_URL = "http://134.209.2.225";
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -34,9 +21,10 @@ exports.apiProxy = onRequest(
     region: "us-central1",
     memory: "256MiB",
     timeoutSeconds: 60,
+    invoker: "public",
   },
   async (req, res) => {
-    const backend = backendUrl.value().replace(/\/+$/, "");
+    const backend = BACKEND_URL.replace(/\/+$/, "");
     const incoming = new URL(req.url, `https://${req.headers.host}`);
     const pathname = incoming.pathname.replace(/^\/api/, "") || "/";
     const target = `${backend}${pathname}${incoming.search}`;
@@ -73,8 +61,7 @@ exports.apiProxy = onRequest(
       console.error("API proxy failed", { target, error });
       res.status(502).json({
         error: "Bad Gateway",
-        message:
-          "Could not reach BACKEND_URL. Set a public HTTPS URL in functions/.env.bomibondapp (ngrok/Cloudflare tunnel for LAN APIs).",
+        message: `Could not reach ${BACKEND_URL}. Check that the server is online.`,
         target,
       });
     }

@@ -1,50 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
 import '../../../../core/widgets/dashboard/analytics_card.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/responsive_stats_grid.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
-import '../utils/ledger_labels.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_dashboard_widgets.dart';
 import 'wallets_page_widgets.dart';
 
 List<Widget> walletOverviewKpiCards(
+  BuildContext context,
   WalletOverviewEntity overview, {
   bool showPackageStat = false,
 }) {
   final cards = <Widget>[
     AnalyticsCard(
-      label: 'Total wallets',
+      label: walletL10nOr(context, 'walletKpiTotalWallets', 'Total wallets'),
       value: '${overview.walletsTotal}',
       icon: Icons.account_balance_wallet_outlined,
     ),
     AnalyticsCard(
-      label: 'Total balance',
+      label: walletL10nOr(context, 'walletKpiTotalBalance', 'Total balance'),
       value: CoinFormat.coins(overview.totalBalanceCoins),
       icon: Icons.monetization_on_outlined,
       highlight: true,
     ),
     AnalyticsCard(
-      label: 'Fiat purchases',
+      label: walletL10nOr(context, 'walletKpiFiatPurchases', 'Fiat purchases'),
       value: '${overview.fiatPurchasesTotal}',
       icon: Icons.shopping_cart_outlined,
     ),
     AnalyticsCard(
-      label: 'Purchase volume',
+      label: walletL10nOr(context, 'walletKpiPurchaseVolume', 'Purchase volume'),
       value: CoinFormat.purchaseVolume(overview.completedPurchaseVolume),
       icon: Icons.payments_outlined,
     ),
     AnalyticsCard(
-      label: 'Pending withdrawals',
+      label: walletL10nOr(
+        context,
+        'walletKpiPendingWithdrawals',
+        'Pending withdrawals',
+      ),
       value: '${overview.withdrawalsPending}',
       icon: Icons.hourglass_top_outlined,
     ),
     AnalyticsCard(
-      label: 'Ledger entries (24h)',
+      label: walletL10nOr(
+        context,
+        'walletKpiLedgerEntries24h',
+        'Ledger entries (24h)',
+      ),
       value: '${overview.ledgerEntriesLast24Hours}',
       icon: Icons.receipt_long_outlined,
     ),
@@ -53,9 +65,19 @@ List<Widget> walletOverviewKpiCards(
   if (showPackageStat) {
     cards.add(
       AnalyticsCard(
-        label: 'Coin packages',
-        value: '${overview.packagesActive} active',
-        subtitle: '${overview.packagesTotal} total in catalog',
+        label: walletL10nOr(context, 'walletKpiCoinPackages', 'Coin packages'),
+        value: walletL10nArgs(
+          context,
+          'walletKpiPackagesActive',
+          {'active': '${overview.packagesActive}'},
+          '${overview.packagesActive} active',
+        ),
+        subtitle: walletL10nArgs(
+          context,
+          'walletKpiPackagesTotal',
+          {'total': '${overview.packagesTotal}'},
+          '${overview.packagesTotal} total in catalog',
+        ),
         icon: Icons.inventory_2_outlined,
       ),
     );
@@ -100,9 +122,13 @@ class WalletOverviewKpiSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return ResponsiveStatsGrid(
       minTileWidth: minTileWidth,
       children: walletOverviewKpiCards(
+        context,
         overview,
         showPackageStat: showPackageStat,
       ),
@@ -124,6 +150,9 @@ class WalletLedgerByTypeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final maxAmount = items.isEmpty
         ? 0.0
@@ -140,14 +169,17 @@ class WalletLedgerByTypeSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  walletL10nOr(context, 'walletSectionLedgerByType24h', title),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Entry count and coin volume per ledger type in the last 24 hours.',
+                  walletL10nOr(context,
+                    'walletSubtitleLedgerByType24h',
+                    'Entry count and coin volume per ledger type in the last 24 hours.',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                         height: 1.35,
@@ -157,11 +189,17 @@ class WalletLedgerByTypeSection extends StatelessWidget {
             ),
           ),
           if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
               child: EmptyStateCard(
-                title: 'No ledger activity',
-                message: 'Ledger breakdown will appear when entries are recorded.',
+                title: walletL10nOr(context,
+                  'walletEmptyLedgerActivity',
+                  'No ledger activity',
+                ),
+                message: walletL10nOr(context,
+                  'walletEmptyMsgLedgerActivity',
+                  'Ledger breakdown will appear when entries are recorded.',
+                ),
                 icon: Icons.receipt_long_outlined,
               ),
             )
@@ -202,12 +240,16 @@ class _LedgerTypeCompactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final fraction =
         maxAmount > 0 ? (item.amountCoins / maxAmount).clamp(0.0, 1.0) : 0.0;
+    final count = '${item.count}';
 
     return WalletsCompactCard(
-      title: ledgerTypeLabel(item.type),
+      title: ledgerTypeLabel(context, item.type),
       trailing: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -220,7 +262,11 @@ class _LedgerTypeCompactCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${item.count} entries',
+            walletL10nArgs(context,
+              'walletLedgerTypeEntries',
+              {'count': count},
+              '$count entries',
+            ),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -251,6 +297,9 @@ class _LedgerTypeDesktopList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return DecoratedBox(
@@ -268,9 +317,23 @@ class _LedgerTypeDesktopList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                Expanded(flex: 4, child: WalletsTableHeaderLabel('Type')),
-                Expanded(child: WalletsTableHeaderLabel('Entries')),
-                Expanded(flex: 2, child: WalletsTableHeaderLabel('Volume')),
+                Expanded(
+                  flex: 4,
+                  child: WalletsTableHeaderLabel(
+                    walletL10nOr(context, 'walletColType', 'Type'),
+                  ),
+                ),
+                Expanded(
+                  child: WalletsTableHeaderLabel(
+                    walletL10nOr(context, 'walletColEntries', 'Entries'),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: WalletsTableHeaderLabel(
+                    walletL10nOr(context, 'walletColVolume', 'Volume'),
+                  ),
+                ),
                 const Expanded(flex: 3, child: SizedBox()),
               ],
             ),
@@ -316,6 +379,9 @@ class _LedgerTypeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final cellStyle = walletsTableCellStyle(context);
     final fraction =
@@ -328,7 +394,7 @@ class _LedgerTypeRow extends StatelessWidget {
           Expanded(
             flex: 4,
             child: Text(
-              ledgerTypeLabel(item.type),
+              ledgerTypeLabel(context, item.type),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
@@ -420,12 +486,21 @@ class WalletCoinPackagesCatalog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
+    final activeLabel = walletL10nOr(context, 'active', 'Active');
+    final inactiveLabel = walletL10nOr(context, 'inactive', 'Inactive');
+
     if (packages.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
+      return Padding(
+        padding: const EdgeInsets.all(16),
         child: EmptyStateCard(
-          title: 'No coin packages',
-          message: 'Active packages offered for fiat purchase will appear here.',
+          title: walletL10nOr(context, 'walletEmptyCoinPackages', 'No coin packages'),
+          message: walletL10nOr(context,
+            'walletEmptyMsgCoinPackages',
+            'Active packages offered for fiat purchase will appear here.',
+          ),
           icon: Icons.inventory_2_outlined,
         ),
       );
@@ -434,11 +509,19 @@ class WalletCoinPackagesCatalog extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: ResponsiveDataTable(
-        columns: const [
-          DataColumn(label: Text('Name')),
-          DataColumn(label: Text('Coins')),
-          DataColumn(label: Text('Price')),
-          DataColumn(label: Text('Status')),
+        columns: [
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColName', 'Name')),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColCoins', 'Coins')),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColPrice', 'Price')),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColStatus', 'Status')),
+          ),
         ],
         rows: [
           for (final pkg in packages)
@@ -448,7 +531,7 @@ class WalletCoinPackagesCatalog extends StatelessWidget {
                 DataCell(Text(CoinFormat.coins(pkg.coinAmount))),
                 DataCell(Text(MoneyFormat.format(pkg.price, pkg.currencyCode))),
                 DataCell(WalletsStatusChip(
-                  label: pkg.isActive ? 'Active' : 'Inactive',
+                  label: pkg.isActive ? activeLabel : inactiveLabel,
                   tone: pkg.isActive
                       ? WalletsChipTone.success
                       : WalletsChipTone.neutral,
@@ -463,7 +546,7 @@ class WalletCoinPackagesCatalog extends StatelessWidget {
               primary: CoinFormat.coins(pkg.coinAmount),
               secondary: MoneyFormat.format(pkg.price, pkg.currencyCode),
               chip: WalletsStatusChip(
-                label: pkg.isActive ? 'Active' : 'Inactive',
+                label: pkg.isActive ? activeLabel : inactiveLabel,
                 tone: pkg.isActive
                     ? WalletsChipTone.success
                     : WalletsChipTone.neutral,
@@ -482,12 +565,21 @@ class WalletGiftCatalogTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
+    final activeLabel = walletL10nOr(context, 'active', 'Active');
+    final inactiveLabel = walletL10nOr(context, 'inactive', 'Inactive');
+
     if (items.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
+      return Padding(
+        padding: const EdgeInsets.all(16),
         child: EmptyStateCard(
-          title: 'No gifts in catalog',
-          message: 'Gift items and coin prices will appear here.',
+          title: walletL10nOr(context, 'walletEmptyGiftsCatalog', 'No gifts in catalog'),
+          message: walletL10nOr(context,
+            'walletEmptyMsgGiftsCatalog',
+            'Gift items and coin prices will appear here.',
+          ),
           icon: Icons.card_giftcard_outlined,
         ),
       );
@@ -496,10 +588,16 @@ class WalletGiftCatalogTable extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: ResponsiveDataTable(
-        columns: const [
-          DataColumn(label: Text('Name')),
-          DataColumn(label: Text('Price')),
-          DataColumn(label: Text('Status')),
+        columns: [
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColName', 'Name')),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColPrice', 'Price')),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColStatus', 'Status')),
+          ),
         ],
         rows: [
           for (final gift in items)
@@ -508,7 +606,7 @@ class WalletGiftCatalogTable extends StatelessWidget {
                 DataCell(Text(gift.name)),
                 DataCell(Text(CoinFormat.coins(gift.priceCoins))),
                 DataCell(WalletsStatusChip(
-                  label: gift.isActive ? 'Active' : 'Inactive',
+                  label: gift.isActive ? activeLabel : inactiveLabel,
                   tone: gift.isActive
                       ? WalletsChipTone.success
                       : WalletsChipTone.neutral,
@@ -522,7 +620,7 @@ class WalletGiftCatalogTable extends StatelessWidget {
               title: gift.name,
               primary: CoinFormat.coins(gift.priceCoins),
               chip: WalletsStatusChip(
-                label: gift.isActive ? 'Active' : 'Inactive',
+                label: gift.isActive ? activeLabel : inactiveLabel,
                 tone: gift.isActive
                     ? WalletsChipTone.success
                     : WalletsChipTone.neutral,
@@ -541,12 +639,24 @@ class WalletPromoPackagesCatalog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
+    final activeLabel = walletL10nOr(context, 'active', 'Active');
+    final inactiveLabel = walletL10nOr(context, 'inactive', 'Inactive');
+
     if (items.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
+      return Padding(
+        padding: const EdgeInsets.all(16),
         child: EmptyStateCard(
-          title: 'No promotion packages',
-          message: 'Promotion packages and budgets will appear here.',
+          title: walletL10nOr(context,
+            'walletEmptyPromotionPackages',
+            'No promotion packages',
+          ),
+          message: walletL10nOr(context,
+            'walletEmptyMsgPromotionPackages',
+            'Promotion packages and budgets will appear here.',
+          ),
           icon: Icons.campaign_outlined,
         ),
       );
@@ -555,11 +665,21 @@ class WalletPromoPackagesCatalog extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: ResponsiveDataTable(
-        columns: const [
-          DataColumn(label: Text('Name')),
-          DataColumn(label: Text('Budget')),
-          DataColumn(label: Text('Impressions')),
-          DataColumn(label: Text('Status')),
+        columns: [
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColName', 'Name')),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColBudget', 'Budget')),
+          ),
+          DataColumn(
+            label: Text(
+              walletL10nOr(context, 'walletColImpressions', 'Impressions'),
+            ),
+          ),
+          DataColumn(
+            label: Text(walletL10nOr(context, 'walletColStatus', 'Status')),
+          ),
         ],
         rows: [
           for (final pkg in items)
@@ -569,7 +689,7 @@ class WalletPromoPackagesCatalog extends StatelessWidget {
                 DataCell(Text(CoinFormat.coins(pkg.priceCoins))),
                 DataCell(Text('${pkg.impressionCount}')),
                 DataCell(WalletsStatusChip(
-                  label: pkg.isActive ? 'Active' : 'Inactive',
+                  label: pkg.isActive ? activeLabel : inactiveLabel,
                   tone: pkg.isActive
                       ? WalletsChipTone.success
                       : WalletsChipTone.neutral,
@@ -582,9 +702,13 @@ class WalletPromoPackagesCatalog extends StatelessWidget {
             _CatalogMobileCard(
               title: pkg.name,
               primary: CoinFormat.coins(pkg.priceCoins),
-              secondary: '${pkg.impressionCount} impressions',
+              secondary: walletL10nArgs(context,
+                'walletPromoImpressions',
+                {'count': '${pkg.impressionCount}'},
+                '${pkg.impressionCount} impressions',
+              ),
               chip: WalletsStatusChip(
-                label: pkg.isActive ? 'Active' : 'Inactive',
+                label: pkg.isActive ? activeLabel : inactiveLabel,
                 tone: pkg.isActive
                     ? WalletsChipTone.success
                     : WalletsChipTone.neutral,

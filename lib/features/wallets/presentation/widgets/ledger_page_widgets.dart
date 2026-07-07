@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../../domain/enums/wallet_enums.dart';
 import '../bloc/ledger_bloc.dart';
-import '../utils/ledger_labels.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_page_widgets.dart';
 
@@ -34,19 +36,24 @@ class LedgerToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final gap = metrics.filterGap;
     final controlHeight = metrics.filterControlHeight;
+    final allTypes = walletL10nOr(context, 'walletAllTypes', 'All types');
+    final allActions = walletL10nOr(context, 'walletAllActions', 'All actions');
 
     final typeFilter = WalletsToolbarDropdown<String?>(
       value: type,
-      hint: 'All types',
+      hint: allTypes,
       icon: Icons.category_outlined,
       items: [
-        const DropdownMenuItem(value: null, child: Text('All types')),
+        DropdownMenuItem(value: null, child: Text(allTypes)),
         ...LedgerType.values.map(
           (t) => DropdownMenuItem(
             value: t.apiValue,
-            child: Text(ledgerTypeLabel(t.apiValue)),
+            child: Text(ledgerTypeLabel(context, t.apiValue)),
           ),
         ),
       ],
@@ -55,14 +62,14 @@ class LedgerToolbar extends StatelessWidget {
 
     final actionFilter = WalletsToolbarDropdown<String?>(
       value: action,
-      hint: 'All actions',
+      hint: allActions,
       icon: Icons.swap_horiz_rounded,
       items: [
-        const DropdownMenuItem(value: null, child: Text('All actions')),
+        DropdownMenuItem(value: null, child: Text(allActions)),
         ...LedgerAction.values.map(
           (a) => DropdownMenuItem(
             value: a.apiValue,
-            child: Text(ledgerActionLabel(a.apiValue)),
+            child: Text(ledgerActionLabel(context, a.apiValue)),
           ),
         ),
       ],
@@ -129,13 +136,19 @@ class LedgerTableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDataListCard(
       total: state.meta.total,
-      totalLabel: 'entries',
+      totalLabel: walletL10nOr(context, 'walletCountEntries', 'entries'),
       isEmpty: state.entries.isEmpty,
       emptyIcon: Icons.receipt_long_outlined,
-      emptyTitle: 'No ledger entries',
-      emptySubtitle: 'Try adjusting type or action filters.',
+      emptyTitle: walletL10nOr(context, 'walletEmptyLedger', 'No ledger entries'),
+      emptySubtitle: walletL10nOr(context,
+        'walletEmptyMsgLedger',
+        'Try adjusting type or action filters.',
+      ),
       page: state.meta.page,
       totalPages: state.meta.totalPages,
       onPage: (page) =>
@@ -155,6 +168,9 @@ class _LedgerCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsCompactListFrame(
       itemCount: entries.length,
       itemBuilder: (context, index) {
@@ -164,7 +180,7 @@ class _LedgerCompactList extends StatelessWidget {
         final scheme = Theme.of(context).colorScheme;
 
         return WalletsCompactCard(
-          title: ledgerTypeLabel(entry.type),
+          title: ledgerTypeLabel(context, entry.type),
           subtitle: user?.displayName ?? entry.wallet?.userId ?? '—',
           footer: Text(
             dateFmt.format(entry.createdAt.toLocal()),
@@ -186,7 +202,7 @@ class _LedgerCompactList extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                ledgerActionLabel(entry.action),
+                ledgerActionLabel(context, entry.action),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -207,16 +223,53 @@ class _LedgerDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDesktopTableFrame(
       header: Row(
         children: [
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Date')),
-          Expanded(flex: 3, child: WalletsTableHeaderLabel('User')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Type')),
-          Expanded(child: WalletsTableHeaderLabel('Action')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Amount')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Balance after')),
-          Expanded(flex: 3, child: WalletsTableHeaderLabel('Reason')),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColDate', 'Date'),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColUser', 'User'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColType', 'Type'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColAction', 'Action'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColAmount', 'Amount'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColBalanceAfter', 'Balance after'),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColReason', 'Reason'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -240,6 +293,9 @@ class _LedgerTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final user = entry.wallet?.user;
     final amountPrefix = entry.action == 'DEBIT' ? '−' : '+';
@@ -268,14 +324,14 @@ class _LedgerTableRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              ledgerTypeLabel(entry.type),
+              ledgerTypeLabel(context, entry.type),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cellStyle,
             ),
           ),
           Expanded(
-            child: Text(ledgerActionLabel(entry.action), style: cellStyle),
+            child: Text(ledgerActionLabel(context, entry.action), style: cellStyle),
           ),
           Expanded(
             flex: 2,

@@ -95,7 +95,10 @@ class _CategoriesPageBody extends StatelessWidget {
           builder: (context, constraints) {
             final width = constraints.maxWidth;
             final hasTree = state is CategoriesLoaded &&
-                state.catalogCategories.isNotEmpty;
+                (state.catalogCategories.isNotEmpty ||
+                    state.searchQuery.trim().isNotEmpty ||
+                    state.filter != CategoryFilter.all ||
+                    state.typeFilter != CategoryTypeFilter.all);
             final hPad = _horizontalPadding(width);
             final vPad = _verticalPadding(width, hasTree);
             final sectionGap = _sectionSpacing(width, hasTree);
@@ -179,20 +182,12 @@ class _CategoriesPageBody extends StatelessWidget {
     }
     if (state is CategoriesLoaded) {
       final hasCatalog = state.catalogCategories.isNotEmpty;
-      final noFiltersApplied = state.searchQuery.trim().isEmpty &&
-          state.filter == CategoryFilter.all &&
-          state.typeFilter == CategoryTypeFilter.all;
+      final filtersActive = state.searchQuery.trim().isNotEmpty ||
+          state.filter != CategoryFilter.all ||
+          state.typeFilter != CategoryTypeFilter.all;
 
-      if (!hasCatalog && noFiltersApplied) {
+      if (!hasCatalog && !filtersActive) {
         return CategoriesEmptyView(isDark: isDark);
-      }
-
-      if (state.isFetching && state.displayRoots.isEmpty) {
-        return Center(
-          child: CircularProgressIndicator(
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        );
       }
 
       return CategoryTreeView(

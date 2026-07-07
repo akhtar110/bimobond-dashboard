@@ -107,6 +107,7 @@ Map<String, dynamic> userPostEntityToAdminJson(UserPostEntity post) {
     if (post.locationId != null) 'locationId': post.locationId,
     if (post.playlistId != null) 'playlistId': post.playlistId,
     if (post.soundId != null) 'soundId': post.soundId,
+    if (post.sound != null) 'sound': post.sound,
     if (post.originalPostId != null) 'originalPostId': post.originalPostId,
     if (post.user != null) 'user': post.user,
     if (post.media != null && post.media!.isNotEmpty) 'media': post.media,

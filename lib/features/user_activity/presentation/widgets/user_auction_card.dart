@@ -31,7 +31,7 @@ class _UserAuctionCardState extends State<UserAuctionCard> {
     final l10n = context.l10n;
     final auction = widget.auction;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
-    final progress = auction.progressPercent;
+    final progress = auction.progressFraction;
     final isEnded = !auction.isActive;
 
     return MouseRegion(

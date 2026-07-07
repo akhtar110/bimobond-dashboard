@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/entities/managed_post_sound_entity.dart';
 import '../../domain/entities/post_media_entity.dart';
 
 /// Stable media-only slice used to isolate carousel rebuilds from draft edits.
@@ -15,6 +16,8 @@ class PostMediaSnapshot {
     this.media = const [],
     this.videoWidth,
     this.videoHeight,
+    this.soundId,
+    this.sound,
   });
 
   final String postId;
@@ -25,6 +28,25 @@ class PostMediaSnapshot {
   final List<PostMediaEntity> media;
   final int? videoWidth;
   final int? videoHeight;
+  final String? soundId;
+  final ManagedPostSoundEntity? sound;
+
+  bool get hasAttachedSound =>
+      soundId != null && soundId!.trim().isNotEmpty;
+
+  String? get attachedSoundPlayUrl {
+    final url = sound?.audioUrl;
+    if (url != null && url.trim().isNotEmpty) return url.trim();
+    return null;
+  }
+
+  bool get shouldPlayAttachedSound {
+    final isVideo = type.toUpperCase() == 'VIDEO';
+    final hasVideoMedia = isVideo || media.any((item) => item.isVideo);
+    return !hasVideoMedia &&
+        hasAttachedSound &&
+        attachedSoundPlayUrl != null;
+  }
 
   factory PostMediaSnapshot.fromPost(ManagedPostEntity post) {
     return PostMediaSnapshot(
@@ -36,6 +58,8 @@ class PostMediaSnapshot {
       media: post.media,
       videoWidth: post.videoWidth,
       videoHeight: post.videoHeight,
+      soundId: post.soundId,
+      sound: post.sound,
     );
   }
 
@@ -51,6 +75,8 @@ class PostMediaSnapshot {
       media: media,
       videoWidth: videoWidth,
       videoHeight: videoHeight,
+      soundId: soundId,
+      sound: sound,
       status: 'PUBLISHED',
       viewCount: 0,
       shareCount: 0,
@@ -81,6 +107,8 @@ class PostMediaSnapshot {
         other.thumbnailUrl == thumbnailUrl &&
         other.videoWidth == videoWidth &&
         other.videoHeight == videoHeight &&
+        other.soundId == soundId &&
+        other.sound == sound &&
         listEquals(other.media, media);
   }
 
@@ -93,6 +121,8 @@ class PostMediaSnapshot {
         thumbnailUrl,
         videoWidth,
         videoHeight,
+        soundId,
+        sound,
         Object.hashAll(media),
       );
 }

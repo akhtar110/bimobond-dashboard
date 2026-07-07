@@ -12,25 +12,33 @@ class PostVideoControllerCache {
 
   final Map<String, _CachedVideoController> _cache = {};
 
-  VideoPlayerController obtain(String url) {
+  VideoPlayerController obtain(String url, {bool looping = true}) {
     final existing = _cache[url];
     if (existing != null) {
       existing.refCount++;
+      existing.looping = looping;
+      if (existing.initialized) {
+        existing.controller.setLooping(looping);
+      }
       return existing.controller;
     }
 
     final controller = VideoPlayerController.networkUrl(Uri.parse(url));
-    final entry = _CachedVideoController(controller);
+    final entry = _CachedVideoController(controller, looping: looping);
     _cache[url] = entry;
     entry.refCount = 1;
     entry.initializeFuture = controller.initialize().then((_) {
       entry.initialized = true;
-      controller.setLooping(true);
+      controller.setLooping(entry.looping);
     }).catchError((_) {
       entry.failed = true;
     });
     return controller;
   }
+
+  VideoPlayerController? controllerFor(String url) => _cache[url]?.controller;
+
+  bool isInitialized(String url) => _cache[url]?.initialized ?? false;
 
   Future<void> waitForInitialize(String url) async {
     final entry = _cache[url];
@@ -60,9 +68,10 @@ class PostVideoControllerCache {
 }
 
 class _CachedVideoController {
-  _CachedVideoController(this.controller);
+  _CachedVideoController(this.controller, {this.looping = true});
 
   final VideoPlayerController controller;
+  bool looping;
   int refCount = 0;
   Future<void>? initializeFuture;
   bool initialized = false;
@@ -78,6 +87,7 @@ class PostMediaPreview extends StatefulWidget {
     this.type = 'VIDEO',
     this.height = 360,
     this.autoplay = false,
+    this.looping = true,
     this.fit = BoxFit.contain,
     this.onAspectRatioDetermined,
   });
@@ -88,6 +98,7 @@ class PostMediaPreview extends StatefulWidget {
   final String type;
   final double height;
   final bool autoplay;
+  final bool looping;
   final BoxFit fit;
   final ValueChanged<double>? onAspectRatioDetermined;
 
@@ -164,6 +175,7 @@ class _PostMediaPreviewState extends State<PostMediaPreview> {
             key: ValueKey(playUrl),
             videoUrl: playUrl,
             autoplay: widget.autoplay,
+            looping: widget.looping,
             fit: widget.fit,
             onAspectRatioDetermined: widget.onAspectRatioDetermined,
           )
@@ -187,17 +199,117 @@ class _PostMediaPreviewState extends State<PostMediaPreview> {
   }
 }
 
+class PostAttachedSoundPreview extends StatefulWidget {
+  const PostAttachedSoundPreview({
+    super.key,
+    required this.audioUrl,
+    this.autoplay = true,
+    this.looping = true,
+  });
+
+  final String audioUrl;
+  final bool autoplay;
+  final bool looping;
+
+  @override
+  State<PostAttachedSoundPreview> createState() =>
+      _PostAttachedSoundPreviewState();
+}
+
+class _PostAttachedSoundPreviewState extends State<PostAttachedSoundPreview> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PostVideoControllerCache.instance.obtain(
+      widget.audioUrl,
+      looping: widget.looping,
+    );
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await PostVideoControllerCache.instance.waitForInitialize(widget.audioUrl);
+    if (!mounted) return;
+    final value = _controller.value;
+    if (value.hasError || !value.isInitialized) {
+      setState(() => _failed = true);
+      return;
+    }
+    if (widget.autoplay) {
+      await _controller.play();
+    }
+    if (mounted) setState(() => _initialized = true);
+  }
+
+  @override
+  void didUpdateWidget(PostAttachedSoundPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.audioUrl != widget.audioUrl) {
+      PostVideoControllerCache.instance.release(oldWidget.audioUrl);
+      _controller = PostVideoControllerCache.instance.obtain(
+        widget.audioUrl,
+        looping: widget.looping,
+      );
+      _initialized = false;
+      _failed = false;
+      _bootstrap();
+      return;
+    }
+
+    if (oldWidget.autoplay != widget.autoplay &&
+        _controller.value.isInitialized) {
+      if (widget.autoplay) {
+        _controller.play();
+      } else {
+        _controller.pause();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    PostVideoControllerCache.instance.release(widget.audioUrl);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed ||
+        !_initialized ||
+        !_controller.value.isInitialized ||
+        _controller.value.hasError) {
+      return const SizedBox.shrink();
+    }
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return PostVideoControlsOverlay(
+          controller: _controller,
+          enableFullscreen: false,
+        );
+      },
+    );
+  }
+}
+
 class PostVideoPreview extends StatefulWidget {
   const PostVideoPreview({
     super.key,
     required this.videoUrl,
     this.autoplay = false,
+    this.looping = true,
     this.fit = BoxFit.contain,
     this.onAspectRatioDetermined,
   });
 
   final String videoUrl;
   final bool autoplay;
+  final bool looping;
   final BoxFit fit;
   final ValueChanged<double>? onAspectRatioDetermined;
 
@@ -215,7 +327,10 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
   @override
   void initState() {
     super.initState();
-    _controller = PostVideoControllerCache.instance.obtain(widget.videoUrl);
+    _controller = PostVideoControllerCache.instance.obtain(
+      widget.videoUrl,
+      looping: widget.looping,
+    );
     _bootstrap();
   }
 
@@ -275,7 +390,10 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.videoUrl != widget.videoUrl) {
       PostVideoControllerCache.instance.release(oldWidget.videoUrl);
-      _controller = PostVideoControllerCache.instance.obtain(widget.videoUrl);
+      _controller = PostVideoControllerCache.instance.obtain(
+        widget.videoUrl,
+        looping: widget.looping,
+      );
       _initialized = false;
       _failed = false;
       _aspectRatioReported = false;

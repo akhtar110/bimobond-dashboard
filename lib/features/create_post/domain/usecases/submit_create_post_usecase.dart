@@ -1,6 +1,8 @@
 import '../create_post_payload_builder.dart';
 import '../entities/create_post_entity.dart';
+import '../services/create_post_media_filter_service.dart';
 import '../services/create_post_media_upload_service.dart';
+import '../services/create_post_payload_validator.dart';
 import '../services/create_post_thumbnail_service.dart';
 import '../../../posts/domain/usecases/video_thumbnail_usecases.dart';
 import 'create_post_usecase.dart';
@@ -12,15 +14,18 @@ class SubmitCreatePost {
     required CreatePostThumbnailService thumbnailService,
     required UploadThumbnailUseCase uploadThumbnail,
     required CreatePost createPost,
+    required CreatePostMediaFilterService mediaFilterService,
   })  : _uploadService = uploadService,
         _thumbnailService = thumbnailService,
         _uploadThumbnail = uploadThumbnail,
-        _createPost = createPost;
+        _createPost = createPost,
+        _mediaFilterService = mediaFilterService;
 
   final CreatePostMediaUploadService _uploadService;
   final CreatePostThumbnailService _thumbnailService;
   final UploadThumbnailUseCase _uploadThumbnail;
   final CreatePost _createPost;
+  final CreatePostMediaFilterService _mediaFilterService;
 
   Future<CreatePostEntity> call({
     required CreatePostEntity form,
@@ -41,6 +46,9 @@ class SubmitCreatePost {
       working = working.copyWith(description: '');
     }
 
+    CreatePostPayloadValidator.validate(working);
+
+    working = await _mediaFilterService.applyFiltersToImages(working);
     working = await _thumbnailService.generateIfNeeded(working);
 
     if (!working.allMediaUploaded) {

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../../domain/enums/wallet_enums.dart';
+import '../utils/wallet_labels.dart';
 
 class AdjustBalanceDialog extends StatefulWidget {
   const AdjustBalanceDialog({super.key});
@@ -40,10 +44,12 @@ class _AdjustBalanceDialogState extends State<AdjustBalanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
     return AlertDialog(
-      title: const Text('Adjust balance'),
+      title: Text(walletL10nOr(context, 'walletAdjustBalance', 'Adjust balance')),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -53,16 +59,20 @@ class _AdjustBalanceDialogState extends State<AdjustBalanceDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SegmentedButton<LedgerAction>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: LedgerAction.credit,
-                    label: Text('Credit'),
-                    icon: Icon(Icons.add),
+                    label: Text(
+                      ledgerActionLabel(context, LedgerAction.credit.apiValue),
+                    ),
+                    icon: const Icon(Icons.add),
                   ),
                   ButtonSegment(
                     value: LedgerAction.debit,
-                    label: Text('Debit'),
-                    icon: Icon(Icons.remove),
+                    label: Text(
+                      ledgerActionLabel(context, LedgerAction.debit.apiValue),
+                    ),
+                    icon: const Icon(Icons.remove),
                   ),
                 ],
                 selected: {_action},
@@ -73,9 +83,12 @@ class _AdjustBalanceDialogState extends State<AdjustBalanceDialog> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountController,
-                decoration: const InputDecoration(
-                  labelText: 'Amount (coins)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: walletL10nOr(context,
+                    'walletAmountCoins',
+                    'Amount (coins)',
+                  ),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -86,7 +99,10 @@ class _AdjustBalanceDialogState extends State<AdjustBalanceDialog> {
                 validator: (value) {
                   final parsed = double.tryParse(value?.trim() ?? '');
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a positive amount';
+                    return walletL10nOr(context,
+                      'walletAmountPositive',
+                      'Enter a positive amount',
+                    );
                   }
                   return null;
                 },
@@ -94,15 +110,21 @@ class _AdjustBalanceDialogState extends State<AdjustBalanceDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (optional)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: walletL10nOr(context,
+                    'walletReasonOptional',
+                    'Reason (optional)',
+                  ),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 2,
               ),
               const SizedBox(height: 8),
               Text(
-                'Creates an ADMIN_ADJUSTMENT ledger entry.',
+                walletL10nOr(context,
+                  'walletAdjustBalanceHint',
+                  'Creates an ADMIN_ADJUSTMENT ledger entry.',
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -114,11 +136,11 @@ class _AdjustBalanceDialogState extends State<AdjustBalanceDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(walletL10nOr(context, 'cancel', 'Cancel')),
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('Apply'),
+          child: Text(walletL10nOr(context, 'apply', 'Apply')),
         ),
       ],
     );

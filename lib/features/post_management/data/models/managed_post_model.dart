@@ -2,6 +2,7 @@ import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/data/models/category_model.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/utils/post_status_utils.dart';
+import 'managed_post_sound_model.dart';
 import 'post_engagement_user_model.dart';
 
 class ManagedPostModel extends ManagedPostEntity {
@@ -54,6 +55,7 @@ class ManagedPostModel extends ManagedPostEntity {
     super.locationId,
     super.playlistId,
     super.soundId,
+    super.sound,
     super.originalPostId,
   });
 
@@ -164,6 +166,10 @@ class ManagedPostModel extends ManagedPostEntity {
       locationId: json['locationId'] as String?,
       playlistId: json['playlistId'] as String?,
       soundId: json['soundId'] as String?,
+      sound: parseManagedPostSound(
+        json['sound'],
+        soundId: json['soundId']?.toString(),
+      ),
       originalPostId: json['originalPostId'] as String?,
     );
   }

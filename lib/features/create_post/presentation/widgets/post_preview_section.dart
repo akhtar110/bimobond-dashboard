@@ -4,7 +4,10 @@ import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/create_post_entity.dart';
+import '../../domain/services/create_post_media_filter_service.dart';
 import 'create_post_local_video_preview.dart';
+import 'create_post_media_filter_sheet.dart';
+import 'create_post_rich_description.dart';
 
 class PostPreviewSection extends StatefulWidget {
   const PostPreviewSection({super.key, required this.form});
@@ -118,12 +121,15 @@ class _PostPreviewSectionState extends State<PostPreviewSection> {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            widget.form.description?.isNotEmpty == true
-                ? widget.form.description!
-                : '—',
-            style: theme.textTheme.bodyLarge,
-          ),
+          CreatePostRichDescriptionPreview(form: widget.form),
+          if (widget.form.hasLocation) ...[
+            const SizedBox(height: 12),
+            _LocationPreview(form: widget.form),
+          ],
+          if (widget.form.hasSound && widget.form.selectedSound != null) ...[
+            const SizedBox(height: 12),
+            _SoundPreview(sound: widget.form.selectedSound!),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -218,14 +224,19 @@ class _MainMediaPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const filterService = CreatePostMediaFilterService();
+
+    Widget child;
     if (file.mediaType == 'IMAGE') {
-      return Image.memory(file.bytes, fit: BoxFit.contain);
+      child = Image.memory(file.bytes, fit: BoxFit.contain);
+    } else {
+      child = CreatePostLocalVideoPreview(
+        bytes: file.bytes,
+        fileName: file.name,
+      );
     }
 
-    return CreatePostLocalVideoPreview(
-      bytes: file.bytes,
-      fileName: file.name,
-    );
+    return filterService.buildFilteredPreview(child: child, filter: file.filter);
   }
 }
 
@@ -279,7 +290,11 @@ class _AttachedMediaThumb extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       if (isImage)
-                        Image.memory(file.bytes, fit: BoxFit.cover)
+                        buildFilteredImagePreview(
+                          bytes: file.bytes,
+                          filter: file.filter,
+                          fit: BoxFit.cover,
+                        )
                       else
                         ColoredBox(
                           color: isDark
@@ -357,6 +372,79 @@ class _Chip extends StatelessWidget {
       label: Text(label, style: const TextStyle(fontSize: 11)),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+
+class _LocationPreview extends StatelessWidget {
+  const _LocationPreview({required this.form});
+
+  final CreatePostEntity form;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final location = form.location;
+    final label = location?.name ?? form.locationId ?? '';
+
+    return Row(
+      children: [
+        Icon(Icons.location_on_outlined, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.t('createPostLocation'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(label, style: theme.textTheme.bodyMedium),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SoundPreview extends StatelessWidget {
+  const _SoundPreview({required this.sound});
+
+  final CreatePostSoundSelectionEntity sound;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Icon(Icons.music_note_outlined, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.t('createPostSound'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                '${sound.name} · ${sound.author}',
+                style: theme.textTheme.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

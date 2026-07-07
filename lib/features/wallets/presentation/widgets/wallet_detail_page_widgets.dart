@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
 import '../../../../core/widgets/toolbar_filter_style.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
-import '../utils/ledger_labels.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_dashboard_widgets.dart';
 import 'wallets_page_widgets.dart';
@@ -17,9 +20,15 @@ class WalletDetailSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final user = detail.user;
     final metrics = walletsMetricsOf(context);
+    final ledgerCount = '${detail.accountings.length}';
+    final purchasesCount = '${detail.fiatPurchases.length}';
+    final withdrawalsCount = '${detail.withdrawals.length}';
 
     return WalletsDashboardCard(
       child: Column(
@@ -65,7 +74,7 @@ class WalletDetailSummaryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'Balance',
+                    walletL10nOr(context, 'walletColBalance', 'Balance'),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
@@ -90,15 +99,27 @@ class WalletDetailSummaryCard extends StatelessWidget {
             children: [
               _SummaryChip(
                 icon: Icons.receipt_long_outlined,
-                label: '${detail.accountings.length} ledger',
+                label: walletL10nArgs(context,
+                  'walletSummaryLedgerCount',
+                  {'count': ledgerCount},
+                  '$ledgerCount ledger',
+                ),
               ),
               _SummaryChip(
                 icon: Icons.shopping_cart_outlined,
-                label: '${detail.fiatPurchases.length} purchases',
+                label: walletL10nArgs(context,
+                  'walletSummaryPurchasesCount',
+                  {'count': purchasesCount},
+                  '$purchasesCount purchases',
+                ),
               ),
               _SummaryChip(
                 icon: Icons.account_balance_outlined,
-                label: '${detail.withdrawals.length} withdrawals',
+                label: walletL10nArgs(context,
+                  'walletSummaryWithdrawalsCount',
+                  {'count': withdrawalsCount},
+                  '$withdrawalsCount withdrawals',
+                ),
               ),
             ],
           ),
@@ -158,6 +179,9 @@ class WalletDetailTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final metrics = walletsMetricsOf(context);
 
@@ -187,9 +211,27 @@ class WalletDetailTabBar extends StatelessWidget {
               ),
           unselectedLabelStyle: Theme.of(context).textTheme.labelLarge,
           tabs: [
-            Tab(text: 'Ledger ($ledgerCount)'),
-            Tab(text: 'Purchases ($purchasesCount)'),
-            Tab(text: 'Withdrawals ($withdrawalsCount)'),
+            Tab(
+              text: walletL10nArgs(context,
+                'walletTabLedger',
+                {'count': '$ledgerCount'},
+                'Ledger ($ledgerCount)',
+              ),
+            ),
+            Tab(
+              text: walletL10nArgs(context,
+                'walletTabPurchases',
+                {'count': '$purchasesCount'},
+                'Purchases ($purchasesCount)',
+              ),
+            ),
+            Tab(
+              text: walletL10nArgs(context,
+                'walletTabWithdrawals',
+                {'count': '$withdrawalsCount'},
+                'Withdrawals ($withdrawalsCount)',
+              ),
+            ),
           ],
         ),
       ),
@@ -211,15 +253,21 @@ class WalletDetailLedgerTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: metrics.pageHorizontalPadding),
       child: WalletsDataListCard(
         total: entries.length,
-        totalLabel: 'entries',
+        totalLabel: walletL10nOr(context, 'walletCountEntries', 'entries'),
         isEmpty: entries.isEmpty,
         emptyIcon: Icons.receipt_long_outlined,
-        emptyTitle: 'No ledger entries',
-        emptySubtitle: 'This wallet has no recorded ledger activity yet.',
+        emptyTitle: walletL10nOr(context, 'walletEmptyLedger', 'No ledger entries'),
+        emptySubtitle: walletL10nOr(context,
+          'walletEmptyMsgLedgerUser',
+          'This wallet has no recorded ledger activity yet.',
+        ),
         child: metrics.useCompactTable
             ? _DetailLedgerCompactList(entries: entries, dateFmt: dateFmt)
             : _DetailLedgerDesktopTable(entries: entries, dateFmt: dateFmt),
@@ -242,15 +290,21 @@ class WalletDetailPurchasesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: metrics.pageHorizontalPadding),
       child: WalletsDataListCard(
         total: purchases.length,
-        totalLabel: 'purchases',
+        totalLabel: walletL10nOr(context, 'walletCountPurchases', 'purchases'),
         isEmpty: purchases.isEmpty,
         emptyIcon: Icons.shopping_cart_outlined,
-        emptyTitle: 'No fiat purchases',
-        emptySubtitle: 'This user has not completed any fiat coin purchases.',
+        emptyTitle: walletL10nOr(context, 'walletEmptyFiatPurchasesUser', 'No fiat purchases'),
+        emptySubtitle: walletL10nOr(context,
+          'walletEmptyMsgFiatPurchasesUser',
+          'This user has not completed any fiat coin purchases.',
+        ),
         child: metrics.useCompactTable
             ? _DetailPurchasesCompactList(
                 purchases: purchases,
@@ -279,15 +333,21 @@ class WalletDetailWithdrawalsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: metrics.pageHorizontalPadding),
       child: WalletsDataListCard(
         total: withdrawals.length,
-        totalLabel: 'withdrawals',
+        totalLabel: walletL10nOr(context, 'walletCountWithdrawals', 'withdrawals'),
         isEmpty: withdrawals.isEmpty,
         emptyIcon: Icons.account_balance_outlined,
-        emptyTitle: 'No withdrawals',
-        emptySubtitle: 'This user has not requested any withdrawals.',
+        emptyTitle: walletL10nOr(context, 'walletEmptyWithdrawals', 'No withdrawals'),
+        emptySubtitle: walletL10nOr(context,
+          'walletEmptyMsgWithdrawalsUser',
+          'This user has not requested any withdrawals.',
+        ),
         child: metrics.useCompactTable
             ? _DetailWithdrawalsCompactList(
                 withdrawals: withdrawals,
@@ -313,6 +373,9 @@ class _DetailLedgerCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return WalletsCompactListFrame(
@@ -320,10 +383,11 @@ class _DetailLedgerCompactList extends StatelessWidget {
       itemBuilder: (context, index) {
         final entry = entries[index];
         final prefix = entry.action == 'DEBIT' ? '−' : '+';
+        final balanceAfter = CoinFormat.coins(entry.balanceAfterCoins);
 
         return WalletsCompactCard(
-          title: ledgerTypeLabel(entry.type),
-          subtitle: ledgerActionLabel(entry.action),
+          title: ledgerTypeLabel(context, entry.type),
+          subtitle: ledgerActionLabel(context, entry.action),
           footer: Text(
             dateFmt.format(entry.createdAt.toLocal()),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -344,7 +408,11 @@ class _DetailLedgerCompactList extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'After ${CoinFormat.coins(entry.balanceAfterCoins)}',
+                walletL10nArgs(context,
+                  'walletBalanceAfter',
+                  {'balance': balanceAfter},
+                  'After $balanceAfter',
+                ),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -368,15 +436,47 @@ class _DetailLedgerDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDesktopTableFrame(
       header: Row(
         children: [
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Date')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Type')),
-          Expanded(child: WalletsTableHeaderLabel('Action')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Amount')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Balance after')),
-          Expanded(flex: 3, child: WalletsTableHeaderLabel('Reason')),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColDate', 'Date'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColType', 'Type'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColAction', 'Action'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColAmount', 'Amount'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColBalanceAfter', 'Balance after'),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColReason', 'Reason'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -400,6 +500,9 @@ class _DetailLedgerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final prefix = entry.action == 'DEBIT' ? '−' : '+';
     final cellStyle = walletsTableCellStyle(context);
@@ -418,14 +521,14 @@ class _DetailLedgerRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              ledgerTypeLabel(entry.type),
+              ledgerTypeLabel(context, entry.type),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           Expanded(
-            child: Text(ledgerActionLabel(entry.action), style: cellStyle),
+            child: Text(ledgerActionLabel(context, entry.action), style: cellStyle),
           ),
           Expanded(
             flex: 2,
@@ -470,6 +573,9 @@ class _DetailPurchasesCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return WalletsCompactListFrame(
@@ -478,7 +584,7 @@ class _DetailPurchasesCompactList extends StatelessWidget {
         final purchase = purchases[index];
         return WalletsCompactCard(
           title: purchase.package?.name ?? purchase.providerTxId,
-          subtitle: purchase.provider,
+          subtitle: fiatProviderLabel(context, purchase.provider),
           footer: Text(
             dateFmt.format(purchase.createdAt.toLocal()),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -505,7 +611,7 @@ class _DetailPurchasesCompactList extends StatelessWidget {
                 ),
               const SizedBox(height: 4),
               WalletsStatusChip(
-                label: purchase.status,
+                label: fiatPurchaseStatusLabel(context, purchase.status),
                 tone: statusChipTone(purchase.status),
               ),
             ],
@@ -527,15 +633,45 @@ class _DetailPurchasesDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDesktopTableFrame(
       header: Row(
         children: [
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Date')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Package')),
-          Expanded(child: WalletsTableHeaderLabel('Coins')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Fiat')),
-          Expanded(child: WalletsTableHeaderLabel('Provider')),
-          Expanded(child: WalletsTableHeaderLabel('Status')),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColDate', 'Date'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColPackage', 'Package'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColCoins', 'Coins'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColFiat', 'Fiat'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColProvider', 'Provider'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColStatus', 'Status'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -563,6 +699,9 @@ class _DetailPurchaseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final cellStyle = walletsTableCellStyle(context);
     final scheme = Theme.of(context).colorScheme;
 
@@ -601,10 +740,15 @@ class _DetailPurchaseRow extends StatelessWidget {
               style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
-          Expanded(child: Text(purchase.provider, style: cellStyle)),
+          Expanded(
+            child: Text(
+              fiatProviderLabel(context, purchase.provider),
+              style: cellStyle,
+            ),
+          ),
           Expanded(
             child: WalletsStatusChip(
-              label: purchase.status,
+              label: fiatPurchaseStatusLabel(context, purchase.status),
               tone: statusChipTone(purchase.status),
             ),
           ),
@@ -625,6 +769,9 @@ class _DetailWithdrawalsCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return WalletsCompactListFrame(
@@ -651,7 +798,7 @@ class _DetailWithdrawalsCompactList extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               WalletsStatusChip(
-                label: withdrawal.status,
+                label: withdrawalStatusLabel(context, withdrawal.status),
                 tone: statusChipTone(withdrawal.status),
               ),
             ],
@@ -673,13 +820,35 @@ class _DetailWithdrawalsDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDesktopTableFrame(
       header: Row(
         children: [
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Date')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Amount')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Method')),
-          Expanded(child: WalletsTableHeaderLabel('Status')),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColDate', 'Date'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColAmount', 'Amount'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColMethod', 'Method'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColStatus', 'Status'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -707,6 +876,9 @@ class _DetailWithdrawalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final cellStyle = walletsTableCellStyle(context);
 
@@ -737,7 +909,7 @@ class _DetailWithdrawalRow extends StatelessWidget {
           ),
           Expanded(
             child: WalletsStatusChip(
-              label: withdrawal.status,
+              label: withdrawalStatusLabel(context, withdrawal.status),
               tone: statusChipTone(withdrawal.status),
             ),
           ),

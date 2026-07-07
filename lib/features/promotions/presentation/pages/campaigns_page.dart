@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../../core/widgets/state_widgets.dart';
+import '../../../../core/widgets/toolbar_filter_dropdown.dart';
 import '../../../auth/domain/utils/dashboard_permissions.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -14,6 +14,7 @@ import '../utils/promotions_responsive.dart';
 import '../widgets/campaigns_table.dart';
 import '../widgets/campaign_detail_sheet.dart';
 import '../widgets/promotions_dashboard_widgets.dart';
+import '../widgets/promotions_data_display_widgets.dart';
 import '../widgets/promotions_pagination_bar.dart';
 import '../widgets/promotions_shared_widgets.dart';
 
@@ -93,10 +94,10 @@ class _CampaignsPageState extends State<CampaignsPage> {
                   const _CampaignsFilters(),
                   if (showProgress) ...[
                     SizedBox(height: metrics.sectionGap),
-                    const LinearProgressIndicator(),
+                    const LinearProgressIndicator(minHeight: 2),
                   ],
                   SizedBox(height: metrics.isMobile ? PromotionsSpace.md : PromotionsSpace.lg),
-                  _CampaignsBody(blocState: state),
+                  _CampaignsDataSection(blocState: state),
                 ],
               );
             },
@@ -129,7 +130,7 @@ class _CampaignsFilters extends StatelessWidget {
             final controlHeight = metrics.filterControlHeight;
             final gap = metrics.toolbarFilterGap;
 
-            final search = _CampaignSearchField(
+            final search = PromotionsToolbarSearchField(
               hint: l10n.t('promoSearchCampaigns'),
               initialValue: query.search ?? '',
               height: controlHeight,
@@ -139,58 +140,52 @@ class _CampaignsFilters extends StatelessWidget {
                   .add(SearchCampaignsEvent(q)),
             );
 
-            final status = SizedBox(
+            final status = ToolbarFilterDropdown<String?>(
+              hint: l10n.t('status'),
+              value: query.status,
               height: controlHeight,
-              child: _CampaignFilterDropdown(
-                hint: l10n.t('status'),
-                value: query.status,
-                compact: metrics.isMobile,
-                items: [null, ...CampaignStatus.values.map((s) => s.apiValue)],
-                itemLabel: (v) {
-                  if (v == null) return l10n.t('all');
-                  return switch (CampaignStatus.tryParse(v)) {
-                    CampaignStatus.pendingPayment =>
-                      l10n.t('promoStatusPendingPayment'),
-                    CampaignStatus.active => l10n.t('promoStatusActive'),
-                    CampaignStatus.paused => l10n.t('promoStatusPaused'),
-                    CampaignStatus.completed => l10n.t('promoStatusCompleted'),
-                    CampaignStatus.cancelled => l10n.t('promoStatusCancelled'),
-                    CampaignStatus.rejected => l10n.t('promoStatusRejected'),
-                    _ => v,
-                  };
-                },
-                onChanged: (v) => context
-                    .read<CampaignsBloc>()
-                    .add(FilterCampaignStatusEvent(v)),
-              ),
+              items: [null, ...CampaignStatus.values.map((s) => s.apiValue)],
+              itemLabel: (v) {
+                if (v == null) return l10n.t('all');
+                return switch (CampaignStatus.tryParse(v)) {
+                  CampaignStatus.pendingPayment =>
+                    l10n.t('promoStatusPendingPayment'),
+                  CampaignStatus.active => l10n.t('promoStatusActive'),
+                  CampaignStatus.paused => l10n.t('promoStatusPaused'),
+                  CampaignStatus.completed => l10n.t('promoStatusCompleted'),
+                  CampaignStatus.cancelled => l10n.t('promoStatusCancelled'),
+                  CampaignStatus.rejected => l10n.t('promoStatusRejected'),
+                  _ => v,
+                };
+              },
+              onChanged: (v) => context
+                  .read<CampaignsBloc>()
+                  .add(FilterCampaignStatusEvent(v)),
             );
 
-            final objective = SizedBox(
+            final objective = ToolbarFilterDropdown<String?>(
+              hint: l10n.t('promoObjective'),
+              value: query.objective,
               height: controlHeight,
-              child: _CampaignFilterDropdown(
-                hint: l10n.t('promoObjective'),
-                value: query.objective,
-                compact: metrics.isMobile,
-                items: [
-                  null,
-                  ...CampaignObjective.values.map((o) => o.apiValue),
-                ],
-                itemLabel: (v) {
-                  if (v == null) return l10n.t('all');
-                  return switch (CampaignObjective.tryParse(v)) {
-                    CampaignObjective.views => 'Views',
-                    CampaignObjective.followers => 'Followers',
-                    CampaignObjective.engagement => 'Engagement',
-                    CampaignObjective.challenges => 'Challenges',
-                    CampaignObjective.profileVisits => 'Profile visits',
-                    CampaignObjective.sales => 'Sales',
-                    _ => v,
-                  };
-                },
-                onChanged: (v) => context
-                    .read<CampaignsBloc>()
-                    .add(FilterCampaignObjectiveEvent(v)),
-              ),
+              items: [
+                null,
+                ...CampaignObjective.values.map((o) => o.apiValue),
+              ],
+              itemLabel: (v) {
+                if (v == null) return l10n.t('all');
+                return switch (CampaignObjective.tryParse(v)) {
+                  CampaignObjective.views => 'Views',
+                  CampaignObjective.followers => 'Followers',
+                  CampaignObjective.engagement => 'Engagement',
+                  CampaignObjective.challenges => 'Challenges',
+                  CampaignObjective.profileVisits => 'Profile visits',
+                  CampaignObjective.sales => 'Sales',
+                  _ => v,
+                };
+              },
+              onChanged: (v) => context
+                  .read<CampaignsBloc>()
+                  .add(FilterCampaignObjectiveEvent(v)),
             );
 
             final clearButton = hasActiveFilters
@@ -249,247 +244,59 @@ class _CampaignsFilters extends StatelessWidget {
   }
 }
 
-class _CampaignSearchField extends StatefulWidget {
-  const _CampaignSearchField({
-    required this.hint,
-    required this.onChanged,
-    this.initialValue = '',
-    this.height = 40,
-    this.compact = false,
-  });
-
-  final String hint;
-  final ValueChanged<String> onChanged;
-  final String initialValue;
-  final double height;
-  final bool compact;
-
-  @override
-  State<_CampaignSearchField> createState() => _CampaignSearchFieldState();
-}
-
-class _CampaignSearchFieldState extends State<_CampaignSearchField> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void didUpdateWidget(_CampaignSearchField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != oldWidget.initialValue &&
-        widget.initialValue != _controller.text) {
-      _controller.text = widget.initialValue;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    final fontSize = widget.compact ? 12.0 : 13.0;
-
-    return SizedBox(
-      height: widget.height,
-      child: TextField(
-        controller: _controller,
-        onChanged: (value) {
-          setState(() {});
-          widget.onChanged(value);
-        },
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: fontSize),
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: widget.hint,
-          hintStyle: TextStyle(
-            color: scheme.onSurfaceVariant,
-            fontSize: fontSize,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            size: widget.compact ? 16 : 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    _controller.clear();
-                    widget.onChanged('');
-                    setState(() {});
-                  },
-                  icon: Icon(
-                    Icons.close_rounded,
-                    size: widget.compact ? 14 : 16,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                )
-              : null,
-          isDense: true,
-          filled: true,
-          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: widget.compact ? 6 : 8,
-            vertical: 0,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 8 : 10),
-            borderSide: BorderSide(
-              color: scheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 8 : 10),
-            borderSide: BorderSide(
-              color: scheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 8 : 10),
-            borderSide: BorderSide(color: scheme.primary, width: 1.2),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CampaignFilterDropdown extends StatelessWidget {
-  const _CampaignFilterDropdown({
-    required this.hint,
-    required this.value,
-    required this.items,
-    required this.itemLabel,
-    required this.onChanged,
-    this.compact = false,
-  });
-
-  final String hint;
-  final String? value;
-  final List<String?> items;
-  final String Function(String?) itemLabel;
-  final ValueChanged<String?> onChanged;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final safeValue = items.contains(value) ? value : null;
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(compact ? 8 : 10),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: safeValue,
-          isExpanded: true,
-          isDense: true,
-          hint: Text(
-            hint,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: compact ? 12 : null,
-                ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          icon: Icon(
-            Icons.expand_more_rounded,
-            size: compact ? 16 : 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          items: items
-              .map(
-                (v) => DropdownMenuItem(
-                  value: v,
-                  child: Text(
-                    itemLabel(v),
-                    style: Theme.of(context).textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-}
-
-AdminCampaignsQuery _campaignQueryFrom(CampaignsState state) {
-  return switch (state) {
-    CampaignsLoaded(:final query) => query,
-    CampaignsLoading(:final query) => query,
-    CampaignsError(:final query) => query,
-    _ => const AdminCampaignsQuery(),
-  };
-}
-
-bool _campaignsHasActiveFilters(AdminCampaignsQuery query) {
-  return (query.search != null && query.search!.isNotEmpty) ||
-      (query.status != null && query.status!.isNotEmpty) ||
-      (query.objective != null && query.objective!.isNotEmpty);
-}
-
-class _CampaignsBody extends StatelessWidget {
-  const _CampaignsBody({required this.blocState});
+class _CampaignsDataSection extends StatelessWidget {
+  const _CampaignsDataSection({required this.blocState});
 
   final CampaignsState blocState;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-
-    return switch (blocState) {
-      CampaignsInitial() || CampaignsLoading() => const _PageStateBox(
-          child: LoadingView(),
-        ),
-      CampaignsError(:final message) => _PageStateBox(
-          child: ErrorView(
-            message: message,
-            retryLabel: l10n.t('retry'),
-            onRetry: () =>
-                context.read<CampaignsBloc>().add(LoadCampaignsEvent()),
-          ),
-        ),
-      CampaignsLoaded loaded => _CampaignsLoadedBody(state: loaded),
-      _ => const _PageStateBox(child: LoadingView()),
+    final isLoading = blocState is CampaignsInitial || blocState is CampaignsLoading;
+    final errorMessage = switch (blocState) {
+      CampaignsError(:final message) => message,
+      _ => null,
     };
-  }
-}
+    final loaded = blocState is CampaignsLoaded ? blocState as CampaignsLoaded : null;
+    final isEmpty = loaded != null && loaded.campaigns.isEmpty;
 
-class _PageStateBox extends StatelessWidget {
-  const _PageStateBox({required this.child});
+    Widget? footer;
+    if (loaded != null) {
+      if (promotionsMetricsOf(context).useDesktopPagination) {
+        footer = PromotionsPaginationBar(
+          page: loaded.meta.page,
+          totalPages: loaded.meta.totalPages,
+          total: loaded.meta.total,
+          metrics: promotionsMetricsOf(context),
+          showTopBorder: true,
+          onPage: (p) =>
+              context.read<CampaignsBloc>().add(LoadCampaignsEvent(page: p)),
+        );
+      } else if (loaded.isLoadingMore) {
+        footer = const PromotionsLoadMoreIndicator();
+      } else if (loaded.meta.hasReachedMax && loaded.campaigns.isNotEmpty) {
+        footer = const PromotionsEndOfListLabel();
+      }
+    }
 
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 360,
-      child: Center(child: child),
+    return PromotionsDataSection(
+      footer: footer,
+      child: PromotionsDataBody(
+        isLoading: isLoading,
+        errorMessage: errorMessage,
+        onRetry: () => context.read<CampaignsBloc>().add(LoadCampaignsEvent()),
+        isEmpty: isEmpty,
+        emptyMessage: l10n.t('noData'),
+        child: loaded == null
+            ? const SizedBox.shrink()
+            : _CampaignsLoadedContent(state: loaded),
+      ),
     );
   }
 }
 
-class _CampaignsLoadedBody extends StatelessWidget {
-  const _CampaignsLoadedBody({required this.state});
+class _CampaignsLoadedContent extends StatelessWidget {
+  const _CampaignsLoadedContent({required this.state});
 
   final CampaignsLoaded state;
 
@@ -508,72 +315,42 @@ class _CampaignsLoadedBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (state.campaigns.isEmpty)
-          _PageStateBox(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.campaign_outlined,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(height: PromotionsSpace.lg),
-                Text(
-                  l10n.t('promoNoCampaigns'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: PromotionsSpace.sm),
-                Text(
-                  l10n.t('promoNoCampaignsHint'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
-            ),
-          )
-        else ...[
         if (canWrite)
           BulkActionToolbar(
-          selectedCount: state.selectedIds.length,
-          allVisibleSelected: state.allVisibleSelected,
-          someVisibleSelected: state.someVisibleSelected,
-          onSelectAll: () =>
-              context.read<CampaignsBloc>().add(SelectAllCampaignsEvent()),
-          onClear: () =>
-              context.read<CampaignsBloc>().add(ClearCampaignSelectionEvent()),
-          actions: [
-            FilledButton.tonal(
-              onPressed: state.selectedIds.isEmpty || state.isActioning
-                  ? null
-                  : () => _bulk(context, BulkCampaignAction.pause),
-              child: Text(l10n.t('promoBulkPause')),
-            ),
-            FilledButton.tonal(
-              onPressed: state.selectedIds.isEmpty || state.isActioning
-                  ? null
-                  : () => _bulk(context, BulkCampaignAction.activate),
-              child: Text(l10n.t('promoBulkActivate')),
-            ),
-            FilledButton.tonal(
-              onPressed: state.selectedIds.isEmpty || state.isActioning
-                  ? null
-                  : () => _bulk(context, BulkCampaignAction.reject),
-              child: Text(l10n.t('promoBulkReject')),
-            ),
-            FilledButton(
-              onPressed: state.selectedIds.isEmpty || state.isActioning
-                  ? null
-                  : () => _bulk(context, BulkCampaignAction.delete),
-              child: Text(l10n.t('delete')),
-            ),
-          ],
-        ),
+            selectedCount: state.selectedIds.length,
+            allVisibleSelected: state.allVisibleSelected,
+            someVisibleSelected: state.someVisibleSelected,
+            onSelectAll: () =>
+                context.read<CampaignsBloc>().add(SelectAllCampaignsEvent()),
+            onClear: () =>
+                context.read<CampaignsBloc>().add(ClearCampaignSelectionEvent()),
+            actions: [
+              FilledButton.tonal(
+                onPressed: state.selectedIds.isEmpty || state.isActioning
+                    ? null
+                    : () => _bulk(context, BulkCampaignAction.pause),
+                child: Text(l10n.t('promoBulkPause')),
+              ),
+              FilledButton.tonal(
+                onPressed: state.selectedIds.isEmpty || state.isActioning
+                    ? null
+                    : () => _bulk(context, BulkCampaignAction.activate),
+                child: Text(l10n.t('promoBulkActivate')),
+              ),
+              FilledButton.tonal(
+                onPressed: state.selectedIds.isEmpty || state.isActioning
+                    ? null
+                    : () => _bulk(context, BulkCampaignAction.reject),
+                child: Text(l10n.t('promoBulkReject')),
+              ),
+              FilledButton(
+                onPressed: state.selectedIds.isEmpty || state.isActioning
+                    ? null
+                    : () => _bulk(context, BulkCampaignAction.delete),
+                child: Text(l10n.t('delete')),
+              ),
+            ],
+          ),
         if (canWrite && state.selectedIds.isNotEmpty)
           const SizedBox(height: PromotionsSpace.md),
         CampaignsTable(
@@ -602,25 +379,6 @@ class _CampaignsLoadedBody extends StatelessWidget {
           onDelete: (id) =>
               context.read<CampaignsBloc>().add(DeleteCampaignFromListEvent(id)),
         ),
-        if (promotionsMetricsOf(context).useDesktopPagination)
-          PromotionsPaginationBar(
-            page: state.meta.page,
-            totalPages: state.meta.totalPages,
-            total: state.meta.total,
-            metrics: promotionsMetricsOf(context),
-            onPage: (p) =>
-                context.read<CampaignsBloc>().add(LoadCampaignsEvent(page: p)),
-          )
-        else ...[
-          if (state.isLoadingMore)
-            const PromotionsLoadMoreFooter(isLoading: true),
-          if (state.meta.hasReachedMax && state.campaigns.isNotEmpty)
-            PromotionsLoadMoreFooter(
-              hasReachedMax: true,
-              total: state.meta.total,
-            ),
-        ],
-        ],
       ],
     );
   }
@@ -646,4 +404,19 @@ class _CampaignsLoadedBody extends StatelessWidget {
       }
     });
   }
+}
+
+AdminCampaignsQuery _campaignQueryFrom(CampaignsState state) {
+  return switch (state) {
+    CampaignsLoaded(:final query) => query,
+    CampaignsLoading(:final query) => query,
+    CampaignsError(:final query) => query,
+    _ => const AdminCampaignsQuery(),
+  };
+}
+
+bool _campaignsHasActiveFilters(AdminCampaignsQuery query) {
+  return (query.search != null && query.search!.isNotEmpty) ||
+      (query.status != null && query.status!.isNotEmpty) ||
+      (query.objective != null && query.objective!.isNotEmpty);
 }

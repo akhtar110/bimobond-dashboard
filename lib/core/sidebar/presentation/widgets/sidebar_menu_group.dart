@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../features/settings/presentation/bloc/settings_cubit.dart';
 import '../../../localization/localization.dart';
 import '../../../widgets/web_dashboard_layout.dart';
 import '../../bloc/sidebar_bloc.dart';
@@ -29,6 +30,7 @@ class SidebarMenuGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 

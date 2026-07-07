@@ -5,12 +5,11 @@ import '../../../../core/utils/coin_format.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/promotion_entities.dart';
 import 'campaign_action_dialogs.dart';
-import 'promotions_dashboard_widgets.dart';
+import 'promotions_data_display_widgets.dart';
 import 'promotions_shared_widgets.dart';
 
-const double kCampaignsTableHeaderHeight = 40;
+const double kCampaignsTableHeaderHeight = kPromotionsDataTableHeaderHeight;
 const double _kCellHPad = 10;
-const double _kRowVPad = 10;
 
 enum CampaignsTableDensity { wide, medium, narrow, compact }
 
@@ -69,21 +68,7 @@ class CampaignsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (campaigns.isEmpty) {
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: PromotionsSpace.xl),
-            child: Text(context.l10n.t('noData')),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return LayoutBuilder(
@@ -93,13 +78,9 @@ class CampaignsTable extends StatelessWidget {
         final scheme = Theme.of(context).colorScheme;
 
         return DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: scheme.outlineVariant),
-          ),
+          decoration: promotionsInnerTableDecoration(scheme),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,34 +92,27 @@ class CampaignsTable extends StatelessWidget {
                   onSelectAll: onSelectAll,
                   readOnly: readOnly,
                 ),
-                if (showProgress) const LinearProgressIndicator(),
-                for (var i = 0; i < campaigns.length; i++)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: i == campaigns.length - 1
-                          ? null
-                          : Border(
-                              bottom: BorderSide(
-                                color: scheme.outlineVariant.withValues(
-                                  alpha: 0.45,
-                                ),
-                              ),
-                            ),
-                    ),
-                    child: CampaignsTableRow(
-                      campaign: campaigns[i],
-                      density: density,
-                      isSelected: selectedIds.contains(campaigns[i].id),
-                      currency: currency,
-                      dateFmt: dateFmt,
-                      readOnly: readOnly,
-                      onToggle: () => onToggle(campaigns[i].id),
-                      onOpen: () => onOpen(campaigns[i]),
-                      onStatus: (status) =>
-                          onStatus(campaigns[i].id, status),
-                      onDelete: () => onDelete(campaigns[i].id),
-                    ),
+                if (showProgress) const LinearProgressIndicator(minHeight: 2),
+                for (var i = 0; i < campaigns.length; i++) ...[
+                  CampaignsTableRow(
+                    campaign: campaigns[i],
+                    density: density,
+                    isSelected: selectedIds.contains(campaigns[i].id),
+                    striped: i.isOdd,
+                    currency: currency,
+                    dateFmt: dateFmt,
+                    readOnly: readOnly,
+                    onToggle: () => onToggle(campaigns[i].id),
+                    onOpen: () => onOpen(campaigns[i]),
+                    onStatus: (status) => onStatus(campaigns[i].id, status),
+                    onDelete: () => onDelete(campaigns[i].id),
                   ),
+                  if (i < campaigns.length - 1)
+                    Divider(
+                      height: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.35),
+                    ),
+                ],
               ],
             ),
           ),
@@ -168,12 +142,7 @@ class CampaignsTableHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: scheme.onSurfaceVariant,
-          fontSize: 11,
-          letterSpacing: 0.1,
-        );
+    final style = promotionsTableHeaderStyle(context);
 
     return Container(
       height: kCampaignsTableHeaderHeight,
@@ -223,12 +192,13 @@ class CampaignsTableHeader extends StatelessWidget {
   }
 }
 
-class CampaignsTableRow extends StatelessWidget {
+class CampaignsTableRow extends StatefulWidget {
   const CampaignsTableRow({
     super.key,
     required this.campaign,
     required this.density,
     required this.isSelected,
+    required this.striped,
     required this.currency,
     required this.dateFmt,
     required this.onToggle,
@@ -241,6 +211,7 @@ class CampaignsTableRow extends StatelessWidget {
   final CampaignEntity campaign;
   final CampaignsTableDensity density;
   final bool isSelected;
+  final bool striped;
   final NumberFormat currency;
   final DateFormat dateFmt;
   final VoidCallback onToggle;
@@ -249,151 +220,166 @@ class CampaignsTableRow extends StatelessWidget {
   final VoidCallback onDelete;
   final bool readOnly;
 
+  @override
+  State<CampaignsTableRow> createState() => _CampaignsTableRowState();
+}
+
+class _CampaignsTableRowState extends State<CampaignsTableRow> {
+  bool _hovered = false;
+
   Future<void> _changeStatus(BuildContext context, String status) async {
     final confirmed =
         await confirmCampaignStatusChange(context, status: status);
     if (!confirmed || !context.mounted) return;
-    onStatus(status);
+    widget.onStatus(status);
   }
 
   Future<void> _delete(BuildContext context) async {
     final confirmed = await confirmCampaignDelete(context);
     if (!confirmed || !context.mounted) return;
-    onDelete();
+    widget.onDelete();
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = campaign;
+    final c = widget.campaign;
+    final density = widget.density;
     final scheme = Theme.of(context).colorScheme;
     final cellStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize: 12,
+          fontSize: 11.5,
           height: 1.25,
         );
     final numericStyle = cellStyle?.copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 
-    final bg = isSelected
-        ? scheme.primaryContainer.withValues(alpha: 0.18)
-        : scheme.surface;
+    Color rowColor;
+    if (widget.isSelected) {
+      rowColor = scheme.primaryContainer.withValues(alpha: 0.18);
+    } else if (_hovered) {
+      rowColor = scheme.surfaceContainerHighest;
+    } else if (widget.striped) {
+      rowColor = scheme.surfaceContainerHighest.withValues(alpha: 0.35);
+    } else {
+      rowColor = scheme.surface;
+    }
 
     final ownerName = c.user?.displayName ?? c.userId;
 
-    return Material(
-      color: bg,
-      child: InkWell(
-        onTap: onOpen,
-        hoverColor: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        mouseCursor: SystemMouseCursors.click,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: _campaignsTableRowHPad(density),
-            vertical: density == CampaignsTableDensity.compact ? 8 : _kRowVPad,
-          ),
-          child: _CampaignsTableRowLayout(
-            density: density,
-            checkbox: readOnly
-                ? const SizedBox.shrink()
-                : Checkbox(
-                    value: isSelected,
-                    onChanged: (_) => onToggle(),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-            owner: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    ownerName,
-                    maxLines: density == CampaignsTableDensity.narrow ||
-                            density == CampaignsTableDensity.compact
-                        ? 1
-                        : 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  if (density == CampaignsTableDensity.narrow ||
-                      density == CampaignsTableDensity.compact) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      c.objective,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cellStyle?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 11,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: rowColor,
+        child: InkWell(
+          onTap: widget.onOpen,
+          mouseCursor: SystemMouseCursors.click,
+          child: SizedBox(
+            height: kPromotionsDataRowHeight,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: _campaignsTableRowHPad(density),
+              ),
+              child: _CampaignsTableRowLayout(
+                density: density,
+                checkbox: widget.readOnly
+                    ? const SizedBox.shrink()
+                    : Checkbox(
+                        value: widget.isSelected,
+                        onChanged: (_) => widget.onToggle(),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
+                owner: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      ownerName,
+                      maxLines: density == CampaignsTableDensity.narrow ||
+                              density == CampaignsTableDensity.compact
+                          ? 1
+                          : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
                     ),
+                    if (density == CampaignsTableDensity.narrow ||
+                        density == CampaignsTableDensity.compact) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        c.objective,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: cellStyle?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
+                objective: density == CampaignsTableDensity.narrow ||
+                        density == CampaignsTableDensity.compact
+                    ? const SizedBox.shrink()
+                    : Text(
+                        c.objective,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: cellStyle,
+                      ),
+                package: density != CampaignsTableDensity.narrow &&
+                        density != CampaignsTableDensity.compact
+                    ? Text(
+                        c.package?.name ?? '—',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: cellStyle,
+                      )
+                    : const SizedBox.shrink(),
+                status: CampaignStatusBadge(status: c.status),
+                budget: Text(
+                  CoinFormat.coins(c.budgetCoins),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: numericStyle,
+                ),
+                spent: density != CampaignsTableDensity.narrow &&
+                        density != CampaignsTableDensity.compact
+                    ? Text(
+                        CoinFormat.coins(c.spentCoins),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: numericStyle,
+                      )
+                    : const SizedBox.shrink(),
+                progress: Text(
+                  '${c.progressPercent.toStringAsFixed(1)}%',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: numericStyle?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                created: density == CampaignsTableDensity.wide
+                    ? Text(
+                        widget.dateFmt.format(c.createdAt),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: cellStyle?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+                actions: widget.readOnly
+                    ? const SizedBox.shrink()
+                    : _CampaignRowActions(
+                        onPause: () => _changeStatus(context, 'PAUSED'),
+                        onActivate: () => _changeStatus(context, 'ACTIVE'),
+                        onReject: () => _changeStatus(context, 'REJECTED'),
+                        onOpen: widget.onOpen,
+                        onDelete: () => _delete(context),
+                      ),
               ),
             ),
-            objective: density == CampaignsTableDensity.narrow ||
-                    density == CampaignsTableDensity.compact
-                ? const SizedBox.shrink()
-                : Text(
-                    c.objective,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: cellStyle,
-                  ),
-            package: density != CampaignsTableDensity.narrow &&
-                    density != CampaignsTableDensity.compact
-                ? Text(
-                    c.package?.name ?? '—',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: cellStyle,
-                  )
-                : const SizedBox.shrink(),
-            status: CampaignStatusBadge(status: c.status),
-            budget: Text(
-              CoinFormat.coins(c.budgetCoins),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: numericStyle,
-            ),
-            spent: density != CampaignsTableDensity.narrow &&
-                    density != CampaignsTableDensity.compact
-                ? Text(
-                    CoinFormat.coins(c.spentCoins),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: numericStyle,
-                  )
-                : const SizedBox.shrink(),
-            progress: Text(
-              '${c.progressPercent.toStringAsFixed(1)}%',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: numericStyle?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            created: density == CampaignsTableDensity.wide
-                ? Text(
-                    dateFmt.format(c.createdAt),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: cellStyle?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: 11,
-                    ),
-                  )
-                : const SizedBox.shrink(),
-            actions: readOnly
-                ? const SizedBox.shrink()
-                : _CampaignRowActions(
-                    onPause: () => _changeStatus(context, 'PAUSED'),
-                    onActivate: () => _changeStatus(context, 'ACTIVE'),
-                    onReject: () => _changeStatus(context, 'REJECTED'),
-                    onOpen: onOpen,
-                    onDelete: () => _delete(context),
-                  ),
           ),
         ),
       ),

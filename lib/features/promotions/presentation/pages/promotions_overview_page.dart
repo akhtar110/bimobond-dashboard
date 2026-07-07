@@ -4,13 +4,13 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
-import '../../../../core/widgets/state_widgets.dart';
 import '../widgets/campaign_detail_sheet.dart';
 import '../../domain/entities/promotion_entities.dart';
 import '../bloc/promotions_overview_bloc.dart';
 import '../utils/promotions_responsive.dart';
 import '../widgets/analytics_chart.dart';
 import '../widgets/promotions_dashboard_widgets.dart';
+import '../widgets/promotions_data_display_widgets.dart';
 import '../widgets/promotions_shared_widgets.dart';
 
 class PromotionsOverviewPage extends StatelessWidget {
@@ -21,29 +21,22 @@ class PromotionsOverviewPage extends StatelessWidget {
     return BlocBuilder<PromotionsOverviewBloc, PromotionsOverviewState>(
       builder: (context, state) {
         final l10n = context.l10n;
-        if (state is PromotionsOverviewLoading) {
-          return const PromotionsDashboardShell(
-            child: LoadingView(),
-          );
-        }
-        if (state is PromotionsOverviewError) {
-          return PromotionsDashboardShell(
-            child: ErrorView(
-              message: state.message,
-              retryLabel: l10n.t('retry'),
-              onRetry: () => context
-                  .read<PromotionsOverviewBloc>()
-                  .add(LoadPromotionsOverviewEvent()),
-            ),
-          );
-        }
-        if (state is! PromotionsOverviewLoaded) {
+        final isLoading = state is PromotionsOverviewLoading;
+        final isInitial = state is PromotionsOverviewInitial;
+        final errorMessage = switch (state) {
+          PromotionsOverviewError(:final message) => message,
+          _ => null,
+        };
+        if (state is! PromotionsOverviewLoaded && !isLoading && !isInitial && errorMessage == null) {
           return const SizedBox.shrink();
         }
 
-        final currency = NumberFormat.compactCurrency(symbol: '\$');
         final number = NumberFormat.compact();
-        final overview = state.overview;
+        final overview = state is PromotionsOverviewLoaded ? state.overview : null;
+        final recentCampaigns =
+            state is PromotionsOverviewLoaded ? state.recentCampaigns : const <CampaignEntity>[];
+        final moderationQueue =
+            state is PromotionsOverviewLoaded ? state.moderationQueue : const <CampaignEntity>[];
 
         return PromotionsDashboardShell(
           child: LayoutBuilder(
@@ -65,6 +58,22 @@ class PromotionsOverviewPage extends StatelessWidget {
                           fontSize: metrics.isMobile ? 20 : null,
                         ),
                   ),
+                  if (isLoading || isInitial) ...[
+                    SizedBox(height: metrics.sectionGap),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
+                  if (errorMessage != null) ...[
+                    SizedBox(height: metrics.sectionGap),
+                    PromotionsDataSection(
+                      child: PromotionsDataBody(
+                        errorMessage: errorMessage,
+                        onRetry: () => context
+                            .read<PromotionsOverviewBloc>()
+                            .add(LoadPromotionsOverviewEvent()),
+                        child: const SizedBox.shrink(),
+                      ),
+                    ),
+                  ] else if (overview != null) ...[
                   SizedBox(height: metrics.sectionGap),
                   _CompactOverviewMetrics(
                     items: [
@@ -157,13 +166,14 @@ class PromotionsOverviewPage extends StatelessWidget {
                   const SizedBox(height: PromotionsSpace.lg),
                   _CampaignListSection(
                     title: l10n.t('promoRecentCampaigns'),
-                    campaigns: state.recentCampaigns,
+                    campaigns: recentCampaigns,
                   ),
                   const SizedBox(height: PromotionsSpace.sm),
                   _CampaignListSection(
                     title: l10n.t('promoModerationQueue'),
-                    campaigns: state.moderationQueue,
+                    campaigns: moderationQueue,
                   ),
+                  ],
                 ],
               );
             },
@@ -342,32 +352,35 @@ class _CampaignListSection extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
-    return DashboardCard(
-      padding: const EdgeInsets.all(PromotionsSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: PromotionsSpace.sm),
-          if (campaigns.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: PromotionsSpace.sm),
+    return PromotionsDataSection(
+      title: title,
+      child: campaigns.isEmpty
+          ? Center(
               child: Text(
                 l10n.t('noData'),
                 style: TextStyle(color: scheme.onSurfaceVariant),
               ),
             )
-          else
-            ...campaigns.map(
-              (c) => _CampaignRow(campaign: c),
+          : DecoratedBox(
+              decoration: promotionsInnerTableDecoration(scheme),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < campaigns.length; i++) ...[
+                      _CampaignRow(campaign: campaigns[i]),
+                      if (i < campaigns.length - 1)
+                        Divider(
+                          height: 1,
+                          color: scheme.outlineVariant.withValues(alpha: 0.35),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-        ],
-      ),
     );
   }
 }
@@ -403,18 +416,15 @@ class _CampaignRowState extends State<_CampaignRow> {
       onExit: (_) => _setHovered(false),
       child: Material(
         color: _hovered
-            ? scheme.surfaceContainerHigh.withValues(alpha: 0.65)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+            ? scheme.surfaceContainerHighest
+            : scheme.surface,
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
           onTap: () => showCampaignDetailSheet(context, c.id),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: PromotionsSpace.sm,
-              vertical: 6,
-            ),
-            child: Row(
+          child: SizedBox(
+            height: kPromotionsDataRowHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
               children: [
                 Expanded(
                   child: Column(
@@ -455,6 +465,7 @@ class _CampaignRowState extends State<_CampaignRow> {
           ),
         ),
       ),
+    ),
     );
   }
 }

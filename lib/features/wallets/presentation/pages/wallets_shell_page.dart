@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../auth/domain/utils/dashboard_permissions.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../money_dashboard/presentation/bloc/money_dashboard_bloc.dart';
 import '../../../money_dashboard/presentation/pages/money_dashboard_page.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../bloc/coin_packages_bloc.dart';
 import '../bloc/economy_bloc.dart';
@@ -15,6 +17,7 @@ import '../bloc/ledger_bloc.dart';
 import '../bloc/wallet_overview_bloc.dart';
 import '../bloc/wallets_list_bloc.dart';
 import '../bloc/withdrawals_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'coin_packages_page.dart';
 import 'economy_home_page.dart';
@@ -45,8 +48,11 @@ class WalletsShellPage extends StatefulWidget {
 class _WalletsShellPageState extends State<WalletsShellPage> {
   WalletsSection _section = WalletsSection.moneyDashboard;
 
-  List<(WalletsSection, IconData, String)> _navItemsFor(List<UserRole> roles) {
-    final all = _walletsNavItems();
+  List<(WalletsSection, IconData, String)> _navItemsFor(
+    List<UserRole> roles,
+    BuildContext context,
+  ) {
+    final all = _walletsNavItems(context);
     if (canManageWallets(roles)) return all;
     return all
         .where((e) =>
@@ -60,13 +66,14 @@ class _WalletsShellPageState extends State<WalletsShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final scheme = Theme.of(context).colorScheme;
     final roles = context.select<AuthBloc, List<UserRole>>((b) {
       final state = b.state;
       if (state is Authenticated) return state.user.roles;
       return const <UserRole>[];
     });
-    final navItems = _navItemsFor(roles);
+    final navItems = _navItemsFor(roles, context);
 
     return MultiBlocProvider(
       providers: [
@@ -162,45 +169,82 @@ class _WalletsSectionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final localeCode =
+        context.read<SettingsCubit>().state.locale.languageCode;
     return switch (section) {
-      WalletsSection.moneyDashboard => const MoneyDashboardPage(
-          key: ValueKey('wallets_section_money_dashboard'),
+      WalletsSection.moneyDashboard => MoneyDashboardPage(
+          key: ValueKey('wallets_section_money_dashboard_$localeCode'),
         ),
-      WalletsSection.economyHome => const EconomyHomePage(
-          key: ValueKey('wallets_section_economy'),
+      WalletsSection.economyHome => EconomyHomePage(
+          key: ValueKey('wallets_section_economy_$localeCode'),
         ),
-      WalletsSection.overview => const WalletsOverviewPage(
-          key: ValueKey('wallets_section_overview'),
+      WalletsSection.overview => WalletsOverviewPage(
+          key: ValueKey('wallets_section_overview_$localeCode'),
         ),
-      WalletsSection.walletsList => const WalletsListPage(
-          key: ValueKey('wallets_section_list'),
+      WalletsSection.walletsList => WalletsListPage(
+          key: ValueKey('wallets_section_list_$localeCode'),
         ),
-      WalletsSection.ledger => const LedgerPage(
-          key: ValueKey('wallets_section_ledger'),
+      WalletsSection.ledger => LedgerPage(
+          key: ValueKey('wallets_section_ledger_$localeCode'),
         ),
-      WalletsSection.fiatPurchases => const FiatPurchasesPage(
-          key: ValueKey('wallets_section_fiat'),
+      WalletsSection.fiatPurchases => FiatPurchasesPage(
+          key: ValueKey('wallets_section_fiat_$localeCode'),
         ),
-      WalletsSection.withdrawals => const WithdrawalsPage(
-          key: ValueKey('wallets_section_withdrawals'),
+      WalletsSection.withdrawals => WithdrawalsPage(
+          key: ValueKey('wallets_section_withdrawals_$localeCode'),
         ),
-      WalletsSection.coinPackages => const CoinPackagesPage(
-          key: ValueKey('wallets_section_packages'),
+      WalletsSection.coinPackages => CoinPackagesPage(
+          key: ValueKey('wallets_section_packages_$localeCode'),
         ),
     };
   }
 }
 
-List<(WalletsSection, IconData, String)> _walletsNavItems() {
-  return const [
-    (WalletsSection.moneyDashboard, Icons.dashboard_outlined, 'Money Dashboard'),
-    (WalletsSection.economyHome, Icons.home_work_outlined, 'Economy Home'),
-    (WalletsSection.overview, Icons.dashboard_outlined, 'Overview'),
-    (WalletsSection.walletsList, Icons.account_balance_wallet_outlined, 'Wallets'),
-    (WalletsSection.ledger, Icons.receipt_long_outlined, 'Ledger'),
-    (WalletsSection.fiatPurchases, Icons.payments_outlined, 'Fiat Purchases'),
-    (WalletsSection.withdrawals, Icons.savings_outlined, 'Withdrawals'),
-    (WalletsSection.coinPackages, Icons.inventory_2_outlined, 'Coin Packages'),
+List<(WalletsSection, IconData, String)> _walletsNavItems(
+  BuildContext context,
+) {
+  return [
+    (
+      WalletsSection.moneyDashboard,
+      Icons.dashboard_outlined,
+      walletL10nOr(context, 'walletNavMoneyDashboard', 'Money Dashboard'),
+    ),
+    (
+      WalletsSection.economyHome,
+      Icons.home_work_outlined,
+      walletL10nOr(context, 'walletNavEconomyHome', 'Economy Home'),
+    ),
+    (
+      WalletsSection.overview,
+      Icons.dashboard_outlined,
+      walletL10nOr(context, 'walletNavOverview', 'Overview'),
+    ),
+    (
+      WalletsSection.walletsList,
+      Icons.account_balance_wallet_outlined,
+      walletL10nOr(context, 'walletNavWallets', 'Wallets'),
+    ),
+    (
+      WalletsSection.ledger,
+      Icons.receipt_long_outlined,
+      walletL10nOr(context, 'walletNavLedger', 'Ledger'),
+    ),
+    (
+      WalletsSection.fiatPurchases,
+      Icons.payments_outlined,
+      walletL10nOr(context, 'walletNavFiatPurchases', 'Fiat Purchases'),
+    ),
+    (
+      WalletsSection.withdrawals,
+      Icons.savings_outlined,
+      walletL10nOr(context, 'walletNavWithdrawals', 'Withdrawals'),
+    ),
+    (
+      WalletsSection.coinPackages,
+      Icons.inventory_2_outlined,
+      walletL10nOr(context, 'walletNavCoinPackages', 'Coin Packages'),
+    ),
   ];
 }
 
@@ -217,6 +261,7 @@ class _WalletsSideNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final scheme = Theme.of(context).colorScheme;
 
     return Material(
@@ -231,7 +276,7 @@ class _WalletsSideNav extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Wallets',
+                walletL10nOr(context, 'walletNavWallets', 'Wallets'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: scheme.onSurface,
@@ -239,7 +284,10 @@ class _WalletsSideNav extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Coins economy & wallet admin',
+                walletL10nOr(context,
+                  'walletShellSubtitle',
+                  'Coins economy & wallet admin',
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -274,6 +322,7 @@ class _WalletsTopNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final scheme = Theme.of(context).colorScheme;
     final metrics = walletsMetricsOf(context);
 
@@ -293,7 +342,7 @@ class _WalletsTopNav extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Wallets',
+              walletL10nOr(context, 'walletNavWallets', 'Wallets'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: scheme.onSurface,

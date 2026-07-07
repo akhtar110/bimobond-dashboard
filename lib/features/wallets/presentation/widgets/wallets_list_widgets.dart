@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/widgets/toolbar_filter_style.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../../domain/enums/wallet_enums.dart';
 import '../bloc/wallets_list_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_page_widgets.dart';
 
@@ -20,6 +23,9 @@ class WalletsListHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final compact = metrics.isMobile;
 
@@ -27,7 +33,7 @@ class WalletsListHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Wallets',
+          walletL10nOr(context, 'walletTitleWalletsList', 'Wallets'),
           style: (compact
                   ? Theme.of(context).textTheme.titleLarge
                   : Theme.of(context).textTheme.headlineSmall)
@@ -35,7 +41,10 @@ class WalletsListHeader extends StatelessWidget {
         ),
         SizedBox(height: metrics.toolbarFilterGap),
         Text(
-          'Search users and filter by balance. Tap a row to open wallet details.',
+          walletL10nOr(context,
+            'walletSubtitleWalletsList',
+            'Search users and filter by balance. Tap a row to open wallet details.',
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -102,6 +111,9 @@ class _WalletsListToolbarState extends State<WalletsListToolbar> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final bloc = context.read<WalletsListBloc>();
     final m = widget.metrics;
     final controlHeight = m.filterControlHeight;
@@ -117,19 +129,22 @@ class _WalletsListToolbarState extends State<WalletsListToolbar> {
 
         final searchField = WalletsToolbarSearchField(
           controller: widget.searchController,
-          hintText: 'Search by username, name, or email',
+          hintText: walletL10nOr(context,
+            'walletSearchUserHint',
+            'Search by username, name, or email',
+          ),
           onChanged: (value) => bloc.add(WalletsListSearchEvent(value)),
         );
 
         final minField = WalletsToolbarNumberField(
           controller: widget.minBalanceController,
-          hintText: 'Min coins',
+          hintText: walletL10nOr(context, 'walletMinCoins', 'Min coins'),
           onChanged: (_) => _applyBalanceFilters(),
         );
 
         final maxField = WalletsToolbarNumberField(
           controller: widget.maxBalanceController,
-          hintText: 'Max coins',
+          hintText: walletL10nOr(context, 'walletMaxCoins', 'Max coins'),
           onChanged: (_) => _applyBalanceFilters(),
         );
 
@@ -265,15 +280,11 @@ class _WalletsSortDropdown extends StatelessWidget {
   final WalletSort value;
   final ValueChanged<WalletSort?> onChanged;
 
-  static String _label(WalletSort sort) => switch (sort) {
-        WalletSort.balanceDesc => 'Highest balance',
-        WalletSort.balanceAsc => 'Lowest balance',
-        WalletSort.newest => 'Newest first',
-        WalletSort.oldest => 'Oldest first',
-      };
-
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -291,7 +302,7 @@ class _WalletsSortDropdown extends StatelessWidget {
           dropdownColor: scheme.surface,
           style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
           hint: Text(
-            'Sort',
+            walletL10nOr(context, 'walletSort', 'Sort'),
             style: textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -306,7 +317,7 @@ class _WalletsSortDropdown extends StatelessWidget {
                 (sort) => DropdownMenuItem(
                   value: sort,
                   child: Text(
-                    _label(sort),
+                    walletSortLabel(context, sort),
                     style: textTheme.bodySmall?.copyWith(
                       color: scheme.onSurface,
                     ),
@@ -336,13 +347,19 @@ class WalletsListTableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDataListCard(
       total: state.meta.total,
-      totalLabel: 'wallets',
+      totalLabel: walletL10nOr(context, 'walletCountWallets', 'wallets'),
       isEmpty: state.wallets.isEmpty,
       emptyIcon: Icons.account_balance_wallet_outlined,
-      emptyTitle: 'No wallets found',
-      emptySubtitle: 'Try adjusting your search or balance filters.',
+      emptyTitle: walletL10nOr(context, 'walletEmptyWallets', 'No wallets found'),
+      emptySubtitle: walletL10nOr(context,
+        'walletEmptyMsgWallets',
+        'Try adjusting your search or balance filters.',
+      ),
       page: state.meta.page,
       totalPages: state.meta.totalPages,
       onPage: (page) => context
@@ -404,8 +421,13 @@ class _WalletsCompactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final user = wallet.user;
+    final updatedAt = dateFmt.format(wallet.updatedAt.toLocal());
+    final ledgerCount = '${wallet.counts?.accountings ?? 0}';
 
     return Material(
       color: scheme.surface,
@@ -444,7 +466,11 @@ class _WalletsCompactCard extends StatelessWidget {
                       ),
                     const SizedBox(height: 6),
                     Text(
-                      'Updated ${dateFmt.format(wallet.updatedAt.toLocal())}',
+                      walletL10nArgs(context,
+                        'walletUpdatedAt',
+                        {'date': updatedAt},
+                        'Updated $updatedAt',
+                      ),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -464,7 +490,11 @@ class _WalletsCompactCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${wallet.counts?.accountings ?? 0} ledger',
+                    walletL10nArgs(context,
+                      'walletSummaryLedgerCount',
+                      {'count': ledgerCount},
+                      '$ledgerCount ledger',
+                    ),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -495,6 +525,9 @@ class _WalletsDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return DecoratedBox(
@@ -517,11 +550,26 @@ class _WalletsDesktopTable extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: _WalletsRowLayout(
                   showCounts: showCounts,
-                  user: Text('User', style: _headerStyle(context)),
-                  balance: Text('Balance', style: _headerStyle(context)),
-                  ledger: Text('Ledger', style: _headerStyle(context)),
-                  withdrawals: Text('Withdrawals', style: _headerStyle(context)),
-                  updated: Text('Updated', style: _headerStyle(context)),
+                  user: Text(
+                    walletL10nOr(context, 'walletColUser', 'User'),
+                    style: _headerStyle(context),
+                  ),
+                  balance: Text(
+                    walletL10nOr(context, 'walletColBalance', 'Balance'),
+                    style: _headerStyle(context),
+                  ),
+                  ledger: Text(
+                    walletL10nOr(context, 'walletColLedger', 'Ledger'),
+                    style: _headerStyle(context),
+                  ),
+                  withdrawals: Text(
+                    walletL10nOr(context, 'walletColWithdrawals', 'Withdrawals'),
+                    style: _headerStyle(context),
+                  ),
+                  updated: Text(
+                    walletL10nOr(context, 'walletColUpdated', 'Updated'),
+                    style: _headerStyle(context),
+                  ),
                   actions: const SizedBox(width: 36),
                 ),
               ),
@@ -594,6 +642,9 @@ class _WalletsTableRowState extends State<_WalletsTableRow> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final wallet = widget.wallet;
     final user = wallet.user;
@@ -673,7 +724,7 @@ class _WalletsTableRowState extends State<_WalletsTableRow> {
                   style: cellStyle?.copyWith(color: scheme.onSurfaceVariant),
                 ),
                 actions: IconButton(
-                  tooltip: 'View wallet',
+                  tooltip: walletL10nOr(context, 'walletViewWallet', 'View wallet'),
                   visualDensity: VisualDensity.compact,
                   onPressed: _open,
                   icon: const Icon(Icons.open_in_new_rounded, size: 18),

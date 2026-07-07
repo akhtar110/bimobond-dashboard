@@ -124,6 +124,9 @@ class _CreatePostView extends StatelessWidget {
       'description_required' => l10n.t('descriptionRequired'),
       'category_required' => l10n.t('categoryRequired'),
       'auction_incomplete' => l10n.t('auctionIncomplete'),
+      'media_limit_reached' => l10n.t('mediaLimitReached'),
+      'sound_conflict' => l10n.t('soundConflict'),
+      'location_conflict' => l10n.t('locationConflict'),
       _ => key,
     };
   }

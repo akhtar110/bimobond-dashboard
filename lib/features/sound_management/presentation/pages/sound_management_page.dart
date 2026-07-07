@@ -75,11 +75,15 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
       SoundCrudOperation.deactivate => SoundLibraryMutation.deactivated,
     };
 
+    final soundId = (state.sound?.id.isNotEmpty ?? false)
+        ? state.sound!.id
+        : _pendingSoundId;
+
     context.read<SoundsBloc>().add(
           ApplySoundLibraryMutationEvent(
             mutation: mutation,
             sound: state.sound,
-            soundIds: _pendingSoundId != null ? [_pendingSoundId!] : const [],
+            soundIds: soundId != null ? [soundId] : const [],
           ),
         );
     _pendingSoundId = null;

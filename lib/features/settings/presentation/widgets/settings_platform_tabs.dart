@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
+import '../bloc/settings_cubit.dart';
 import '../bloc/app_settings_bloc.dart';
 import '../bloc/economy_settings_bloc.dart';
 import 'app_settings_panel.dart';
@@ -28,6 +30,9 @@ class _SettingsPlatformTabsState extends State<SettingsPlatformTabs> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<EconomySettingsBloc>()),
@@ -41,8 +46,8 @@ class _SettingsPlatformTabsState extends State<SettingsPlatformTabs> {
           final useStackedTabs = width < 400;
 
           return SettingsSection(
-            title: 'Platform configuration',
-            description: 'Economy rules and global key-value settings',
+            title: l10n.t('platformConfiguration'),
+            description: l10n.t('platformConfigurationDescription'),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: scheme.surface,
@@ -66,6 +71,10 @@ class _SettingsPlatformTabsState extends State<SettingsPlatformTabs> {
                       compact: compact,
                       stacked: useStackedTabs,
                       onSelect: _selectTab,
+                      economyLabel: l10n.t('economyTab'),
+                      economySettingsLabel: l10n.t('economySettingsTab'),
+                      appSettingsLabel: l10n.t('appSettingsTab'),
+                      appSettingsShortLabel: l10n.t('appSettingsTabShort'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -121,12 +130,20 @@ class _SettingsTabSelector extends StatelessWidget {
     required this.compact,
     required this.stacked,
     required this.onSelect,
+    required this.economyLabel,
+    required this.economySettingsLabel,
+    required this.appSettingsLabel,
+    required this.appSettingsShortLabel,
   });
 
   final int selectedIndex;
   final bool compact;
   final bool stacked;
   final ValueChanged<int> onSelect;
+  final String economyLabel;
+  final String economySettingsLabel;
+  final String appSettingsLabel;
+  final String appSettingsShortLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -137,14 +154,14 @@ class _SettingsTabSelector extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SettingsTabChip(
-            label: 'Economy',
+            label: economyLabel,
             icon: Icons.percent_outlined,
             selected: selectedIndex == 0,
             onTap: () => onSelect(0),
           ),
           const SizedBox(height: 8),
           _SettingsTabChip(
-            label: 'App settings',
+            label: appSettingsLabel,
             icon: Icons.tune_outlined,
             selected: selectedIndex == 1,
             onTap: () => onSelect(1),
@@ -155,16 +172,16 @@ class _SettingsTabSelector extends StatelessWidget {
 
     if (compact) {
       return SegmentedButton<int>(
-        segments: const [
+        segments: [
           ButtonSegment<int>(
             value: 0,
-            icon: Icon(Icons.percent_outlined, size: 18),
-            label: Text('Economy'),
+            icon: const Icon(Icons.percent_outlined, size: 18),
+            label: Text(economyLabel),
           ),
           ButtonSegment<int>(
             value: 1,
-            icon: Icon(Icons.tune_outlined, size: 18),
-            label: Text('App'),
+            icon: const Icon(Icons.tune_outlined, size: 18),
+            label: Text(appSettingsShortLabel),
           ),
         ],
         selected: {selectedIndex},
@@ -187,7 +204,7 @@ class _SettingsTabSelector extends StatelessWidget {
           children: [
             Expanded(
               child: _SettingsTabChip(
-                label: 'Economy settings',
+                label: economySettingsLabel,
                 icon: Icons.percent_outlined,
                 selected: selectedIndex == 0,
                 onTap: () => onSelect(0),
@@ -196,7 +213,7 @@ class _SettingsTabSelector extends StatelessWidget {
             const SizedBox(width: 6),
             Expanded(
               child: _SettingsTabChip(
-                label: 'App settings',
+                label: appSettingsLabel,
                 icon: Icons.tune_outlined,
                 selected: selectedIndex == 1,
                 onTap: () => onSelect(1),

@@ -84,6 +84,7 @@ class AuctionModel extends AuctionEntity {
       commissionPercent: _optionalD(json['commissionPercent']),
       currencyCode: json['currencyCode']?.toString(),
       targetPrice: _optionalD(json['targetPrice']),
+      targetPriceCoins: _optionalD(json['targetPriceCoins']),
       startingPrice: _optionalD(json['startingPrice']),
       estimatedHostEarningsCoins:
           _optionalD(json['estimatedHostEarningsCoins']),

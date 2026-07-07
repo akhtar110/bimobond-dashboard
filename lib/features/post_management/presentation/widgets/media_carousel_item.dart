@@ -13,6 +13,7 @@ class MediaCarouselItem extends StatefulWidget {
     this.hlsUrl,
     this.fit = BoxFit.contain,
     this.isActive = false,
+    this.videoLooping = true,
     this.onAspectRatioDetermined,
   });
 
@@ -21,6 +22,7 @@ class MediaCarouselItem extends StatefulWidget {
   final String? hlsUrl;
   final BoxFit fit;
   final bool isActive;
+  final bool videoLooping;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -47,6 +49,7 @@ class _MediaCarouselItemState extends State<MediaCarouselItem>
           type: 'VIDEO',
           height: widget.height,
           autoplay: widget.isActive,
+          looping: widget.videoLooping,
           fit: widget.fit,
           onAspectRatioDetermined: widget.onAspectRatioDetermined,
         ),

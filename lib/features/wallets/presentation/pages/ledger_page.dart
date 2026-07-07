@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/state_widgets.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../bloc/ledger_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import '../widgets/ledger_page_widgets.dart';
 import '../widgets/wallets_dashboard_widgets.dart';
@@ -14,11 +17,13 @@ class LedgerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final dateFmt = DateFormat.yMMMd().add_Hm();
     final metrics = walletsMetricsOf(context);
 
     return BlocBuilder<LedgerBloc, LedgerState>(
       builder: (context, state) {
+        final l10n = context.l10n;
         if (state is LedgerLoading) {
           return const WalletsDashboardShell(
             scrollable: false,
@@ -29,7 +34,7 @@ class LedgerPage extends StatelessWidget {
           return WalletsDashboardShell(
             child: ErrorView(
               message: state.message,
-              retryLabel: 'Retry',
+              retryLabel: walletL10nOr(context, 'retry', 'Retry'),
               onRetry: () => context.read<LedgerBloc>().add(LoadLedgerEvent()),
             ),
           );
@@ -45,8 +50,11 @@ class LedgerPage extends StatelessWidget {
             children: [
               WalletsPageHeader(
                 metrics: metrics,
-                title: 'Global ledger',
-                subtitle: 'Filter by entry type and credit/debit action.',
+                title: walletL10nOr(context, 'walletTitleGlobalLedger', 'Global ledger'),
+                subtitle: walletL10nOr(context,
+                  'walletSubtitleGlobalLedger',
+                  'Filter by entry type and credit/debit action.',
+                ),
               ),
               SizedBox(height: metrics.sectionGap),
               LedgerToolbar(

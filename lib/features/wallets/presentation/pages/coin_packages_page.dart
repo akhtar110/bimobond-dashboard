@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../../auth/domain/utils/dashboard_permissions.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../bloc/coin_packages_bloc.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import '../widgets/coin_package_dialog.dart';
 import '../widgets/coin_packages_page_widgets.dart';
@@ -18,6 +21,7 @@ class CoinPackagesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final metrics = walletsMetricsOf(context);
     final scheme = Theme.of(context).colorScheme;
 
@@ -26,13 +30,14 @@ class CoinPackagesPage extends StatelessWidget {
         if (state is CoinPackagesLoaded && state.message != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.message!),
+              content: Text(resolveWalletMessage(context, state.message!)),
               backgroundColor: state.isError ? scheme.error : null,
             ),
           );
         }
       },
       builder: (context, state) {
+        final l10n = context.l10n;
         if (state is CoinPackagesLoading) {
           return const WalletsDashboardShell(
             scrollable: false,
@@ -43,7 +48,7 @@ class CoinPackagesPage extends StatelessWidget {
           return WalletsDashboardShell(
             child: ErrorView(
               message: state.message,
-              retryLabel: 'Retry',
+              retryLabel: walletL10nOr(context, 'retry', 'Retry'),
               onRetry: () =>
                   context.read<CoinPackagesBloc>().add(LoadCoinPackagesEvent()),
             ),
@@ -64,15 +69,18 @@ class CoinPackagesPage extends StatelessWidget {
             children: [
               WalletsPageHeader(
                 metrics: metrics,
-                title: 'Coin packages',
-                subtitle: 'Manage coin bundles available for fiat purchase.',
+                title: walletL10nOr(context, 'walletTitleCoinPackages', 'Coin packages'),
+                subtitle: walletL10nOr(context,
+                  'walletSubtitleCoinPackages',
+                  'Manage coin bundles available for fiat purchase.',
+                ),
                 trailing: canManage
                     ? FilledButton.icon(
                         onPressed: state.isSaving
                             ? null
                             : () => _openDialog(context, null),
                         icon: const Icon(Icons.add),
-                        label: const Text('Create'),
+                        label: Text(walletL10nOr(context, 'create', 'Create')),
                       )
                     : null,
               ),
@@ -117,21 +125,26 @@ class CoinPackagesPage extends StatelessWidget {
     BuildContext context,
     CoinPackageEntity pkg,
   ) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete package?'),
+        title: Text(walletL10nOr(context, 'walletDeletePackageTitle', 'Delete package?')),
         content: Text(
-          'Delete "${pkg.name}"? Packages with purchase history should be deactivated instead.',
+          walletL10nArgs(context,
+            'walletDeletePackageMessage',
+            {'name': pkg.name},
+            'Delete "${pkg.name}"? Packages with purchase history should be deactivated instead.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(walletL10nOr(context, 'cancel', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(walletL10nOr(context, 'delete', 'Delete')),
           ),
         ],
       ),

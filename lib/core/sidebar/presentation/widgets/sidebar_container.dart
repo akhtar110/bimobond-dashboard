@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../features/settings/presentation/bloc/settings_cubit.dart';
 import '../../../widgets/web_dashboard_layout.dart';
 import '../../bloc/sidebar_bloc.dart';
 import '../../models/sidebar_menu_group.dart';
@@ -34,6 +35,8 @@ class SidebarContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+
     return BlocSelector<SidebarBloc, SidebarState, _SidebarViewData>(
       selector: (state) => _SidebarViewData(
         collapsed: state.isCollapsed,

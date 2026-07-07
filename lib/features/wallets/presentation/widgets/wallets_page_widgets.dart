@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/toolbar_filter_style.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
+import '../utils/wallet_labels.dart';
 import '../../domain/entities/wallet_entities.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_dashboard_widgets.dart';
@@ -108,6 +112,8 @@ class _WalletsToolbarSearchFieldState extends State<WalletsToolbarSearchField> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
     return SizedBox(
@@ -125,7 +131,7 @@ class _WalletsToolbarSearchFieldState extends State<WalletsToolbarSearchField> {
           ),
           suffixIcon: widget.controller.text.isNotEmpty
               ? IconButton(
-                  tooltip: 'Clear search',
+                  tooltip: walletL10nOr(context, 'walletClearSearch', 'Clear search'),
                   icon: const Icon(Icons.close_rounded, size: 16),
                   onPressed: _clear,
                 )
@@ -233,10 +239,12 @@ class WalletsToolbarClearButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
     return IconButton(
-      tooltip: 'Clear filters',
+      tooltip: walletL10nOr(context, 'walletClearFilters', 'Clear filters'),
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       constraints: BoxConstraints(

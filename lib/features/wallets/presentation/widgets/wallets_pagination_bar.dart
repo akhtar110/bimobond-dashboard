@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 
 class WalletsPaginationBar extends StatelessWidget {
@@ -24,12 +28,27 @@ class WalletsPaginationBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final metrics = walletsMetricsOf(context);
     final compact = metrics.isMobile;
     final summary = compact
-        ? 'Page $page / $totalPages'
-        : '$total total · Page $page of $totalPages';
+        ? walletL10nArgs(context,
+            'walletPaginationCompact',
+            {'page': '$page', 'totalPages': '$totalPages'},
+            'Page $page / $totalPages',
+          )
+        : walletL10nArgs(context,
+            'walletPaginationFull',
+            {
+              'total': '$total',
+              'page': '$page',
+              'totalPages': '$totalPages',
+            },
+            '$total total · Page $page of $totalPages',
+          );
 
     final visiblePages = <int>{
       for (var i = page - 2; i <= page + 2; i++)

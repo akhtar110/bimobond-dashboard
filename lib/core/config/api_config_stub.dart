@@ -2,3 +2,5 @@
 String? readWebRuntimeApiBaseUrl() => null;
 
 String? readWebRuntimeSocketBaseUrl() => null;
+
+String? readWebStoredApiBaseUrl() => null;

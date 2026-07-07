@@ -20,6 +20,7 @@ bool canAccessDashboardTab(int tabIndex, List<UserRole> roles) {
     10 => true, // promotions (read-only actions)
     12 => true, // reports / money reports
     13 => true, // notifications
+    14 => true, // filters & effects (read + moderate)
     _ => false,
   };
 }
@@ -47,3 +48,6 @@ bool canWritePromotions(List<UserRole> roles) =>
 
 bool canModerateAuctions(List<UserRole> roles) =>
     roles.contains(UserRole.admin) || roles.contains(UserRole.moderator);
+
+bool canManageFiltersEffects(List<UserRole> roles) =>
+    roles.contains(UserRole.admin);

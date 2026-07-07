@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../features/settings/presentation/bloc/settings_cubit.dart';
 import '../../../localization/localization.dart';
 import '../../bloc/sidebar_bloc.dart';
 
@@ -32,6 +33,7 @@ class SidebarHeader extends StatelessWidget {
       );
     }
 
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final theme = Theme.of(context);
     final l10n = context.l10n;
     final scheme = theme.colorScheme;

@@ -18,15 +18,21 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isDark = context.select<SettingsCubit, bool>(
-      (cubit) => cubit.state.themeMode == ThemeMode.dark,
+    final themeMode = context.select<SettingsCubit, ThemeMode>(
+      (cubit) => cubit.state.themeMode,
     );
 
-    if (_optimisticDark != null && _optimisticDark == isDark) {
-      _optimisticDark = null;
+    if (_optimisticDark != null) {
+      final optimisticMode =
+          _optimisticDark! ? ThemeMode.dark : ThemeMode.light;
+      if (optimisticMode == themeMode) {
+        _optimisticDark = null;
+      }
     }
 
-    final effectiveDark = _optimisticDark ?? isDark;
+    final effectiveMode = _optimisticDark == null
+        ? themeMode
+        : (_optimisticDark! ? ThemeMode.dark : ThemeMode.light);
     final cubit = context.read<SettingsCubit>();
 
     return SettingsSection(
@@ -45,9 +51,9 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
                 Color(0xFFE2E8F0),
                 Color(0xFFCBD5E1),
               ],
-              selected: !effectiveDark,
+              selected: effectiveMode == ThemeMode.light,
               onTap: () {
-                if (effectiveDark) {
+                if (effectiveMode != ThemeMode.light) {
                   setState(() => _optimisticDark = false);
                   cubit.switchTheme(false);
                 }
@@ -62,9 +68,9 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
                 Color(0xFF1E293B),
                 Color(0xFF334155),
               ],
-              selected: effectiveDark,
+              selected: effectiveMode == ThemeMode.dark,
               onTap: () {
-                if (!effectiveDark) {
+                if (effectiveMode != ThemeMode.dark) {
                   setState(() => _optimisticDark = true);
                   cubit.switchTheme(true);
                 }

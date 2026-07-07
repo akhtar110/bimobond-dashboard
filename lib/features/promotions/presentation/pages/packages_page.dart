@@ -3,13 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../../core/utils/coin_format.dart';
-import '../../../../core/widgets/state_widgets.dart';
 import '../../domain/entities/promotion_entities.dart';
 import '../bloc/packages_bloc.dart';
 import '../utils/promotions_responsive.dart';
 import '../widgets/package_dialog.dart';
+import '../widgets/packages_table.dart';
 import '../widgets/promotions_dashboard_widgets.dart';
+import '../widgets/promotions_data_display_widgets.dart';
 
 class PackagesPage extends StatelessWidget {
   const PackagesPage({super.key});
@@ -30,21 +30,17 @@ class PackagesPage extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        if (state is PackagesLoading) {
-          return const PromotionsDashboardShell(child: LoadingView());
-        }
-        if (state is PackagesError) {
-          return PromotionsDashboardShell(
-            child: ErrorView(
-              message: state.message,
-              retryLabel: l10n.t('retry'),
-              onRetry: () =>
-                  context.read<PackagesBloc>().add(LoadPackagesEvent()),
-            ),
-          );
-        }
-        if (state is! PackagesLoaded) return const SizedBox.shrink();
-
+        final isLoading = state is PackagesLoading;
+        final isInitial = state is PackagesInitial;
+        final errorMessage = switch (state) {
+          PackagesError(:final message) => message,
+          _ => null,
+        };
+        final loaded = state is PackagesLoaded ? state : null;
+        final showProgress = isLoading ||
+            isInitial ||
+            (loaded != null && (loaded.isSaving || loaded.isRefreshing));
+        final isEmpty = loaded != null && loaded.packages.isEmpty;
         final dateFmt = DateFormat.yMMMd();
 
         return PromotionsDashboardShell(
@@ -69,7 +65,7 @@ class PackagesPage extends StatelessWidget {
                         ),
                       ),
                       FilledButton.icon(
-                        onPressed: state.isSaving
+                        onPressed: loaded?.isSaving == true
                             ? null
                             : () => _openDialog(context, null),
                         icon: Icon(
@@ -93,124 +89,39 @@ class PackagesPage extends StatelessWidget {
                   ),
                   SizedBox(height: metrics.sectionGap),
                   const _PackagesSearchBar(),
-                  if (state.isSaving || state.isRefreshing) ...[
+                  if (showProgress) ...[
                     SizedBox(height: metrics.sectionGap),
-                    const LinearProgressIndicator(),
+                    const LinearProgressIndicator(minHeight: 2),
                   ],
                   SizedBox(
                     height: metrics.isMobile
                         ? PromotionsSpace.md
                         : PromotionsSpace.lg,
                   ),
-                  DashboardCard(
-                    padding: EdgeInsets.zero,
-                    child: state.packages.isEmpty
-                        ? Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: metrics.isMobile
-                                  ? PromotionsSpace.lg
-                                  : PromotionsSpace.xl,
-                            ),
-                            child: Center(
-                              child: Text(
-                                l10n.t('noData'),
-                                style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              final table = DataTable(
-                                columns: [
-                                  DataColumn(label: Text(l10n.t('name'))),
-                                  DataColumn(label: Text(l10n.t('promoPrice'))),
-                                  DataColumn(
-                                    label: Text(l10n.t('promoImpressionCount')),
-                                  ),
-                                  DataColumn(label: Text(l10n.t('status'))),
-                                  DataColumn(label: Text(l10n.t('createdAt'))),
-                                  DataColumn(label: Text(l10n.t('actions'))),
-                                ],
-                                rows: state.packages.map((pkg) {
-                                  return DataRow(
-                                    cells: [
-                                      DataCell(Text(pkg.name)),
-                                      DataCell(
-                                          Text(CoinFormat.coins(pkg.priceCoins))),
-                                      DataCell(
-                                          Text('${pkg.impressionCount}')),
-                                      DataCell(
-                                        Text(
-                                          pkg.isActive
-                                              ? l10n.t('active')
-                                              : l10n.t('inactive'),
+                  PromotionsDataSection(
+                    child: PromotionsDataBody(
+                      isLoading: isLoading || isInitial,
+                      errorMessage: errorMessage,
+                      onRetry: () =>
+                          context.read<PackagesBloc>().add(LoadPackagesEvent()),
+                      isEmpty: isEmpty,
+                      emptyMessage: l10n.t('noData'),
+                      child: loaded == null
+                          ? const SizedBox.shrink()
+                          : PackagesTable(
+                              packages: loaded.packages,
+                              dateFmt: dateFmt,
+                              isSaving: loaded.isSaving,
+                              onEdit: (pkg) => _openDialog(context, pkg),
+                              onToggleActive: (pkg, {required activate}) =>
+                                  context.read<PackagesBloc>().add(
+                                        TogglePackageActiveEvent(
+                                          pkg.id,
+                                          activate: activate,
                                         ),
                                       ),
-                                      DataCell(
-                                          Text(dateFmt.format(pkg.createdAt))),
-                                      DataCell(
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(
-                                                Icons.edit_outlined,
-                                                size: metrics.isMobile ? 16 : 18,
-                                              ),
-                                              onPressed: state.isSaving
-                                                  ? null
-                                                  : () => _openDialog(
-                                                        context,
-                                                        pkg,
-                                                      ),
-                                            ),
-                                            IconButton(
-                                              icon: Icon(
-                                                pkg.isActive
-                                                    ? Icons
-                                                        .visibility_off_outlined
-                                                    : Icons
-                                                        .visibility_outlined,
-                                                size: metrics.isMobile ? 16 : 18,
-                                              ),
-                                              onPressed: state.isSaving
-                                                  ? null
-                                                  : () => context
-                                                      .read<PackagesBloc>()
-                                                      .add(
-                                                        TogglePackageActiveEvent(
-                                                          pkg.id,
-                                                          activate:
-                                                              !pkg.isActive,
-                                                        ),
-                                                      ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
-                              );
-
-                              if (metrics.isMobile) {
-                                return SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      minWidth: constraints.maxWidth,
-                                    ),
-                                    child: table,
-                                  ),
-                                );
-                              }
-                              return table;
-                            },
-                          ),
+                            ),
+                    ),
                   ),
                 ],
               );
@@ -253,7 +164,7 @@ class _PackagesSearchBar extends StatelessWidget {
         return Row(
           children: [
             Expanded(
-              child: _PackageSearchField(
+              child: PromotionsToolbarSearchField(
                 hint: l10n.t('promoSearchPackages'),
                 initialValue: search,
                 height: metrics.filterControlHeight,
@@ -280,121 +191,6 @@ class _PackagesSearchBar extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _PackageSearchField extends StatefulWidget {
-  const _PackageSearchField({
-    required this.hint,
-    required this.onChanged,
-    this.initialValue = '',
-    this.height = 40,
-    this.compact = false,
-  });
-
-  final String hint;
-  final ValueChanged<String> onChanged;
-  final String initialValue;
-  final double height;
-  final bool compact;
-
-  @override
-  State<_PackageSearchField> createState() => _PackageSearchFieldState();
-}
-
-class _PackageSearchFieldState extends State<_PackageSearchField> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void didUpdateWidget(_PackageSearchField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != oldWidget.initialValue &&
-        widget.initialValue != _controller.text) {
-      _controller.text = widget.initialValue;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: widget.height,
-      child: TextField(
-        controller: _controller,
-        onChanged: (value) {
-          setState(() {});
-          widget.onChanged(value);
-        },
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: widget.compact ? 12 : null,
-            ),
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: widget.hint,
-          hintStyle: TextStyle(
-            color: scheme.onSurfaceVariant,
-            fontSize: widget.compact ? 12 : 13,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            size: widget.compact ? 16 : 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    _controller.clear();
-                    widget.onChanged('');
-                    setState(() {});
-                  },
-                  icon: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                )
-              : null,
-          isDense: true,
-          filled: true,
-          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: widget.compact ? 6 : 8,
-            vertical: 0,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 8 : 10),
-            borderSide: BorderSide(
-              color: scheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 8 : 10),
-            borderSide: BorderSide(
-              color: scheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 8 : 10),
-            borderSide: BorderSide(color: scheme.primary, width: 1.2),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../../../../core/widgets/dashboard/responsive_stats_grid.dart';
 import '../../../auction_reports/domain/entities/auction_report_entities.dart';
 import '../../../auctions/presentation/widgets/auction_card.dart';
 import '../../../gift_reports/domain/entities/gift_report_entities.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../../user_reports/domain/entities/user_report_entities.dart';
+import '../../../wallets/presentation/utils/wallet_labels.dart';
 import '../../../wallets/presentation/utils/wallets_responsive.dart';
 import '../../../wallets/presentation/widgets/wallets_dashboard_widgets.dart';
 import '../../../wallets/presentation/widgets/wallets_page_widgets.dart';
@@ -73,15 +77,24 @@ class MoneyDashboardTopGiftsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final top = gifts.take(8).toList();
 
     return MoneyDashboardDataSection(
       metrics: metrics,
-      title: 'Top gifts',
-      subtitle: 'Highest revenue gifts in the selected period.',
+      title: walletL10nOr(context, 'walletTopGifts', 'Top gifts'),
+      subtitle: walletL10nOr(context,
+        'walletSubtitleTopGifts',
+        'Highest revenue gifts in the selected period.',
+      ),
       emptyIcon: Icons.card_giftcard_outlined,
-      emptyTitle: 'No top gifts yet',
-      emptyMessage: 'Gift revenue leaders will appear here.',
+      emptyTitle: walletL10nOr(context, 'walletEmptyTopGifts', 'No top gifts yet'),
+      emptyMessage: walletL10nOr(context,
+        'walletEmptyMsgTopGifts',
+        'Gift revenue leaders will appear here.',
+      ),
       isEmpty: gifts.isEmpty,
       resultCount: top.length,
       child: metrics.useCompactTable
@@ -103,15 +116,24 @@ class MoneyDashboardTopUsersSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final top = users.take(8).toList();
 
     return MoneyDashboardDataSection(
       metrics: metrics,
-      title: 'Top users',
-      subtitle: 'Users ranked by followers with wallet balance.',
+      title: walletL10nOr(context, 'walletTopUsers', 'Top users'),
+      subtitle: walletL10nOr(context,
+        'walletSubtitleTopUsers',
+        'Users ranked by followers with wallet balance.',
+      ),
       emptyIcon: Icons.people_outline,
-      emptyTitle: 'No top users yet',
-      emptyMessage: 'Top users by followers will appear here.',
+      emptyTitle: walletL10nOr(context, 'walletEmptyTopUsers', 'No top users yet'),
+      emptyMessage: walletL10nOr(context,
+        'walletEmptyMsgTopUsers',
+        'Top users by followers will appear here.',
+      ),
       isEmpty: users.isEmpty,
       resultCount: top.length,
       child: metrics.useCompactTable
@@ -133,15 +155,27 @@ class MoneyDashboardTopAuctionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final top = auctions.take(8).toList();
 
     return MoneyDashboardDataSection(
       metrics: metrics,
-      title: 'Top auctions',
-      subtitle: 'Auctions with the highest total gift spend.',
+      title: walletL10nOr(context, 'walletTopAuctions', 'Top auctions'),
+      subtitle: walletL10nOr(context,
+        'walletSubtitleTopAuctions',
+        'Auctions with the highest total gift spend.',
+      ),
       emptyIcon: Icons.gavel_outlined,
-      emptyTitle: 'No top auctions yet',
-      emptyMessage: 'Leading auctions will appear here.',
+      emptyTitle: walletL10nOr(context,
+        'walletEmptyTopAuctions',
+        'No top auctions yet',
+      ),
+      emptyMessage: walletL10nOr(context,
+        'walletEmptyMsgTopAuctions',
+        'Leading auctions will appear here.',
+      ),
       isEmpty: auctions.isEmpty,
       resultCount: top.length,
       child: metrics.useCompactTable
@@ -177,6 +211,9 @@ class MoneyDashboardDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final pad = metrics.cardPadding;
 
@@ -214,7 +251,11 @@ class MoneyDashboardDataSection extends StatelessWidget {
                     Padding(
                       padding: EdgeInsets.fromLTRB(pad, pad, pad, 8),
                       child: Text(
-                        '$resultCount results',
+                        walletL10nArgs(context,
+                          'walletResultsCount',
+                          {'count': '$resultCount'},
+                          '$resultCount results',
+                        ),
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: scheme.onSurfaceVariant,
@@ -237,6 +278,9 @@ class _TopGiftsCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsCompactListFrame(
       nestedInScrollView: true,
       itemCount: gifts.length,
@@ -245,7 +289,11 @@ class _TopGiftsCompactList extends StatelessWidget {
         return WalletsCompactCard(
           leading: _GiftThumbnail(gift: gift),
           title: gift.displayName,
-          subtitle: '${gift.transactions} sends',
+          subtitle: walletL10nArgs(context,
+            'walletTopGiftSends',
+            {'count': '${gift.transactions}'},
+            '${gift.transactions} sends',
+          ),
           trailing: Text(
             CoinFormat.coins(gift.spendCoins),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -266,12 +314,29 @@ class _TopGiftsDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return _MoneyDashboardStripedTable(
       header: Row(
         children: [
-          Expanded(flex: 4, child: WalletsTableHeaderLabel('Gift')),
-          Expanded(child: WalletsTableHeaderLabel('Sends')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Revenue')),
+          Expanded(
+            flex: 4,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColGift', 'Gift'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColSends', 'Sends'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColRevenue', 'Revenue'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -312,6 +377,9 @@ class _TopUsersCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return WalletsCompactListFrame(
@@ -325,7 +393,14 @@ class _TopUsersCompactList extends StatelessWidget {
         return WalletsCompactCard(
           leading: _UserReportAvatar(user: user),
           title: name,
-          subtitle: '@${user.username} · ${user.followerCount} followers',
+          subtitle: walletL10nArgs(context,
+            'walletTopUserFollowers',
+            {
+              'username': user.username,
+              'count': '${user.followerCount}',
+            },
+            '@${user.username} · ${user.followerCount} followers',
+          ),
           trailing: Text(
             CoinFormat.coins(user.walletBalanceCoins),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -346,14 +421,32 @@ class _TopUsersDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return _MoneyDashboardStripedTable(
       header: Row(
         children: [
-          Expanded(flex: 4, child: WalletsTableHeaderLabel('User')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Followers')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Balance')),
+          Expanded(
+            flex: 4,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColUser', 'User'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColFollowers', 'Followers'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColBalance', 'Balance'),
+            ),
+          ),
         ],
       ),
       rows: [
@@ -439,6 +532,9 @@ class _TopAuctionsCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return WalletsCompactListFrame(
@@ -448,7 +544,11 @@ class _TopAuctionsCompactList extends StatelessWidget {
         final auction = auctions[index];
         return WalletsCompactCard(
           title: auction.itemName,
-          subtitle: '${auction.progressPercent}% raised',
+          subtitle: walletL10nArgs(context,
+            'walletAuctionProgressRaised',
+            {'percent': '${auction.progressPercent}'},
+            '${auction.progressPercent}% raised',
+          ),
           trailing: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -476,14 +576,32 @@ class _TopAuctionsDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
 
     return _MoneyDashboardStripedTable(
       header: Row(
         children: [
-          Expanded(flex: 4, child: WalletsTableHeaderLabel('Item')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Status')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Raised')),
+          Expanded(
+            flex: 4,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColItem', 'Item'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColStatus', 'Status'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColRaised', 'Raised'),
+            ),
+          ),
         ],
       ),
       rows: [

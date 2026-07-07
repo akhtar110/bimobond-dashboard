@@ -145,23 +145,27 @@ class UsersSelectionHeader extends StatelessWidget {
                               ],
                             ),
                           ),
-                          if (actions.showBan) ...[
-                            _BanButton(l10n: l10n, compact: narrow),
-                            const SizedBox(width: 6),
+                          if (narrow)
+                            _BulkActionsMenu(l10n: l10n, actions: actions)
+                          else ...[
+                            if (actions.showBan) ...[
+                              _BanButton(l10n: l10n, compact: false),
+                              const SizedBox(width: 6),
+                            ],
+                            if (actions.showUnban) ...[
+                              _UnbanButton(l10n: l10n, compact: false),
+                              const SizedBox(width: 6),
+                            ],
+                            if (actions.showPromote) ...[
+                              _PromoteButton(l10n: l10n, compact: false),
+                              const SizedBox(width: 6),
+                            ],
+                            if (actions.showDemote) ...[
+                              _DemoteButton(l10n: l10n, compact: false),
+                              const SizedBox(width: 6),
+                            ],
+                            _DeleteButton(l10n: l10n, compact: false),
                           ],
-                          if (actions.showUnban) ...[
-                            _UnbanButton(l10n: l10n, compact: narrow),
-                            const SizedBox(width: 6),
-                          ],
-                          if (actions.showPromote) ...[
-                            _PromoteButton(l10n: l10n, compact: narrow),
-                            const SizedBox(width: 6),
-                          ],
-                          if (actions.showDemote) ...[
-                            _DemoteButton(l10n: l10n, compact: narrow),
-                            const SizedBox(width: 6),
-                          ],
-                          _DeleteButton(l10n: l10n, compact: narrow),
                         ],
                       );
                     },
@@ -183,6 +187,178 @@ class UsersSelectionHeader extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _BulkActionsMenu extends StatelessWidget {
+  const _BulkActionsMenu({
+    required this.l10n,
+    required this.actions,
+  });
+
+  final AppLocalizations l10n;
+  final SelectedUsersActions actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return PopupMenuButton<String>(
+      tooltip: l10n.t('actions'),
+      icon: Icon(Icons.more_vert_rounded, color: scheme.primary),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      offset: const Offset(0, 8),
+      onSelected: (value) async {
+        switch (value) {
+          case 'ban':
+            await _confirmBulkBan(context, l10n);
+          case 'unban':
+            await _confirmBulkUnban(context, l10n);
+          case 'promote':
+            await _confirmBulkPromote(context, l10n);
+          case 'demote':
+            await _confirmBulkDemote(context, l10n);
+          case 'delete':
+            await _confirmBulkDelete(context, l10n);
+        }
+      },
+      itemBuilder: (_) => [
+        if (actions.showBan)
+          PopupMenuItem(
+            value: 'ban',
+            child: Row(
+              children: [
+                const Icon(Icons.block_rounded, size: 18),
+                const SizedBox(width: 10),
+                Text(l10n.t('ban')),
+              ],
+            ),
+          ),
+        if (actions.showUnban)
+          PopupMenuItem(
+            value: 'unban',
+            child: Row(
+              children: [
+                const Icon(Icons.lock_open_rounded, size: 18),
+                const SizedBox(width: 10),
+                Text(l10n.t('unban')),
+              ],
+            ),
+          ),
+        if (actions.showPromote)
+          PopupMenuItem(
+            value: 'promote',
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_upward_rounded, size: 18),
+                const SizedBox(width: 10),
+                Text(l10n.t('promote')),
+              ],
+            ),
+          ),
+        if (actions.showDemote)
+          PopupMenuItem(
+            value: 'demote',
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_downward_rounded, size: 18),
+                const SizedBox(width: 10),
+                Text(l10n.t('demote')),
+              ],
+            ),
+          ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 18, color: scheme.error),
+              const SizedBox(width: 10),
+              Text(l10n.t('delete'), style: TextStyle(color: scheme.error)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _confirmBulkBan(BuildContext context, AppLocalizations l10n) async {
+  final count = selectedUsersCount(context);
+  if (count == 0) return;
+  final confirmed = await confirmUsersBulkAction(
+    context,
+    title: l10n.t('ban'),
+    message: usersBanConfirmMessage(l10n, count),
+    destructive: true,
+  );
+  if (confirmed && context.mounted) {
+    context.read<UsersBloc>().add(BulkSuspendUsersEvent());
+  }
+}
+
+Future<void> _confirmBulkUnban(
+  BuildContext context,
+  AppLocalizations l10n,
+) async {
+  final count = selectedUsersCount(context);
+  if (count == 0) return;
+  final confirmed = await confirmUsersBulkAction(
+    context,
+    title: l10n.t('unban'),
+    message: usersUnbanConfirmMessage(l10n, count),
+  );
+  if (confirmed && context.mounted) {
+    context.read<UsersBloc>().add(BulkActivateUsersEvent());
+  }
+}
+
+Future<void> _confirmBulkPromote(
+  BuildContext context,
+  AppLocalizations l10n,
+) async {
+  final count = selectedUsersCount(context);
+  if (count == 0) return;
+  final confirmed = await confirmUsersBulkAction(
+    context,
+    title: l10n.t('promote'),
+    message: usersPromoteConfirmMessage(l10n, count),
+  );
+  if (confirmed && context.mounted) {
+    context.read<UsersBloc>().add(BulkPromoteUsersEvent());
+  }
+}
+
+Future<void> _confirmBulkDemote(
+  BuildContext context,
+  AppLocalizations l10n,
+) async {
+  final count = selectedUsersCount(context);
+  if (count == 0) return;
+  final confirmed = await confirmUsersBulkAction(
+    context,
+    title: l10n.t('demote'),
+    message: usersDemoteConfirmMessage(l10n, count),
+    destructive: true,
+  );
+  if (confirmed && context.mounted) {
+    context.read<UsersBloc>().add(BulkDemoteUsersEvent());
+  }
+}
+
+Future<void> _confirmBulkDelete(
+  BuildContext context,
+  AppLocalizations l10n,
+) async {
+  final count = selectedUsersCount(context);
+  if (count == 0) return;
+  final confirmed = await confirmUsersBulkAction(
+    context,
+    title: l10n.t('delete'),
+    message: usersDeleteConfirmMessage(l10n, count),
+    destructive: true,
+  );
+  if (confirmed && context.mounted) {
+    context.read<UsersBloc>().add(BulkDeleteUsersEvent());
   }
 }
 

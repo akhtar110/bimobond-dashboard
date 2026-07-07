@@ -29,6 +29,11 @@ import '../utils/auctions_responsive.dart';
         bg: scheme.errorContainer,
         label: l10n.t('cancelled'),
       ),
+    'BANNED' => (
+        fg: scheme.onErrorContainer,
+        bg: scheme.errorContainer,
+        label: l10n.tOr('banned', 'Banned'),
+      ),
     _ => (
         fg: scheme.onSurfaceVariant,
         bg: scheme.surfaceContainerHigh,
@@ -311,7 +316,7 @@ class _ProgressSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final pct = auction.progressPercent;
+    final pct = auction.progressFraction;
     final color = auctionProgressColor(scheme, auction);
 
     return Column(
@@ -329,7 +334,7 @@ class _ProgressSection extends StatelessWidget {
               ),
             ),
             Text(
-              'of ${CoinFormat.coins(auction.targetPriceCoins)}',
+              'of ${CoinFormat.coins(auction.effectiveTargetPriceCoins)}',
               style: TextStyle(
                 fontSize: compact ? 11 : 12,
                 color: scheme.onSurfaceVariant,

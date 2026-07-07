@@ -1,6 +1,9 @@
 import '../entities/create_post_auction_entity.dart';
 import '../entities/create_post_entity.dart';
 import '../entities/create_post_field.dart';
+import '../entities/create_post_location_entity.dart';
+import '../entities/create_post_new_sound_entity.dart';
+import '../entities/create_post_sound_selection_entity.dart';
 
 /// Applies [CreatePostField] updates — keeps presentation free of business rules.
 class CreatePostFormReducer {
@@ -67,6 +70,14 @@ class CreatePostFormReducer {
         return form.copyWith(
           locationId: id,
           clearLocationId: id == null,
+          clearLocation: id != null,
+        );
+      case CreatePostField.location:
+        final location = value as CreatePostLocationEntity?;
+        return form.copyWith(
+          location: location,
+          clearLocation: location == null,
+          clearLocationId: location != null,
         );
       case CreatePostField.playlistId:
         final id = value as String?;
@@ -79,6 +90,20 @@ class CreatePostFormReducer {
         return form.copyWith(
           soundId: id,
           clearSoundId: id == null,
+          clearNewSound: id != null,
+        );
+      case CreatePostField.newSound:
+        final sound = value as CreatePostNewSoundEntity?;
+        return form.copyWith(
+          newSound: sound,
+          clearNewSound: sound == null,
+          clearSoundId: sound != null,
+        );
+      case CreatePostField.selectedSound:
+        final sound = value as CreatePostSoundSelectionEntity?;
+        return form.copyWith(
+          selectedSound: sound,
+          clearSelectedSound: sound == null,
         );
       case CreatePostField.originalPostId:
         final id = value as String?;

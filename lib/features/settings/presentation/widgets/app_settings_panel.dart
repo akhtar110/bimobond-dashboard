@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../bloc/app_settings_bloc.dart';
+import '../bloc/settings_cubit.dart';
 import 'settings_section.dart';
 
 class AppSettingsPanel extends StatefulWidget {
@@ -45,11 +47,14 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
         }
       },
       builder: (context, state) {
+        context.select<SettingsCubit, Locale>((c) => c.state.locale);
+        final l10n = context.l10n;
+
         final columns = <DataColumn>[
-          const DataColumn(label: Text('Key')),
-          const DataColumn(label: Text('Value')),
-          const DataColumn(label: Text('Description')),
-          if (widget.canManage) const DataColumn(label: Text('Actions')),
+          DataColumn(label: Text(l10n.t('settingKey'))),
+          DataColumn(label: Text(l10n.t('settingValue'))),
+          DataColumn(label: Text(l10n.t('description'))),
+          if (widget.canManage) DataColumn(label: Text(l10n.t('actions'))),
         ];
 
         final body = Column(
@@ -63,17 +68,17 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
                       ? null
                       : () => _openEditor(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('Add setting'),
+                  label: Text(l10n.t('addSetting')),
                 ),
               ),
             if (widget.canManage) const SizedBox(height: 16),
             if (state.isLoading)
               const Center(child: CircularProgressIndicator())
             else if (state.settings.isEmpty)
-              const EmptyStateCard(
+              EmptyStateCard(
                 icon: Icons.tune_outlined,
-                title: 'No settings',
-                message: 'Create a setting to store platform configuration.',
+                title: l10n.t('noSettings'),
+                message: l10n.t('noSettingsMessage'),
               )
             else
               ResponsiveDataTable(
@@ -90,7 +95,7 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                tooltip: 'Edit',
+                                tooltip: l10n.t('edit'),
                                 icon: const Icon(Icons.edit_outlined),
                                 onPressed: state.isSaving
                                     ? null
@@ -100,7 +105,7 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
                                         ),
                               ),
                               IconButton(
-                                tooltip: 'Delete',
+                                tooltip: l10n.t('delete'),
                                 icon: Icon(
                                   Icons.delete_outline,
                                   color: scheme.error,
@@ -134,9 +139,19 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 6),
-                            Text('Value: ${setting.value}'),
+                            Text(
+                              l10n.tArgs(
+                                'settingValueLabel',
+                                {'value': setting.value},
+                              ),
+                            ),
                             if (setting.description != null)
-                              Text('Description: ${setting.description}'),
+                              Text(
+                                l10n.tArgs(
+                                  'settingDescriptionLabel',
+                                  {'description': setting.description!},
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -153,10 +168,10 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
         if (widget.embedded) return body;
 
         return SettingsSection(
-          title: 'App settings',
+          title: l10n.t('appSettingsTab'),
           description: widget.canManage
-              ? 'Manage arbitrary key-value configuration'
-              : 'Read-only view of platform settings',
+              ? l10n.t('appSettingsManageDescription')
+              : l10n.t('appSettingsReadOnlyDescription'),
           child: body,
         );
       },
@@ -174,47 +189,58 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isEdit ? 'Edit setting' : 'Create setting'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: keyCtrl,
-                enabled: !isEdit,
-                decoration: const InputDecoration(
-                  labelText: 'Key',
-                  hintText: 'SETTING_KEY',
+      builder: (ctx) {
+        final dialogL10n = ctx.l10n;
+        return AlertDialog(
+          title: Text(
+            isEdit
+                ? dialogL10n.t('editSetting')
+                : dialogL10n.t('createSetting'),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: keyCtrl,
+                  enabled: !isEdit,
+                  decoration: InputDecoration(
+                    labelText: dialogL10n.t('settingKey'),
+                    hintText: 'SETTING_KEY',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: valueCtrl,
-                decoration: const InputDecoration(labelText: 'Value'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: valueCtrl,
+                  decoration: InputDecoration(
+                    labelText: dialogL10n.t('settingValue'),
+                  ),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  decoration: InputDecoration(
+                    labelText: dialogL10n.t('descriptionOptional'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(dialogL10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                isEdit ? dialogL10n.t('save') : dialogL10n.t('create'),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isEdit ? 'Save' : 'Create'),
-          ),
-        ],
-      ),
+            ),
+          ],
+        );
+      },
     );
 
     if (saved != true || !context.mounted) return;
@@ -236,20 +262,25 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
   Future<void> _confirmDelete(BuildContext context, String key) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete setting?'),
-        content: Text('Remove "$key" from platform configuration?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder: (ctx) {
+        final dialogL10n = ctx.l10n;
+        return AlertDialog(
+          title: Text(dialogL10n.t('deleteSettingTitle')),
+          content: Text(
+            dialogL10n.tArgs('deleteSettingMessage', {'key': key}),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(dialogL10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(dialogL10n.t('delete')),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed == true && context.mounted) {
       context.read<AppSettingsBloc>().add(DeleteAppSettingEvent(key));

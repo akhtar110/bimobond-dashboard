@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
+import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../domain/entities/wallet_entities.dart';
+import '../utils/wallet_labels.dart';
 import '../utils/wallets_responsive.dart';
 import 'wallets_dashboard_widgets.dart';
 import 'wallets_page_widgets.dart';
@@ -27,14 +31,20 @@ class CoinPackagesTableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDataListCard(
       total: packages.length,
-      totalLabel: 'packages',
+      totalLabel: walletL10nOr(context, 'walletCountPackages', 'packages'),
       isEmpty: packages.isEmpty,
       emptyIcon: Icons.inventory_2_outlined,
-      emptyTitle: 'No packages',
+      emptyTitle: walletL10nOr(context, 'walletEmptyPackages', 'No packages'),
       emptySubtitle: canManage
-          ? 'Create a package to offer coin bundles for purchase.'
+          ? walletL10nOr(context,
+              'walletEmptyMsgPackagesCreate',
+              'Create a package to offer coin bundles for purchase.',
+            )
           : null,
       child: metrics.useCompactTable
           ? _CoinPackagesCompactList(
@@ -72,7 +82,12 @@ class _CoinPackagesCompactList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
+    final activeLabel = walletL10nOr(context, 'active', 'Active');
+    final inactiveLabel = walletL10nOr(context, 'inactive', 'Inactive');
 
     return WalletsCompactListFrame(
       itemCount: packages.length,
@@ -92,7 +107,7 @@ class _CoinPackagesCompactList extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               WalletsStatusChip(
-                label: pkg.isActive ? 'Active' : 'Inactive',
+                label: pkg.isActive ? activeLabel : inactiveLabel,
                 tone: pkg.isActive
                     ? WalletsChipTone.success
                     : WalletsChipTone.neutral,
@@ -103,13 +118,13 @@ class _CoinPackagesCompactList extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Edit',
+                      tooltip: walletL10nOr(context, 'edit', 'Edit'),
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       onPressed: isSaving ? null : () => onEdit(pkg),
                     ),
                     IconButton(
-                      tooltip: 'Delete',
+                      tooltip: walletL10nOr(context, 'delete', 'Delete'),
                       visualDensity: VisualDensity.compact,
                       icon: Icon(
                         Icons.delete_outline,
@@ -146,15 +161,42 @@ class _CoinPackagesDesktopTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     return WalletsDesktopTableFrame(
       header: Row(
         children: [
-          Expanded(flex: 3, child: WalletsTableHeaderLabel('Name')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Coins')),
-          Expanded(flex: 2, child: WalletsTableHeaderLabel('Fiat price')),
-          Expanded(child: WalletsTableHeaderLabel('Status')),
+          Expanded(
+            flex: 3,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColName', 'Name'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColCoins', 'Coins'),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColFiatPrice', 'Fiat price'),
+            ),
+          ),
+          Expanded(
+            child: WalletsTableHeaderLabel(
+              walletL10nOr(context, 'walletColStatus', 'Status'),
+            ),
+          ),
           if (canManage)
-            const SizedBox(width: 88, child: WalletsTableHeaderLabel('Actions')),
+            SizedBox(
+              width: 88,
+              child: WalletsTableHeaderLabel(
+                walletL10nOr(context, 'walletColActions', 'Actions'),
+              ),
+            ),
         ],
       ),
       rows: [
@@ -191,9 +233,14 @@ class _CoinPackageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final l10n = context.l10n;
+
     final scheme = Theme.of(context).colorScheme;
     final cellStyle = walletsTableCellStyle(context);
     final pkg = package;
+    final activeLabel = walletL10nOr(context, 'active', 'Active');
+    final inactiveLabel = walletL10nOr(context, 'inactive', 'Inactive');
 
     return WalletsHoverTableRow(
       striped: striped,
@@ -227,7 +274,7 @@ class _CoinPackageRow extends StatelessWidget {
           ),
           Expanded(
             child: WalletsStatusChip(
-              label: pkg.isActive ? 'Active' : 'Inactive',
+              label: pkg.isActive ? activeLabel : inactiveLabel,
               tone: pkg.isActive
                   ? WalletsChipTone.success
                   : WalletsChipTone.neutral,
@@ -240,13 +287,13 @@ class _CoinPackageRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: 'Edit',
+                    tooltip: walletL10nOr(context, 'edit', 'Edit'),
                     visualDensity: VisualDensity.compact,
                     onPressed: isSaving ? null : () => onEdit(pkg),
                     icon: const Icon(Icons.edit_outlined, size: 18),
                   ),
                   IconButton(
-                    tooltip: 'Delete',
+                    tooltip: walletL10nOr(context, 'delete', 'Delete'),
                     visualDensity: VisualDensity.compact,
                     onPressed: isSaving ? null : () => onDelete(pkg),
                     icon: Icon(

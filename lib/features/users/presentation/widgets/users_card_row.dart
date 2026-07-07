@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
+import 'user_action_buttons.dart';
 import 'user_status_badge.dart';
 
 /// Compact card row for mobile layouts (location-style).
@@ -89,11 +90,7 @@ class UsersCardRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: scheme.onSurfaceVariant,
-                size: 20,
-              ),
+              UserActionButtons(user: user, compact: true),
             ],
           ),
         ),
