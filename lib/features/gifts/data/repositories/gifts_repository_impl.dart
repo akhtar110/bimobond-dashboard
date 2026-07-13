@@ -21,9 +21,19 @@ class GiftsRepositoryImpl implements GiftsRepository {
       data.imageBytes,
       data.imageName,
     );
+
+    String? animationUrl;
+    if (data.animationBytes != null && data.animationBytes!.isNotEmpty) {
+      animationUrl = await _dataSource.uploadGiftImage(
+        data.animationBytes!,
+        data.animationName ?? 'gift-animation.gif',
+      );
+    }
+
     return _dataSource.createGiftWithUrl(
       name: data.name,
       thumbnailUrl: thumbnailUrl,
+      animationUrl: animationUrl,
       priceCoins: data.priceCoins,
       isActive: data.isActive,
       publishedAt: data.publishedAt,
@@ -34,9 +44,11 @@ class GiftsRepositoryImpl implements GiftsRepository {
   /// If [data.imageBytes] is provided the image is uploaded first and the
   /// resulting URL is used as [thumbnailUrl]; any explicit [data.thumbnailUrl]
   /// value is ignored in that case.
+  /// Same for [data.animationBytes] → [animationUrl].
   @override
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data) async {
     String? resolvedThumbnailUrl = data.thumbnailUrl;
+    String? resolvedAnimationUrl = data.animationUrl;
 
     if (data.imageBytes != null && data.imageBytes!.isNotEmpty) {
       resolvedThumbnailUrl = await _dataSource.uploadGiftImage(
@@ -45,10 +57,17 @@ class GiftsRepositoryImpl implements GiftsRepository {
       );
     }
 
+    if (data.animationBytes != null && data.animationBytes!.isNotEmpty) {
+      resolvedAnimationUrl = await _dataSource.uploadGiftImage(
+        data.animationBytes!,
+        data.animationName ?? 'gift-animation.gif',
+      );
+    }
+
     final patchedData = UpdateGiftData(
       name: data.name,
       thumbnailUrl: resolvedThumbnailUrl,
-      animationUrl: data.animationUrl,
+      animationUrl: resolvedAnimationUrl,
       priceCoins: data.priceCoins,
       isActive: data.isActive,
       publishedAt: data.publishedAt,

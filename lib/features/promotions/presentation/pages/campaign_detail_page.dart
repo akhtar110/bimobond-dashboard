@@ -148,7 +148,7 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (state.isActioning) const LinearProgressIndicator(),
+        if (state.isActioning) const LinearProgressIndicator(minHeight: 2),
         DashboardCard(
           padding: EdgeInsets.all(
             embedded ? metrics.cardPadding : metrics.cardPadding + 4,
@@ -164,7 +164,7 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Wrap(
-                          spacing: 8,
+                          spacing: 10,
                           runSpacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
@@ -173,23 +173,26 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
                               style: Theme.of(context)
                                   .textTheme
                                   .titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w800),
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                  ),
                             ),
                             CampaignStatusBadge(status: c.status),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         _DetailMetaLine(
                           icon: Icons.person_outline_rounded,
                           text: '${l10n.t('owner')}: $ownerLabel',
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         _DetailMetaLine(
                           icon: Icons.flag_outlined,
                           text: '${l10n.t('promoObjective')}: ${c.objective}',
                         ),
                         if (c.startAt != null || c.endAt != null) ...[
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           _DetailMetaLine(
                             icon: Icons.date_range_outlined,
                             text: _formatDateRange(
@@ -205,102 +208,97 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
                   ),
                   if (c.post?.previewThumbnailUrl != null) ...[
                     const SizedBox(width: PromotionsSpace.md),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(
-                        embedded ? 12 : (metrics.isMobile ? 12 : 16),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(
+                          embedded ? 12 : (metrics.isMobile ? 12 : 16),
+                        ),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.55),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: scheme.shadow.withValues(alpha: 0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      child: CachedNetworkImage(
-                        imageUrl: c.post!.previewThumbnailUrl!,
-                        height: embedded ? 96 : (metrics.isMobile ? 72 : 88),
-                        width: embedded ? 96 : (metrics.isMobile ? 72 : 88),
-                        fit: BoxFit.cover,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                          embedded ? 12 : (metrics.isMobile ? 12 : 16),
+                        ),
+                        child: CachedNetworkImage(
+                          imageUrl: c.post!.previewThumbnailUrl!,
+                          height: embedded ? 96 : (metrics.isMobile ? 72 : 88),
+                          width: embedded ? 96 : (metrics.isMobile ? 72 : 88),
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ],
                 ],
               ),
               const SizedBox(height: PromotionsSpace.lg),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.t('promoProgress'),
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
-                        const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 8,
-                            backgroundColor: scheme.surfaceContainerHighest,
-                          ),
-                        ),
-                      ],
-                    ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
                   ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '${stats.progressPercent.toStringAsFixed(1)}%',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.t('promoProgress'),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 8,
+                                backgroundColor:
+                                    scheme.surfaceContainerHighest,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '${stats.progressPercent.toStringAsFixed(1)}%',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: PromotionsSpace.lg),
-        DashboardCard(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: state.isActioning
-                    ? null
-                    : () => _updateStatus(context, 'ACTIVE'),
-                icon: const Icon(Icons.play_circle_outline, size: 18),
-                label: Text(l10n.t('promoActivate')),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: state.isActioning
-                    ? null
-                    : () => _updateStatus(context, 'PAUSED'),
-                icon: const Icon(Icons.pause_circle_outline, size: 18),
-                label: Text(l10n.t('promoPause')),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: state.isActioning
-                    ? null
-                    : () => _updateStatus(context, 'REJECTED'),
-                icon: const Icon(Icons.block, size: 18),
-                label: Text(l10n.t('promoReject')),
-              ),
-              OutlinedButton.icon(
-                onPressed: state.isActioning
-                    ? null
-                    : () => _updateStatus(context, 'CANCELLED'),
-                icon: const Icon(Icons.cancel_outlined, size: 18),
-                label: Text(l10n.t('cancel')),
-              ),
-              TextButton.icon(
-                onPressed: state.isActioning ? null : () => _delete(context),
-                icon: Icon(Icons.delete_outline, size: 18, color: scheme.error),
-                label: Text(
-                  l10n.t('delete'),
-                  style: TextStyle(color: scheme.error),
-                ),
-              ),
-            ],
-          ),
+        _AdminActionsCard(
+          isActioning: state.isActioning,
+          onActivate: () => _updateStatus(context, 'ACTIVE'),
+          onPause: () => _updateStatus(context, 'PAUSED'),
+          onReject: () => _updateStatus(context, 'REJECTED'),
+          onCancel: () => _updateStatus(context, 'CANCELLED'),
+          onDelete: () => _delete(context),
         ),
         const SizedBox(height: PromotionsSpace.xl),
         LayoutBuilder(
@@ -373,7 +371,10 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
                   ),
                   _DetailInfoRow(
                     label: l10n.t('status'),
-                    valueWidget: CampaignStatusBadge(status: c.status),
+                    valueWidget: Align(
+                      alignment: Alignment.centerLeft,
+                      child: CampaignStatusBadge(status: c.status),
+                    ),
                     labelWidth: metrics.detailLabelWidth,
                   ),
                   if (c.startAt != null)
@@ -467,11 +468,21 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(PromotionsSpace.xl),
-                child: Text(
-                  l10n.t('promoDeliveryLogs'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 18,
+                      color: scheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      l10n.t('promoDeliveryLogs'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
                 ),
               ),
               if (state.impressions.isEmpty)
@@ -495,28 +506,40 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
                     horizontal: PromotionsSpace.xl,
                     vertical: 12,
                   ),
-                  color: scheme.surfaceContainerHigh,
+                  color: scheme.surfaceContainerLow,
                   child: Row(
                     children: [
                       Expanded(
                         flex: 3,
                         child: Text(
                           l10n.t('promoViewer'),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12.5,
+                          ),
                         ),
                       ),
                       Expanded(
                         flex: 2,
                         child: Text(
                           l10n.t('promoCost'),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12.5,
+                          ),
                         ),
                       ),
                       Expanded(
                         flex: 3,
                         child: Text(
                           l10n.t('createdAt'),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12.5,
+                          ),
                         ),
                       ),
                     ],
@@ -598,6 +621,158 @@ class _CampaignDetailLoadedContent extends StatelessWidget {
     }
 
     return PromotionsDashboardShell(child: body);
+  }
+}
+
+class _AdminActionsCard extends StatelessWidget {
+  const _AdminActionsCard({
+    required this.isActioning,
+    required this.onActivate,
+    required this.onPause,
+    required this.onReject,
+    required this.onCancel,
+    required this.onDelete,
+  });
+
+  final bool isActioning;
+  final VoidCallback onActivate;
+  final VoidCallback onPause;
+  final VoidCallback onReject;
+  final VoidCallback onCancel;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final metrics = promotionsMetricsOf(context);
+
+    ButtonStyle primaryStyle() => FilledButton.styleFrom(
+          minimumSize: Size(metrics.isMobile ? 0 : 120, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        );
+
+    ButtonStyle tonalStyle() => FilledButton.styleFrom(
+          minimumSize: Size(metrics.isMobile ? 0 : 120, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        );
+
+    ButtonStyle outlineStyle() => OutlinedButton.styleFrom(
+          minimumSize: Size(metrics.isMobile ? 0 : 120, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          side: BorderSide(color: scheme.outlineVariant),
+        );
+
+    ButtonStyle dangerStyle() => OutlinedButton.styleFrom(
+          foregroundColor: scheme.error,
+          minimumSize: Size(metrics.isMobile ? 0 : 120, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          side: BorderSide(color: scheme.error.withValues(alpha: 0.45)),
+        );
+
+    return DashboardCard(
+      padding: EdgeInsets.all(metrics.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.admin_panel_settings_outlined,
+                    size: 18,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.tOr('adminActions', 'Admin actions'),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.tOr(
+                        'promoCampaignActionsHint',
+                        'Update status or remove this campaign',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PromotionsSpace.md),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                style: primaryStyle(),
+                onPressed: isActioning ? null : onActivate,
+                icon: const Icon(Icons.play_circle_outline, size: 18),
+                label: Text(l10n.t('promoActivate')),
+              ),
+              FilledButton.tonalIcon(
+                style: tonalStyle(),
+                onPressed: isActioning ? null : onPause,
+                icon: const Icon(Icons.pause_circle_outline, size: 18),
+                label: Text(l10n.t('promoPause')),
+              ),
+              FilledButton.tonalIcon(
+                style: tonalStyle().copyWith(
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.disabled)) return null;
+                    return scheme.error;
+                  }),
+                  backgroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.disabled)) return null;
+                    return scheme.errorContainer.withValues(alpha: 0.55);
+                  }),
+                ),
+                onPressed: isActioning ? null : onReject,
+                icon: Icon(Icons.block, size: 18, color: scheme.error),
+                label: Text(
+                  l10n.t('promoReject'),
+                  style: TextStyle(color: scheme.error),
+                ),
+              ),
+              OutlinedButton.icon(
+                style: outlineStyle(),
+                onPressed: isActioning ? null : onCancel,
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: Text(l10n.t('cancel')),
+              ),
+              OutlinedButton.icon(
+                style: dangerStyle(),
+                onPressed: isActioning ? null : onDelete,
+                icon: Icon(Icons.delete_outline, size: 18, color: scheme.error),
+                label: Text(l10n.t('delete')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

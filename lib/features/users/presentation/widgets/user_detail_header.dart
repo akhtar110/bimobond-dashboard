@@ -1,10 +1,8 @@
 ﻿import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
-import '../bloc/users_bloc.dart';
 
 class UserDetailRoleChip extends StatelessWidget {
   const UserDetailRoleChip({super.key, required this.user});
@@ -54,36 +52,15 @@ class UserDetailRoleChip extends StatelessWidget {
   }
 }
 
-class UserDetailActionButton extends StatelessWidget {
-  const UserDetailActionButton({
+class UserDetailHeader extends StatelessWidget {
+  const UserDetailHeader({
     super.key,
-    required this.label,
-    required this.color,
-    required this.onTap,
+    required this.user,
+    this.adminActions,
   });
 
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: color.withValues(alpha: 0.5)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-    );
-  }
-}
-
-class UserDetailHeader extends StatelessWidget {
-  const UserDetailHeader({super.key, required this.user});
   final UserEntity user;
+  final Widget? adminActions;
 
   @override
   Widget build(BuildContext context) {
@@ -171,12 +148,11 @@ class UserDetailHeader extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 16),
-              if (user.bio != null)
+              if (user.bio != null) ...[
+                const SizedBox(height: 12),
                 Text(
                   user.bio!,
-                  textAlign:
-                      isCompact ? TextAlign.center : TextAlign.start,
+                  textAlign: isCompact ? TextAlign.center : TextAlign.start,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.5,
@@ -184,36 +160,7 @@ class UserDetailHeader extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              const SizedBox(height: 24),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                alignment: wrapAlign,
-                children: [
-                  UserDetailActionButton(
-                    label: user.isBanned
-                        ? context.l10n.t('unban')
-                        : context.l10n.t('ban'),
-                    color: user.isBanned ? scheme.tertiary : scheme.error,
-                    onTap: () => context
-                        .read<UsersBloc>()
-                        .add(ToggleBanUserEvent(user.id)),
-                  ),
-                  UserDetailActionButton(
-                    label: user.roles.contains(UserRole.admin)
-                        ? context.l10n.t('demote')
-                        : context.l10n.t('promote'),
-                    color: scheme.primary,
-                    onTap: () => user.roles.contains(UserRole.admin)
-                        ? context
-                            .read<UsersBloc>()
-                            .add(DemoteUserEvent(user.id))
-                        : context
-                            .read<UsersBloc>()
-                            .add(PromoteUserEvent(user.id)),
-                  ),
-                ],
-              ),
+              ],
             ],
           );
         }
@@ -232,30 +179,41 @@ class UserDetailHeader extends StatelessWidget {
               ),
             ],
           ),
-          child: isCompact
-              ? Column(
-                  children: [
-                    avatar,
-                    const SizedBox(height: 16),
-                    contentColumn(
-                      CrossAxisAlignment.center,
-                      WrapAlignment.center,
-                    ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    avatar,
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: contentColumn(
-                        CrossAxisAlignment.start,
-                        WrapAlignment.start,
-                      ),
-                    ),
-                  ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (adminActions != null)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: adminActions!,
                 ),
+              if (adminActions != null) const SizedBox(height: 8),
+              isCompact
+                  ? Column(
+                      children: [
+                        avatar,
+                        const SizedBox(height: 16),
+                        contentColumn(
+                          CrossAxisAlignment.center,
+                          WrapAlignment.center,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        avatar,
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: contentColumn(
+                            CrossAxisAlignment.start,
+                            WrapAlignment.start,
+                          ),
+                        ),
+                      ],
+                    ),
+            ],
+          ),
         );
       },
     );

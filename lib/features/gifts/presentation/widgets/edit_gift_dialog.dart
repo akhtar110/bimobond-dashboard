@@ -9,6 +9,8 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_image_picker.dart';
+import 'gift_animation_preview.dart';
+import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
 
 void showEditGiftDialog(BuildContext pageContext, GiftEntity gift) {
@@ -35,6 +37,9 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
   Uint8List? _newImageBytes;
   String? _newImageName;
+  Uint8List? _newAnimationBytes;
+  String? _newAnimationName;
+  bool _clearAnimation = false;
   DateTime? _publishedAt;
 
   @override
@@ -59,6 +64,16 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     setState(() {
       _newImageBytes = picked.bytes;
       _newImageName = picked.name;
+    });
+  }
+
+  Future<void> _pickAnimation() async {
+    final picked = await pickGiftAnimation();
+    if (!mounted || picked == null) return;
+    setState(() {
+      _newAnimationBytes = picked.bytes;
+      _newAnimationName = picked.name;
+      _clearAnimation = false;
     });
   }
 
@@ -98,6 +113,9 @@ class EditGiftDialogState extends State<EditGiftDialog> {
             publishedAt: _publishedAt,
             imageBytes: _newImageBytes,
             imageName: _newImageName,
+            animationBytes: _newAnimationBytes,
+            animationName: _newAnimationName,
+            animationUrl: _clearAnimation ? '' : null,
           ),
         ));
   }
@@ -109,6 +127,12 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     final screenW = MediaQuery.sizeOf(context).width;
     final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
     final hasNewImage = _newImageBytes != null;
+    final hasNewAnimation = _newAnimationBytes != null;
+    final existingAnimation = widget.gift.animationUrl;
+    final showExistingAnimation = !hasNewAnimation &&
+        !_clearAnimation &&
+        existingAnimation != null &&
+        existingAnimation.isNotEmpty;
 
     return BlocListener<GiftsBloc, GiftsState>(
       bloc: widget.pageContext.read<GiftsBloc>(),
@@ -146,7 +170,6 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // â”€â”€ Gift Name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       TextFormField(
                         controller: _nameCtrl,
                         decoration: InputDecoration(
@@ -161,7 +184,6 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                       ),
                       const SizedBox(height: 14),
 
-                      // â”€â”€ Image section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       OutlinedButton.icon(
                         onPressed: isActioning ? null : _pickImage,
                         icon: const Icon(Icons.upload_file_outlined, size: 18),
@@ -180,7 +202,6 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Preview: new bytes OR existing URL
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: AspectRatio(
@@ -216,18 +237,49 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
                       const SizedBox(height: 14),
 
-                      // â”€â”€ Price â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                      TextFormField(
-                        controller: _priceCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: InputDecoration(
-                          labelText: l10n.t('giftPriceLabel'),
-                          prefixText: '\$',
-                          border: OutlineInputBorder(
+                      OutlinedButton.icon(
+                        onPressed: isActioning ? null : _pickAnimation,
+                        icon: const Icon(Icons.animation_rounded, size: 18),
+                        label: Text(
+                          hasNewAnimation || showExistingAnimation
+                              ? l10n.tOr('changeAnimation', 'Change animation')
+                              : l10n.tOr(
+                                  'uploadAnimationOptional',
+                                  'Upload animation (MP4, optional)',
+                                ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
+                      ),
+                      if (hasNewAnimation || showExistingAnimation) ...[
+                        const SizedBox(height: 12),
+                        GiftAnimationPreview(
+                          bytes: _newAnimationBytes,
+                          networkUrl: hasNewAnimation
+                              ? null
+                              : existingAnimation,
+                          fileName: hasNewAnimation
+                              ? _newAnimationName
+                              : existingAnimation,
+                          onClear: isActioning
+                              ? null
+                              : () => setState(() {
+                                    _newAnimationBytes = null;
+                                    _newAnimationName = null;
+                                    _clearAnimation = true;
+                                  }),
+                        ),
+                      ],
+
+                      const SizedBox(height: 14),
+
+                      GiftPriceCoinsField(
+                        controller: _priceCtrl,
+                        enabled: !isActioning,
                         validator: (v) {
                           if (v?.trim().isEmpty == true) {
                             return l10n.t('requiredField');
@@ -240,7 +292,6 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                       ),
                       const SizedBox(height: 14),
 
-                      // â”€â”€ Published At â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       GiftPublishedAtPicker(
                         value: _publishedAt,
                         onTap: isActioning ? null : _pickPublishedAt,
@@ -249,7 +300,6 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                             : null,
                       ),
 
-                      // â”€â”€ Uploading indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                       if (isActioning) ...[
                         const SizedBox(height: 14),
                         Row(

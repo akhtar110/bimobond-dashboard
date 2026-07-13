@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/toolbar_filter_dropdown.dart';
@@ -45,8 +46,6 @@ class _PromotedPostsPageState extends State<PromotedPostsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
     return BlocConsumer<PromotedPostsBloc, PromotedPostsState>(
       listenWhen: (p, c) =>
           c is PromotedPostsLoaded &&
@@ -72,6 +71,8 @@ class _PromotedPostsPageState extends State<PromotedPostsPage> {
             state is PromotedPostsEmpty && state.isLoading;
         final showProgress =
             isInitialLoad || isRefreshing || isEmptyLoading;
+        final loaded =
+            state is PromotedPostsLoaded ? state : null;
 
         return PromotionsDashboardShell(
           scrollController: _scrollController,
@@ -82,27 +83,28 @@ class _PromotedPostsPageState extends State<PromotedPostsPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    l10n.t('promoPromotedPostsTitle'),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: metrics.isMobile ? 20 : null,
-                        ),
+                  _PromotedPostsHeader(
+                    metrics: metrics,
+                    isBusy: showProgress,
+                    onRefresh: () => context
+                        .read<PromotedPostsBloc>()
+                        .add(const LoadPromotedPostsEvent()),
                   ),
                   SizedBox(height: metrics.sectionGap),
-                  const _PromotedPostsFilters(),
-                  if (showProgress) ...[
+                  if (loaded != null) ...[
+                    _PromotedPostsSummaryStrip(state: loaded),
                     SizedBox(height: metrics.sectionGap),
+                  ],
+                  _PromotedPostsFilters(metrics: metrics),
+                  if (showProgress) ...[
+                    SizedBox(height: metrics.toolbarFilterGap),
                     const LinearProgressIndicator(minHeight: 2),
                   ],
-                  SizedBox(
-                    height: metrics.isMobile
-                        ? PromotionsSpace.md
-                        : PromotionsSpace.lg,
-                  ),
+                  SizedBox(height: metrics.sectionGap),
                   _PromotedPostsDataSection(
                     state: state,
-                    onOpenAnalytics: (postId) => _openAnalytics(context, postId),
+                    onOpenAnalytics: (postId) =>
+                        _openAnalytics(context, postId),
                   ),
                 ],
               );
@@ -118,8 +120,198 @@ class _PromotedPostsPageState extends State<PromotedPostsPage> {
   }
 }
 
+class _PromotedPostsHeader extends StatelessWidget {
+  const _PromotedPostsHeader({
+    required this.metrics,
+    required this.isBusy,
+    required this.onRefresh,
+  });
+
+  final PromotionsLayoutMetrics metrics;
+  final bool isBusy;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final compact = metrics.isMobile;
+
+    final title = Text(
+      l10n.t('promoPromotedPostsTitle'),
+      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            fontSize: compact ? 20 : null,
+            height: 1.15,
+          ),
+    );
+
+    final subtitle = Text(
+      l10n.tOr(
+        'promoPromotedPostsSubtitle',
+        'Browse and analyze posts currently running promotion campaigns.',
+      ),
+      maxLines: compact ? 2 : 2,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontSize: compact ? 12 : null,
+            height: 1.35,
+          ),
+    );
+
+    final refresh = IconButton(
+      tooltip: l10n.t('refresh'),
+      visualDensity: VisualDensity.compact,
+      onPressed: isBusy ? null : onRefresh,
+      icon: Icon(
+        Icons.refresh_rounded,
+        size: compact ? 20 : 22,
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 520;
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: title),
+                  refresh,
+                ],
+              ),
+              SizedBox(height: metrics.toolbarFilterGap),
+              subtitle,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  title,
+                  SizedBox(height: metrics.toolbarFilterGap),
+                  subtitle,
+                ],
+              ),
+            ),
+            refresh,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PromotedPostsSummaryStrip extends StatelessWidget {
+  const _PromotedPostsSummaryStrip({required this.state});
+
+  final PromotedPostsLoaded state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final metrics = promotionsMetricsOf(context);
+    final number = NumberFormat.compact();
+    final activeFilters = _promotedPostsHasActiveFilters(state.query);
+
+    return Wrap(
+      spacing: metrics.toolbarFilterGap,
+      runSpacing: metrics.toolbarFilterGap,
+      children: [
+        _SummaryChip(
+          icon: Icons.campaign_outlined,
+          label: l10n.tOr('promoPromotedPostsTotal', 'Total posts'),
+          value: number.format(state.meta.total),
+        ),
+        _SummaryChip(
+          icon: Icons.grid_view_rounded,
+          label: l10n.tOr('promoShowing', 'Showing'),
+          value: number.format(state.posts.length),
+        ),
+        if (activeFilters)
+          _SummaryChip(
+            icon: Icons.filter_alt_outlined,
+            label: l10n.tOr('filtersActive', 'Filters active'),
+            value: '•',
+            emphasize: true,
+          ),
+      ],
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = emphasize ? scheme.primary : scheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: emphasize
+            ? scheme.primaryContainer.withValues(alpha: 0.35)
+            : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: emphasize
+              ? scheme.primary.withValues(alpha: 0.35)
+              : scheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: emphasize ? scheme.primary : accent),
+          const SizedBox(width: 7),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  height: 1.1,
+                ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PromotedPostsFilters extends StatelessWidget {
-  const _PromotedPostsFilters();
+  const _PromotedPostsFilters({this.metrics});
+
+  final PromotionsLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -134,17 +326,20 @@ class _PromotedPostsFilters extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final metrics = PromotionsLayoutMetrics(
-              getPromotionsDeviceType(constraints.maxWidth),
-            );
+            final m = metrics ??
+                PromotionsLayoutMetrics(
+                  getPromotionsDeviceType(constraints.maxWidth),
+                );
             final narrow = constraints.maxWidth < 720;
-            final controlHeight = metrics.filterControlHeight;
+            final veryNarrow = constraints.maxWidth < 420;
+            final controlHeight = m.filterControlHeight;
+            final gap = m.toolbarFilterGap;
 
             final search = PromotionsToolbarSearchField(
               hint: l10n.t('promoSearchPromotedPosts'),
               initialValue: query.search ?? '',
               height: controlHeight,
-              compact: metrics.isMobile,
+              compact: m.isMobile,
               onChanged: (q) => context
                   .read<PromotedPostsBloc>()
                   .add(SearchPromotedPostsEvent(q)),
@@ -182,38 +377,74 @@ class _PromotedPostsFilters extends StatelessWidget {
                         .add(const ClearPromotedPostsFiltersEvent()),
                     icon: Icon(
                       Icons.filter_alt_off_outlined,
-                      size: 18,
+                      size: m.isMobile ? 16 : 18,
                       color: scheme.error,
                     ),
                   )
                 : null;
 
-            if (narrow) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  search,
-                  SizedBox(height: metrics.filterGap),
-                  Row(
+            final filtersBody = narrow
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(child: status),
-                      if (clearButton != null) clearButton,
+                      search,
+                      SizedBox(height: gap),
+                      if (veryNarrow)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            status,
+                            if (clearButton != null) ...[
+                              SizedBox(height: gap),
+                              Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: clearButton,
+                              ),
+                            ],
+                          ],
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(child: status),
+                            if (clearButton != null) ...[
+                              SizedBox(width: gap),
+                              clearButton,
+                            ],
+                          ],
+                        ),
                     ],
-                  ),
-                ],
-              );
-            }
+                  )
+                : Row(
+                    children: [
+                      Expanded(flex: 3, child: search),
+                      SizedBox(width: gap),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: 140,
+                          maxWidth: constraints.maxWidth < 1100 ? 168 : 200,
+                        ),
+                        child: status,
+                      ),
+                      if (clearButton != null) ...[
+                        SizedBox(width: gap),
+                        clearButton,
+                      ],
+                    ],
+                  );
 
-            return Row(
-              children: [
-                Expanded(flex: 3, child: search),
-                SizedBox(width: metrics.filterGap),
-                SizedBox(
-                  width: metrics.isMobile ? 140 : 160,
-                  child: status,
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: scheme.outlineVariant.withValues(alpha: 0.55),
                 ),
-                if (clearButton != null) clearButton,
-              ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(m.isMobile ? 8 : 10),
+                child: filtersBody,
+              ),
             );
           },
         );
@@ -234,6 +465,7 @@ class _PromotedPostsDataSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final metrics = promotionsMetricsOf(context);
     final emptyState =
         state is PromotedPostsEmpty ? state as PromotedPostsEmpty : null;
     final isLoading = state is PromotedPostsInitial ||
@@ -247,15 +479,17 @@ class _PromotedPostsDataSection extends StatelessWidget {
         state is PromotedPostsLoaded ? state as PromotedPostsLoaded : null;
     final isEmpty = emptyState != null && !emptyState.isLoading;
     final sortField = _sortFieldFrom(state);
+    final query = _queryFrom(state);
+    final hasFilters = _promotedPostsHasActiveFilters(query);
 
     Widget? footer;
     if (loaded != null) {
-      if (promotionsMetricsOf(context).useDesktopPagination) {
+      if (metrics.useDesktopPagination) {
         footer = PromotionsPaginationBar(
           page: loaded.meta.page,
           totalPages: loaded.meta.totalPages,
           total: loaded.meta.total,
-          metrics: promotionsMetricsOf(context),
+          metrics: metrics,
           showTopBorder: true,
           onPage: (p) => context
               .read<PromotedPostsBloc>()
@@ -270,6 +504,12 @@ class _PromotedPostsDataSection extends StatelessWidget {
 
     return PromotionsDataSection(
       footer: footer,
+      padding: EdgeInsets.fromLTRB(
+        metrics.isMobile ? PromotionsSpace.md : PromotionsSpace.lg,
+        metrics.isMobile ? PromotionsSpace.md : PromotionsSpace.lg,
+        metrics.isMobile ? PromotionsSpace.md : PromotionsSpace.lg,
+        PromotionsSpace.md,
+      ),
       child: PromotionsDataBody(
         isLoading: isLoading,
         errorMessage: errorMessage,
@@ -277,7 +517,16 @@ class _PromotedPostsDataSection extends StatelessWidget {
             .read<PromotedPostsBloc>()
             .add(const LoadPromotedPostsEvent()),
         isEmpty: isEmpty,
-        emptyMessage: l10n.t('noData'),
+        emptyMessage: hasFilters
+            ? l10n.tOr(
+                'promoPromotedPostsNoSearchResults',
+                'No promoted posts match your search or filters.',
+              )
+            : l10n.t('noData'),
+        emptyIcon: hasFilters
+            ? Icons.filter_alt_off_outlined
+            : Icons.campaign_outlined,
+        minHeight: metrics.isMobile ? 220 : 280,
         child: loaded == null
             ? const SizedBox.shrink()
             : PromotedPostsTable(
@@ -287,7 +536,6 @@ class _PromotedPostsDataSection extends StatelessWidget {
                     .read<PromotedPostsBloc>()
                     .add(SortPromotedPostsEvent(field)),
                 onViewAnalytics: onOpenAnalytics,
-                onViewHistory: onOpenAnalytics,
               ),
       ),
     );

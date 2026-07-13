@@ -7,6 +7,7 @@ import '../entities/bulk_gift_action_result.dart';
 /// Payload for creating a new gift.
 /// The [imageBytes] + [imageName] are uploaded first; the returned URL
 /// is used as [thumbnailUrl] when calling POST /gifts/admin.
+/// Optional [animationBytes] are uploaded the same way and sent as [animationUrl].
 class CreateGiftData {
   const CreateGiftData({
     required this.name,
@@ -15,6 +16,8 @@ class CreateGiftData {
     required this.priceCoins,
     this.isActive = true,
     this.publishedAt,
+    this.animationBytes,
+    this.animationName,
   });
 
   final String name;
@@ -25,6 +28,10 @@ class CreateGiftData {
 
   /// Explicit publish timestamp. Defaults to server-side `DateTime.now()` when null.
   final DateTime? publishedAt;
+
+  /// Optional animation file uploaded before create; result becomes `animationUrl`.
+  final Uint8List? animationBytes;
+  final String? animationName;
 }
 
 class UpdateGiftData {
@@ -37,6 +44,8 @@ class UpdateGiftData {
     this.publishedAt,
     this.imageBytes,
     this.imageName,
+    this.animationBytes,
+    this.animationName,
   });
 
   final String? name;
@@ -51,6 +60,10 @@ class UpdateGiftData {
   /// When set, the image is uploaded first and the resulting URL replaces [thumbnailUrl].
   final Uint8List? imageBytes;
   final String? imageName;
+
+  /// When set, the animation is uploaded first and the resulting URL replaces [animationUrl].
+  final Uint8List? animationBytes;
+  final String? animationName;
 }
 
 abstract class GiftsRepository {

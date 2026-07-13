@@ -13,6 +13,7 @@ import '../../../promotions/presentation/bloc/location_intelligence_bloc.dart';
 import '../../../search_history/presentation/bloc/search_history_bloc.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/user_detail_bloc.dart';
+import '../bloc/user_detail_event.dart';
 import 'user_detail_screen.dart';
 
 /// Keeps user-detail blocs alive for the pushed route lifetime.

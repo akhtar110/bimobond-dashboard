@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/post_media_preview.dart';
@@ -71,12 +72,21 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
   void _onRatioDetermined(int index, double ratio) {
     if (_aspectRatios[index] == ratio) return;
     _aspectRatios[index] = ratio;
+    // Keep carousel viewport size stable while paging — resizing the parent
+    // mid-swipe cancels PageView animations and breaks back/forth navigation.
+    if (_media.length > 1) {
+      if (index == 0 && _currentIndex == 0) {
+        widget.onAspectRatioChanged?.call(ratio);
+      }
+      return;
+    }
     if (index == _currentIndex) {
       widget.onAspectRatioChanged?.call(ratio);
     }
   }
 
   void _notifyAspectForIndex(int index) {
+    if (_media.length > 1) return;
     if (_aspectRatios.containsKey(index)) {
       widget.onAspectRatioChanged?.call(_aspectRatios[index]!);
       return;
@@ -85,23 +95,19 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
     widget.onAspectRatioChanged?.call(item.isVideo ? 9 / 16 : 1.0);
   }
 
-  void _goToPrevious() {
-    if (_currentIndex <= 0 || !_pageController.hasClients) return;
-    _pageController.previousPage(
+  void _goToPage(int index) {
+    if (!_pageController.hasClients) return;
+    if (index < 0 || index >= _media.length || index == _currentIndex) return;
+    _pageController.animateToPage(
+      index,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
     );
   }
 
-  void _goToNext() {
-    if (_currentIndex >= _media.length - 1 || !_pageController.hasClients) {
-      return;
-    }
-    _pageController.nextPage(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
-  }
+  void _goToPrevious() => _goToPage(_currentIndex - 1);
+
+  void _goToNext() => _goToPage(_currentIndex + 1);
 
   Widget _buildCarouselNavButton({
     required ColorScheme scheme,
@@ -165,13 +171,19 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
   Widget _buildAttachedSoundOverlay() {
     if (!_hasAttachedSound) return const SizedBox.shrink();
     final audioUrl = widget.post.attachedSoundPlayUrl!;
-    return PostAttachedSoundPreview(
+    final preview = PostAttachedSoundPreview(
       key: ValueKey('attached_sound_${widget.post.id}_$audioUrl'),
       audioUrl: audioUrl,
       autoplay: true,
       looping: widget.soundLooping,
       showSeekBar: widget.showSeekBar,
     );
+    // Full-screen sound controls steal horizontal drags from PageView.
+    // Keep audio playing, but let carousel gestures pass through.
+    if (_media.length > 1) {
+      return IgnorePointer(child: preview);
+    }
+    return preview;
   }
 
   Widget _buildCarouselWithControls(double mediaHeight, ColorScheme scheme) {
@@ -215,13 +227,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
             final selected = index == _currentIndex;
 
             return GestureDetector(
-              onTap: () {
-                _pageController.animateToPage(
-                  index,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                );
-              },
+              onTap: () => _goToPage(index),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -267,29 +273,38 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
   }
 
   Widget _buildPageView(double mediaHeight) {
-    return PageView.builder(
-      key: PageStorageKey<String>('post_media_${widget.post.id}'),
-      controller: _pageController,
-      itemCount: _media.length,
-      allowImplicitScrolling: true,
-      onPageChanged: (index) {
-        setState(() => _currentIndex = index);
-        _notifyAspectForIndex(index);
-      },
-      itemBuilder: (context, index) {
-        final item = _media[index];
-        return MediaCarouselItem(
-          key: ValueKey('${widget.post.id}_${item.url}_$index'),
-          item: item,
-          height: mediaHeight,
-          fit: widget.fit,
-          isActive: index == _currentIndex,
-          videoLooping: widget.videoLooping,
-          showSeekBar: widget.showSeekBar,
-          hlsUrl: widget.post.hlsUrl,
-          onAspectRatioDetermined: (ratio) => _onRatioDetermined(index, ratio),
-        );
-      },
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      ),
+      child: PageView.builder(
+        controller: _pageController,
+        itemCount: _media.length,
+        physics: const ClampingScrollPhysics(),
+        onPageChanged: (index) {
+          setState(() => _currentIndex = index);
+          _notifyAspectForIndex(index);
+        },
+        itemBuilder: (context, index) {
+          final item = _media[index];
+          return MediaCarouselItem(
+            key: ValueKey('${widget.post.id}_${item.url}_$index'),
+            item: item,
+            height: mediaHeight,
+            fit: widget.fit,
+            isActive: index == _currentIndex,
+            videoLooping: widget.videoLooping,
+            showSeekBar: widget.showSeekBar,
+            hlsUrl: widget.post.hlsUrl,
+            onAspectRatioDetermined: (ratio) => _onRatioDetermined(index, ratio),
+          );
+        },
+      ),
     );
   }
 

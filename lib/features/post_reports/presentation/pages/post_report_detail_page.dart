@@ -6,6 +6,8 @@ import '../../../../core/localization/localization.dart';
 import '../../../analytics/presentation/utils/analytics_format.dart';
 import '../../../analytics/presentation/widgets/analytics_kpi_card.dart';
 import '../../../reports/presentation/utils/report_detail_labels.dart';
+import '../../../reports/presentation/widgets/report_detail_header_layout.dart';
+import '../../../reports/presentation/widgets/report_detail_metric_card.dart';
 import '../../../reports/presentation/widgets/report_safe_media.dart';
 import '../../../reports/presentation/widgets/reports_embedded_panel.dart';
 import '../../domain/entities/post_report_entities.dart';
@@ -207,56 +209,71 @@ class _PostHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final title = post.description?.trim().isNotEmpty == true
+        ? post.description!.trim()
+        : ReportDetailLabels.postFallback(l10n, post.id);
+    final subtitle =
+        '@${post.user?.username ?? post.userId} · ${post.type} · ${post.status}';
 
-    return AnalyticsSectionCard(
-      title: post.description?.trim().isNotEmpty == true
-          ? post.description!.trim()
-          : ReportDetailLabels.postFallback(l10n, post.id),
-      subtitle:
-          '@${post.user?.username ?? post.userId} · ${post.type} · ${post.status}',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PostReportThumbnail(
-            post: post,
-            width: 120,
-            height: 120,
-            borderRadius: 12,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (post.categoryRelation != null)
-                  Chip(
-                    label: Text(post.categoryRelation!.name),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                if (post.isAd)
-                  Chip(label: Text(ReportDetailLabels.ad(l10n))),
-                if (post.isStory)
-                  Chip(label: Text(ReportDetailLabels.story(l10n))),
-                if (post.isAuctionable)
-                  Chip(label: Text(ReportDetailLabels.auctionable(l10n))),
-                ...post.hashtags.map(
-                  (h) => Chip(
-                    label: Text('#${h.name}'),
-                    visualDensity: VisualDensity.compact,
-                  ),
+    return ReportDetailHeaderSplit(
+      start: ReportDetailHeaderCard(
+        title: title,
+        subtitle: subtitle,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PostReportThumbnail(
+              post: post,
+              width: 88,
+              height: 88,
+              borderRadius: 12,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _PostReportDetailView._formatDate(post.createdAt),
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+      end: ReportDetailHeaderCard(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (post.categoryRelation != null)
+              Chip(
+                label: Text(post.categoryRelation!.name),
+                visualDensity: VisualDensity.compact,
+              ),
+            if (post.isAd) Chip(label: Text(ReportDetailLabels.ad(l10n))),
+            if (post.isStory) Chip(label: Text(ReportDetailLabels.story(l10n))),
+            if (post.isAuctionable)
+              Chip(label: Text(ReportDetailLabels.auctionable(l10n))),
+            ...post.hashtags.map(
+              (h) => Chip(
+                label: Text('#${h.name}'),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            if (post.categoryRelation == null &&
+                !post.isAd &&
+                !post.isStory &&
+                !post.isAuctionable &&
+                post.hashtags.isEmpty)
+              Text(
+                '—',
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 13,
                 ),
-              ],
-            ),
-          ),
-          Text(
-            _PostReportDetailView._formatDate(post.createdAt),
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -273,57 +290,51 @@ class _MetricsGrid extends StatelessWidget {
     final m = detail.metrics;
     final c = detail.counts;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossCount = constraints.maxWidth > 900 ? 4 : 2;
-        return GridView.count(
-          crossAxisCount: crossCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.6,
-          children: [
-            AnalyticsKpiCard(
-              title: l10n.t('views'),
-              value: AnalyticsFormat.count(m.viewCount),
-              subtitle: ReportDetailLabels.allTimeCount(
-                l10n,
-                AnalyticsFormat.count(c.views),
-              ),
-              icon: Icons.visibility_outlined,
-            ),
-            AnalyticsKpiCard(
-              title: l10n.t('likes'),
-              value: AnalyticsFormat.count(m.likeCount),
-              subtitle: ReportDetailLabels.moderationFlagsCount(
-                l10n,
-                c.reports,
-              ),
-              icon: Icons.favorite_border_rounded,
-            ),
-            AnalyticsKpiCard(
-              title: l10n.t('comments'),
-              value: AnalyticsFormat.count(m.commentCount),
-              subtitle: ReportDetailLabels.savesCount(
-                l10n,
-                AnalyticsFormat.count(c.saves),
-              ),
-              icon: Icons.chat_bubble_outline_rounded,
-            ),
-            AnalyticsKpiCard(
-              title: l10n.t('reposts'),
-              value: AnalyticsFormat.count(m.repostCount),
-              subtitle: ReportDetailLabels.giftsDuetsCount(
-                l10n,
-                c.giftTransactions,
-                c.duets,
-              ),
-              icon: Icons.repeat_rounded,
-            ),
-          ],
-        );
-      },
+    return ReportDetailMetricsGrid(
+      hasSubtitle: true,
+      children: [
+        ReportDetailMetricCard(
+          title: l10n.t('views'),
+          value: AnalyticsFormat.count(m.viewCount),
+          subtitle: ReportDetailLabels.allTimeCount(
+            l10n,
+            AnalyticsFormat.count(c.views),
+          ),
+          icon: Icons.visibility_outlined,
+          accent: const Color(0xFF2563EB),
+        ),
+        ReportDetailMetricCard(
+          title: l10n.t('likes'),
+          value: AnalyticsFormat.count(m.likeCount),
+          subtitle: ReportDetailLabels.moderationFlagsCount(
+            l10n,
+            c.reports,
+          ),
+          icon: Icons.favorite_border_rounded,
+          accent: const Color(0xFFDB2777),
+        ),
+        ReportDetailMetricCard(
+          title: l10n.t('comments'),
+          value: AnalyticsFormat.count(m.commentCount),
+          subtitle: ReportDetailLabels.savesCount(
+            l10n,
+            AnalyticsFormat.count(c.saves),
+          ),
+          icon: Icons.chat_bubble_outline_rounded,
+          accent: const Color(0xFF0891B2),
+        ),
+        ReportDetailMetricCard(
+          title: l10n.t('reposts'),
+          value: AnalyticsFormat.count(m.repostCount),
+          subtitle: ReportDetailLabels.giftsDuetsCount(
+            l10n,
+            c.giftTransactions,
+            c.duets,
+          ),
+          icon: Icons.repeat_rounded,
+          accent: const Color(0xFF7C3AED),
+        ),
+      ],
     );
   }
 }
@@ -340,34 +351,37 @@ class _PeriodActivitySection extends StatelessWidget {
     return AnalyticsSectionCard(
       title: ReportDetailLabels.periodActivity(l10n),
       subtitle: ReportDetailLabels.engagementInRange(l10n),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
+      child: ReportDetailMetricsGrid(
         children: [
-          AnalyticsMiniStat(
-            label: l10n.t('views'),
-            value: AnalyticsFormat.count(activity.views),
+          ReportDetailCountMetricCard(
+            title: l10n.t('views'),
+            count: activity.views,
             icon: Icons.visibility_outlined,
+            accent: const Color(0xFF2563EB),
           ),
-          AnalyticsMiniStat(
-            label: l10n.t('likes'),
-            value: AnalyticsFormat.count(activity.likes),
+          ReportDetailCountMetricCard(
+            title: l10n.t('likes'),
+            count: activity.likes,
             icon: Icons.favorite_border_rounded,
+            accent: const Color(0xFFDB2777),
           ),
-          AnalyticsMiniStat(
-            label: l10n.t('comments'),
-            value: AnalyticsFormat.count(activity.comments),
+          ReportDetailCountMetricCard(
+            title: l10n.t('comments'),
+            count: activity.comments,
             icon: Icons.chat_bubble_outline_rounded,
+            accent: const Color(0xFF0891B2),
           ),
-          AnalyticsMiniStat(
-            label: ReportDetailLabels.saves(l10n),
-            value: AnalyticsFormat.count(activity.saves),
+          ReportDetailCountMetricCard(
+            title: ReportDetailLabels.saves(l10n),
+            count: activity.saves,
             icon: Icons.bookmark_border_rounded,
+            accent: const Color(0xFF7C3AED),
           ),
-          AnalyticsMiniStat(
-            label: l10n.t('reposts'),
-            value: AnalyticsFormat.count(activity.reposts),
+          ReportDetailCountMetricCard(
+            title: l10n.t('reposts'),
+            count: activity.reposts,
             icon: Icons.repeat_rounded,
+            accent: Theme.of(context).colorScheme.primary,
           ),
         ],
       ),

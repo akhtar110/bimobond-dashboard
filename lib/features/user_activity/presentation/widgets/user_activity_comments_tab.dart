@@ -116,9 +116,9 @@ class _UserActivityCommentsTabState extends State<UserActivityCommentsTab> {
             child: ListView.separated(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
               itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 if (index >= state.items.length) {
                   return const Padding(
@@ -182,8 +182,11 @@ class _CommentCard extends StatelessWidget {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dateStr = DateFormat('MMM d, yyyy · HH:mm').format(comment.createdAt);
+    final dateStr = DateFormat('MMM d · HH:mm').format(comment.createdAt);
     final post = comment.post;
+    final contextUser =
+        type == 'received' ? comment.user : post.user;
+    final contextLabel = type == 'received' ? 'From' : 'On post by';
 
     return ActivityListCard(
       isDark: isDark,
@@ -191,82 +194,130 @@ class _CommentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Comment text + badges ───────────────────────────────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  comment.content,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    height: 1.4,
-                    color: scheme.onSurface,
-                  ),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 15,
+                  color: scheme.primary,
                 ),
               ),
-              if (comment.isGift) ...[
-                const SizedBox(width: 8),
-                _Badge(
-                  icon: Icons.card_giftcard,
-                  label: l10n.t('gift'),
-                  color: theme.colorScheme.primary,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (contextUser != null)
+                      _CompactContextHeader(
+                        label: contextLabel,
+                        user: contextUser,
+                        isDark: isDark,
+                      )
+                    else
+                      Text(
+                        contextLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border(
+                          left: BorderSide(
+                            color: scheme.primary.withValues(alpha: 0.65),
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        comment.content,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          height: 1.35,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ],
-          ),
-
-          // ── Meta row ───────────────────────────────────────────────────
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.favorite_border,
-                  size: 14, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text('${comment.likeCount}', style: _meta(scheme)),
-              const SizedBox(width: 12),
-              Icon(Icons.reply_outlined,
-                  size: 14, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 4),
+              ),
+              const SizedBox(width: 8),
               Text(
-                context.tr('repliesCount', {'count': '${comment.replyCount}'}),
+                dateStr,
                 style: _meta(scheme),
               ),
-              const Spacer(),
-              Text(dateStr, style: _meta(scheme)),
             ],
           ),
-
-          // ── Post context ───────────────────────────────────────────────
-          const SizedBox(height: 12),
-          Divider(
-            height: 1,
-            color: scheme.outlineVariant,
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _MetaChip(
+                icon: Icons.favorite_border_rounded,
+                label: '${comment.likeCount}',
+                scheme: scheme,
+              ),
+              _MetaChip(
+                icon: Icons.reply_rounded,
+                label: context.tr('repliesCount', {'count': '${comment.replyCount}'}),
+                scheme: scheme,
+              ),
+              if (comment.isGift)
+                _Badge(
+                  icon: Icons.card_giftcard_rounded,
+                  label: l10n.t('gift'),
+                  color: scheme.primary,
+                ),
+            ],
           ),
-          const SizedBox(height: 10),
-
-          // 'made'  → show post owner as context ("on post by …")
-          // 'received' → show who wrote the comment ("from …")
-          if (type == 'received' && comment.user != null)
-            _ContextRow(
-              label: 'From',
-              user: comment.user!,
-              isDark: isDark,
-            )
-          else if (type == 'made' && post.user != null)
-            _ContextRow(
-              label: 'On post by',
-              user: post.user!,
-              isDark: isDark,
-            ),
-
           if (post.description != null && post.description!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              post.description!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.article_outlined,
+                    size: 13,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      post.description!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -281,10 +332,10 @@ class _CommentCard extends StatelessWidget {
       );
 }
 
-// ─── Context row ──────────────────────────────────────────────────────────────
+// ─── Compact context header ───────────────────────────────────────────────────
 
-class _ContextRow extends StatelessWidget {
-  const _ContextRow({
+class _CompactContextHeader extends StatelessWidget {
+  const _CompactContextHeader({
     required this.label,
     required this.user,
     required this.isDark,
@@ -297,26 +348,82 @@ class _ContextRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final display = (user.fullName != null && user.fullName!.isNotEmpty)
+        ? user.fullName!
+        : user.username;
 
     return Row(
       children: [
         Text(
           '$label ',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
+        CircleAvatar(
+          radius: 10,
+          backgroundColor: scheme.surfaceContainerHighest,
+          backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+              ? NetworkImage(user.avatarUrl!)
+              : null,
+          child: user.avatarUrl == null || user.avatarUrl!.isEmpty
+              ? Icon(Icons.person, size: 12, color: scheme.onSurfaceVariant)
+              : null,
+        ),
+        const SizedBox(width: 6),
         Expanded(
-          child: ActivityAuthorRow(
-            username: user.username,
-            fullName: user.fullName,
-            avatarUrl: user.avatarUrl,
-            isDark: isDark,
+          child: Text(
+            display,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.icon,
+    required this.label,
+    required this.scheme,
+  });
+
+  final IconData icon;
+  final String label;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -337,16 +444,16 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
           Text(
             label,
             style: TextStyle(

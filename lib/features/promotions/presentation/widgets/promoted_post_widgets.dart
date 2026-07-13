@@ -1236,14 +1236,12 @@ class PromotedPostsTable extends StatelessWidget {
     required this.sortField,
     required this.onSort,
     required this.onViewAnalytics,
-    required this.onViewHistory,
   });
 
   final List<PromotedPostEntity> posts;
   final PromotedPostsSortField sortField;
   final ValueChanged<PromotedPostsSortField> onSort;
   final ValueChanged<String> onViewAnalytics;
-  final ValueChanged<String> onViewHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -1261,7 +1259,7 @@ class PromotedPostsTable extends StatelessWidget {
           return DecoratedBox(
             decoration: promotionsInnerTableDecoration(scheme),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1270,7 +1268,6 @@ class PromotedPostsTable extends StatelessWidget {
                     _PromotedPostCompactCard(
                       row: posts[i],
                       onViewAnalytics: () => onViewAnalytics(posts[i].post.id),
-                      onViewHistory: () => onViewHistory(posts[i].post.id),
                     ),
                     if (i < posts.length - 1)
                       Divider(
@@ -1292,7 +1289,7 @@ class PromotedPostsTable extends StatelessWidget {
         Widget table = DecoratedBox(
           decoration: promotionsInnerTableDecoration(scheme),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               width: tableWidth,
               child: Column(
@@ -1310,7 +1307,6 @@ class PromotedPostsTable extends StatelessWidget {
                       density: density,
                       striped: i.isOdd,
                       onViewAnalytics: () => onViewAnalytics(posts[i].post.id),
-                      onViewHistory: () => onViewHistory(posts[i].post.id),
                     ),
                     if (i < posts.length - 1)
                       Divider(
@@ -1370,7 +1366,10 @@ class _PromotedPostPrimaryCell extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          CampaignStatusBadge(status: primary!.status),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: CampaignStatusBadge(status: primary!.status),
+          ),
           const SizedBox(height: 4),
           Text(
             primary!.objective,
@@ -1429,12 +1428,10 @@ class _PromotedPostCompactCard extends StatelessWidget {
   const _PromotedPostCompactCard({
     required this.row,
     required this.onViewAnalytics,
-    required this.onViewHistory,
   });
 
   final PromotedPostEntity row;
   final VoidCallback onViewAnalytics;
-  final VoidCallback onViewHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -1447,12 +1444,12 @@ class _PromotedPostCompactCard extends StatelessWidget {
 
     Widget statChip(String label, String value) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.45),
+            color: scheme.outlineVariant.withValues(alpha: 0.4),
           ),
         ),
         child: Column(
@@ -1465,6 +1462,7 @@ class _PromotedPostCompactCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
                     height: 1.0,
                   ),
             ),
@@ -1488,7 +1486,7 @@ class _PromotedPostCompactCard extends StatelessWidget {
       child: InkWell(
         onTap: onViewAnalytics,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+          padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1517,7 +1515,11 @@ class _PromotedPostCompactCard extends StatelessWidget {
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                height: 1.25,
+                              ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -1526,6 +1528,7 @@ class _PromotedPostCompactCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
+                                fontSize: 10.5,
                               ),
                         ),
                       ],
@@ -1533,14 +1536,13 @@ class _PromotedPostCompactCard extends StatelessWidget {
                   ),
                   _PromotedPostRowActions(
                     onViewAnalytics: onViewAnalytics,
-                    onViewHistory: onViewHistory,
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 6,
+                runSpacing: 6,
                 children: [
                   statChip(
                     l10n.t('promoMetricViews'),
@@ -1569,10 +1571,11 @@ class _PromotedPostCompactCard extends StatelessWidget {
                 ],
               ),
               if (primary != null) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    Flexible(
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
                       child: CampaignStatusBadge(status: primary.status),
                     ),
                     const SizedBox(width: 8),
@@ -1651,9 +1654,9 @@ class _PromotedPostsTableHeader extends StatelessWidget {
     return Container(
       height: density == PromotedPostsTableDensity.wide
           ? kPromotedPostsTableHeaderHeight
-          : kPromotedPostsTableHeaderHeight + 4,
-      color: scheme.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+          : kPromotedPostsTableHeaderHeight + 2,
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: _PromotedPostsRowLayout(
         density: density,
         thumb: Text(
@@ -1701,14 +1704,12 @@ class _PromotedPostsTableRow extends StatefulWidget {
     required this.density,
     required this.striped,
     required this.onViewAnalytics,
-    required this.onViewHistory,
   });
 
   final PromotedPostEntity row;
   final PromotedPostsTableDensity density;
   final bool striped;
   final VoidCallback onViewAnalytics;
-  final VoidCallback onViewHistory;
 
   @override
   State<_PromotedPostsTableRow> createState() => _PromotedPostsTableRowState();
@@ -1756,7 +1757,7 @@ class _PromotedPostsTableRowState extends State<_PromotedPostsTableRow> {
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: rowHeight),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               child: _PromotedPostsRowLayout(
                 density: density,
                 thumb: ClipRRect(
@@ -1835,7 +1836,6 @@ class _PromotedPostsTableRowState extends State<_PromotedPostsTableRow> {
                     : const SizedBox.shrink(),
                 actions: _PromotedPostRowActions(
                   onViewAnalytics: widget.onViewAnalytics,
-                  onViewHistory: widget.onViewHistory,
                 ),
               ),
             ),
@@ -1987,11 +1987,9 @@ class _PromotedPostsRowLayout extends StatelessWidget {
 class _PromotedPostRowActions extends StatelessWidget {
   const _PromotedPostRowActions({
     required this.onViewAnalytics,
-    required this.onViewHistory,
   });
 
   final VoidCallback onViewAnalytics;
-  final VoidCallback onViewHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -2005,8 +2003,6 @@ class _PromotedPostRowActions extends StatelessWidget {
         switch (value) {
           case 'analytics':
             onViewAnalytics();
-          case 'history':
-            onViewHistory();
         }
       },
       itemBuilder: (context) => [
@@ -2017,16 +2013,6 @@ class _PromotedPostRowActions extends StatelessWidget {
               const Icon(Icons.insights_outlined, size: 18),
               const SizedBox(width: 8),
               Text(l10n.t('promoViewAnalytics')),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'history',
-          child: Row(
-            children: [
-              const Icon(Icons.history_rounded, size: 18),
-              const SizedBox(width: 8),
-              Text(l10n.t('promoViewHistory')),
             ],
           ),
         ),

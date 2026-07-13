@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import 'effect_placement_entities.dart';
+import 'filter_settings_entities.dart';
+
 class FiltersEffectsCountSummary extends Equatable {
   const FiltersEffectsCountSummary({
     required this.total,
@@ -57,6 +60,8 @@ class CameraFilterEntity extends Equatable {
     this.isBeautyDefault = false,
     this.isActive = true,
     this.sortOrder = 0,
+    this.filterSettings = const FilterSettingsEntity({}),
+    this.colorMatrix = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -73,6 +78,8 @@ class CameraFilterEntity extends Equatable {
   final bool isBeautyDefault;
   final bool isActive;
   final int sortOrder;
+  final FilterSettingsEntity filterSettings;
+  final List<double> colorMatrix;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -92,6 +99,8 @@ class CameraFilterEntity extends Equatable {
         isBeautyDefault,
         isActive,
         sortOrder,
+        filterSettings,
+        colorMatrix,
         createdAt,
         updatedAt,
       ];
@@ -146,6 +155,15 @@ class CameraEffectEntity extends Equatable {
     this.isScreenEffect = false,
     this.isActive = true,
     this.sortOrder = 0,
+    this.anchorType,
+    this.anchorLandmarks = const [],
+    this.scaleFactor,
+    this.offsetX,
+    this.offsetY,
+    this.landmarkSize,
+    this.fallbackAnchorType,
+    this.fallbackOffsetY,
+    this.fallbackScaleFactor,
     this.createdAt,
     this.updatedAt,
   });
@@ -161,8 +179,29 @@ class CameraEffectEntity extends Equatable {
   final bool isScreenEffect;
   final bool isActive;
   final int sortOrder;
+  final String? anchorType;
+  final List<String> anchorLandmarks;
+  final double? scaleFactor;
+  final double? offsetX;
+  final double? offsetY;
+  final double? landmarkSize;
+  final String? fallbackAnchorType;
+  final double? fallbackOffsetY;
+  final double? fallbackScaleFactor;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  EffectPlacementSettingsEntity get placement => EffectPlacementSettingsEntity(
+        anchorType: anchorType,
+        anchorLandmarks: anchorLandmarks,
+        scaleFactor: scaleFactor,
+        offsetX: offsetX,
+        offsetY: offsetY,
+        landmarkSize: landmarkSize,
+        fallbackAnchorType: fallbackAnchorType,
+        fallbackOffsetY: fallbackOffsetY,
+        fallbackScaleFactor: fallbackScaleFactor,
+      );
 
   @override
   List<Object?> get props => [
@@ -177,6 +216,15 @@ class CameraEffectEntity extends Equatable {
         isScreenEffect,
         isActive,
         sortOrder,
+        anchorType,
+        anchorLandmarks,
+        scaleFactor,
+        offsetX,
+        offsetY,
+        landmarkSize,
+        fallbackAnchorType,
+        fallbackOffsetY,
+        fallbackScaleFactor,
         createdAt,
         updatedAt,
       ];
@@ -263,6 +311,7 @@ class CreateFilterRequest extends Equatable {
     this.isBeautyDefault = false,
     this.sortOrder = 0,
     this.isActive = true,
+    this.filterSettings = const FilterSettingsEntity({}),
   });
 
   final String slug;
@@ -276,8 +325,9 @@ class CreateFilterRequest extends Equatable {
   final bool isBeautyDefault;
   final int sortOrder;
   final bool isActive;
+  final FilterSettingsEntity filterSettings;
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({FilterSettingsSchemaEntity? schema}) => {
         'slug': slug,
         'engineKey': engineKey,
         'engineType': CameraFilterEngineTypeApi.forAdminApi(engineType),
@@ -292,6 +342,8 @@ class CreateFilterRequest extends Equatable {
         'isBeautyDefault': isBeautyDefault,
         'sortOrder': sortOrder,
         'isActive': isActive,
+        if (schema != null)
+          'filterSettings': filterSettings.toFullApiJson(schema),
       };
 
   @override
@@ -307,6 +359,7 @@ class CreateFilterRequest extends Equatable {
         isBeautyDefault,
         sortOrder,
         isActive,
+        filterSettings,
       ];
 }
 
@@ -323,10 +376,12 @@ class UpdateFilterRequest extends Equatable {
     this.isBeautyDefault,
     this.sortOrder,
     this.isActive,
+    this.filterSettings,
     this.clearLabelKey = false,
     this.clearCustomLabel = false,
     this.clearThumbnailUrl = false,
     this.clearPreviewColorHex = false,
+    this.clearFilterSettings = false,
   });
 
   final String? slug;
@@ -340,12 +395,14 @@ class UpdateFilterRequest extends Equatable {
   final bool? isBeautyDefault;
   final int? sortOrder;
   final bool? isActive;
+  final FilterSettingsEntity? filterSettings;
   final bool clearLabelKey;
   final bool clearCustomLabel;
   final bool clearThumbnailUrl;
   final bool clearPreviewColorHex;
+  final bool clearFilterSettings;
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson({FilterSettingsSchemaEntity? schema}) {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
     if (engineKey != null) json['engineKey'] = engineKey;
@@ -376,6 +433,12 @@ class UpdateFilterRequest extends Equatable {
     if (isBeautyDefault != null) json['isBeautyDefault'] = isBeautyDefault;
     if (sortOrder != null) json['sortOrder'] = sortOrder;
     if (isActive != null) json['isActive'] = isActive;
+    if (clearFilterSettings) {
+      json['filterSettings'] = {};
+    } else if (filterSettings != null && schema != null) {
+      // Full snapshot so beauty/client-only keys reset cleanly on PATCH.
+      json['filterSettings'] = filterSettings!.toFullApiJson(schema);
+    }
     return json;
   }
 
@@ -392,10 +455,12 @@ class UpdateFilterRequest extends Equatable {
         isBeautyDefault,
         sortOrder,
         isActive,
+        filterSettings,
         clearLabelKey,
         clearCustomLabel,
         clearThumbnailUrl,
         clearPreviewColorHex,
+        clearFilterSettings,
       ];
 }
 
@@ -468,6 +533,7 @@ class CreateEffectRequest extends Equatable {
     this.isScreenEffect = false,
     this.sortOrder = 0,
     this.isActive = true,
+    this.placement = EffectPlacementSettingsEntity.empty,
   });
 
   final String slug;
@@ -480,19 +546,30 @@ class CreateEffectRequest extends Equatable {
   final bool isScreenEffect;
   final int sortOrder;
   final bool isActive;
+  final EffectPlacementSettingsEntity placement;
 
-  Map<String, dynamic> toJson() => {
-        'slug': slug,
-        'effectType': CameraEffectTypeApi.normalize(effectType),
-        if (emoji != null && emoji!.isNotEmpty) 'emoji': emoji,
-        if (assetUrl != null && assetUrl!.isNotEmpty) 'assetUrl': assetUrl,
-        'previewColorHex': previewColorHex,
-        'labelKey': labelKey,
-        'requiresFaceDetection': requiresFaceDetection,
-        'isScreenEffect': isScreenEffect,
-        'sortOrder': sortOrder,
-        'isActive': isActive,
-      };
+  Map<String, dynamic> toJson() {
+    final includePlacement = !isScreenEffect && requiresFaceDetection;
+    return {
+      'slug': slug,
+      'effectType': CameraEffectTypeApi.normalize(effectType),
+      if (emoji != null && emoji!.isNotEmpty) 'emoji': emoji,
+      if (assetUrl != null && assetUrl!.isNotEmpty) 'assetUrl': assetUrl,
+      'previewColorHex': previewColorHex,
+      'labelKey': labelKey,
+      'requiresFaceDetection': requiresFaceDetection,
+      'isScreenEffect': isScreenEffect,
+      'sortOrder': sortOrder,
+      'isActive': isActive,
+      ...placement.toCreateJson(
+        includePlacement: includePlacement || isScreenEffect,
+      ),
+      if (isScreenEffect)
+        'anchorType': CameraEffectAnchorTypeApi.forApi(
+          CameraEffectAnchorTypeApi.screen,
+        ),
+    };
+  }
 
   @override
   List<Object?> get props => [
@@ -506,6 +583,7 @@ class CreateEffectRequest extends Equatable {
         isScreenEffect,
         sortOrder,
         isActive,
+        placement,
       ];
 }
 
@@ -521,6 +599,10 @@ class UpdateEffectRequest extends Equatable {
     this.isScreenEffect,
     this.sortOrder,
     this.isActive,
+    this.placement,
+    this.clearEmoji = false,
+    this.clearAssetUrl = false,
+    this.clearAnchorLandmarks = false,
   });
 
   final String? slug;
@@ -533,15 +615,27 @@ class UpdateEffectRequest extends Equatable {
   final bool? isScreenEffect;
   final int? sortOrder;
   final bool? isActive;
+  final EffectPlacementSettingsEntity? placement;
+  final bool clearEmoji;
+  final bool clearAssetUrl;
+  final bool clearAnchorLandmarks;
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson({EffectPlacementSettingsEntity? baselinePlacement}) {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
     if (effectType != null) {
       json['effectType'] = CameraEffectTypeApi.normalize(effectType!);
     }
-    if (emoji != null) json['emoji'] = emoji;
-    if (assetUrl != null) json['assetUrl'] = assetUrl;
+    if (clearEmoji) {
+      json['emoji'] = null;
+    } else if (emoji != null) {
+      json['emoji'] = emoji;
+    }
+    if (clearAssetUrl) {
+      json['assetUrl'] = null;
+    } else if (assetUrl != null) {
+      json['assetUrl'] = assetUrl;
+    }
     if (previewColorHex != null) json['previewColorHex'] = previewColorHex;
     if (labelKey != null) json['labelKey'] = labelKey;
     if (requiresFaceDetection != null) {
@@ -550,6 +644,14 @@ class UpdateEffectRequest extends Equatable {
     if (isScreenEffect != null) json['isScreenEffect'] = isScreenEffect;
     if (sortOrder != null) json['sortOrder'] = sortOrder;
     if (isActive != null) json['isActive'] = isActive;
+    if (placement != null) {
+      json.addAll(
+        placement!.toUpdateJson(
+          baseline: baselinePlacement,
+          clearAnchorLandmarks: clearAnchorLandmarks,
+        ),
+      );
+    }
     return json;
   }
 
@@ -565,6 +667,10 @@ class UpdateEffectRequest extends Equatable {
         isScreenEffect,
         sortOrder,
         isActive,
+        placement,
+        clearEmoji,
+        clearAssetUrl,
+        clearAnchorLandmarks,
       ];
 }
 

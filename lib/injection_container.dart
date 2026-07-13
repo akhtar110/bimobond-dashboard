@@ -91,6 +91,8 @@ import 'features/filters_effects/data/datasources/filters_effects_remote_datasou
 import 'features/filters_effects/data/repositories/filters_effects_repository_impl.dart';
 import 'features/filters_effects/domain/repositories/filters_effects_repository.dart';
 import 'features/filters_effects/domain/usecases/filters_effects_usecases.dart';
+import 'features/filters_effects/presentation/bloc/effect_editor_bloc.dart';
+import 'features/filters_effects/presentation/bloc/filter_editor_bloc.dart';
 import 'features/filters_effects/presentation/bloc/filters_effects_bloc.dart';
 
 import 'features/user_activity/data/datasources/user_activity_remote_data_source.dart';
@@ -537,6 +539,11 @@ Future<void> init() async {
         () => UserDetailBloc(
       getUserById: sl<GetUserById>(),
       getUserPosts: sl<GetUserPosts>(),
+      banUser: sl<BanUser>(),
+      unbanUser: sl<UnbanUser>(),
+      promoteUser: sl<PromoteUser>(),
+      demoteUser: sl<DemoteUser>(),
+      deleteUser: sl<DeleteUser>(),
     ),
   );
 
@@ -684,6 +691,12 @@ Future<void> init() async {
     () => GetCameraFiltersUseCase(sl<FiltersEffectsRepository>()),
   );
   sl.registerLazySingleton(
+    () => GetCameraFilterUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetFilterSettingsSchemaUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
     () => CreateCameraFilterUseCase(sl<FiltersEffectsRepository>()),
   );
   sl.registerLazySingleton(
@@ -718,6 +731,15 @@ Future<void> init() async {
   );
   sl.registerLazySingleton(
     () => GetCameraEffectsUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetCameraEffectUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetEffectPlacementSchemaUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UploadEffectAssetUseCase(sl<FiltersEffectsRepository>()),
   );
   sl.registerLazySingleton(
     () => CreateCameraEffectUseCase(sl<FiltersEffectsRepository>()),
@@ -788,6 +810,24 @@ Future<void> init() async {
       assignEffectsToCategory: sl<AssignEffectsToCategoryUseCase>(),
       publishCatalog: sl<PublishFiltersEffectsCatalogUseCase>(),
       seedCatalog: sl<SeedFiltersEffectsCatalogUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => FilterEditorBloc(
+      getSchema: sl<GetFilterSettingsSchemaUseCase>(),
+      getFilter: sl<GetCameraFilterUseCase>(),
+      createFilter: sl<CreateCameraFilterUseCase>(),
+      updateFilter: sl<UpdateCameraFilterUseCase>(),
+      uploadFilterThumbnail: sl<UploadEffectAssetUseCase>(),
+    ),
+  );
+  sl.registerFactory(
+    () => EffectEditorBloc(
+      getSchema: sl<GetEffectPlacementSchemaUseCase>(),
+      getEffect: sl<GetCameraEffectUseCase>(),
+      createEffect: sl<CreateCameraEffectUseCase>(),
+      updateEffect: sl<UpdateCameraEffectUseCase>(),
+      uploadEffectAsset: sl<UploadEffectAssetUseCase>(),
     ),
   );
 
@@ -1208,6 +1248,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => CreatePackageUseCase(sl<PromotionsRepository>()));
   sl.registerLazySingleton(() => UpdatePackageUseCase(sl<PromotionsRepository>()));
   sl.registerLazySingleton(() => TogglePackageStatusUseCase(sl<PromotionsRepository>()));
+  sl.registerLazySingleton(() => DeletePackageUseCase(sl<PromotionsRepository>()));
   sl.registerLazySingleton(
     () => GetLocationHistoryUseCase(sl<LocationIntelligenceRepository>()),
   );
@@ -1258,6 +1299,8 @@ Future<void> init() async {
       createPackage: sl<CreatePackageUseCase>(),
       updatePackage: sl<UpdatePackageUseCase>(),
       toggleStatus: sl<TogglePackageStatusUseCase>(),
+      deletePackage: sl<DeletePackageUseCase>(),
+      bulkAction: sl<BulkCampaignActionUseCase>(),
     ),
   );
   sl.registerFactory(

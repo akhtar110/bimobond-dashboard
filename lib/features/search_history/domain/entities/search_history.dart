@@ -34,6 +34,12 @@ class SearchHistoryUserSummary extends Equatable {
   final String? email;
   final String? avatarUrl;
 
+  String get displayName {
+    final full = fullName?.trim();
+    if (full != null && full.isNotEmpty) return full;
+    return username;
+  }
+
   @override
   List<Object?> get props => [id, username, fullName, email, avatarUrl];
 }

@@ -7,9 +7,24 @@ import 'dart:typed_data';
 /// Returns [null] if the user cancels.
 // ignore: avoid_web_libraries_in_flutter
 Future<({String name, Uint8List bytes})?> pickGiftImage() async {
+  return _pickFile(accept: 'image/*,.jpg,.jpeg,.png,.webp,.gif');
+}
+
+/// Opens the native file dialog for gift animation assets (image / gif / lottie / video).
+/// Returns [null] if the user cancels.
+// ignore: avoid_web_libraries_in_flutter
+Future<({String name, Uint8List bytes})?> pickGiftAnimation() async {
+  return _pickFile(
+    accept: 'video/mp4,video/webm,video/*,.mp4,.webm,.mov',
+  );
+}
+
+Future<({String name, Uint8List bytes})?> _pickFile({
+  required String accept,
+}) async {
   final input = html.FileUploadInputElement()
     ..multiple = false
-    ..accept = 'image/*,.jpg,.jpeg,.png,.webp,.gif';
+    ..accept = accept;
 
   // Appending to the DOM is required for reliable dialog triggering on Chrome.
   html.document.body?.append(input);

@@ -946,6 +946,56 @@ class _AuctionAdminSection extends StatelessWidget {
   const _AuctionAdminSection({required this.state});
   final AuctionDetailLoaded state;
 
+  Widget _actionButtonsRow(List<Widget> buttons) {
+    if (buttons.isEmpty) return const SizedBox.shrink();
+    if (buttons.length == 1) {
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: buttons.first,
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = DashboardSpace.sm;
+        final minButtonWidth = 148.0;
+        final fitsOneRow = constraints.maxWidth >=
+            buttons.length * minButtonWidth +
+                (buttons.length - 1) * spacing;
+
+        if (fitsOneRow) {
+          return Row(
+            children: [
+              for (var i = 0; i < buttons.length; i++) ...[
+                if (i > 0) SizedBox(width: spacing),
+                Expanded(child: buttons[i]),
+              ],
+            ],
+          );
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              for (var i = 0; i < buttons.length; i++) ...[
+                if (i > 0) SizedBox(width: spacing),
+                SizedBox(
+                  width: minButtonWidth,
+                  child: buttons[i],
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -980,11 +1030,13 @@ class _AuctionAdminSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: DashboardSpace.md),
-          ActionPanelButton(
-            label: l10n.tOr('editAuction', 'Edit auction'),
-            icon: Icons.edit_outlined,
-            onTap: () => _showEditDialog(context, auction),
-          ),
+          _actionButtonsRow([
+            ActionPanelButton(
+              label: l10n.tOr('editAuction', 'Edit auction'),
+              icon: Icons.edit_outlined,
+              onTap: () => _showEditDialog(context, auction),
+            ),
+          ]),
         ],
       );
     }
@@ -993,11 +1045,13 @@ class _AuctionAdminSection extends StatelessWidget {
       return ActionPanel(
         title: l10n.t('actions'),
         children: [
-          ActionPanelButton(
-            label: l10n.tOr('editAuction', 'Edit auction'),
-            icon: Icons.edit_outlined,
-            onTap: () => _showEditDialog(context, auction),
-          ),
+          _actionButtonsRow([
+            ActionPanelButton(
+              label: l10n.tOr('editAuction', 'Edit auction'),
+              icon: Icons.edit_outlined,
+              onTap: () => _showEditDialog(context, auction),
+            ),
+          ]),
         ],
       );
     }
@@ -1006,31 +1060,30 @@ class _AuctionAdminSection extends StatelessWidget {
       title: l10n.t('actions'),
       isLoading: state.isActioning,
       children: [
-        ActionPanelButton(
-          label: l10n.t('manuallyResolve'),
-          icon: Icons.check_circle_rounded,
-          onTap: () => _showResolveDialog(context),
-        ),
-        const SizedBox(height: DashboardSpace.md),
-        ActionPanelButton(
-          label: l10n.t('forceCancel'),
-          icon: Icons.cancel_outlined,
-          variant: ActionPanelButtonVariant.destructive,
-          onTap: () => _confirmCancel(context),
-        ),
-        const SizedBox(height: DashboardSpace.md),
-        ActionPanelButton(
-          label: l10n.tOr('banAuction', 'Ban auction'),
-          icon: Icons.block_outlined,
-          variant: ActionPanelButtonVariant.destructive,
-          onTap: () => _confirmBan(context),
-        ),
-        const SizedBox(height: DashboardSpace.md),
-        ActionPanelButton(
-          label: l10n.tOr('editAuction', 'Edit auction'),
-          icon: Icons.edit_outlined,
-          onTap: () => _showEditDialog(context, auction),
-        ),
+        _actionButtonsRow([
+          ActionPanelButton(
+            label: l10n.t('manuallyResolve'),
+            icon: Icons.check_circle_rounded,
+            onTap: () => _showResolveDialog(context),
+          ),
+          ActionPanelButton(
+            label: l10n.t('forceCancel'),
+            icon: Icons.cancel_outlined,
+            variant: ActionPanelButtonVariant.destructive,
+            onTap: () => _confirmCancel(context),
+          ),
+          ActionPanelButton(
+            label: l10n.tOr('banAuction', 'Ban auction'),
+            icon: Icons.block_outlined,
+            variant: ActionPanelButtonVariant.destructive,
+            onTap: () => _confirmBan(context),
+          ),
+          ActionPanelButton(
+            label: l10n.tOr('editAuction', 'Edit auction'),
+            icon: Icons.edit_outlined,
+            onTap: () => _showEditDialog(context, auction),
+          ),
+        ]),
       ],
     );
   }

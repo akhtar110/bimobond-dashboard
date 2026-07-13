@@ -29,6 +29,16 @@ abstract class UsersRepository {
   Future<void> promoteToAdmin(String userId);
   Future<void> demoteFromAdmin(String userId);
   Future<void> verifyUser(String userId);
+  Future<void> unverifyUser(String userId);
+  Future<void> suspendUser(String userId);
+  Future<void> unsuspendUser(String userId);
+  Future<void> banUser(String userId);
+  Future<void> unbanUser(String userId);
+  Future<void> activateUser(String userId);
+  Future<void> deactivateUser(String userId);
+  Future<void> resetUserPassword(String userId);
+  Future<void> setUserCanPost(String userId, {required bool canPost});
+  Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
   Future<void> deleteUser(String userId);
   Future<AdminBulkUsersResultEntity> suspendUsers(
     List<String> userIds, {

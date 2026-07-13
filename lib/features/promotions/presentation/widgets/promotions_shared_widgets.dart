@@ -14,14 +14,14 @@ class CampaignStatusBadge extends StatelessWidget {
       case CampaignStatus.active:
         return scheme.primary;
       case CampaignStatus.pendingPayment:
-        return scheme.secondary;
+        return const Color(0xFFED6C02); // amber/orange — readable border + text
       case CampaignStatus.paused:
         return scheme.tertiary;
       case CampaignStatus.rejected:
       case CampaignStatus.cancelled:
         return scheme.error;
       case CampaignStatus.completed:
-        return scheme.outline;
+        return const Color(0xFF2E7D32); // green — avoid weak scheme.outline
       default:
         return scheme.onSurfaceVariant;
     }
@@ -45,8 +45,9 @@ class CampaignStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color, width: 1.25),
       ),
       child: Text(
         label,
@@ -54,6 +55,7 @@ class CampaignStatusBadge extends StatelessWidget {
           color: color,
           fontSize: 12,
           fontWeight: FontWeight.w700,
+          height: 1.1,
         ),
       ),
     );

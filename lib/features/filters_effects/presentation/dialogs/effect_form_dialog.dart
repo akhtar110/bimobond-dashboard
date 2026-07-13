@@ -2,338 +2,433 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/state_widgets.dart';
+import '../../../../injection_container.dart' as di;
 import '../../domain/entities/filters_effects_entities.dart';
-import '../bloc/filters_effects_bloc.dart';
-import '../bloc/filters_effects_event.dart';
-import '../utils/fe_preview_color_utils.dart';
-import '../widgets/fe_catalog_item_preview.dart';
-import '../widgets/fe_effect_form_fields.dart';
-import '../widgets/fe_filter_form_fields.dart';
-import '../widgets/fe_form_preview_panel.dart';
+import '../bloc/effect_editor_bloc.dart';
+import '../bloc/effect_editor_event.dart';
+import '../bloc/effect_editor_state.dart';
+import '../widgets/effect_editor_basic_section.dart';
+import '../widgets/effect_editor_placement_section.dart';
+import '../widgets/effect_editor_preview_panel.dart';
+
+Future<bool?> openEffectEditor(BuildContext context, {String? effectId}) {
+  return showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => BlocProvider(
+      create: (_) => di.sl<EffectEditorBloc>()
+        ..add(LoadEffectEditorEvent(effectId: effectId)),
+      child: EffectFormDialog(effectId: effectId),
+    ),
+  );
+}
 
 void showEffectFormDialog(
   BuildContext context, {
   CameraEffectEntity? editing,
 }) {
-  showDialog<void>(
-    context: context,
-    builder: (ctx) => BlocProvider.value(
-      value: context.read<FiltersEffectsBloc>(),
-      child: EffectFormDialog(editing: editing),
-    ),
-  );
+  openEffectEditor(context, effectId: editing?.id);
 }
 
-class EffectFormDialog extends StatefulWidget {
-  const EffectFormDialog({super.key, this.editing});
+class EffectFormDialog extends StatelessWidget {
+  const EffectFormDialog({super.key, this.effectId});
 
-  final CameraEffectEntity? editing;
+  final String? effectId;
 
-  @override
-  State<EffectFormDialog> createState() => _EffectFormDialogState();
-}
-
-class _EffectFormDialogState extends State<EffectFormDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _slugCtrl;
-  late final TextEditingController _emojiCtrl;
-  late final TextEditingController _assetCtrl;
-  late final TextEditingController _labelKeyCtrl;
-  late final TextEditingController _sortOrderCtrl;
-  late String _selectedEffectType;
-  late String _previewColorHex;
-  late bool _requiresFaceDetection;
-  late bool _isScreenEffect;
-  late bool _isActive;
-
-  bool get _isEditing => widget.editing != null;
-
-  String get _previewLabel {
-    final key = _labelKeyCtrl.text.trim();
-    if (key.isNotEmpty) return key;
-    final slug = _slugCtrl.text.trim();
-    return slug.isNotEmpty ? slug : '—';
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.editing;
-    _slugCtrl = TextEditingController(text: e?.slug ?? '');
-    _selectedEffectType =
-        CameraEffectTypeApi.normalize(e?.effectType ?? CameraEffectTypeApi.faceAr);
-    _emojiCtrl = TextEditingController(text: e?.emoji ?? '');
-    _assetCtrl = TextEditingController(text: e?.assetUrl ?? '');
-    _labelKeyCtrl = TextEditingController(text: e?.labelKey ?? '');
-    _sortOrderCtrl = TextEditingController(text: '${e?.sortOrder ?? 0}');
-    _previewColorHex = e?.previewColorHex?.trim().isNotEmpty == true
-        ? e!.previewColorHex!.trim().toUpperCase()
-        : defaultPreviewColorHex(required: true);
-    _requiresFaceDetection = e?.requiresFaceDetection ?? false;
-    _isScreenEffect = e?.isScreenEffect ?? false;
-    _isActive = e?.isActive ?? true;
-
-    final flags = CameraEffectTypeApi.flagsForType(
-      _selectedEffectType,
-      requiresFaceDetection: _requiresFaceDetection,
-    );
-    _requiresFaceDetection = flags.requiresFaceDetection;
-    _isScreenEffect = flags.isScreenEffect;
-
-    for (final ctrl in [_slugCtrl, _labelKeyCtrl, _emojiCtrl, _assetCtrl]) {
-      ctrl.addListener(() => setState(() {}));
-    }
-  }
-
-  @override
-  void dispose() {
-    _slugCtrl.dispose();
-    _emojiCtrl.dispose();
-    _assetCtrl.dispose();
-    _labelKeyCtrl.dispose();
-    _sortOrderCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onEffectTypeChanged(String value) {
-    setState(() {
-      _selectedEffectType = value;
-      final flags = CameraEffectTypeApi.flagsForType(
-        value,
-        requiresFaceDetection: _requiresFaceDetection,
-      );
-      _requiresFaceDetection = flags.requiresFaceDetection;
-      _isScreenEffect = flags.isScreenEffect;
-    });
-  }
-
-  ({String effectType, bool requiresFaceDetection, bool isScreenEffect})
-      _resolvedEffectPayload() {
-    final effectType = CameraEffectTypeApi.normalize(_selectedEffectType);
-    final flags = CameraEffectTypeApi.flagsForType(
-      effectType,
-      requiresFaceDetection: _requiresFaceDetection,
-    );
-    return (
-      effectType: effectType,
-      requiresFaceDetection: flags.requiresFaceDetection,
-      isScreenEffect: flags.isScreenEffect,
-    );
-  }
-
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    if (_previewColorHex.trim().isEmpty) return;
-    final bloc = context.read<FiltersEffectsBloc>();
-    final sortOrder = int.tryParse(_sortOrderCtrl.text.trim()) ?? 0;
-    final payload = _resolvedEffectPayload();
-
-    if (_isEditing) {
-      bloc.add(
-        UpdateCameraEffectEvent(
-          widget.editing!.id,
-          UpdateEffectRequest(
-            slug: _slugCtrl.text.trim(),
-            effectType: payload.effectType,
-            emoji: _emojiCtrl.text.trim().isEmpty ? null : _emojiCtrl.text.trim(),
-            assetUrl: _assetCtrl.text.trim().isEmpty ? null : _assetCtrl.text.trim(),
-            previewColorHex: _previewColorHex.trim(),
-            labelKey: _labelKeyCtrl.text.trim(),
-            requiresFaceDetection: payload.requiresFaceDetection,
-            isScreenEffect: payload.isScreenEffect,
-            sortOrder: sortOrder,
-            isActive: _isActive,
+  Future<bool> _confirmDiscard(BuildContext context) async {
+    final l10n = context.l10n;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.tOr('feDiscardChangesTitle', 'Discard changes?')),
+        content: Text(
+          l10n.tOr(
+            'feDiscardChangesMessage',
+            'You have unsaved changes. Leave without saving?',
           ),
         ),
-      );
-    } else {
-      bloc.add(
-        CreateCameraEffectEvent(
-          CreateEffectRequest(
-            slug: _slugCtrl.text.trim(),
-            effectType: payload.effectType,
-            emoji: _emojiCtrl.text.trim().isEmpty ? null : _emojiCtrl.text.trim(),
-            assetUrl: _assetCtrl.text.trim().isEmpty ? null : _assetCtrl.text.trim(),
-            previewColorHex: _previewColorHex.trim(),
-            labelKey: _labelKeyCtrl.text.trim(),
-            requiresFaceDetection: payload.requiresFaceDetection,
-            isScreenEffect: payload.isScreenEffect,
-            sortOrder: sortOrder,
-            isActive: _isActive,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.t('cancel')),
           ),
-        ),
-      );
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.tOr('feDiscard', 'Discard')),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _handleClose(BuildContext context, EffectEditorState state) async {
+    final ready = state is EffectEditorReady ? state : null;
+    if (ready != null && ready.hasUnsavedChanges) {
+      final discard = await _confirmDiscard(context);
+      if (!discard || !context.mounted) return;
     }
-    Navigator.of(context).pop();
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
+    return BlocListener<EffectEditorBloc, EffectEditorState>(
+      listenWhen: (previous, current) {
+        if (current is EffectEditorReady &&
+            current.saveSucceeded &&
+            (previous is! EffectEditorReady || !previous.saveSucceeded)) {
+          return true;
+        }
+        if (current is EffectEditorReady &&
+            current.submitError != null &&
+            (previous is! EffectEditorReady ||
+                previous.submitError != current.submitError)) {
+          return true;
+        }
+        return false;
+      },
+      listener: (context, state) {
+        if (state is! EffectEditorReady) return;
+        if (state.saveSucceeded) {
+          context
+              .read<EffectEditorBloc>()
+              .add(const ClearEffectEditorSaveFlagEvent());
+          Navigator.of(context).pop(true);
+          return;
+        }
+        if (state.submitError != null) {
+          final scheme = Theme.of(context).colorScheme;
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(
+                  state.submitError!,
+                  style: TextStyle(color: scheme.onError),
+                ),
+                backgroundColor: scheme.error,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          context
+              .read<EffectEditorBloc>()
+              .add(const ClearEffectEditorSubmitErrorEvent());
+        }
+      },
+      child: BlocBuilder<EffectEditorBloc, EffectEditorState>(
+        buildWhen: (previous, current) {
+          if (previous.runtimeType != current.runtimeType) return true;
+          if (current is EffectEditorReady && previous is EffectEditorReady) {
+            return previous.isSaving != current.isSaving ||
+                previous.effectId != current.effectId;
+          }
+          return false;
+        },
+        builder: (context, state) {
+          final l10n = context.l10n;
+          final ready = state is EffectEditorReady ? state : null;
+          final screen = MediaQuery.sizeOf(context);
+          final dialogWidth = (screen.width * 0.94).clamp(960.0, 1280.0);
+          final dialogHeight = (screen.height * 0.88).clamp(520.0, 820.0);
 
-    return AlertDialog(
-      title: Text(
-        _isEditing
-            ? l10n.tOr('feEditEffect', 'Edit effect')
-            : l10n.tOr('feCreateEffect', 'Create effect'),
+          return AlertDialog(
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    ready?.isEditing == true
+                        ? l10n.tOr('feEditEffect', 'Edit effect')
+                        : l10n.tOr('feCreateEffect', 'Create effect'),
+                  ),
+                ),
+                IconButton(
+                  tooltip: l10n.t('cancel'),
+                  onPressed: state is EffectEditorLoading
+                      ? null
+                      : () => _handleClose(context, state),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            content: SizedBox(
+              width: dialogWidth,
+              height: dialogHeight,
+              child: _EffectEditorDialogBody(effectId: effectId),
+            ),
+            actions: [
+              TextButton(
+                onPressed: state is EffectEditorLoading
+                    ? null
+                    : () => _handleClose(context, state),
+                child: Text(l10n.t('cancel')),
+              ),
+              if (ready != null)
+                FilledButton(
+                  onPressed: ready.isSaving || ready.isUploadingAsset
+                      ? null
+                      : () => context
+                          .read<EffectEditorBloc>()
+                          .add(const SubmitEffectEditorEvent()),
+                  child: ready.isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(l10n.tOr('feSave', 'Save')),
+                ),
+            ],
+          );
+        },
       ),
-      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      content: SizedBox(
-        width: 860,
-        height: maxHeight.clamp(480, 720),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+  }
+}
+
+class _EffectEditorDialogBody extends StatelessWidget {
+  const _EffectEditorDialogBody({required this.effectId});
+
+  final String? effectId;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<EffectEditorBloc, EffectEditorState>(
+      buildWhen: (previous, current) =>
+          previous.runtimeType != current.runtimeType,
+      builder: (context, state) {
+        if (state is EffectEditorLoading) {
+          return const Center(child: LoadingView());
+        }
+
+        if (state is EffectEditorError) {
+          return Center(
+            child: ErrorView(
+              message: state.message,
+              retryLabel: context.l10n.t('retry'),
+              onRetry: () => context.read<EffectEditorBloc>().add(
+                    LoadEffectEditorEvent(effectId: effectId),
+                  ),
+            ),
+          );
+        }
+
+        if (state is! EffectEditorReady) {
+          return const SizedBox.shrink();
+        }
+
+        return const _EffectEditorReadyBody();
+      },
+    );
+  }
+}
+
+class _EffectEditorReadyBody extends StatelessWidget {
+  const _EffectEditorReadyBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return BlocSelector<EffectEditorBloc, EffectEditorState, bool>(
+      selector: (state) => state is EffectEditorReady ? state.isSaving : false,
+      builder: (context, isSaving) {
+        return Stack(
+          fit: StackFit.expand,
           children: [
-            Expanded(
-              flex: 11,
-              child: FeFilterFormTheme(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 34,
+                  child: _DialogColumn(
+                    title: context.l10n.tOr(
+                      'feEffectSectionBasic',
+                      'Basic information',
+                    ),
+                    child: BlocSelector<EffectEditorBloc, EffectEditorState,
+                        _BasicPanelState?>(
+                      selector: _selectBasicPanelState,
+                      builder: (context, panelState) {
+                        if (panelState == null) return const SizedBox.shrink();
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.only(right: 4, bottom: 8),
+                          child: EffectEditorBasicSection(
+                            key: ValueKey(
+                              panelState.ready.effectId ?? 'new-effect',
+                            ),
+                            state: panelState.ready,
+                            embedded: true,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                VerticalDivider(width: 1, color: scheme.outlineVariant),
+                Expanded(
+                  flex: 40,
+                  child: _DialogColumn(
+                    title: context.l10n.tOr(
+                      'feEffectSectionPlacement',
+                      'Effect placement & settings',
+                    ),
+                    child: BlocSelector<EffectEditorBloc, EffectEditorState,
+                        _PlacementPanelState?>(
+                      selector: _selectPlacementPanelState,
+                      builder: (context, panelState) {
+                        if (panelState == null) return const SizedBox.shrink();
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.only(right: 4, bottom: 8),
+                          child: EffectEditorPlacementSection(
+                            state: panelState.ready,
+                            embedded: true,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                VerticalDivider(width: 1, color: scheme.outlineVariant),
+                Expanded(
+                  flex: 30,
+                  child: _DialogColumn(
+                    title: context.l10n.tOr(
+                      'feEffectSectionPreview',
+                      'Live preview',
+                    ),
+                    child: RepaintBoundary(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            FeFormColorPicker(
-                              selectedHex: _previewColorHex,
-                              onSelected: (hex) {
-                                if (hex != null) {
-                                  setState(() => _previewColorHex = hex);
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 18),
-                            TextFormField(
-                              controller: _slugCtrl,
-                              decoration: InputDecoration(
-                                labelText: l10n.tOr('feFieldSlug', 'Slug'),
-                              ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? l10n.tOr('feRequired', 'Required')
-                                  : null,
-                            ),
-                            const SizedBox(height: 10),
-                            FeEffectTypeField(
-                              value: _selectedEffectType,
-                              onChanged: _onEffectTypeChanged,
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _labelKeyCtrl,
-                              decoration: InputDecoration(
-                                labelText:
-                                    l10n.tOr('feFieldLabelKey', 'Label key'),
-                              ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? l10n.tOr('feRequired', 'Required')
-                                  : null,
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _emojiCtrl,
-                              decoration: InputDecoration(
-                                labelText: l10n.tOr('feFieldEmoji', 'Emoji'),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _assetCtrl,
-                              decoration: InputDecoration(
-                                labelText:
-                                    l10n.tOr('feFieldAssetUrl', 'Asset URL'),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _sortOrderCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText:
-                                    l10n.tOr('feFieldSortOrder', 'Sort order'),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            SwitchListTile(
-                              contentPadding: EdgeInsetsDirectional.zero,
-                              title: Text(
-                                l10n.tOr('feFlagFaceDetection', 'Face detection'),
-                              ),
-                              value: _requiresFaceDetection,
-                              onChanged: CameraEffectTypeApi.isScreenOverlay(
-                                _selectedEffectType,
-                              )
-                                  ? null
-                                  : (v) =>
-                                      setState(() => _requiresFaceDetection = v),
-                            ),
-                            SwitchListTile(
-                              contentPadding: EdgeInsetsDirectional.zero,
-                              title: Text(
-                                l10n.tOr('feFlagScreenEffect', 'Screen effect'),
-                              ),
-                              value: _isScreenEffect,
-                              onChanged: !CameraEffectTypeApi.isScreenOverlay(
-                                _selectedEffectType,
-                              )
-                                  ? null
-                                  : (v) => setState(() => _isScreenEffect = v),
-                            ),
-                            SwitchListTile(
-                              contentPadding: EdgeInsetsDirectional.zero,
-                              title: Text(l10n.tOr('feActive', 'Active')),
-                              value: _isActive,
-                              onChanged: (v) => setState(() => _isActive = v),
-                            ),
-                          ],
-                        ),
+                        padding: const EdgeInsets.only(right: 4, bottom: 8),
+                        child: const EffectEditorPreviewPanel(embedded: true),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(l10n.t('cancel')),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _submit,
-                          child: Text(l10n.tOr('feSave', 'Save')),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
+              ],
+            ),
+            if (isSaving)
+              const ColoredBox(
+                color: Color(0x44000000),
+                child: Center(child: CircularProgressIndicator()),
               ),
-            ),
-            ),
-            const SizedBox(width: 16),
-            VerticalDivider(
-              width: 1,
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 9,
-              child: FeFormPreviewPane(
-                mode: FeCatalogPreviewMode.effect,
-                label: _previewLabel,
-                previewColorHex: _previewColorHex,
-                emoji: _emojiCtrl.text.trim(),
-                thumbnailUrl: _assetCtrl.text.trim(),
-                effectType: CameraEffectTypeApi.normalize(_selectedEffectType),
-                requiresFaceDetection: _requiresFaceDetection,
-                isScreenEffect: _isScreenEffect,
-              ),
-            ),
           ],
-        ),
+        );
+      },
+    );
+  }
+}
+
+class _BasicPanelState {
+  const _BasicPanelState({required this.ready});
+
+  final EffectEditorReady ready;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _BasicPanelState) return false;
+    final a = ready.form;
+    final b = other.ready.form;
+    return a.effectType == b.effectType &&
+        a.previewColorHex == b.previewColorHex &&
+        a.requiresFaceDetection == b.requiresFaceDetection &&
+        a.isScreenEffect == b.isScreenEffect &&
+        a.isActive == b.isActive &&
+        a.emoji == b.emoji &&
+        a.assetUrl == b.assetUrl &&
+        ready.fieldErrors == other.ready.fieldErrors &&
+        ready.isUploadingAsset == other.ready.isUploadingAsset &&
+        ready.assetFileName == other.ready.assetFileName;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        ready.form.effectType,
+        ready.form.previewColorHex,
+        ready.form.requiresFaceDetection,
+        ready.form.isScreenEffect,
+        ready.form.isActive,
+        ready.form.emoji,
+        ready.form.assetUrl,
+        ready.fieldErrors,
+        ready.isUploadingAsset,
+        ready.assetFileName,
+      );
+}
+
+_BasicPanelState? _selectBasicPanelState(EffectEditorState state) {
+  if (state is! EffectEditorReady) return null;
+  return _BasicPanelState(ready: state);
+}
+
+class _PlacementPanelState {
+  const _PlacementPanelState({required this.ready});
+
+  final EffectEditorReady ready;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! _PlacementPanelState) return false;
+    final a = ready;
+    final b = other.ready;
+    return a.form.placement == b.form.placement &&
+        a.form.slug == b.form.slug &&
+        a.form.requiresFaceDetection == b.form.requiresFaceDetection &&
+        a.form.isScreenEffect == b.form.isScreenEffect &&
+        a.schema == b.schema &&
+        a.fieldErrors == b.fieldErrors;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        ready.form.placement,
+        ready.form.slug,
+        ready.form.requiresFaceDetection,
+        ready.form.isScreenEffect,
+        ready.schema,
+        ready.fieldErrors,
+      );
+}
+
+_PlacementPanelState? _selectPlacementPanelState(EffectEditorState state) {
+  if (state is! EffectEditorReady) return null;
+  return _PlacementPanelState(ready: state);
+}
+
+class _DialogColumn extends StatelessWidget {
+  const _DialogColumn({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: scheme.primary,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(child: child),
+        ],
       ),
     );
   }

@@ -88,6 +88,10 @@ class PromotionsRepositoryImpl implements PromotionsRepository {
       _remote.deactivatePackage(packageId);
 
   @override
+  Future<void> deletePackage(String packageId) =>
+      _remote.deletePackage(packageId);
+
+  @override
   Future<PromotedPostsPageEntity> getPromotedPosts(PromotedPostsQuery query) =>
       _remote.getPromotedPosts(query);
 

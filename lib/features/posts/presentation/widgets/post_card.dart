@@ -7,6 +7,7 @@ import '../../../../features/categories/presentation/widgets/category_icon.dart'
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
 import '../utils/posts_responsive.dart';
 import 'post_list_thumbnail.dart';
+import 'posts_table_view.dart';
 import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 
 /// Fixed thumbnail height — card body grows with content below.
@@ -242,7 +243,7 @@ class _UserDateRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final name = post.userName ?? post.userId;
+    final name = postDisplayAuthor(post);
     final dateStr = DateFormat('MMM d, yyyy').format(post.createdAt);
     final nameSize = compact ? 11.0 : 12.0;
     final dateSize = compact ? 9.5 : 10.5;

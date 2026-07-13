@@ -134,11 +134,6 @@ class UserDetailPersonalInfo extends StatelessWidget {
             Icons.phone_outlined,
           ),
           UserDetailInfoItem(
-            l10n.t('firebaseUid'),
-            user.firebaseUid ?? l10n.t('notAvailable'),
-            Icons.fingerprint,
-          ),
-          UserDetailInfoItem(
             l10n.t('joinedOn'),
             user.createdAt != null
                 ? dateFormat.format(user.createdAt!)

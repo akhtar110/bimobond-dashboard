@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +26,23 @@ class LocationUserMapMarker {
   final UserEntity user;
   final LocationPointEntity point;
   final bool isLatest;
+}
+
+/// Tap target for overview map markers (flutter_map captures gestures on the map).
+class _OverviewMarkerTapTarget {
+  const _OverviewMarkerTapTarget({
+    required this.latLng,
+    required this.point,
+    required this.markers,
+    required this.hitSize,
+    this.clusterKey,
+  });
+
+  final LatLng latLng;
+  final LocationPointEntity point;
+  final List<LocationUserMapMarker> markers;
+  final double hitSize;
+  final String? clusterKey;
 }
 
 class LocationMapPanel extends StatefulWidget {
@@ -60,18 +79,31 @@ class LocationMapPanel extends StatefulWidget {
   State<LocationMapPanel> createState() => _LocationMapPanelState();
 }
 
-class _LocationMapPanelState extends State<LocationMapPanel> {
+class _LocationMapPanelState extends State<LocationMapPanel>
+    with SingleTickerProviderStateMixin {
   late final MapController _mapController;
+  late final AnimationController _spreadController;
   bool _mapReady = false;
   List<Marker>? _cachedMarkers;
   Polyline? _cachedPolyline;
   String? _cachedMarkersInputKey;
   String? _cachedPolylinePointsKey;
+  List<_OverviewMarkerTapTarget>? _cachedOverviewTapTargets;
+  final Set<String> _expandedClusterKeys = {};
+  String? _spreadingClusterKey;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
+    _spreadController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+    )..addListener(() {
+        if (_spreadingClusterKey != null && mounted) {
+          setState(() {});
+        }
+      });
     if (kDebugMode) {
       debugPrint('Map points count: ${widget.points.length}');
     }
@@ -79,6 +111,7 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
 
   @override
   void dispose() {
+    _spreadController.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -86,6 +119,12 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
   @override
   void didUpdateWidget(LocationMapPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_userMarkersCacheKey(oldWidget.userMarkers) !=
+        _userMarkersCacheKey(widget.userMarkers)) {
+      _expandedClusterKeys.clear();
+      _spreadingClusterKey = null;
+      _spreadController.reset();
+    }
     if (!_mapDataChanged(oldWidget)) return;
     if (kDebugMode) {
       debugPrint('Map points count: ${widget.points.length}');
@@ -248,10 +287,100 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
           .map((p) => p.id)
           .join('|'),
       _userMarkersCacheKey(),
+      _expandedClusterKeys.join('|'),
+      _spreadingClusterKey ?? '',
+      _spreadController.value.toStringAsFixed(3),
     ].join('::');
   }
 
-  List<Marker> _buildMarkers(ColorScheme scheme) {
+  double _spreadProgressFor(String clusterKey) {
+    if (!_expandedClusterKeys.contains(clusterKey)) return 0;
+    if (_spreadingClusterKey == clusterKey && _spreadController.isAnimating) {
+      return Curves.easeOutCubic.transform(_spreadController.value);
+    }
+    return 1;
+  }
+
+  LatLng _spreadLatLng(
+    LatLng center,
+    int index,
+    int total,
+    String clusterKey,
+  ) {
+    final t = _spreadProgressFor(clusterKey);
+    if (total <= 1 || t <= 0) return center;
+    if (!_canControlMap()) return center;
+
+    final pixelRadius = 26.0 + (total * 5.0).clamp(0.0, 48.0);
+    final angle = (2 * math.pi * index) / total - math.pi / 2;
+    final camera = _mapController.camera;
+    final centerPx = camera.projectAtZoom(center);
+    final offset = Offset(
+      math.cos(angle) * pixelRadius * t,
+      math.sin(angle) * pixelRadius * t,
+    );
+    return camera.unprojectAtZoom(centerPx + offset);
+  }
+
+  void _expandCluster(String clusterKey) {
+    setState(() {
+      _expandedClusterKeys.add(clusterKey);
+      _spreadingClusterKey = clusterKey;
+    });
+    _spreadController.forward(from: 0).whenComplete(() {
+      if (!mounted) return;
+      setState(() => _spreadingClusterKey = null);
+    });
+  }
+
+  void _collapseExpandedClusters() {
+    if (_expandedClusterKeys.isEmpty) return;
+    setState(() {
+      _expandedClusterKeys.clear();
+      _spreadingClusterKey = null;
+      _spreadController.reset();
+    });
+  }
+
+  void _handleOverviewMapTap(TapPosition tapPosition, LatLng _) {
+    if (widget.showMovementPath) return;
+    final targets = _cachedOverviewTapTargets;
+    if (targets == null || targets.isEmpty || !_canControlMap()) return;
+
+    final relative = tapPosition.relative;
+    if (relative == null) return;
+
+    final camera = _mapController.camera;
+    _OverviewMarkerTapTarget? hit;
+    var bestDistance = double.infinity;
+
+    for (final target in targets) {
+      final center = camera.projectAtZoom(target.latLng) - camera.pixelOrigin;
+      final radius = (target.hitSize / 2) + 10;
+      final distance = (relative - center).distance;
+      if (distance <= radius && distance < bestDistance) {
+        bestDistance = distance;
+        hit = target;
+      }
+    }
+
+    if (hit == null) {
+      _collapseExpandedClusters();
+      return;
+    }
+
+    final clusterKey = hit.clusterKey;
+    if (clusterKey != null &&
+        hit.markers.length > 1 &&
+        !_expandedClusterKeys.contains(clusterKey)) {
+      _expandCluster(clusterKey);
+    }
+  }
+
+  String _coordGroupKey(LatLng latLng) =>
+      '${latLng.latitude.toStringAsFixed(5)}_${latLng.longitude.toStringAsFixed(5)}';
+
+  List<Marker> _buildMarkers(BuildContext context, ColorScheme scheme) {
     final inputKey = _markersInputKey();
     if (_cachedMarkersInputKey == inputKey && _cachedMarkers != null) {
       return _cachedMarkers!;
@@ -264,11 +393,13 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
     if (valid.isEmpty && !hasOverviewMarkers) {
       _cachedMarkersInputKey = inputKey;
       _cachedMarkers = const [];
+      _cachedOverviewTapTargets = const [];
       return _cachedMarkers!;
     }
 
     final user = widget.selectedUser;
     if (widget.showMovementPath && user != null) {
+      _cachedOverviewTapTargets = const [];
       _cachedMarkers = [
         for (var i = 0; i < valid.length; i++)
           _userLocationMarker(
@@ -282,20 +413,102 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
     } else if (!widget.showMovementPath &&
         widget.userMarkers != null &&
         widget.userMarkers!.isNotEmpty) {
-      _cachedMarkers = [
-        for (final marker in widget.userMarkers!)
-          if (LocationCoordinateHelper.isPlottable(
-            marker.point,
-            countryHint: marker.user.country,
-          ))
-            _overviewUserMarker(
-              user: marker.user,
-              point: marker.point,
-              scheme: scheme,
-              isLatest: marker.isLatest,
-            ),
-      ];
+      final plottable = <LocationUserMapMarker>[];
+      for (final marker in widget.userMarkers!) {
+        if (LocationCoordinateHelper.isPlottable(
+          marker.point,
+          countryHint: marker.user.country,
+        )) {
+          plottable.add(marker);
+        }
+      }
+
+      final groups = <String, List<LocationUserMapMarker>>{};
+      for (final marker in plottable) {
+        final key = _coordGroupKey(
+          _toLatLng(marker.point, countryHint: marker.user.country),
+        );
+        groups.putIfAbsent(key, () => []).add(marker);
+      }
+
+      final tapTargets = <_OverviewMarkerTapTarget>[];
+      final overviewMarkers = <Marker>[];
+
+      for (final group in groups.values) {
+        final sorted = List<LocationUserMapMarker>.from(group)
+          ..sort(
+            (a, b) => _userDisplayName(a.user)
+                .toLowerCase()
+                .compareTo(_userDisplayName(b.user).toLowerCase()),
+          );
+        final primary = sorted.first;
+        final latLng =
+            _toLatLng(primary.point, countryHint: primary.user.country);
+        final groupKey = _coordGroupKey(latLng);
+        final isCluster = sorted.length > 1;
+        const size = 40.0;
+        final isExpanded = isCluster && _expandedClusterKeys.contains(groupKey);
+
+        if (isExpanded) {
+          for (var i = 0; i < sorted.length; i++) {
+            final marker = sorted[i];
+            final spreadLatLng = _spreadLatLng(
+              latLng,
+              i,
+              sorted.length,
+              groupKey,
+            );
+            tapTargets.add(
+              _OverviewMarkerTapTarget(
+                latLng: spreadLatLng,
+                point: marker.point,
+                markers: [marker],
+                hitSize: size + 8,
+              ),
+            );
+            overviewMarkers.add(
+              _overviewUserMarker(
+                user: marker.user,
+                point: marker.point,
+                scheme: scheme,
+                isLatest: marker.isLatest,
+                displayLatLng: spreadLatLng,
+              ),
+            );
+          }
+          continue;
+        }
+
+        tapTargets.add(
+          _OverviewMarkerTapTarget(
+            latLng: latLng,
+            point: primary.point,
+            markers: sorted,
+            hitSize: isCluster ? size + 12 : size + 8,
+            clusterKey: isCluster ? groupKey : null,
+          ),
+        );
+
+        overviewMarkers.add(
+          isCluster
+              ? _overviewClusterMarker(
+                  markers: sorted,
+                  point: primary.point,
+                  scheme: scheme,
+                )
+              : _overviewUserMarker(
+                  user: primary.user,
+                  point: primary.point,
+                  scheme: scheme,
+                  isLatest: primary.isLatest,
+                ),
+        );
+      }
+
+      _cachedMarkers = overviewMarkers;
+      _cachedOverviewTapTargets = tapTargets;
     } else if (widget.showMovementPath && valid.length > 1) {
+      _cachedOverviewTapTargets = const [];
       _cachedMarkers = [
         for (var i = 0; i < valid.length; i++)
           _movementMarker(
@@ -306,6 +519,7 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
           ),
       ];
     } else {
+      _cachedOverviewTapTargets = const [];
       _cachedMarkers = valid
           .map(
             (point) => Marker(
@@ -330,16 +544,98 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
     return _cachedMarkers!;
   }
 
+  Marker _overviewClusterMarker({
+    required List<LocationUserMapMarker> markers,
+    required LocationPointEntity point,
+    required ColorScheme scheme,
+  }) {
+    const size = 40.0;
+    final sorted = List<LocationUserMapMarker>.from(markers)
+      ..sort(
+        (a, b) => _userDisplayName(a.user)
+            .toLowerCase()
+            .compareTo(_userDisplayName(b.user).toLowerCase()),
+      );
+    final primary = sorted.first;
+    final count = sorted.length;
+    final latLng = _toLatLng(point, countryHint: primary.user.country);
+
+    return Marker(
+      key: ValueKey('cluster-$count-${latLng.latitude}-${latLng.longitude}'),
+      point: latLng,
+      width: size + 12,
+      height: size + 12,
+      child: Tooltip(
+        message: _clusterMarkerTooltip(sorted, point),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _UserLocationMarkerAvatar(
+              user: primary.user,
+              size: size,
+              isLatest: true,
+              isOldest: false,
+              scheme: scheme,
+            ),
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: scheme.surface, width: 1.5),
+                ),
+                child: Text(
+                  '$count',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: scheme.onPrimary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _userDisplayName(UserEntity user) {
+    if (user.fullName?.trim().isNotEmpty == true) {
+      return user.fullName!.trim();
+    }
+    return user.username;
+  }
+
+  String _clusterMarkerTooltip(
+    List<LocationUserMapMarker> markers,
+    LocationPointEntity point,
+  ) {
+    final location = _markerLabel(point);
+    final names = markers.map((m) => _userDisplayName(m.user)).join(', ');
+    return '$location · ${markers.length} users · $names';
+  }
+
   Marker _overviewUserMarker({
     required UserEntity user,
     required LocationPointEntity point,
     required ColorScheme scheme,
     bool isLatest = false,
+    LatLng? displayLatLng,
   }) {
     const size = 40.0;
+    final markerLatLng =
+        displayLatLng ?? _toLatLng(point, countryHint: user.country);
     return Marker(
-      key: ValueKey('user-${user.id}-${point.id}'),
-      point: _toLatLng(point, countryHint: user.country),
+      key: ValueKey('user-${user.id}-${point.id}-${markerLatLng.latitude}'),
+      point: markerLatLng,
       width: size + 8,
       height: size + 8,
       child: Tooltip(
@@ -396,9 +692,7 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
     required bool isLatest,
   }) {
     final location = _markerLabel(point);
-    final name = user.fullName?.isNotEmpty == true
-        ? user.fullName!
-        : '@${user.username}';
+    final name = _userDisplayName(user);
     if (isLatest) return '$name · Latest · $location';
     return '$name · $location';
   }
@@ -614,7 +908,7 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
     }
 
     final fitPoints = _fitLatLngs();
-    final markers = _buildMarkers(scheme);
+    final markers = _buildMarkers(context, scheme);
     final polyline = _buildPolyline(scheme);
     final initialCenter = fitPoints.isNotEmpty
         ? fitPoints.first
@@ -634,6 +928,7 @@ class _LocationMapPanelState extends State<LocationMapPanel> {
             minZoom: widget.minZoom,
             maxZoom: LocationMapTiles.maxZoom,
             onMapReady: _onMapReady,
+            onTap: _handleOverviewMapTap,
             backgroundColor: scheme.surfaceContainerHighest,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,

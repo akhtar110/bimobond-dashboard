@@ -47,6 +47,16 @@ abstract class UsersRemoteDataSource {
   Future<AdminBulkUsersResultEntity> promoteUsers(List<String> userIds);
   Future<AdminBulkUsersResultEntity> demoteUsers(List<String> userIds);
   Future<void> verifyUser(String userId);
+  Future<void> unverifyUser(String userId);
+  Future<void> suspendUser(String userId);
+  Future<void> unsuspendUser(String userId);
+  Future<void> banUser(String userId);
+  Future<void> unbanUser(String userId);
+  Future<void> activateUser(String userId);
+  Future<void> deactivateUser(String userId);
+  Future<void> resetUserPassword(String userId);
+  Future<void> setUserCanPost(String userId, {required bool canPost});
+  Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
   Future<UserDetailModel> getUserById(String userId);
   Future<UserPostsResponseModel> getUserPosts(String userId, {int page = 1, int limit = 20});
   Future<UserFollowListPageModel> getUserFollowList({
@@ -329,6 +339,77 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   @override
   Future<void> verifyUser(String userId) async {
     await _dio.patch('/users/$userId/verify');
+  }
+
+  @override
+  Future<void> unverifyUser(String userId) async {
+    await _dio.patch('/users/$userId/unverify');
+  }
+
+  @override
+  Future<void> suspendUser(String userId) async {
+    await blockUser(
+      userId: userId,
+      reason: 'Suspended by admin',
+      until: DateTime.now().add(const Duration(days: 30)),
+    );
+  }
+
+  @override
+  Future<void> unsuspendUser(String userId) async {
+    await unblockUser(userId);
+  }
+
+  @override
+  Future<void> banUser(String userId) async {
+    await blockUser(
+      userId: userId,
+      reason: 'Banned by admin',
+      until: DateTime.now().add(const Duration(days: 3650)),
+    );
+  }
+
+  @override
+  Future<void> unbanUser(String userId) async {
+    await unblockUser(userId);
+  }
+
+  @override
+  Future<void> activateUser(String userId) async {
+    await unblockUser(userId);
+  }
+
+  @override
+  Future<void> deactivateUser(String userId) async {
+    await blockUser(
+      userId: userId,
+      reason: 'Deactivated by admin',
+      until: DateTime.now().add(const Duration(days: 3650)),
+    );
+  }
+
+  @override
+  Future<void> resetUserPassword(String userId) async {
+    await _dio.post('/users/$userId/reset-password');
+  }
+
+  @override
+  Future<void> setUserCanPost(String userId, {required bool canPost}) async {
+    await _dio.patch(
+      '/users/$userId/admin/settings',
+      data: {'canPost': canPost},
+    );
+  }
+
+  @override
+  Future<void> setUserAllowDirectMsgs(
+    String userId, {
+    required bool allow,
+  }) async {
+    await _dio.patch(
+      '/users/$userId/admin/settings',
+      data: {'allowDirectMsgs': allow},
+    );
   }
 
   @override
