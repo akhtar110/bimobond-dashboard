@@ -8,6 +8,8 @@ import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_report_entities.dart';
 import '../../../reports/presentation/utils/report_detail_labels.dart';
+import '../../../reports/presentation/widgets/report_detail_header_layout.dart';
+import '../../../reports/presentation/widgets/report_detail_metric_card.dart';
 import '../../../reports/presentation/widgets/reports_embedded_panel.dart';
 import '../bloc/gift_report_detail_bloc.dart';
 import '../utils/gift_report_format.dart';
@@ -147,87 +149,114 @@ class _DetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: gift.thumbnailUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: gift.thumbnailUrl,
-                            width: 88,
-                            height: 88,
-                            fit: BoxFit.cover,
-                          )
-                        : Container(
-                            width: 88,
-                            height: 88,
-                            color: scheme.primaryContainer,
-                            child: Icon(
-                              Icons.card_giftcard,
-                              color: scheme.primary,
-                              size: 36,
-                            ),
-                          ),
+              ReportDetailHeaderSplit(
+                start: ReportDetailHeaderCard(
+                  title: gift.name,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: gift.thumbnailUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: gift.thumbnailUrl,
+                                width: 72,
+                                height: 72,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: 72,
+                                height: 72,
+                                color: scheme.primaryContainer,
+                                child: Icon(
+                                  Icons.card_giftcard,
+                                  color: scheme.primary,
+                                  size: 32,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          gift.name,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                ),
+                end: ReportDetailHeaderCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatReportCoins(gift.priceCoins),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${formatReportCoins(gift.priceCoins)} · '
-                          '${gift.isActive ? l10n.t('active') : l10n.t('inactive')}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        gift.isActive ? l10n.t('active') : l10n.t('inactive'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 24),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              ReportDetailMetricsGrid(
                 children: [
-                  _MetricCard(
-                    label: ReportDetailLabels.allTimeSpend(l10n),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.allTimeSpend(l10n),
                     value: formatReportCoins(detail.allTimeSpendCoins),
+                    icon: Icons.savings_outlined,
+                    accent: const Color(0xFFD97706),
                   ),
-                  _MetricCard(
-                    label: ReportDetailLabels.periodSends(l10n, days),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.periodSends(l10n, days),
                     value: formatReportCount(detail.periodTransactions),
+                    icon: Icons.outbound_rounded,
+                    accent: const Color(0xFF2563EB),
                   ),
-                  _MetricCard(
-                    label: ReportDetailLabels.periodSpend(l10n),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.periodSpend(l10n),
                     value: formatReportCoins(detail.periodSpendCoins),
+                    icon: Icons.payments_outlined,
+                    accent: const Color(0xFF059669),
                   ),
-                  _MetricCard(
-                    label: ReportDetailLabels.inventoryQty(l10n),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.inventoryQty(l10n),
                     value: formatReportCount(detail.counts.inventoryQuantity),
+                    icon: Icons.inventory_2_outlined,
+                    accent: const Color(0xFF7C3AED),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
               _Section(
                 title: ReportDetailLabels.contextBreakdown(l10n),
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                child: ReportDetailMetricsGrid(
                   children: [
-                    _MiniStat(l10n.t('posts'), detail.toPost),
-                    _MiniStat(ReportDetailLabels.live(l10n), detail.toLive),
-                    _MiniStat(l10n.t('auctions'), detail.toAuction),
-                    _MiniStat(ReportDetailLabels.direct(l10n), detail.direct),
+                    ReportDetailCountMetricCard(
+                      title: l10n.t('posts'),
+                      count: detail.toPost,
+                      icon: Icons.article_outlined,
+                      accent: const Color(0xFF2563EB),
+                    ),
+                    ReportDetailCountMetricCard(
+                      title: ReportDetailLabels.live(l10n),
+                      count: detail.toLive,
+                      icon: Icons.live_tv_outlined,
+                      accent: const Color(0xFFDB2777),
+                    ),
+                    ReportDetailCountMetricCard(
+                      title: l10n.t('auctions'),
+                      count: detail.toAuction,
+                      icon: Icons.gavel_rounded,
+                      accent: const Color(0xFFD97706),
+                    ),
+                    ReportDetailCountMetricCard(
+                      title: ReportDetailLabels.direct(l10n),
+                      count: detail.direct,
+                      icon: Icons.send_outlined,
+                      accent: const Color(0xFF059669),
+                    ),
                   ],
                 ),
               ),
@@ -291,38 +320,6 @@ class _DetailBody extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 180,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: scheme.onSurfaceVariant)),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _Section extends StatelessWidget {
   const _Section({required this.title, required this.child});
 
@@ -353,18 +350,6 @@ class _Section extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  const _MiniStat(this.label, this.value);
-
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(label: Text('$label: ${formatReportCount(value)}'));
   }
 }
 

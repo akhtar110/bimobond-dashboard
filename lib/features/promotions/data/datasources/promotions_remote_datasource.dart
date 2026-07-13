@@ -36,6 +36,7 @@ abstract class PromotionsRemoteDataSource {
   );
   Future<PromotionPackageEntity> activatePackage(String packageId);
   Future<PromotionPackageEntity> deactivatePackage(String packageId);
+  Future<void> deletePackage(String packageId);
   Future<PromotedPostsPageEntity> getPromotedPosts(PromotedPostsQuery query);
   Future<PromotedPostDetailEntity> getPromotedPostDetail(String postId);
   Future<PostPromotionStatsEntity> getPromotedPostStats(
@@ -204,6 +205,11 @@ class PromotionsRemoteDataSourceImpl implements PromotionsRemoteDataSource {
     final response =
         await _dio.patch('/promotions/admin/packages/$packageId/deactivate');
     return PromotionPackageModel.fromJson(_map(response.data));
+  }
+
+  @override
+  Future<void> deletePackage(String packageId) async {
+    await _dio.delete('/promotions/admin/packages/$packageId');
   }
 
   @override

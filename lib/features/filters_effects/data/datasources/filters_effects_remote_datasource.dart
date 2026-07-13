@@ -1,14 +1,30 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
+import '../../../../core/utils/media_url_resolver.dart';
+
+import '../../domain/entities/effect_placement_entities.dart';
+import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
+import '../models/effect_placement_schema_model.dart';
+import '../models/filter_settings_schema_model.dart';
 
 abstract class FiltersEffectsRemoteDataSource {
   Future<FiltersEffectsOverviewEntity> getOverview();
   Future<CameraStudioCatalogEntity> getCatalog();
   Future<List<CameraFilterEntity>> getFilters();
   Future<CameraFilterEntity> getFilter(String id);
-  Future<CameraFilterEntity> createFilter(CreateFilterRequest request);
-  Future<CameraFilterEntity> updateFilter(String id, UpdateFilterRequest request);
+  Future<FilterSettingsSchemaEntity> getFilterSettingsSchema();
+  Future<CameraFilterEntity> createFilter(
+    CreateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  });
+  Future<CameraFilterEntity> updateFilter(
+    String id,
+    UpdateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  });
   Future<CameraFilterEntity> activateFilter(String id);
   Future<CameraFilterEntity> deactivateFilter(String id);
   Future<void> deleteFilter(String id);
@@ -30,8 +46,13 @@ abstract class FiltersEffectsRemoteDataSource {
   Future<void> deleteFilterCategory(String id);
   Future<List<CameraEffectEntity>> getEffects();
   Future<CameraEffectEntity> getEffect(String id);
+  Future<EffectPlacementSchemaEntity> getEffectPlacementSchema();
   Future<CameraEffectEntity> createEffect(CreateEffectRequest request);
-  Future<CameraEffectEntity> updateEffect(String id, UpdateEffectRequest request);
+  Future<CameraEffectEntity> updateEffect(
+    String id,
+    UpdateEffectRequest request, {
+    EffectPlacementSettingsEntity? baselinePlacement,
+  });
   Future<CameraEffectEntity> activateEffect(String id);
   Future<CameraEffectEntity> deactivateEffect(String id);
   Future<void> deleteEffect(String id);
@@ -55,6 +76,9 @@ abstract class FiltersEffectsRemoteDataSource {
     PublishCatalogRequest request,
   );
   Future<CameraStudioCatalogEntity> seedCatalog();
+
+  /// Uploads a PNG/sticker via `POST /posts/upload` and returns an absolute URL.
+  Future<String> uploadEffectAsset(Uint8List bytes, String filename);
 }
 
 class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSource {
@@ -90,18 +114,33 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
-  Future<CameraFilterEntity> createFilter(CreateFilterRequest request) async {
-    final response = await _dio.post('$_base/filters', data: request.toJson());
+  Future<FilterSettingsSchemaEntity> getFilterSettingsSchema() async {
+    final response = await _dio.get('/camera-studio/filter-settings/schema');
+    return FilterSettingsSchemaModel.fromJson(_map(response.data));
+  }
+
+  @override
+  Future<CameraFilterEntity> createFilter(
+    CreateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  }) async {
+    final response = await _dio.post(
+      '$_base/filters',
+      data: request.toJson(schema: schema),
+    );
     return CameraFilterModel.fromJson(_map(response.data));
   }
 
   @override
   Future<CameraFilterEntity> updateFilter(
     String id,
-    UpdateFilterRequest request,
-  ) async {
-    final response =
-        await _dio.patch('$_base/filters/$id', data: request.toJson());
+    UpdateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  }) async {
+    final response = await _dio.patch(
+      '$_base/filters/$id',
+      data: request.toJson(schema: schema),
+    );
     return CameraFilterModel.fromJson(_map(response.data));
   }
 
@@ -200,6 +239,12 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
+  Future<EffectPlacementSchemaEntity> getEffectPlacementSchema() async {
+    final response = await _dio.get('/camera-studio/effect-placement/schema');
+    return EffectPlacementSchemaModel.fromJson(_map(response.data));
+  }
+
+  @override
   Future<CameraEffectEntity> createEffect(CreateEffectRequest request) async {
     final response = await _dio.post('$_base/effects', data: request.toJson());
     return CameraEffectModel.fromJson(_map(response.data));
@@ -208,10 +253,13 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   @override
   Future<CameraEffectEntity> updateEffect(
     String id,
-    UpdateEffectRequest request,
-  ) async {
-    final response =
-        await _dio.patch('$_base/effects/$id', data: request.toJson());
+    UpdateEffectRequest request, {
+    EffectPlacementSettingsEntity? baselinePlacement,
+  }) async {
+    final response = await _dio.patch(
+      '$_base/effects/$id',
+      data: request.toJson(baselinePlacement: baselinePlacement),
+    );
     return CameraEffectModel.fromJson(_map(response.data));
   }
 
@@ -310,6 +358,54 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
     return CameraStudioCatalogModel.fromJson(_map(response.data));
   }
 
+  @override
+  Future<String> uploadEffectAsset(Uint8List bytes, String filename) async {
+    final formData = FormData();
+    formData.files.add(
+      MapEntry(
+        'files',
+        MultipartFile.fromBytes(bytes, filename: filename),
+      ),
+    );
+
+    final response = await _dio.post(
+      '/posts/upload',
+      data: formData,
+      options: Options(
+        sendTimeout: const Duration(minutes: 5),
+        receiveTimeout: const Duration(minutes: 5),
+      ),
+    );
+
+    final data = response.data;
+    String? url;
+
+    if (data is Map<String, dynamic>) {
+      final nested = data['data'];
+      final urls = data['urls'] ??
+          (nested is Map<String, dynamic> ? nested['urls'] : null);
+      if (urls is List && urls.isNotEmpty) {
+        url = _parseUploadUrl(urls.first);
+      }
+    } else if (data is List && data.isNotEmpty) {
+      url = _parseUploadUrl(data.first);
+    }
+
+    if (url == null || url.isEmpty) {
+      throw Exception('Asset upload failed: no URL returned');
+    }
+
+    return resolveMediaUrl(url) ?? url;
+  }
+
+  String _parseUploadUrl(dynamic entry) {
+    if (entry is String) return entry;
+    if (entry is Map<String, dynamic>) {
+      return (entry['url'] ?? entry['path'] ?? '').toString();
+    }
+    return '';
+  }
+
   Map<String, dynamic> _map(dynamic data) {
     if (data is Map<String, dynamic>) {
       if (data['data'] is Map<String, dynamic>) {
@@ -378,6 +474,8 @@ class CameraFilterModel extends CameraFilterEntity {
     super.isBeautyDefault,
     super.isActive,
     super.sortOrder,
+    super.filterSettings,
+    super.colorMatrix,
     super.createdAt,
     super.updatedAt,
   });
@@ -398,6 +496,8 @@ class CameraFilterModel extends CameraFilterEntity {
       isBeautyDefault: json['isBeautyDefault'] == true,
       isActive: json['isActive'] != false,
       sortOrder: _int(json['sortOrder']),
+      filterSettings: parseFilterSettings(json['filterSettings']),
+      colorMatrix: parseColorMatrix(json['colorMatrix']),
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
     );
@@ -446,6 +546,15 @@ class CameraEffectModel extends CameraEffectEntity {
     super.isScreenEffect,
     super.isActive,
     super.sortOrder,
+    super.anchorType,
+    super.anchorLandmarks,
+    super.scaleFactor,
+    super.offsetX,
+    super.offsetY,
+    super.landmarkSize,
+    super.fallbackAnchorType,
+    super.fallbackOffsetY,
+    super.fallbackScaleFactor,
     super.createdAt,
     super.updatedAt,
   });
@@ -458,13 +567,29 @@ class CameraEffectModel extends CameraEffectEntity {
         json['effectType']?.toString() ?? '',
       ),
       emoji: json['emoji']?.toString(),
-      assetUrl: json['assetUrl']?.toString(),
+      assetUrl: resolveMediaUrl(json['assetUrl']?.toString()) ??
+          json['assetUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
       labelKey: json['labelKey']?.toString() ?? '',
       requiresFaceDetection: json['requiresFaceDetection'] == true,
       isScreenEffect: json['isScreenEffect'] == true,
       isActive: json['isActive'] != false,
       sortOrder: _int(json['sortOrder']),
+      anchorType: json['anchorType'] == null
+          ? null
+          : CameraEffectAnchorTypeApi.normalize(json['anchorType'].toString()),
+      anchorLandmarks: parseEffectAnchorLandmarks(json['anchorLandmarks']),
+      scaleFactor: _double(json['scaleFactor']),
+      offsetX: _double(json['offsetX']),
+      offsetY: _double(json['offsetY']),
+      landmarkSize: _double(json['landmarkSize']),
+      fallbackAnchorType: json['fallbackAnchorType'] == null
+          ? null
+          : CameraEffectAnchorTypeApi.normalize(
+              json['fallbackAnchorType'].toString(),
+            ),
+      fallbackOffsetY: _double(json['fallbackOffsetY']),
+      fallbackScaleFactor: _double(json['fallbackScaleFactor']),
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
     );
@@ -543,6 +668,12 @@ class CatalogPublishResultModel extends CatalogPublishResultEntity {
       notes: json['notes']?.toString(),
     );
   }
+}
+
+double? _double(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
 }
 
 int _int(dynamic value) {

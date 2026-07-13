@@ -108,6 +108,12 @@ class TogglePackageStatusUseCase {
       _repository.deactivatePackage(packageId);
 }
 
+class DeletePackageUseCase {
+  const DeletePackageUseCase(this._repository);
+  final PromotionsRepository _repository;
+  Future<void> call(String packageId) => _repository.deletePackage(packageId);
+}
+
 class GetLocationHistoryUseCase {
   const GetLocationHistoryUseCase(this._repository);
   final LocationIntelligenceRepository _repository;

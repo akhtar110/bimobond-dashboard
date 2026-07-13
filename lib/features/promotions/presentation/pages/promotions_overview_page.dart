@@ -189,9 +189,7 @@ class _CompactOverviewMetrics extends StatelessWidget {
 
   final List<(String, String, IconData)> items;
 
-  static double _stripHeight(bool isMobile) => isMobile ? 38.0 : 44.0;
-  static double _defaultMaxTileWidth(bool isMobile) => isMobile ? 120.0 : 136.0;
-  static double _wideMaxTileWidth(bool isMobile) => isMobile ? 132.0 : 152.0;
+  static double _stripHeight(bool isMobile) => isMobile ? 44.0 : 48.0;
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +211,6 @@ class _CompactOverviewMetrics extends StatelessWidget {
                   label: items[i].$1,
                   value: items[i].$2,
                   icon: items[i].$3,
-                  maxWidth: _maxWidthForIndex(i, metrics.isMobile),
                   compact: metrics.isMobile,
                 ),
             ],
@@ -235,7 +232,6 @@ class _CompactOverviewMetrics extends StatelessWidget {
                     label: items[i].$1,
                     value: items[i].$2,
                     icon: items[i].$3,
-                    maxWidth: _maxWidthForIndex(i, metrics.isMobile),
                     compact: metrics.isMobile,
                   ),
                 ],
@@ -246,13 +242,6 @@ class _CompactOverviewMetrics extends StatelessWidget {
       },
     );
   }
-
-  double _maxWidthForIndex(int index, bool isMobile) {
-    // Revenue/spend tiles tend to need slightly more room.
-    return index >= 5
-        ? _wideMaxTileWidth(isMobile)
-        : _defaultMaxTileWidth(isMobile);
-  }
 }
 
 class _CompactMetricTile extends StatelessWidget {
@@ -260,17 +249,13 @@ class _CompactMetricTile extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    required this.maxWidth,
     this.compact = false,
   });
 
   final String label;
   final String value;
   final IconData icon;
-  final double maxWidth;
   final bool compact;
-
-  static const _minTileWidth = 80.0;
 
   @override
   Widget build(BuildContext context) {
@@ -279,59 +264,51 @@ class _CompactMetricTile extends StatelessWidget {
 
     return Tooltip(
       message: label,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minWidth: compact ? 76 : _minTileWidth,
-          maxWidth: maxWidth,
+      child: Container(
+        height: stripHeight,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 12,
+          vertical: compact ? 4 : 5,
         ),
-        child: Container(
-          height: stripHeight,
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 10,
-            vertical: compact ? 3 : 4,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(compact ? 8 : 10),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
           ),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(compact ? 8 : 10),
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: compact ? 12 : 14, color: scheme.primary),
-              SizedBox(width: compact ? 4 : 6),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            height: 1.0,
-                          ),
-                    ),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 10,
-                            height: 1.1,
-                          ),
-                    ),
-                  ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: compact ? 13 : 15, color: scheme.primary),
+            SizedBox(width: compact ? 6 : 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                      ),
                 ),
-              ),
-            ],
-          ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: compact ? 10.5 : 11,
+                        height: 1.15,
+                      ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

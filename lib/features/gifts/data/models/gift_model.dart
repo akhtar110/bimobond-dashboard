@@ -18,7 +18,7 @@ class GiftModel extends GiftEntity {
       name: json['name']?.toString() ?? '',
       thumbnailUrl:
           resolveMediaUrl(json['thumbnailUrl']?.toString()) ?? '',
-      animationUrl: resolveMediaUrl(json['animationUrl'] as String?),
+      animationUrl: resolveMediaUrl(json['animationUrl']?.toString()),
       priceCoins: _d(json['priceCoins'] ?? json['priceUsd']),
       isActive: json['isActive'] as bool? ?? true,
       publishedAt: _parseDate(

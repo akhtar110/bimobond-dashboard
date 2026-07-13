@@ -95,8 +95,8 @@ class PromotionsDataSection extends StatelessWidget {
 
 BoxDecoration promotionsInnerTableDecoration(ColorScheme scheme) {
   return BoxDecoration(
-    color: scheme.surfaceContainerHighest.withValues(alpha: 0.2),
-    borderRadius: BorderRadius.circular(16),
+    color: scheme.surfaceContainerHighest.withValues(alpha: 0.18),
+    borderRadius: BorderRadius.circular(12),
     border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
   );
 }
@@ -119,6 +119,7 @@ class PromotionsDataBody extends StatelessWidget {
     this.onRetry,
     this.isEmpty = false,
     this.emptyMessage,
+    this.emptyIcon,
     this.minHeight = 280,
     required this.child,
   });
@@ -128,31 +129,52 @@ class PromotionsDataBody extends StatelessWidget {
   final VoidCallback? onRetry;
   final bool isEmpty;
   final String? emptyMessage;
+  final IconData? emptyIcon;
   final double minHeight;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
 
     Widget content;
     if (isLoading) {
       content = const Center(child: LoadingView());
     } else if (errorMessage != null) {
       content = Center(
-        child: ErrorView(
-          message: errorMessage!,
-          retryLabel: l10n.t('retry'),
-          onRetry: onRetry ?? () {},
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: ErrorView(
+            message: errorMessage!,
+            retryLabel: l10n.t('retry'),
+            onRetry: onRetry ?? () {},
+          ),
         ),
       );
     } else if (isEmpty) {
       content = Center(
-        child: Text(
-          emptyMessage ?? l10n.t('noData'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                emptyIcon ?? Icons.inbox_outlined,
+                size: 36,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
+              const SizedBox(height: 12),
+              Text(
+                emptyMessage ?? l10n.t('noData'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+              ),
+            ],
+          ),
         ),
       );
     } else {

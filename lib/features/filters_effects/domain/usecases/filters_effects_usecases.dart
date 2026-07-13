@@ -1,3 +1,5 @@
+import '../entities/effect_placement_entities.dart';
+import '../entities/filter_settings_entities.dart';
 import '../entities/filters_effects_entities.dart';
 import '../repositories/filters_effects_repository.dart';
 
@@ -33,13 +35,25 @@ class GetCameraFilterUseCase {
   Future<CameraFilterEntity> call(String id) => _repository.getFilter(id);
 }
 
+class GetFilterSettingsSchemaUseCase {
+  const GetFilterSettingsSchemaUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<FilterSettingsSchemaEntity> call() =>
+      _repository.getFilterSettingsSchema();
+}
+
 class CreateCameraFilterUseCase {
   const CreateCameraFilterUseCase(this._repository);
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraFilterEntity> call(CreateFilterRequest request) =>
-      _repository.createFilter(request);
+  Future<CameraFilterEntity> call(
+    CreateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  }) =>
+      _repository.createFilter(request, schema: schema);
 }
 
 class UpdateCameraFilterUseCase {
@@ -47,8 +61,12 @@ class UpdateCameraFilterUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraFilterEntity> call(String id, UpdateFilterRequest request) =>
-      _repository.updateFilter(id, request);
+  Future<CameraFilterEntity> call(
+    String id,
+    UpdateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  }) =>
+      _repository.updateFilter(id, request, schema: schema);
 }
 
 class ActivateCameraFilterUseCase {
@@ -153,6 +171,24 @@ class GetCameraEffectUseCase {
   Future<CameraEffectEntity> call(String id) => _repository.getEffect(id);
 }
 
+class GetEffectPlacementSchemaUseCase {
+  const GetEffectPlacementSchemaUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<EffectPlacementSchemaEntity> call() =>
+      _repository.getEffectPlacementSchema();
+}
+
+class UploadEffectAssetUseCase {
+  const UploadEffectAssetUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<String> call(List<int> bytes, String filename) =>
+      _repository.uploadEffectAsset(bytes, filename);
+}
+
 class CreateCameraEffectUseCase {
   const CreateCameraEffectUseCase(this._repository);
 
@@ -167,8 +203,16 @@ class UpdateCameraEffectUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraEffectEntity> call(String id, UpdateEffectRequest request) =>
-      _repository.updateEffect(id, request);
+  Future<CameraEffectEntity> call(
+    String id,
+    UpdateEffectRequest request, {
+    EffectPlacementSettingsEntity? baselinePlacement,
+  }) =>
+      _repository.updateEffect(
+        id,
+        request,
+        baselinePlacement: baselinePlacement,
+      );
 }
 
 class ActivateCameraEffectUseCase {

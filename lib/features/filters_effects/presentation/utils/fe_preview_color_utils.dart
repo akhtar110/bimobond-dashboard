@@ -154,3 +154,5 @@ FePreviewColorOption resolvePreviewColorOption(String? hex) {
 String defaultPreviewColorHex({bool required = false}) {
   return required ? kFePreviewColorPalette.first.hex : kFePreviewColorPalette.first.hex;
 }
+
+bool isValidFePreviewHex(String? hex) => parsePreviewColorHex(hex) != null;

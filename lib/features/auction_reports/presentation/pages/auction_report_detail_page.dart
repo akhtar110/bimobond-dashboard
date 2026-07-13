@@ -10,6 +10,8 @@ import '../../../analytics/presentation/utils/analytics_format.dart';
 import '../../../analytics/presentation/widgets/analytics_kpi_card.dart';
 import '../../domain/entities/auction_report_entities.dart';
 import '../../../reports/presentation/utils/report_detail_labels.dart';
+import '../../../reports/presentation/widgets/report_detail_header_layout.dart';
+import '../../../reports/presentation/widgets/report_detail_metric_card.dart';
 import '../../../reports/presentation/widgets/reports_embedded_panel.dart';
 import '../bloc/auction_report_detail_bloc.dart';
 
@@ -199,75 +201,90 @@ class _AuctionHeader extends StatelessWidget {
     final l10n = context.l10n;
     final image = resolveMediaUrl(auction.itemImageUrl);
 
-    return AnalyticsSectionCard(
-      title: auction.itemName,
-      subtitle:
-          '@${auction.host?.username ?? auction.hostId} · ${auction.status}',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (image != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: CachedNetworkImage(
-                imageUrl: image,
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
+    return ReportDetailHeaderSplit(
+      start: ReportDetailHeaderCard(
+        title: auction.itemName,
+        subtitle:
+            '@${auction.host?.username ?? auction.hostId} · ${auction.status}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (image != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: image,
+                  width: 88,
+                  height: 88,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.gavel_rounded,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
+            const SizedBox(height: 8),
+            Text(
+              _formatDate(auction.startedAt),
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(
-                  label: Text(
-                    ReportDetailLabels.targetPrice(
-                      l10n,
-                      CoinFormat.coinsAmount(auction.targetPriceCoins),
-                    ),
-                  ),
-                  visualDensity: VisualDensity.compact,
+          ],
+        ),
+      ),
+      end: ReportDetailHeaderCard(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Chip(
+              label: Text(
+                ReportDetailLabels.targetPrice(
+                  l10n,
+                  CoinFormat.coinsAmount(auction.targetPriceCoins),
                 ),
-                Chip(
-                  label: Text(
-                    ReportDetailLabels.startPrice(
-                      l10n,
-                      CoinFormat.coinsAmount(auction.startingPriceCoins),
-                    ),
-                  ),
-                  visualDensity: VisualDensity.compact,
-                ),
-                if (auction.winner != null)
-                  Chip(
-                    label: Text(
-                      ReportDetailLabels.winnerUser(
-                        l10n,
-                        auction.winner!.username,
-                      ),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                if (auction.post != null)
-                  Chip(
-                    label: Text(ReportDetailLabels.postLinked(l10n)),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                if (auction.live != null)
-                  Chip(
-                    label: Text(ReportDetailLabels.liveLinked(l10n)),
-                    visualDensity: VisualDensity.compact,
-                  ),
-              ],
+              ),
+              visualDensity: VisualDensity.compact,
             ),
-          ),
-          Text(
-            _formatDate(auction.startedAt),
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
-          ),
-        ],
+            Chip(
+              label: Text(
+                ReportDetailLabels.startPrice(
+                  l10n,
+                  CoinFormat.coinsAmount(auction.startingPriceCoins),
+                ),
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+            if (auction.winner != null)
+              Chip(
+                label: Text(
+                  ReportDetailLabels.winnerUser(
+                    l10n,
+                    auction.winner!.username,
+                  ),
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+            if (auction.post != null)
+              Chip(
+                label: Text(ReportDetailLabels.postLinked(l10n)),
+                visualDensity: VisualDensity.compact,
+              ),
+            if (auction.live != null)
+              Chip(
+                label: Text(ReportDetailLabels.liveLinked(l10n)),
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -284,50 +301,44 @@ class _MetricsGrid extends StatelessWidget {
     final m = detail.metrics;
     final c = detail.counts;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossCount = constraints.maxWidth > 900 ? 4 : 2;
-        return GridView.count(
-          crossAxisCount: crossCount,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.6,
-          children: [
-            AnalyticsKpiCard(
-              title: ReportDetailLabels.raised(l10n),
-              value: CoinFormat.coinsAmount(m.currentTotalCoins),
-              subtitle: ReportDetailLabels.remaining(
-                l10n,
-                CoinFormat.coinsAmount(m.remainingCoins),
-              ),
-              icon: Icons.payments_outlined,
-            ),
-            AnalyticsKpiCard(
-              title: ReportDetailLabels.target(l10n),
-              value: CoinFormat.coinsAmount(m.targetPriceCoins),
-              subtitle: ReportDetailLabels.percentComplete(
-                l10n,
-                m.progressPercent,
-              ),
-              icon: Icons.flag_outlined,
-            ),
-            AnalyticsKpiCard(
-              title: ReportDetailLabels.bids(l10n),
-              value: AnalyticsFormat.count(c.bids),
-              subtitle: ReportDetailLabels.allTimeManualBids(l10n),
-              icon: Icons.gavel_rounded,
-            ),
-            AnalyticsKpiCard(
-              title: l10n.t('gifts'),
-              value: AnalyticsFormat.count(c.giftTransactions),
-              subtitle: ReportDetailLabels.giftTransactions(l10n),
-              icon: Icons.card_giftcard_outlined,
-            ),
-          ],
-        );
-      },
+    return ReportDetailMetricsGrid(
+      hasSubtitle: true,
+      children: [
+        ReportDetailMetricCard(
+          title: ReportDetailLabels.raised(l10n),
+          value: CoinFormat.coinsAmount(m.currentTotalCoins),
+          subtitle: ReportDetailLabels.remaining(
+            l10n,
+            CoinFormat.coinsAmount(m.remainingCoins),
+          ),
+          icon: Icons.payments_outlined,
+          accent: const Color(0xFF059669),
+        ),
+        ReportDetailMetricCard(
+          title: ReportDetailLabels.target(l10n),
+          value: CoinFormat.coinsAmount(m.targetPriceCoins),
+          subtitle: ReportDetailLabels.percentComplete(
+            l10n,
+            m.progressPercent,
+          ),
+          icon: Icons.flag_outlined,
+          accent: const Color(0xFFD97706),
+        ),
+        ReportDetailMetricCard(
+          title: ReportDetailLabels.bids(l10n),
+          value: AnalyticsFormat.count(c.bids),
+          subtitle: ReportDetailLabels.allTimeManualBids(l10n),
+          icon: Icons.gavel_rounded,
+          accent: Theme.of(context).colorScheme.primary,
+        ),
+        ReportDetailMetricCard(
+          title: l10n.t('gifts'),
+          value: AnalyticsFormat.count(c.giftTransactions),
+          subtitle: ReportDetailLabels.giftTransactions(l10n),
+          icon: Icons.card_giftcard_outlined,
+          accent: const Color(0xFFDB2777),
+        ),
+      ],
     );
   }
 }
@@ -388,29 +399,31 @@ class _PeriodActivitySection extends StatelessWidget {
     return AnalyticsSectionCard(
       title: ReportDetailLabels.periodActivity(l10n),
       subtitle: ReportDetailLabels.bidsAndGiftsInRange(l10n),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
+      child: ReportDetailMetricsGrid(
         children: [
-          AnalyticsMiniStat(
-            label: ReportDetailLabels.bids(l10n),
-            value: AnalyticsFormat.count(activity.bids),
+          ReportDetailCountMetricCard(
+            title: ReportDetailLabels.bids(l10n),
+            count: activity.bids,
             icon: Icons.gavel_rounded,
+            accent: Theme.of(context).colorScheme.primary,
           ),
-          AnalyticsMiniStat(
-            label: l10n.t('gifts'),
-            value: AnalyticsFormat.count(activity.gifts),
+          ReportDetailCountMetricCard(
+            title: l10n.t('gifts'),
+            count: activity.gifts,
             icon: Icons.card_giftcard_outlined,
+            accent: const Color(0xFFDB2777),
           ),
-          AnalyticsMiniStat(
-            label: ReportDetailLabels.contribution(l10n),
+          ReportDetailMetricCard(
+            title: ReportDetailLabels.contribution(l10n),
             value: CoinFormat.coinsAmount(activity.contributionCoins),
             icon: Icons.savings_outlined,
+            accent: const Color(0xFF059669),
           ),
-          AnalyticsMiniStat(
-            label: ReportDetailLabels.giftSpend(l10n),
+          ReportDetailMetricCard(
+            title: ReportDetailLabels.giftSpend(l10n),
             value: CoinFormat.coinsAmount(activity.giftSpendCoins),
             icon: Icons.payments_outlined,
+            accent: const Color(0xFFD97706),
           ),
         ],
       ),

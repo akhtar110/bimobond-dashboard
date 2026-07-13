@@ -22,6 +22,7 @@ class UserEntity {
     required this.isPrivate,
     required this.allowComments,
     required this.allowDirectMsgs,
+    this.canPost = true,
     required this.language,
     required this.theme,
     this.country,
@@ -61,6 +62,7 @@ class UserEntity {
   final bool isPrivate;
   final bool allowComments;
   final bool allowDirectMsgs;
+  final bool canPost;
   final String language;
   final String theme;
 

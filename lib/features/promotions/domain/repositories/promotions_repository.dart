@@ -46,6 +46,8 @@ abstract class PromotionsRepository {
 
   Future<PromotionPackageEntity> deactivatePackage(String packageId);
 
+  Future<void> deletePackage(String packageId);
+
   Future<PromotedPostsPageEntity> getPromotedPosts(PromotedPostsQuery query);
 
   Future<PromotedPostDetailEntity> getPromotedPostDetail(String postId);

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../constants/fe_preview_assets.dart';
+import '../utils/fe_effect_emoji_display.dart';
 import '../utils/fe_engine_filter_preview.dart';
+import '../utils/fe_effect_placement_preview.dart';
+import '../utils/fe_filter_settings_preview.dart';
 import '../utils/fe_preview_color_utils.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 
@@ -21,6 +25,13 @@ class FeCatalogItemPreview extends StatelessWidget {
     this.effectType,
     this.requiresFaceDetection = false,
     this.isScreenEffect = false,
+    this.filterPreviewLook,
+    this.anchorType,
+    this.scaleFactor,
+    this.offsetX,
+    this.offsetY,
+    this.landmarkSize,
+    this.anchorLandmarks = const [],
   });
 
   final FeCatalogPreviewMode mode;
@@ -32,6 +43,13 @@ class FeCatalogItemPreview extends StatelessWidget {
   final String? effectType;
   final bool requiresFaceDetection;
   final bool isScreenEffect;
+  final FilterSettingsPreviewLook? filterPreviewLook;
+  final String? anchorType;
+  final double? scaleFactor;
+  final double? offsetX;
+  final double? offsetY;
+  final double? landmarkSize;
+  final List<String> anchorLandmarks;
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +61,38 @@ class FeCatalogItemPreview extends StatelessWidget {
     final isScreenOverlay = isEffect &&
         CameraEffectTypeApi.isScreenOverlay(effectType ?? CameraEffectTypeApi.faceAr);
     final trimmedEmoji = emoji?.trim();
+    final emojiText = FeEffectEmojiDisplay.textEmoji(trimmedEmoji);
+    final emojiImageUrl = FeEffectEmojiDisplay.resolvedImageUrl(trimmedEmoji);
     final trimmedAsset = thumbnailUrl?.trim();
-    final hasAsset = trimmedAsset != null && trimmedAsset.isNotEmpty;
+    final assetImageUrl = trimmedAsset != null && trimmedAsset.isNotEmpty
+        ? resolveMediaUrl(trimmedAsset)
+        : null;
+    final overlayImageUrl = emojiImageUrl ?? assetImageUrl;
+    final placementLayout = isEffect && !isScreenOverlay
+        ? EffectPlacementPreviewLayout.forPlacement(
+            anchorType: anchorType,
+            scaleFactor: scaleFactor,
+            offsetX: offsetX,
+            offsetY: offsetY,
+            landmarkSize: landmarkSize,
+            anchorLandmarks: anchorLandmarks,
+          )
+        : null;
+    final previewKey = isEffect
+        ? ValueKey(
+            '$previewColorHex|$trimmedEmoji|$trimmedAsset|$effectType|'
+            '$isScreenOverlay|$anchorType|$scaleFactor|$offsetX|$offsetY|'
+            '$landmarkSize|${anchorLandmarks.join(',')}',
+          )
+        : ValueKey(
+            '$previewColorHex|$trimmedAsset|$engineKey|$label|'
+            '${filterPreviewLook?.blurSigma}|'
+            '${filterPreviewLook?.vignette}|'
+            '${filterPreviewLook?.colorMatrix?.join(',')}',
+          );
 
     return Column(
+      key: previewKey,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -73,8 +119,12 @@ class FeCatalogItemPreview extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        _PreviewSceneBackground(engineKey: engineKey),
-                        if (hasColor)
+                        _PreviewSceneBackground(
+                          engineKey: engineKey,
+                          filterPreviewLook: filterPreviewLook,
+                          previewColorHex: isEffect ? null : previewColorHex,
+                        ),
+                        if (hasColor && isEffect)
                           DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -96,10 +146,16 @@ class FeCatalogItemPreview extends StatelessWidget {
                           const _FaceArGuide(),
                         if (isEffect)
                           _EffectOverlayLayer(
+                            key: ValueKey(
+                              'overlay-$trimmedEmoji-$trimmedAsset-'
+                              '$isScreenOverlay-$anchorType-$scaleFactor-'
+                              '$offsetX-$offsetY',
+                            ),
                             isScreenOverlay: isScreenOverlay,
-                            emoji: trimmedEmoji,
-                            assetUrl: hasAsset ? trimmedAsset : null,
+                            emoji: emojiText,
+                            assetUrl: overlayImageUrl,
                             requiresFaceDetection: requiresFaceDetection,
+                            layout: placementLayout,
                           ),
                         Positioned(
                           left: 0,
@@ -109,7 +165,10 @@ class FeCatalogItemPreview extends StatelessWidget {
                             label: label,
                             gradient: gradient,
                             hasColor: hasColor,
-                            emoji: isEffect ? trimmedEmoji : null,
+                            emoji: emojiText,
+                            emojiImageUrl: isEffect
+                                ? emojiImageUrl
+                                : (emojiImageUrl ?? assetImageUrl),
                           ),
                         ),
                         if (isEffect)
@@ -154,33 +213,68 @@ class FeCatalogItemPreview extends StatelessWidget {
 }
 
 class _PreviewSceneBackground extends StatelessWidget {
-  const _PreviewSceneBackground({this.engineKey});
+  const _PreviewSceneBackground({
+    this.engineKey,
+    this.filterPreviewLook,
+    this.previewColorHex,
+  });
 
   final String? engineKey;
+  final FilterSettingsPreviewLook? filterPreviewLook;
+  final String? previewColorHex;
 
   @override
   Widget build(BuildContext context) {
-    return applyEnginePreviewLook(
-      engineKey: engineKey,
-      child: Image.asset(
-        FePreviewAssets.previewScene,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) {
-          return const DecoratedBox(
+    Widget scene = Image.asset(
+      FePreviewAssets.previewScene,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) {
+        return const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF94A3B8), Color(0xFF64748B)],
+            ),
+          ),
+          child: Center(
+            child: Icon(Icons.person_rounded, size: 72, color: Colors.white70),
+          ),
+        );
+      },
+    );
+
+    // Mobile pipeline: engine look → color/settings/beauty overlays.
+    scene = applyEnginePreviewLook(engineKey: engineKey, child: scene);
+    final look = filterPreviewLook;
+    if (look != null) {
+      scene = applyFilterSettingsPreviewLook(child: scene, look: look);
+    }
+
+    final hex = previewColorHex?.trim();
+    if (hex != null && hex.isNotEmpty) {
+      final gradient = previewGradientForHex(hex);
+      scene = Stack(
+        fit: StackFit.expand,
+        children: [
+          scene,
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF94A3B8), Color(0xFF64748B)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  gradient.first.withValues(alpha: 0.22),
+                  gradient.last.withValues(alpha: 0.58),
+                ],
               ),
             ),
-            child: Center(
-              child: Icon(Icons.person_rounded, size: 72, color: Colors.white70),
-            ),
-          );
-        },
-      ),
-    );
+          ),
+        ],
+      );
+    }
+
+    return scene;
   }
 }
 
@@ -190,12 +284,14 @@ class _PickerStripHighlight extends StatelessWidget {
     required this.gradient,
     required this.hasColor,
     this.emoji,
+    this.emojiImageUrl,
   });
 
   final String label;
   final List<Color> gradient;
   final bool hasColor;
   final String? emoji;
+  final String? emojiImageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -227,9 +323,19 @@ class _PickerStripHighlight extends StatelessWidget {
             ],
           ),
           alignment: Alignment.center,
-          child: emoji != null && emoji!.trim().isNotEmpty
-              ? Text(emoji!, style: const TextStyle(fontSize: 22))
-              : null,
+          child: emojiImageUrl != null
+              ? ClipOval(
+                  child: Image.network(
+                    emojiImageUrl!,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                )
+              : emoji != null && emoji!.trim().isNotEmpty
+                  ? Text(emoji!, style: const TextStyle(fontSize: 22))
+                  : null,
         ),
         const SizedBox(height: 4),
         Container(
@@ -278,16 +384,67 @@ class _FaceArGuide extends StatelessWidget {
 
 class _EffectOverlayLayer extends StatelessWidget {
   const _EffectOverlayLayer({
+    super.key,
     required this.isScreenOverlay,
     this.emoji,
     this.assetUrl,
     this.requiresFaceDetection = false,
+    this.layout,
   });
 
   final bool isScreenOverlay;
   final String? emoji;
   final String? assetUrl;
   final bool requiresFaceDetection;
+  final EffectPlacementPreviewLayout? layout;
+
+  Widget _emojiWidget(double fontSize) {
+    return Text(
+      emoji!,
+      style: TextStyle(
+        fontSize: fontSize,
+        shadows: [
+          Shadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _assetWidget(double size, {BoxFit fit = BoxFit.contain}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Image.network(
+        assetUrl!,
+        key: ValueKey(assetUrl),
+        fit: fit,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  Widget _placedContent({
+    required Alignment alignment,
+    required double sizeFactor,
+    bool coverFace = false,
+  }) {
+    final hasEmoji = emoji != null && emoji!.isNotEmpty;
+    final hasAsset = assetUrl != null && assetUrl!.isNotEmpty;
+    if (!hasEmoji && !hasAsset) return const SizedBox.shrink();
+
+    final emojiSize = (coverFace ? 56.0 : 48.0) * sizeFactor;
+    final assetSize = (coverFace ? 110.0 : 72.0) * sizeFactor;
+
+    return Align(
+      alignment: alignment,
+      child: hasAsset
+          ? _assetWidget(assetSize, fit: coverFace ? BoxFit.cover : BoxFit.contain)
+          : _emojiWidget(emojiSize),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +462,7 @@ class _EffectOverlayLayer extends StatelessWidget {
                 opacity: 0.85,
                 child: Image.network(
                   assetUrl!,
+                  key: ValueKey(assetUrl),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
@@ -312,18 +470,7 @@ class _EffectOverlayLayer extends StatelessWidget {
             ),
           if (hasEmoji)
             Center(
-              child: Text(
-                emoji!,
-                style: TextStyle(
-                  fontSize: hasAsset ? 64 : 78,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-              ),
+              child: _emojiWidget(hasAsset ? 64 : 78),
             ),
           if (!hasEmoji && !hasAsset)
             Center(
@@ -337,29 +484,25 @@ class _EffectOverlayLayer extends StatelessWidget {
       );
     }
 
+    final resolved = layout ??
+        const EffectPlacementPreviewLayout(
+          primaryAlignment: Alignment(0, -0.22),
+          sizeFactor: 0.85,
+        );
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (hasAsset)
-          Align(
-            alignment: const Alignment(0, -0.22),
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: Image.network(
-                assetUrl!,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          ),
-        if (hasEmoji)
-          Align(
-            alignment: const Alignment(0, -0.22),
-            child: Text(
-              emoji!,
-              style: const TextStyle(fontSize: 48),
-            ),
+        _placedContent(
+          alignment: resolved.primaryAlignment,
+          sizeFactor: resolved.sizeFactor,
+          coverFace: resolved.coverFace,
+        ),
+        if (resolved.secondaryAlignment != null)
+          _placedContent(
+            alignment: resolved.secondaryAlignment!,
+            sizeFactor: resolved.sizeFactor,
+            coverFace: resolved.coverFace,
           ),
         if (requiresFaceDetection)
           Positioned(

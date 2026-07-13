@@ -6,9 +6,11 @@ class SearchHistoryCategoryBadge extends StatelessWidget {
   const SearchHistoryCategoryBadge({
     super.key,
     required this.category,
+    this.compact = false,
   });
 
   final String category;
+  final bool compact;
 
   Color _accent(ColorScheme scheme) {
     return switch (category.toUpperCase()) {
@@ -40,17 +42,24 @@ class SearchHistoryCategoryBadge extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 3 : 4,
+      ),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        color: accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent, width: 1),
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: accent,
-          fontSize: 12,
+          fontSize: compact ? 11 : 12,
           fontWeight: FontWeight.w700,
+          height: 1.1,
         ),
       ),
     );

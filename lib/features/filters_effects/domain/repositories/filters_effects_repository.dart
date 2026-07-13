@@ -1,3 +1,5 @@
+import '../entities/effect_placement_entities.dart';
+import '../entities/filter_settings_entities.dart';
 import '../entities/filters_effects_entities.dart';
 
 abstract class FiltersEffectsRepository {
@@ -9,9 +11,18 @@ abstract class FiltersEffectsRepository {
 
   Future<CameraFilterEntity> getFilter(String id);
 
-  Future<CameraFilterEntity> createFilter(CreateFilterRequest request);
+  Future<FilterSettingsSchemaEntity> getFilterSettingsSchema();
 
-  Future<CameraFilterEntity> updateFilter(String id, UpdateFilterRequest request);
+  Future<CameraFilterEntity> createFilter(
+    CreateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  });
+
+  Future<CameraFilterEntity> updateFilter(
+    String id,
+    UpdateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  });
 
   Future<CameraFilterEntity> activateFilter(String id);
 
@@ -45,9 +56,15 @@ abstract class FiltersEffectsRepository {
 
   Future<CameraEffectEntity> getEffect(String id);
 
+  Future<EffectPlacementSchemaEntity> getEffectPlacementSchema();
+
   Future<CameraEffectEntity> createEffect(CreateEffectRequest request);
 
-  Future<CameraEffectEntity> updateEffect(String id, UpdateEffectRequest request);
+  Future<CameraEffectEntity> updateEffect(
+    String id,
+    UpdateEffectRequest request, {
+    EffectPlacementSettingsEntity? baselinePlacement,
+  });
 
   Future<CameraEffectEntity> activateEffect(String id);
 
@@ -82,4 +99,6 @@ abstract class FiltersEffectsRepository {
   );
 
   Future<CameraStudioCatalogEntity> seedCatalog();
+
+  Future<String> uploadEffectAsset(List<int> bytes, String filename);
 }

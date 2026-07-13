@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import '../../domain/entities/effect_placement_entities.dart';
+import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../../domain/repositories/filters_effects_repository.dart';
 import '../datasources/filters_effects_remote_datasource.dart';
@@ -20,15 +24,23 @@ class FiltersEffectsRepositoryImpl implements FiltersEffectsRepository {
   Future<CameraFilterEntity> getFilter(String id) => _remote.getFilter(id);
 
   @override
-  Future<CameraFilterEntity> createFilter(CreateFilterRequest request) =>
-      _remote.createFilter(request);
+  Future<FilterSettingsSchemaEntity> getFilterSettingsSchema() =>
+      _remote.getFilterSettingsSchema();
+
+  @override
+  Future<CameraFilterEntity> createFilter(
+    CreateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  }) =>
+      _remote.createFilter(request, schema: schema);
 
   @override
   Future<CameraFilterEntity> updateFilter(
     String id,
-    UpdateFilterRequest request,
-  ) =>
-      _remote.updateFilter(id, request);
+    UpdateFilterRequest request, {
+    FilterSettingsSchemaEntity? schema,
+  }) =>
+      _remote.updateFilter(id, request, schema: schema);
 
   @override
   Future<CameraFilterEntity> activateFilter(String id) =>
@@ -82,15 +94,24 @@ class FiltersEffectsRepositoryImpl implements FiltersEffectsRepository {
   Future<CameraEffectEntity> getEffect(String id) => _remote.getEffect(id);
 
   @override
+  Future<EffectPlacementSchemaEntity> getEffectPlacementSchema() =>
+      _remote.getEffectPlacementSchema();
+
+  @override
   Future<CameraEffectEntity> createEffect(CreateEffectRequest request) =>
       _remote.createEffect(request);
 
   @override
   Future<CameraEffectEntity> updateEffect(
     String id,
-    UpdateEffectRequest request,
-  ) =>
-      _remote.updateEffect(id, request);
+    UpdateEffectRequest request, {
+    EffectPlacementSettingsEntity? baselinePlacement,
+  }) =>
+      _remote.updateEffect(
+        id,
+        request,
+        baselinePlacement: baselinePlacement,
+      );
 
   @override
   Future<CameraEffectEntity> activateEffect(String id) =>
@@ -145,4 +166,11 @@ class FiltersEffectsRepositoryImpl implements FiltersEffectsRepository {
 
   @override
   Future<CameraStudioCatalogEntity> seedCatalog() => _remote.seedCatalog();
+
+  @override
+  Future<String> uploadEffectAsset(List<int> bytes, String filename) =>
+      _remote.uploadEffectAsset(
+        Uint8List.fromList(bytes),
+        filename,
+      );
 }

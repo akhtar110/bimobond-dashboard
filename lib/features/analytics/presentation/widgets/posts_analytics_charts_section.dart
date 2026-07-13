@@ -289,7 +289,7 @@ class _StatusBars extends StatelessWidget {
 
   Widget build(BuildContext context) {
 
-    if (total == 0) {
+    if (items.isEmpty) {
 
       return _EmptyChartMessage(title: title);
 
@@ -318,8 +318,6 @@ class _StatusBars extends StatelessWidget {
         const SizedBox(height: 8),
 
         AnalyticsBarChart(
-
-          height: 180,
 
           horizontal: true,
 

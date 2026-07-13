@@ -20,6 +20,7 @@ abstract class GiftsRemoteDataSource {
     required double priceCoins,
     bool isActive = true,
     DateTime? publishedAt,
+    String? animationUrl,
   });
 
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data);
@@ -102,6 +103,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     required double priceCoins,
     bool isActive = true,
     DateTime? publishedAt,
+    String? animationUrl,
   }) async {
     final body = <String, dynamic>{
       'name': name,
@@ -111,6 +113,8 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       // Always send publishedAt; use provided value or default to now.
       'publishedAt':
           (publishedAt ?? DateTime.now()).toUtc().toIso8601String(),
+      if (animationUrl != null && animationUrl.isNotEmpty)
+        'animationUrl': animationUrl,
     };
 
     final response = await _dio.post(

@@ -115,6 +115,56 @@ class UsersRepositoryImpl implements UsersRepository {
   }
 
   @override
+  Future<void> unverifyUser(String userId) {
+    return remoteDataSource.unverifyUser(userId);
+  }
+
+  @override
+  Future<void> suspendUser(String userId) {
+    return remoteDataSource.suspendUser(userId);
+  }
+
+  @override
+  Future<void> unsuspendUser(String userId) {
+    return remoteDataSource.unsuspendUser(userId);
+  }
+
+  @override
+  Future<void> banUser(String userId) {
+    return remoteDataSource.banUser(userId);
+  }
+
+  @override
+  Future<void> unbanUser(String userId) {
+    return remoteDataSource.unbanUser(userId);
+  }
+
+  @override
+  Future<void> activateUser(String userId) {
+    return remoteDataSource.activateUser(userId);
+  }
+
+  @override
+  Future<void> deactivateUser(String userId) {
+    return remoteDataSource.deactivateUser(userId);
+  }
+
+  @override
+  Future<void> resetUserPassword(String userId) {
+    return remoteDataSource.resetUserPassword(userId);
+  }
+
+  @override
+  Future<void> setUserCanPost(String userId, {required bool canPost}) {
+    return remoteDataSource.setUserCanPost(userId, canPost: canPost);
+  }
+
+  @override
+  Future<void> setUserAllowDirectMsgs(String userId, {required bool allow}) {
+    return remoteDataSource.setUserAllowDirectMsgs(userId, allow: allow);
+  }
+
+  @override
   Future<UserDetailEntity> getUserById(String userId) {
     return remoteDataSource.getUserById(userId);
   }

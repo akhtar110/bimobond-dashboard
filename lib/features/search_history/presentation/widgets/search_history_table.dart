@@ -256,16 +256,21 @@ class _TableHeaderRow extends StatelessWidget {
           letterSpacing: 0.4,
         );
 
+    final showUser = showUserColumn &&
+        density != SearchHistoryTableDensity.narrow;
+
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
       child: Row(
         children: [
           if (showSelection)
             SizedBox(
-              width: 42,
+              width: 36,
               child: Checkbox(
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
                 value: allSelected ? true : (someSelected ? null : false),
                 tristate: true,
                 onChanged: (_) => onSelectAll(),
@@ -284,9 +289,9 @@ class _TableHeaderRow extends StatelessWidget {
               style: style,
             ),
           ),
-          if (showUserColumn && density == SearchHistoryTableDensity.wide)
+          if (showUser)
             Expanded(
-              flex: 2,
+              flex: density == SearchHistoryTableDensity.wide ? 2 : 1,
               child: Text(l10n.t('users'), style: style),
             ),
           Expanded(
@@ -295,7 +300,7 @@ class _TableHeaderRow extends StatelessWidget {
               style: style,
             ),
           ),
-          const SizedBox(width: 72),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -357,13 +362,15 @@ class _SearchHistoryTableRowState extends State<_SearchHistoryTableRow> {
                 ),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             children: [
               if (widget.showSelection)
                 SizedBox(
-                  width: 42,
+                  width: 36,
                   child: Checkbox(
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                     value: widget.isSelected,
                     onChanged: (_) => widget.onToggle(),
                   ),
@@ -374,16 +381,26 @@ class _SearchHistoryTableRowState extends State<_SearchHistoryTableRow> {
                   widget.item.query,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    height: 1.25,
+                  ),
                 ),
               ),
               Expanded(
-                child: SearchHistoryCategoryBadge(category: widget.item.category),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: SearchHistoryCategoryBadge(
+                    category: widget.item.category,
+                    compact: true,
+                  ),
+                ),
               ),
               if (widget.showUserColumn &&
-                  widget.density == SearchHistoryTableDensity.wide)
+                  widget.density != SearchHistoryTableDensity.narrow)
                 Expanded(
-                  flex: 2,
+                  flex: widget.density == SearchHistoryTableDensity.wide ? 2 : 1,
                   child: widget.item.user == null
                       ? Text(
                           '—',
@@ -391,31 +408,22 @@ class _SearchHistoryTableRowState extends State<_SearchHistoryTableRow> {
                         )
                       : Align(
                           alignment: AlignmentDirectional.centerStart,
-                          child: ActionChip(
-                            avatar: CircleAvatar(
-                              radius: 10,
-                              backgroundColor: scheme.primaryContainer,
-                              child: Text(
-                                widget.item.user!.username.isNotEmpty
-                                    ? widget.item.user!.username[0]
-                                        .toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: scheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                            label: Text('@${widget.item.user!.username}'),
+                          child: _UserChip(
+                            user: widget.item.user!,
                             onPressed: widget.onOpenUser,
+                            compact: widget.density ==
+                                SearchHistoryTableDensity.medium,
                           ),
                         ),
                 ),
               Expanded(
                 child: Text(
                   widget.dateFmt.format(widget.item.createdAt.toLocal()),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
+                        fontSize: 12,
                       ),
                 ),
               ),
@@ -425,9 +433,73 @@ class _SearchHistoryTableRowState extends State<_SearchHistoryTableRow> {
                 child: IconButton(
                   tooltip: context.l10n.t('delete'),
                   onPressed: widget.onDelete,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   icon: Icon(
                     Icons.delete_outline_rounded,
+                    size: 20,
                     color: scheme.error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UserChip extends StatelessWidget {
+  const _UserChip({
+    required this.user,
+    this.onPressed,
+    this.compact = false,
+  });
+
+  final SearchHistoryUserSummary user;
+  final VoidCallback? onPressed;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final name = user.displayName;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return Tooltip(
+      message: name,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: compact ? 9 : 10,
+                backgroundColor: scheme.primaryContainer,
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    fontSize: compact ? 9 : 10,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: compact ? 12 : 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -467,43 +539,92 @@ class _SearchHistoryCardList extends StatelessWidget {
           elevation: 0,
           color: scheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             side: BorderSide(color: scheme.outlineVariant),
           ),
-          child: ListTile(
-            leading: showSelection
-                ? Checkbox(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (showSelection)
+                  Checkbox(
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                     value: state.selectedIds.contains(item.id),
                     onChanged: (_) =>
                         bloc.add(ToggleSearchHistorySelection(item.id)),
-                  )
-                : null,
-            title: Text(
-              item.query,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 6),
-                SearchHistoryCategoryBadge(category: item.category),
-                const SizedBox(height: 6),
-                Text(dateFmt.format(item.createdAt.toLocal())),
-                if (showUserColumn && item.user != null) ...[
-                  const SizedBox(height: 6),
-                  Text('@${item.user!.username}'),
-                ],
+                  ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.query,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SearchHistoryCategoryBadge(
+                            category: item.category,
+                            compact: true,
+                          ),
+                          if (showUserColumn && item.user != null)
+                            Text(
+                              item.user!.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurface,
+                                  ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dateFmt.format(item.createdAt.toLocal()),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 20,
+                    color: scheme.error,
+                  ),
+                  onPressed: () async {
+                    final confirmed =
+                        await showSearchHistoryDeleteDialog(context);
+                    if (confirmed == true && context.mounted) {
+                      bloc.add(DeleteSearchHistoryItem(item.id));
+                    }
+                  },
+                ),
               ],
-            ),
-            trailing: IconButton(
-              icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
-              onPressed: () async {
-                final confirmed = await showSearchHistoryDeleteDialog(context);
-                if (confirmed == true && context.mounted) {
-                  bloc.add(DeleteSearchHistoryItem(item.id));
-                }
-              },
             ),
           ),
         ),

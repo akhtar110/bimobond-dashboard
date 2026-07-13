@@ -11,8 +11,10 @@ enum CampaignStatus {
 
   static CampaignStatus? tryParse(String? value) {
     if (value == null || value.isEmpty) return null;
+    final normalized =
+        value.trim().toUpperCase().replaceAll('-', '_').replaceAll(' ', '_');
     for (final s in CampaignStatus.values) {
-      if (s.apiValue == value) return s;
+      if (s.apiValue == normalized) return s;
     }
     return null;
   }

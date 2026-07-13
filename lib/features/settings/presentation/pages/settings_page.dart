@@ -242,8 +242,7 @@ class _SettingsHeader extends StatelessWidget {
   }
 }
 
-/// Groups appearance controls without subscribing to theme/locale itself.
-/// Each card manages its own [BlocSelector] / optimistic state internally.
+
 class _AppearanceSection extends StatelessWidget {
   const _AppearanceSection();
 

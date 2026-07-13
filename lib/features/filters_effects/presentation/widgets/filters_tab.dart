@@ -20,6 +20,29 @@ import '../dialogs/filter_form_dialog.dart';
 import '../utils/filters_effects_responsive.dart';
 import 'fe_tab_scaffold.dart';
 
+Future<void> _openEditor(BuildContext context, {String? filterId}) async {
+  final saved = await openFilterEditor(context, filterId: filterId);
+  if (!context.mounted) return;
+  if (saved == true) {
+    context.read<FiltersEffectsBloc>().add(const LoadCameraFilters());
+    final l10n = context.l10n;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            filterId == null
+                ? l10n.t('feFilterCreatedSuccess')
+                : l10n.t('feFilterUpdatedSuccess'),
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+}
+
 class FiltersTab extends StatelessWidget {
   const FiltersTab({
     super.key,
@@ -53,7 +76,7 @@ class FiltersTab extends StatelessWidget {
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: FilledButton.icon(
-                onPressed: () => showFilterFormDialog(context),
+                onPressed: () => _openEditor(context),
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: Text(l10n.tOr('feCreateFilter', 'Create filter')),
               ),
@@ -157,7 +180,7 @@ class FiltersTab extends StatelessWidget {
           case 'preview':
             showFilterPreviewDialog(context, filter);
           case 'edit':
-            showFilterFormDialog(context, editing: filter);
+            _openEditor(context, filterId: filter.id);
           case 'activate':
             bloc.add(ActivateCameraFilterEvent(filter.id));
           case 'deactivate':
@@ -245,7 +268,7 @@ class _FilterMobileCard extends StatelessWidget {
               Align(
                 alignment: AlignmentDirectional.centerEnd,
                 child: TextButton(
-                  onPressed: () => showFilterFormDialog(context, editing: filter),
+                  onPressed: () => _openEditor(context, filterId: filter.id),
                   child: Text(l10n.tOr('feEdit', 'Edit')),
                 ),
               ),

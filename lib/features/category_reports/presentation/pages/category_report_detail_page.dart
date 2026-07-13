@@ -8,6 +8,8 @@ import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/category_report_entities.dart';
 import '../../../reports/presentation/utils/report_detail_labels.dart';
+import '../../../reports/presentation/widgets/report_detail_header_layout.dart';
+import '../../../reports/presentation/widgets/report_detail_metric_card.dart';
 import '../../../reports/presentation/widgets/reports_embedded_panel.dart';
 import '../bloc/category_report_detail_bloc.dart';
 import '../utils/category_report_format.dart';
@@ -134,72 +136,68 @@ class _DetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+              ReportDetailHeaderSplit(
+                start: ReportDetailHeaderCard(
+                  title: category.name,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
                     child: category.iconUrl != null &&
                             category.iconUrl!.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: category.iconUrl!,
-                            width: 72,
-                            height: 72,
+                            width: 64,
+                            height: 64,
                             fit: BoxFit.cover,
                           )
                         : Container(
-                            width: 72,
-                            height: 72,
+                            width: 64,
+                            height: 64,
                             color: scheme.primaryContainer,
                             child: Icon(Icons.label, color: scheme.primary),
                           ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category.name,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          category.slug,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                ),
+                end: ReportDetailHeaderCard(
+                  child: Text(
+                    category.slug,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'monospace',
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 24),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              ReportDetailMetricsGrid(
                 children: [
-                  _MetricCard(
-                    label: ReportDetailLabels.directPosts(l10n),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.directPosts(l10n),
                     value: formatCategoryReportCount(
                       detail.counts.directPosts ?? detail.counts.posts,
                     ),
+                    icon: Icons.article_outlined,
+                    accent: const Color(0xFF2563EB),
                   ),
-                  _MetricCard(
-                    label: l10n.t('views'),
+                  ReportDetailMetricCard(
+                    title: l10n.t('views'),
                     value: formatCategoryReportCount(detail.postMetrics.views),
+                    icon: Icons.visibility_outlined,
+                    accent: Theme.of(context).colorScheme.primary,
                   ),
-                  _MetricCard(
-                    label: ReportDetailLabels.periodPosts(l10n, days),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.periodPosts(l10n, days),
                     value: formatCategoryReportCount(detail.periodPostsCreated),
+                    icon: Icons.video_library_outlined,
+                    accent: const Color(0xFF059669),
                   ),
-                  _MetricCard(
-                    label: ReportDetailLabels.subcategories(l10n),
+                  ReportDetailMetricCard(
+                    title: ReportDetailLabels.subcategories(l10n),
                     value: formatCategoryReportCount(
                       detail.counts.subcategories ?? detail.counts.children,
                     ),
+                    icon: Icons.account_tree_outlined,
+                    accent: const Color(0xFFEA580C),
                   ),
                 ],
               ),
@@ -261,38 +259,6 @@ class _DetailBody extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 180,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: scheme.onSurfaceVariant)),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-        ],
       ),
     );
   }

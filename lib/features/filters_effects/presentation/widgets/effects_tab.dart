@@ -18,8 +18,32 @@ import '../dialogs/effect_form_dialog.dart';
 import '../dialogs/fe_item_preview_dialog.dart';
 import '../dialogs/fe_confirm_dialog.dart';
 import '../utils/filters_effects_responsive.dart';
+import '../utils/fe_effect_emoji_display.dart';
 import 'fe_tab_scaffold.dart';
 import 'filters_tab.dart';
+
+Future<void> _openEditor(BuildContext context, {String? effectId}) async {
+  final saved = await openEffectEditor(context, effectId: effectId);
+  if (!context.mounted) return;
+  if (saved == true) {
+    context.read<FiltersEffectsBloc>().add(const LoadCameraEffects());
+    final l10n = context.l10n;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            effectId == null
+                ? l10n.t('feEffectCreatedSuccess')
+                : l10n.t('feEffectUpdatedSuccess'),
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+}
 
 class EffectsTab extends StatelessWidget {
   const EffectsTab({
@@ -54,7 +78,7 @@ class EffectsTab extends StatelessWidget {
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: FilledButton.icon(
-                onPressed: () => showEffectFormDialog(context),
+                onPressed: () => _openEditor(context),
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: Text(l10n.tOr('feCreateEffect', 'Create effect')),
               ),
@@ -88,7 +112,12 @@ class EffectsTab extends StatelessWidget {
                 DataCell(Text(effect.slug)),
                 DataCell(Text(_effectTypeLabel(context, effect.effectType))),
                 DataCell(Text(effect.labelKey)),
-                DataCell(Text(effect.emoji ?? '—')),
+                DataCell(
+                  FeEffectEmojiDisplay.build(
+                    emoji: effect.emoji,
+                    assetUrl: effect.assetUrl,
+                  ),
+                ),
                 DataCell(_statusChip(context, effect.isActive)),
                 DataCell(Text(_flagsLabel(context, effect))),
                 DataCell(Text('${effect.sortOrder}')),
@@ -168,7 +197,7 @@ class EffectsTab extends StatelessWidget {
           case 'preview':
             showEffectPreviewDialog(context, effect);
           case 'edit':
-            showEffectFormDialog(context, editing: effect);
+            _openEditor(context, effectId: effect.id);
           case 'activate':
             bloc.add(ActivateCameraEffectEvent(effect.id));
           case 'deactivate':
@@ -233,12 +262,17 @@ class _EffectMobileCard extends StatelessWidget {
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: ListTile(
+        leading: FeEffectEmojiDisplay.build(
+          emoji: effect.emoji,
+          assetUrl: effect.assetUrl,
+          size: 36,
+        ),
         title: Text(effect.labelKey),
         subtitle: Text('${effect.slug} · $effectTypeLabel'),
         trailing: canManage
             ? IconButton(
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () => showEffectFormDialog(context, editing: effect),
+                onPressed: () => _openEditor(context, effectId: effect.id),
               )
             : null,
       ),

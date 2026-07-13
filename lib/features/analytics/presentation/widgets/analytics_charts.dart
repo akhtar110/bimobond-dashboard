@@ -249,70 +249,22 @@ class AnalyticsBarChart extends StatelessWidget {
     final bottomReserved = weeklyLabels ? 36.0 : 28.0;
 
     if (horizontal) {
-      return SizedBox(
-        height: height,
-        child: BarChart(
-          BarChartData(
-            alignment: BarChartAlignment.spaceAround,
-            maxY: yMax,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) => FlLine(
-                color: AnalyticsChartColors.grid(scheme),
-                strokeWidth: 1,
-              ),
+      final maxValue = maxY <= 0 ? 1.0 : maxY;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < entries.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _HorizontalBarRow(
+              label: entries[i].label,
+              value: entries[i].value,
+              maxValue: maxValue,
+              color: entries[i].color ?? scheme.primary,
+              locale: locale,
+              scheme: scheme,
             ),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 88,
-                  getTitlesWidget: (v, meta) {
-                    final idx = v.toInt();
-                    if (idx < 0 || idx >= entries.length) {
-                      return const SizedBox.shrink();
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Text(
-                        entries[idx].label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              bottomTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            barGroups: [
-              for (var i = 0; i < entries.length; i++)
-                BarChartGroupData(
-                  x: i,
-                  barRods: [
-                    BarChartRodData(
-                      toY: entries[i].value,
-                      color: entries[i].color ?? scheme.primary,
-                      width: 14,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          swapAnimationDuration: const Duration(milliseconds: 450),
-        ),
+          ],
+        ],
       );
     }
 
@@ -409,6 +361,80 @@ class AnalyticsBarEntry {
   final String label;
   final double value;
   final Color? color;
+}
+
+class _HorizontalBarRow extends StatelessWidget {
+  const _HorizontalBarRow({
+    required this.label,
+    required this.value,
+    required this.maxValue,
+    required this.color,
+    required this.locale,
+    required this.scheme,
+  });
+
+  final String label;
+  final double value;
+  final double maxValue;
+  final Color color;
+  final String locale;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = maxValue <= 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 88,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurfaceVariant,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 14,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(color: AnalyticsChartColors.grid(scheme)),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: fraction,
+                    child: ColoredBox(color: color),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 52,
+          child: Text(
+            AnalyticsFormat.count(value, locale: locale),
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class AnalyticsPieChart extends StatelessWidget {

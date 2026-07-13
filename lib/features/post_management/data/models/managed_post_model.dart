@@ -99,7 +99,9 @@ class ManagedPostModel extends ManagedPostEntity {
           '',
       type: json['type']?.toString() ?? 'VIDEO',
       userName: user?['username'] as String? ?? user?['name'] as String?,
-      userFullName: user?['fullName'] as String?,
+      userFullName: user?['fullName'] as String? ??
+          user?['displayName'] as String? ??
+          user?['name'] as String?,
       userEmail: user?['email'] as String?,
       userProfileImage: resolveMediaUrl(rawAvatar),
       userIsVerified: user?['isVerified'] as bool? ?? false,

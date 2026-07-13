@@ -1,10 +1,14 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_image_picker.dart';
+import 'gift_animation_preview.dart';
+import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
 
 void showCreateGiftDialog(BuildContext pageContext) {
@@ -29,6 +33,8 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
   final _formKey = GlobalKey<FormState>();
   String? _imageError;
   DateTime? _publishedAt;
+  Uint8List? _animationBytes;
+  String? _animationName;
 
   @override
   void dispose() {
@@ -44,6 +50,15 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
           SetGiftImageEvent(bytes: picked.bytes, name: picked.name),
         );
     setState(() => _imageError = null);
+  }
+
+  Future<void> _pickAnimation() async {
+    final picked = await pickGiftAnimation();
+    if (!mounted || picked == null) return;
+    setState(() {
+      _animationBytes = picked.bytes;
+      _animationName = picked.name;
+    });
   }
 
   Future<void> _pickPublishedAt() async {
@@ -88,6 +103,8 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
               imageName: state.pendingImageName ?? 'gift.jpg',
               priceCoins: double.parse(_priceCtrl.text.trim()),
               publishedAt: _publishedAt,
+              animationBytes: _animationBytes,
+              animationName: _animationName,
             ),
           ),
         );
@@ -98,6 +115,7 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
     final l10n = context.l10n;
     final screenW = MediaQuery.sizeOf(context).width;
     final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
+    final hasAnimation = _animationBytes != null;
 
     return BlocBuilder<GiftsBloc, GiftsState>(
       bloc: widget.pageContext.read<GiftsBloc>(),
@@ -129,7 +147,6 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Name
                     TextFormField(
                       controller: _nameCtrl,
                       decoration: InputDecoration(
@@ -144,7 +161,6 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Image picker button
                     OutlinedButton.icon(
                       onPressed: state.isActioning ? null : _pickImage,
                       icon: const Icon(Icons.upload_file_outlined, size: 18),
@@ -161,7 +177,6 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                       ),
                     ),
 
-                    // Image error
                     if (_imageError != null) ...[
                       const SizedBox(height: 6),
                       Text(
@@ -173,7 +188,6 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                       ),
                     ],
 
-                    // Preview
                     if (hasImage) ...[
                       const SizedBox(height: 12),
                       ClipRRect(
@@ -209,7 +223,39 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                     ],
                     const SizedBox(height: 14),
 
-                    // Published At
+                    OutlinedButton.icon(
+                      onPressed: state.isActioning ? null : _pickAnimation,
+                      icon: const Icon(Icons.animation_rounded, size: 18),
+                      label: Text(
+                        hasAnimation
+                            ? l10n.tOr('changeAnimation', 'Change animation')
+                            : l10n.tOr(
+                                'uploadAnimationOptional',
+                                'Upload animation (MP4, optional)',
+                              ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    if (hasAnimation) ...[
+                      const SizedBox(height: 12),
+                      GiftAnimationPreview(
+                        bytes: _animationBytes,
+                        fileName: _animationName,
+                        onClear: state.isActioning
+                            ? null
+                            : () => setState(() {
+                                  _animationBytes = null;
+                                  _animationName = null;
+                                }),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+
                     GiftPublishedAtPicker(
                       value: _publishedAt,
                       onTap: state.isActioning ? null : _pickPublishedAt,
@@ -219,18 +265,9 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Price
-                    TextFormField(
+                    GiftPriceCoinsField(
                       controller: _priceCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: l10n.t('giftPriceLabel'),
-                        prefixText: '\$',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
+                      enabled: !state.isActioning,
                       validator: (v) {
                         if (v?.trim().isEmpty == true) {
                           return l10n.t('requiredField');
@@ -242,7 +279,6 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                       },
                     ),
 
-                    // Uploading indicator
                     if (state.isActioning) ...[
                       const SizedBox(height: 14),
                       Row(
