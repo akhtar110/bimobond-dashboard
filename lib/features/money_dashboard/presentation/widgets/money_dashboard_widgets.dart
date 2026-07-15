@@ -40,6 +40,7 @@ class MoneyDashboardMetricsBlock extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
+                fontSize: metrics.sectionTitleFontSize,
               ),
         ),
         if (subtitle != null) ...[
@@ -48,7 +49,8 @@ class MoneyDashboardMetricsBlock extends StatelessWidget {
             subtitle!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
-                  height: 1.35,
+                  fontSize: metrics.sectionSubtitleFontSize,
+                  height: 1.3,
                 ),
           ),
         ],
@@ -56,7 +58,9 @@ class MoneyDashboardMetricsBlock extends StatelessWidget {
         WalletsDashboardCard(
           padding: EdgeInsets.all(metrics.cardPadding),
           child: ResponsiveStatsGrid(
-            minTileWidth: metrics.isMobile ? 160 : 200,
+            minTileWidth: metrics.statsMinTileWidth,
+            spacing: metrics.statsGridSpacing,
+            runSpacing: metrics.statsGridSpacing,
             children: cards,
           ),
         ),
@@ -98,7 +102,7 @@ class MoneyDashboardTopGiftsSection extends StatelessWidget {
       isEmpty: gifts.isEmpty,
       resultCount: top.length,
       child: metrics.useCompactTable
-          ? _TopGiftsCompactList(gifts: top)
+          ? _TopGiftsCompactList(gifts: top, metrics: metrics)
           : _TopGiftsDesktopTable(gifts: top),
     );
   }
@@ -137,7 +141,7 @@ class MoneyDashboardTopUsersSection extends StatelessWidget {
       isEmpty: users.isEmpty,
       resultCount: top.length,
       child: metrics.useCompactTable
-          ? _TopUsersCompactList(users: top)
+          ? _TopUsersCompactList(users: top, metrics: metrics)
           : _TopUsersDesktopTable(users: top),
     );
   }
@@ -179,7 +183,7 @@ class MoneyDashboardTopAuctionsSection extends StatelessWidget {
       isEmpty: auctions.isEmpty,
       resultCount: top.length,
       child: metrics.useCompactTable
-          ? _TopAuctionsCompactList(auctions: top)
+          ? _TopAuctionsCompactList(auctions: top, metrics: metrics)
           : _TopAuctionsDesktopTable(auctions: top),
     );
   }
@@ -224,6 +228,7 @@ class MoneyDashboardDataSection extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
+                fontSize: metrics.sectionTitleFontSize,
               ),
         ),
         if (subtitle != null) ...[
@@ -232,7 +237,8 @@ class MoneyDashboardDataSection extends StatelessWidget {
             subtitle!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
-                  height: 1.35,
+                  fontSize: metrics.sectionSubtitleFontSize,
+                  height: 1.3,
                 ),
           ),
         ],
@@ -249,7 +255,7 @@ class MoneyDashboardDataSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(pad, pad, pad, 8),
+                      padding: EdgeInsets.fromLTRB(pad, pad, pad, 6),
                       child: Text(
                         walletL10nArgs(context,
                           'walletResultsCount',
@@ -259,6 +265,7 @@ class MoneyDashboardDataSection extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: scheme.onSurfaceVariant,
+                              fontSize: metrics.sectionSubtitleFontSize,
                             ),
                       ),
                     ),
@@ -272,9 +279,13 @@ class MoneyDashboardDataSection extends StatelessWidget {
 }
 
 class _TopGiftsCompactList extends StatelessWidget {
-  const _TopGiftsCompactList({required this.gifts});
+  const _TopGiftsCompactList({
+    required this.gifts,
+    required this.metrics,
+  });
 
   final List<GiftReportTopGiftSummary> gifts;
+  final WalletsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -283,11 +294,13 @@ class _TopGiftsCompactList extends StatelessWidget {
 
     return WalletsCompactListFrame(
       nestedInScrollView: true,
+      metrics: metrics,
       itemCount: gifts.length,
       itemBuilder: (context, index) {
         final gift = gifts[index];
         return WalletsCompactCard(
-          leading: _GiftThumbnail(gift: gift),
+          metrics: metrics,
+          leading: _GiftThumbnail(gift: gift, size: metrics.analyticsIconBoxSize),
           title: gift.displayName,
           subtitle: walletL10nArgs(context,
             'walletTopGiftSends',
@@ -299,6 +312,7 @@ class _TopGiftsCompactList extends StatelessWidget {
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: Theme.of(context).colorScheme.primary,
+                  fontSize: metrics.compactCardValueFontSize,
                 ),
           ),
         );
@@ -371,9 +385,13 @@ class _TopGiftsDesktopTable extends StatelessWidget {
 }
 
 class _TopUsersCompactList extends StatelessWidget {
-  const _TopUsersCompactList({required this.users});
+  const _TopUsersCompactList({
+    required this.users,
+    required this.metrics,
+  });
 
   final List<UserReportListItemEntity> users;
+  final WalletsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +402,7 @@ class _TopUsersCompactList extends StatelessWidget {
 
     return WalletsCompactListFrame(
       nestedInScrollView: true,
+      metrics: metrics,
       itemCount: users.length,
       itemBuilder: (context, index) {
         final user = users[index];
@@ -391,7 +410,11 @@ class _TopUsersCompactList extends StatelessWidget {
             user.fullName?.isNotEmpty == true ? user.fullName! : user.username;
 
         return WalletsCompactCard(
-          leading: _UserReportAvatar(user: user),
+          metrics: metrics,
+          leading: _UserReportAvatar(
+            user: user,
+            size: metrics.analyticsIconBoxSize + 2,
+          ),
           title: name,
           subtitle: walletL10nArgs(context,
             'walletTopUserFollowers',
@@ -406,6 +429,7 @@ class _TopUsersCompactList extends StatelessWidget {
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: scheme.primary,
+                  fontSize: metrics.compactCardValueFontSize,
                 ),
           ),
         );
@@ -526,9 +550,13 @@ class _TopUserRow extends StatelessWidget {
 }
 
 class _TopAuctionsCompactList extends StatelessWidget {
-  const _TopAuctionsCompactList({required this.auctions});
+  const _TopAuctionsCompactList({
+    required this.auctions,
+    required this.metrics,
+  });
 
   final List<AuctionReportListItem> auctions;
+  final WalletsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -539,10 +567,12 @@ class _TopAuctionsCompactList extends StatelessWidget {
 
     return WalletsCompactListFrame(
       nestedInScrollView: true,
+      metrics: metrics,
       itemCount: auctions.length,
       itemBuilder: (context, index) {
         final auction = auctions[index];
         return WalletsCompactCard(
+          metrics: metrics,
           title: auction.itemName,
           subtitle: walletL10nArgs(context,
             'walletAuctionProgressRaised',
@@ -557,9 +587,10 @@ class _TopAuctionsCompactList extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: scheme.primary,
+                      fontSize: metrics.compactCardValueFontSize,
                     ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               AuctionStatusBadge(status: auction.status, compact: true),
             ],
           ),

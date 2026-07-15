@@ -16,11 +16,12 @@ bool canAccessDashboardTab(int tabIndex, List<UserRole> roles) {
   if (!roles.contains(UserRole.moderator)) return false;
   return switch (tabIndex) {
     0 => true, // analytics (monetization section hidden in UI)
-    7 => true, // auctions
-    10 => true, // promotions (read-only actions)
-    12 => true, // reports / money reports
-    13 => true, // notifications
-    14 => true, // filters & effects (read + moderate)
+    1 => true, // search management
+    8 => true, // auctions
+    11 => true, // promotions (read-only actions)
+    13 => true, // reports / money reports
+    14 => true, // notifications
+    15 => true, // filters & effects (read + moderate)
     _ => false,
   };
 }

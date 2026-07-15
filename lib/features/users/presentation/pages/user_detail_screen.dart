@@ -8,6 +8,8 @@ import '../bloc/user_detail_state.dart';
 import '../widgets/user_admin_actions/user_admin_actions_section.dart';
 import '../widgets/user_detail_activity_tabs.dart';
 import '../widgets/user_detail_header.dart';
+import '../widgets/user_detail_locked_card.dart';
+import '../widgets/user_detail_personal_info.dart';
 import '../widgets/user_detail_stats_grid.dart';
 
 class UserDetailScreen extends StatefulWidget {
@@ -129,10 +131,15 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     const SizedBox(height: 12),
                     UserDetailStatsGrid(user: user),
                     const SizedBox(height: 12),
-                    UserDetailInfoActivitySection(
-                      user: user,
-                      isDark: isDark,
-                    ),
+                    if (user.isProfileLocked) ...[
+                      UserDetailLockedCard(user: user),
+                      const SizedBox(height: 12),
+                      UserDetailPersonalInfo(user: user),
+                    ] else
+                      UserDetailInfoActivitySection(
+                        user: user,
+                        isDark: isDark,
+                      ),
                   ],
                 ),
               );

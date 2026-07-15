@@ -485,6 +485,7 @@ class WalletsCompactListFrame extends StatelessWidget {
     required this.itemCount,
     required this.itemBuilder,
     this.nestedInScrollView = false,
+    this.metrics,
   });
 
   final int itemCount;
@@ -493,17 +494,24 @@ class WalletsCompactListFrame extends StatelessWidget {
   /// When true, sizes to content and defers scrolling to a parent
   /// [SingleChildScrollView] (e.g. money dashboard sections).
   final bool nestedInScrollView;
+  final WalletsLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
+    final m = metrics ?? walletsMetricsOf(context);
     return ListView.separated(
       shrinkWrap: nestedInScrollView,
       physics: nestedInScrollView
           ? const NeverScrollableScrollPhysics()
           : null,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: EdgeInsets.fromLTRB(
+        m.cardPadding,
+        0,
+        m.cardPadding,
+        m.cardPadding,
+      ),
       itemCount: itemCount,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => SizedBox(height: m.statsGridSpacing),
       itemBuilder: itemBuilder,
     );
   }
@@ -518,6 +526,7 @@ class WalletsCompactCard extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.footer,
+    this.metrics,
   });
 
   final VoidCallback? onTap;
@@ -526,29 +535,31 @@ class WalletsCompactCard extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final Widget? footer;
+  final WalletsLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final m = metrics ?? walletsMetricsOf(context);
 
     return Material(
       color: scheme.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.65)),
+        borderRadius: BorderRadius.circular(m.compactCardRadius),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(m.compactCardRadius),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(m.compactCardPadding),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (leading != null) ...[
                 leading!,
-                const SizedBox(width: 10),
+                SizedBox(width: m.statsGridSpacing),
               ],
               Expanded(
                 child: Column(
@@ -560,19 +571,23 @@ class WalletsCompactCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
+                            fontSize: m.compactCardTitleFontSize,
+                            height: 1.25,
                           ),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         subtitle!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
+                              fontSize: m.sectionSubtitleFontSize,
+                              height: 1.25,
                             ),
                       ),
                     ],
                     if (footer != null) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       footer!,
                     ],
                   ],

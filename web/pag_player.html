@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PAG Player</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111318;
+    }
+    #pag {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+    }
+  </style>
+  <!-- Official libpag UMD build (sets window.libpag) -->
+  <script src="https://cdn.jsdelivr.net/npm/libpag@4.2.84/lib/libpag.min.js"></script>
+</head>
+<body>
+  <canvas id="pag"></canvas>
+  <script>
+    (function () {
+      var LIB_BASE = 'https://cdn.jsdelivr.net/npm/libpag@4.2.84/lib/';
+      var PAG = null;
+      var pagView = null;
+      var initPromise = null;
+      var playSeq = 0;
+
+      function post(type, extra) {
+        try {
+          parent.postMessage(Object.assign({ source: 'gift-pag-player', type: type }, extra || {}), '*');
+        } catch (_) {}
+      }
+
+      function ensurePag() {
+        if (PAG) return Promise.resolve(PAG);
+        if (initPromise) return initPromise;
+        if (!window.libpag || typeof window.libpag.PAGInit !== 'function') {
+          return Promise.reject(new Error('libpag failed to load'));
+        }
+        initPromise = window.libpag
+          .PAGInit({
+            locateFile: function (file) {
+              return LIB_BASE + file;
+            },
+          })
+          .then(function (module) {
+            PAG = module;
+            return module;
+          })
+          .catch(function (err) {
+            initPromise = null;
+            throw err;
+          });
+        return initPromise;
+      }
+
+      function destroyViewOnly() {
+        if (!pagView) return;
+        var view = pagView;
+        pagView = null;
+        try {
+          if (typeof view.pause === 'function') view.pause();
+        } catch (_) {}
+        try {
+          if (typeof view.destroy === 'function') view.destroy();
+        } catch (_) {}
+      }
+
+      async function playFromBuffer(buffer, seq) {
+        await ensurePag();
+        if (seq !== playSeq) return;
+
+        destroyViewOnly();
+        if (seq !== playSeq) return;
+
+        // Fresh copy — WASM may detach the buffer during load.
+        var copy = buffer.slice(0);
+        var pagFile = await PAG.PAGFile.load(copy);
+        if (seq !== playSeq) {
+          try {
+            if (pagFile && typeof pagFile.destroy === 'function') pagFile.destroy();
+          } catch (_) {}
+          return;
+        }
+        if (!pagFile) throw new Error('PAGFile.load returned empty');
+
+        var canvas = document.getElementById('pag');
+        var width = 300;
+        var height = 300;
+        try {
+          width = pagFile.width() || width;
+          height = pagFile.height() || height;
+        } catch (e) {
+          try {
+            if (typeof pagFile.destroy === 'function') pagFile.destroy();
+          } catch (_) {}
+          throw e;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Default WebGL inside this dedicated document (no Flutter CanvasKit here).
+        var view = await PAG.PAGView.init(pagFile, canvas, {
+          firstFrame: true,
+          useScale: true,
+        });
+        if (seq !== playSeq) {
+          try {
+            if (view && typeof view.destroy === 'function') view.destroy();
+          } catch (_) {}
+          return;
+        }
+        if (!view) throw new Error('PAGView.init failed');
+
+        try {
+          view.setRepeatCount(0);
+        } catch (_) {}
+
+        await view.play();
+        if (seq !== playSeq) {
+          try {
+            if (typeof view.destroy === 'function') view.destroy();
+          } catch (_) {}
+          return;
+        }
+
+        pagView = view;
+        post('ready');
+      }
+
+      async function playFromUrl(url, seq) {
+        var response = await fetch(url, { mode: 'cors', credentials: 'omit' });
+        if (!response.ok) {
+          throw new Error('Failed to download PAG (' + response.status + ')');
+        }
+        var buffer = await response.arrayBuffer();
+        if (seq !== playSeq) return;
+        await playFromBuffer(buffer, seq);
+      }
+
+      window.addEventListener('message', function (event) {
+        var data = event.data;
+        if (!data || data.target !== 'gift-pag-player') return;
+
+        if (data.type === 'destroy') {
+          playSeq += 1;
+          destroyViewOnly();
+          post('destroyed');
+          return;
+        }
+
+        if (data.type !== 'play') return;
+
+        var seq = ++playSeq;
+        post('loading');
+
+        var task = data.url
+          ? playFromUrl(String(data.url), seq)
+          : data.buffer
+            ? playFromBuffer(data.buffer, seq)
+            : Promise.reject(new Error('No PAG url/buffer'));
+
+        task.catch(function (err) {
+          if (seq !== playSeq) return;
+          destroyViewOnly();
+          post('error', {
+            message: (err && err.message) ? err.message : String(err),
+          });
+        });
+      });
+
+      // Signal parent that the player page is alive.
+      post('boot');
+    })();
+  </script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import '../../../../injection_container.dart' as di;
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_follow_entity.dart';
 import '../cubit/user_follow_list_cubit.dart';
+import 'permission_denied_state.dart';
 
 Future<void> showUserFollowListSheet({
   required BuildContext context,
@@ -101,10 +102,19 @@ class UserFollowListSheet extends StatelessWidget {
                   }
 
                   if (state is UserFollowListError) {
-                    return _EmptyFollowList(
-                      message: state.message,
-                      onRetry: () =>
-                          context.read<UserFollowListCubit>().load(),
+                    return PermissionDeniedState(
+                      message: state.isPrivateAccount
+                          ? l10n.tOr(
+                              'privateAccountFollowToSeeMore',
+                              'This account is private. Follow to see more.',
+                            )
+                          : state.message,
+                      icon: state.isPrivateAccount
+                          ? Icons.lock_outline_rounded
+                          : Icons.people_outline_rounded,
+                      onRetry: state.isPrivateAccount
+                          ? null
+                          : () => context.read<UserFollowListCubit>().load(),
                     );
                   }
 

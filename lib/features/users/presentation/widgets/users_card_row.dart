@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
 import 'user_action_buttons.dart';
+import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 
 /// Compact card row for mobile layouts (location-style).
@@ -85,7 +86,18 @@ class UsersCardRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    UserStatusBadge(user: user),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        UserStatusBadge(user: user),
+                        UserPrivacyBadge(user: user),
+                        MessagePermissionBadge(
+                          permission: user.messagePermission,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

@@ -104,25 +104,31 @@ class GiftCard extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: onEdit,
-                            icon: Icon(
-                              Icons.edit_rounded,
-                              size: compact ? 12 : 14,
-                            ),
-                            label: Text(
-                              l10n.t('edit'),
-                              style: TextStyle(fontSize: compact ? 11 : 12),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: compact ? 8 : 10,
-                                vertical: compact ? 6 : 8,
+                          child: SizedBox(
+                            height: actionSize,
+                            child: OutlinedButton.icon(
+                              onPressed: onEdit,
+                              icon: Icon(
+                                Icons.edit_rounded,
+                                size: compact ? 14 : 16,
                               ),
-                              minimumSize: Size(0, compact ? 32 : 36),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  compact ? 6 : 8,
+                              label: Text(
+                                l10n.t('edit'),
+                                style: TextStyle(fontSize: compact ? 11 : 12),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: compact ? 8 : 10,
+                                ),
+                                minimumSize: Size(0, actionSize),
+                                maximumSize: Size(double.infinity, actionSize),
+                                fixedSize: Size.fromHeight(actionSize),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    compact ? 6 : 8,
+                                  ),
                                 ),
                               ),
                             ),
@@ -143,6 +149,10 @@ class GiftCard extends StatelessWidget {
                             ),
                             padding: EdgeInsets.zero,
                             style: IconButton.styleFrom(
+                              minimumSize: Size(actionSize, actionSize),
+                              maximumSize: Size(actionSize, actionSize),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
                                   compact ? 6 : 8,
@@ -387,8 +397,12 @@ class _ToggleButton extends StatelessWidget {
           ),
           padding: EdgeInsets.zero,
           style: IconButton.styleFrom(
+            minimumSize: Size(size, size),
+            maximumSize: Size(size, size),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(size <= 32 ? 6 : 8),
             ),
           ),
         ),

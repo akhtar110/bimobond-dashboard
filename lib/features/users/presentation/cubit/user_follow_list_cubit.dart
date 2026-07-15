@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/utils/api_error_messages.dart';
 import '../../domain/entities/user_follow_entity.dart';
 import '../../domain/usecases/get_user_follow_list.dart';
 
@@ -49,8 +50,10 @@ class UserFollowListLoaded extends UserFollowListState {
 }
 
 class UserFollowListError extends UserFollowListState {
-  UserFollowListError(this.message);
+  UserFollowListError(this.message, {this.isPrivateAccount = false});
+
   final String message;
+  final bool isPrivateAccount;
 }
 
 class UserFollowListCubit extends Cubit<UserFollowListState> {
@@ -87,10 +90,20 @@ class UserFollowListCubit extends Cubit<UserFollowListState> {
         ),
       );
     } catch (e) {
-      emit(UserFollowListError(e.toString()));
+      emit(_toError(e));
     } finally {
       _busy = false;
     }
+  }
+
+  UserFollowListError _toError(Object e) {
+    if (ApiErrorMessages.isForbidden(e)) {
+      return UserFollowListError(
+        ApiErrorMessages.from(e),
+        isPrivateAccount: true,
+      );
+    }
+    return UserFollowListError(ApiErrorMessages.from(e));
   }
 
   Future<void> loadMore() async {
@@ -122,7 +135,10 @@ class UserFollowListCubit extends Cubit<UserFollowListState> {
         ),
       );
     } catch (e) {
-      emit(current.copyWith(isLoadingMore: false, error: e.toString()));
+      emit(current.copyWith(
+        isLoadingMore: false,
+        error: ApiErrorMessages.from(e),
+      ));
     } finally {
       _busy = false;
     }

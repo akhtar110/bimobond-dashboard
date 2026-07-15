@@ -1,3 +1,5 @@
+import 'message_permission.dart';
+
 enum UserRole {
   user,
   admin,
@@ -20,8 +22,10 @@ class UserEntity {
     this.instagramUrl,
     this.youtubeUrl,
     required this.isPrivate,
+    this.isProfileLocked = false,
     required this.allowComments,
     required this.allowDirectMsgs,
+    this.messagePermission = MessagePermission.everyone,
     this.canPost = true,
     required this.language,
     required this.theme,
@@ -60,8 +64,10 @@ class UserEntity {
   final String? youtubeUrl;
 
   final bool isPrivate;
+  final bool isProfileLocked;
   final bool allowComments;
   final bool allowDirectMsgs;
+  final MessagePermission messagePermission;
   final bool canPost;
   final String language;
   final String theme;

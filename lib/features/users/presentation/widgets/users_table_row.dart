@@ -5,6 +5,7 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
+import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 import 'users_table_config.dart';
 
@@ -139,7 +140,22 @@ class UsersTableRow extends StatelessWidget {
                 flex: 14,
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
-                  child: UserStatusBadge(user: user),
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      UserStatusBadge(user: user),
+                      UserPrivacyBadge(
+                        user: user,
+                        compact: config.compactActions,
+                      ),
+                      MessagePermissionBadge(
+                        permission: user.messagePermission,
+                        compact: true,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (config.showEngagement) ...[

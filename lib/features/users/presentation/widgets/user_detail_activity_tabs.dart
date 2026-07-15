@@ -13,6 +13,7 @@ import '../../../user_activity/presentation/widgets/user_activity_notifications_
 import '../../../user_activity/presentation/widgets/user_activity_posts_subtabs.dart';
 import '../../../user_activity/presentation/widgets/user_activity_tab.dart';
 import '../../domain/entities/user_entity.dart';
+import 'user_detail_interests_tab.dart';
 import 'user_detail_locations_tab.dart';
 import 'user_detail_search_history_tab.dart';
 import 'user_detail_personal_info.dart';
@@ -34,7 +35,7 @@ class UserDetailInfoActivitySection extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final tabsSection = DefaultTabController(
-      length: 11,
+      length: 12,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -71,6 +72,12 @@ class UserDetailInfoActivitySection extends StatelessWidget {
                 Tab(text: l10n.t('notifications')),
                 Tab(text: l10n.tOr('userLocationsTab', 'Locations')),
                 Tab(text: l10n.tOr('searchHistoryTab', 'Search History')),
+                Tab(
+                  text: l10n.tOr(
+                    'userInterestTopicsAndInterests',
+                    'Topics & Interests',
+                  ),
+                ),
               ],
             ),
           ),
@@ -125,6 +132,7 @@ class UserDetailInfoActivitySection extends StatelessWidget {
                     ),
                     UserDetailLocationsTab(user: user),
                     UserDetailSearchHistoryTab(user: user),
+                    UserDetailInterestsTab(user: user),
                   ],
                 ),
               ),

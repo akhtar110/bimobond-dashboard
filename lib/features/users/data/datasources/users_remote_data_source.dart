@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 
 import '../../domain/entities/admin_bulk_user_action.dart';
 import '../../domain/entities/admin_bulk_users_result_entity.dart';
+import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_follow_entity.dart';
 import '../models/admin_bulk_users_result_model.dart';
@@ -57,6 +58,11 @@ abstract class UsersRemoteDataSource {
   Future<void> resetUserPassword(String userId);
   Future<void> setUserCanPost(String userId, {required bool canPost});
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
+  Future<void> setUserIsPrivate(String userId, {required bool isPrivate});
+  Future<void> setUserMessagePermission(
+    String userId, {
+    required MessagePermission permission,
+  });
   Future<UserDetailModel> getUserById(String userId);
   Future<UserPostsResponseModel> getUserPosts(String userId, {int page = 1, int limit = 20});
   Future<UserFollowListPageModel> getUserFollowList({
@@ -409,6 +415,25 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     await _dio.patch(
       '/users/$userId/admin/settings',
       data: {'allowDirectMsgs': allow},
+    );
+  }
+
+  @override
+  Future<void> setUserIsPrivate(String userId, {required bool isPrivate}) async {
+    await _dio.patch(
+      '/users/$userId/admin/settings',
+      data: {'isPrivate': isPrivate},
+    );
+  }
+
+  @override
+  Future<void> setUserMessagePermission(
+    String userId, {
+    required MessagePermission permission,
+  }) async {
+    await _dio.patch(
+      '/users/$userId/admin/settings',
+      data: {'messagePermission': permission.apiValue},
     );
   }
 

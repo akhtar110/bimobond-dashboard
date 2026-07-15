@@ -1,10 +1,16 @@
-import 'dart:typed_data';
+import 'dart:convert';
 
+import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../create_post/presentation/utils/create_post_video_source.dart';
 import '../../../../core/utils/media_url_resolver.dart';
+import '../utils/gift_animation_bytes.dart';
+import '../utils/pag_preview.dart';
+import '../utils/swf_preview.dart';
 
 bool giftAnimationLooksLikeVideo(String? nameOrUrl) {
   if (nameOrUrl == null || nameOrUrl.isEmpty) return false;
@@ -14,6 +20,82 @@ bool giftAnimationLooksLikeVideo(String? nameOrUrl) {
       lower.endsWith('.mov') ||
       lower.endsWith('.mkv') ||
       lower.endsWith('.avi');
+}
+
+bool giftAnimationLooksLikePag(String? nameOrUrl) {
+  if (nameOrUrl == null || nameOrUrl.isEmpty) return false;
+  final lower = nameOrUrl.toLowerCase().split('?').first;
+  return lower.endsWith('.pag');
+}
+
+bool giftAnimationLooksLikeSwf(String? nameOrUrl) {
+  if (nameOrUrl == null || nameOrUrl.isEmpty) return false;
+  final lower = nameOrUrl.toLowerCase().split('?').first;
+  return lower.endsWith('.swf');
+}
+
+/// SWF magic: FWS (uncompressed), CWS (zlib), or ZWS (LZMA).
+bool giftBytesLookLikeSwf(List<int> bytes) {
+  if (bytes.length < 3) return false;
+  final a = bytes[0];
+  return (a == 0x46 || a == 0x43 || a == 0x5A) &&
+      bytes[1] == 0x57 &&
+      bytes[2] == 0x53;
+}
+
+bool giftAnimationLooksLikeJson(String? nameOrUrl) {
+  if (nameOrUrl == null || nameOrUrl.isEmpty) return false;
+  final lower = nameOrUrl.toLowerCase().split('?').first;
+  return lower.endsWith('.json');
+}
+
+bool giftAnimationLooksLikeLottie(String? nameOrUrl) {
+  if (nameOrUrl == null || nameOrUrl.isEmpty) return false;
+  final lower = nameOrUrl.toLowerCase().split('?').first;
+  return lower.endsWith('.lottie');
+}
+
+/// DotLottie (.lottie) archives are ZIP files (PK…).
+bool giftBytesLookLikeLottieZip(List<int> bytes) {
+  return bytes.length >= 2 && bytes[0] == 0x50 && bytes[1] == 0x4B;
+}
+
+bool giftBytesLookLikeJson(List<int> bytes) {
+  if (bytes.isEmpty) return false;
+  var i = 0;
+  // Skip a leading UTF-8 BOM (EF BB BF) if present.
+  if (bytes.length >= 3 &&
+      bytes[0] == 0xEF &&
+      bytes[1] == 0xBB &&
+      bytes[2] == 0xBF) {
+    i = 3;
+  }
+  while (i < bytes.length) {
+    final b = bytes[i];
+    if (b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D) {
+      i++;
+      continue;
+    }
+    return b == 0x7B || b == 0x5B; // '{' or '['
+  }
+  return false;
+}
+
+bool giftAnimationLooksLikeGif(String? nameOrUrl) {
+  if (nameOrUrl == null || nameOrUrl.isEmpty) return false;
+  final lower = nameOrUrl.toLowerCase().split('?').first;
+  return lower.endsWith('.gif');
+}
+
+/// GIF87a / GIF89a magic header.
+bool giftBytesLookLikeGif(List<int> bytes) {
+  if (bytes.length < 6) return false;
+  return bytes[0] == 0x47 &&
+      bytes[1] == 0x49 &&
+      bytes[2] == 0x46 &&
+      bytes[3] == 0x38 &&
+      (bytes[4] == 0x37 || bytes[4] == 0x39) &&
+      bytes[5] == 0x61;
 }
 
 bool giftAnimationLooksLikeImage(String? nameOrUrl) {
@@ -27,6 +109,8 @@ bool giftAnimationLooksLikeImage(String? nameOrUrl) {
       lower.endsWith('.bmp');
 }
 
+enum _AnimKind { pag, video, image, json, swf, unknown }
+
 String? _displayFileName(String? fileName, String? networkUrl) {
   final raw = (fileName != null && fileName.isNotEmpty)
       ? fileName
@@ -37,18 +121,97 @@ String? _displayFileName(String? fileName, String? networkUrl) {
   return parts.isNotEmpty ? parts.last : withoutQuery;
 }
 
-String _formatBadge(String? fileName, String? networkUrl) {
+_AnimKind _kindFromName(String? fileName, String? networkUrl) {
+  if (giftAnimationLooksLikePag(fileName) ||
+      giftAnimationLooksLikePag(networkUrl)) {
+    return _AnimKind.pag;
+  }
+  if (giftAnimationLooksLikeSwf(fileName) ||
+      giftAnimationLooksLikeSwf(networkUrl)) {
+    return _AnimKind.swf;
+  }
+  if (giftAnimationLooksLikeJson(fileName) ||
+      giftAnimationLooksLikeJson(networkUrl) ||
+      giftAnimationLooksLikeLottie(fileName) ||
+      giftAnimationLooksLikeLottie(networkUrl)) {
+    return _AnimKind.json;
+  }
+  if (giftAnimationLooksLikeGif(fileName) ||
+      giftAnimationLooksLikeGif(networkUrl) ||
+      giftAnimationLooksLikeImage(fileName) ||
+      giftAnimationLooksLikeImage(networkUrl)) {
+    return _AnimKind.image;
+  }
+  if (giftAnimationLooksLikeVideo(fileName) ||
+      giftAnimationLooksLikeVideo(networkUrl)) {
+    return _AnimKind.video;
+  }
+  return _AnimKind.unknown;
+}
+
+_AnimKind _kindFromBytes(Uint8List bytes, String? fileName, String? networkUrl) {
+  if (giftBytesLookLikeMp4(bytes)) return _AnimKind.video;
+  if (giftBytesLookLikeGif(bytes)) return _AnimKind.image;
+  if (giftBytesLookLikeSwf(bytes)) return _AnimKind.swf;
+  if (giftBytesLookLikeJson(bytes)) return _AnimKind.json;
+  final named = _kindFromName(fileName, networkUrl);
+  if (named != _AnimKind.unknown) return named;
+  // Bare ZIP without a useful extension → treat as DotLottie.
+  if (giftBytesLookLikeLottieZip(bytes)) return _AnimKind.json;
+  if (giftAnimationLooksLikePag(fileName) ||
+      giftAnimationLooksLikePag(networkUrl)) {
+    return _AnimKind.pag;
+  }
+  return _AnimKind.video;
+}
+
+String _badgeFor(_AnimKind kind, String? fileName, String? networkUrl) {
+  switch (kind) {
+    case _AnimKind.pag:
+      return 'PAG';
+    case _AnimKind.swf:
+      return 'SWF';
+    case _AnimKind.json:
+      final name =
+          _displayFileName(fileName, networkUrl)?.toLowerCase() ?? '';
+      if (name.endsWith('.lottie')) return 'LOTTIE';
+      return 'JSON';
+    case _AnimKind.image:
+      final name =
+          _displayFileName(fileName, networkUrl)?.toLowerCase() ?? '';
+      if (name.endsWith('.gif')) return 'GIF';
+      return 'IMAGE';
+    case _AnimKind.video:
+      final name =
+          _displayFileName(fileName, networkUrl)?.toLowerCase() ?? '';
+      if (name.endsWith('.webm')) return 'WEBM';
+      if (name.endsWith('.mov')) return 'MOV';
+      return 'MP4';
+    case _AnimKind.unknown:
+      return _formatBadgeFallback(fileName, networkUrl);
+  }
+}
+
+String _formatBadgeFallback(String? fileName, String? networkUrl) {
   final name = _displayFileName(fileName, networkUrl)?.toLowerCase() ?? '';
+  if (name.endsWith('.pag')) return 'PAG';
+  if (name.endsWith('.swf')) return 'SWF';
+  if (name.endsWith('.lottie')) return 'LOTTIE';
+  if (name.endsWith('.json')) return 'JSON';
+  if (name.endsWith('.gif')) return 'GIF';
   if (name.endsWith('.mp4')) return 'MP4';
   if (name.endsWith('.webm')) return 'WEBM';
   if (name.endsWith('.mov')) return 'MOV';
   if (giftAnimationLooksLikeImage(name)) return 'IMAGE';
   if (giftAnimationLooksLikeVideo(name)) return 'VIDEO';
-  return 'MP4';
+  return 'FILE';
 }
 
-/// Compact animation preview for gift create/edit dialogs (MP4 / image / placeholder).
-class GiftAnimationPreview extends StatelessWidget {
+/// Compact animation preview for gift create/edit dialogs
+/// (MP4 / PAG / JSON / Lottie / GIF / SWF / image).
+/// Prefers in-memory [bytes] (instant after pick). Network sources download once
+/// and sniff magic bytes so mislabeled `.pag` MP4s use the video player.
+class GiftAnimationPreview extends StatefulWidget {
   const GiftAnimationPreview({
     super.key,
     this.bytes,
@@ -63,49 +226,320 @@ class GiftAnimationPreview extends StatelessWidget {
   final VoidCallback? onClear;
 
   @override
+  State<GiftAnimationPreview> createState() => _GiftAnimationPreviewState();
+}
+
+class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
+  Uint8List? _resolvedBytes;
+  _AnimKind? _resolvedKind;
+  var _resolving = false;
+  String? _resolveError;
+  int _resolveToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncFromWidget();
+  }
+
+  @override
+  void didUpdateWidget(covariant GiftAnimationPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.bytes, widget.bytes) ||
+        oldWidget.networkUrl != widget.networkUrl ||
+        oldWidget.fileName != widget.fileName) {
+      _syncFromWidget();
+    }
+  }
+
+  void _syncFromWidget() {
+    final local = widget.bytes;
+    if (local != null && local.isNotEmpty) {
+      final kind = _kindFromBytes(local, widget.fileName, widget.networkUrl);
+      if (identical(_resolvedBytes, local) &&
+          _resolvedKind == kind &&
+          !_resolving &&
+          _resolveError == null) {
+        return;
+      }
+      _resolveToken++;
+      setState(() {
+        _resolvedBytes = local;
+        _resolvedKind = kind;
+        _resolving = false;
+        _resolveError = null;
+      });
+      return;
+    }
+
+    final url = widget.networkUrl?.trim();
+    if (url == null || url.isEmpty) {
+      if (_resolvedBytes == null &&
+          _resolvedKind == null &&
+          !_resolving &&
+          _resolveError == null) {
+        return;
+      }
+      _resolveToken++;
+      setState(() {
+        _resolvedBytes = null;
+        _resolvedKind = null;
+        _resolving = false;
+        _resolveError = null;
+      });
+      return;
+    }
+
+    final named = _kindFromName(widget.fileName, url);
+
+    // PAG / SWF by extension: hand off to dedicated players (they load/cache).
+    // Do NOT download here — that was remounting the player and fighting WASM.
+    if (named == _AnimKind.pag || named == _AnimKind.swf) {
+      if (_resolvedBytes == null &&
+          _resolvedKind == named &&
+          !_resolving &&
+          _resolveError == null) {
+        return;
+      }
+      _resolveToken++;
+      setState(() {
+        _resolvedBytes = GiftAnimationBytesCache.peek(url);
+        _resolvedKind = named;
+        _resolving = false;
+        _resolveError = null;
+      });
+      return;
+    }
+
+    // Extension-clear video/image/json: no byte download needed.
+    if (named == _AnimKind.video ||
+        named == _AnimKind.image ||
+        named == _AnimKind.json) {
+      if (_resolvedBytes == null &&
+          _resolvedKind == named &&
+          !_resolving &&
+          _resolveError == null) {
+        return;
+      }
+      _resolveToken++;
+      setState(() {
+        _resolvedBytes = null;
+        _resolvedKind = named;
+        _resolving = false;
+        _resolveError = null;
+      });
+      return;
+    }
+
+    // Unknown extension: download once, sniff magic bytes, route.
+    final cached = GiftAnimationBytesCache.peek(url);
+    if (cached != null) {
+      final kind = _kindFromBytes(cached, widget.fileName, url);
+      if (identical(_resolvedBytes, cached) &&
+          _resolvedKind == kind &&
+          !_resolving &&
+          _resolveError == null) {
+        return;
+      }
+      _resolveToken++;
+      setState(() {
+        _resolvedBytes = cached;
+        _resolvedKind = kind;
+        _resolving = false;
+        _resolveError = null;
+      });
+      return;
+    }
+
+    _startNetworkResolve(url);
+  }
+
+  Future<void> _startNetworkResolve(String url) async {
+    final token = ++_resolveToken;
+    setState(() {
+      _resolving = true;
+      _resolveError = null;
+    });
+    try {
+      final bytes = await GiftAnimationBytesCache.get(url);
+      if (!mounted || token != _resolveToken) return;
+      setState(() {
+        _resolvedBytes = bytes;
+        _resolvedKind = _kindFromBytes(bytes, widget.fileName, url);
+        _resolving = false;
+      });
+    } catch (e) {
+      if (!mounted || token != _resolveToken) return;
+      setState(() {
+        _resolving = false;
+        _resolveError = e.toString().replaceFirst('Exception: ', '');
+        _resolvedKind = _kindFromName(widget.fileName, url);
+      });
+    }
+  }
+
+  Widget _placeholder(ColorScheme scheme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.animation_rounded, size: 34, color: scheme.primary),
+          const SizedBox(height: 8),
+          const Text(
+            'Animation preview',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreview(ColorScheme scheme) {
+    final kind = _resolvedKind;
+    final bytes = _resolvedBytes;
+    final url = widget.networkUrl;
+
+    // Keep a single child subtree so PAG / video players are not disposed and
+    // recreated on every parent rebuild (that was causing BindingError loops).
+    Widget? body;
+
+    if (_resolveError != null && bytes == null && !_resolving) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.videocam_off_outlined,
+                  size: 34, color: Colors.white54),
+              const SizedBox(height: 8),
+              const Text(
+                'Preview unavailable',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _resolveError!,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+              if (url != null && url.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => _startNetworkResolve(url),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    } else if (kind == _AnimKind.pag &&
+        ((bytes != null && bytes.isNotEmpty) ||
+            (url != null && url.trim().isNotEmpty))) {
+      body = GiftPagPlayer(
+        key: const ValueKey('gift-pag-player'),
+        bytes: bytes,
+        networkUrl: (bytes == null || bytes.isEmpty) ? url : null,
+      );
+    } else if (kind == _AnimKind.swf &&
+        ((bytes != null && bytes.isNotEmpty) ||
+            (url != null && url.trim().isNotEmpty))) {
+      body = GiftSwfPlayer(
+        key: const ValueKey('gift-swf-player'),
+        bytes: bytes,
+        networkUrl: (bytes == null || bytes.isEmpty) ? url : null,
+      );
+    } else if (kind == _AnimKind.json) {
+      body = _JsonLottiePreview(
+        key: const ValueKey('gift-json-lottie'),
+        bytes: bytes,
+        networkUrl: (bytes == null || bytes.isEmpty) ? url : null,
+      );
+    } else if (kind == _AnimKind.image) {
+      if (bytes != null) {
+        body = Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _placeholder(scheme),
+        );
+      } else if (url != null && url.isNotEmpty) {
+        body = Image.network(
+          resolveMediaUrl(url) ?? url,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _placeholder(scheme),
+        );
+      }
+    } else if (kind == _AnimKind.video || kind == _AnimKind.unknown) {
+      if (bytes != null) {
+        final name = widget.fileName?.isNotEmpty == true
+            ? widget.fileName!
+            : 'animation.mp4';
+        body = _LocalVideoPreview(bytes: bytes, fileName: name);
+      } else if (url != null && url.isNotEmpty) {
+        body = _NetworkVideoPreview(url: url);
+      }
+    }
+
+    body ??= _placeholder(scheme);
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        body,
+        if (_resolving)
+          const ColoredBox(
+            color: Color(0x99111318),
+            child: Center(
+              child: SizedBox(
+                width: 26,
+                height: 26,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Color(0xFF8AB4FF),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final displayName = _displayFileName(fileName, networkUrl) ?? 'animation.mp4';
-    final badge = _formatBadge(fileName, networkUrl);
-    final isVideo = giftAnimationLooksLikeVideo(fileName) ||
-        giftAnimationLooksLikeVideo(networkUrl) ||
-        (bytes != null &&
-            !giftAnimationLooksLikeImage(fileName) &&
-            (fileName == null || fileName!.isEmpty));
-    final isImage = giftAnimationLooksLikeImage(fileName) ||
-        giftAnimationLooksLikeImage(networkUrl);
-
-    Widget preview;
-    if (bytes != null && isVideo) {
-      preview = _LocalVideoPreview(
-        bytes: bytes!,
-        fileName: fileName?.isNotEmpty == true ? fileName! : 'animation.mp4',
-      );
-    } else if (networkUrl != null && networkUrl!.isNotEmpty && isVideo) {
-      preview = _NetworkVideoPreview(url: networkUrl!);
-    } else if (bytes != null && isImage) {
-      preview = Image.memory(
-        bytes!,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => _placeholder(scheme),
-      );
-    } else if (networkUrl != null && networkUrl!.isNotEmpty && isImage) {
-      preview = Image.network(
-        resolveMediaUrl(networkUrl) ?? networkUrl!,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => _placeholder(scheme),
-      );
-    } else if (bytes != null) {
-      preview = _LocalVideoPreview(
-        bytes: bytes!,
-        fileName: fileName?.isNotEmpty == true ? fileName! : 'animation.mp4',
-      );
-    } else if (networkUrl != null && networkUrl!.isNotEmpty) {
-      preview = _NetworkVideoPreview(url: networkUrl!);
-    } else {
-      preview = _placeholder(scheme);
-    }
+    final displayName = _displayFileName(widget.fileName, widget.networkUrl) ??
+        switch (_resolvedKind) {
+          _AnimKind.pag => 'animation.pag',
+          _AnimKind.swf => 'animation.swf',
+          _AnimKind.json =>
+            giftAnimationLooksLikeLottie(widget.fileName) ||
+                    giftAnimationLooksLikeLottie(widget.networkUrl)
+                ? 'animation.lottie'
+                : 'animation.json',
+          _AnimKind.image =>
+            giftAnimationLooksLikeGif(widget.fileName) ||
+                    giftAnimationLooksLikeGif(widget.networkUrl)
+                ? 'animation.gif'
+                : 'animation.png',
+          _ => 'animation.mp4',
+        };
+    final badge = _badgeFor(
+      _resolvedKind ?? _kindFromName(widget.fileName, widget.networkUrl),
+      widget.fileName,
+      widget.networkUrl,
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -170,7 +604,7 @@ class GiftAnimationPreview extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                if (onClear != null)
+                if (widget.onClear != null)
                   IconButton(
                     tooltip: 'Remove',
                     visualDensity: VisualDensity.compact,
@@ -178,7 +612,7 @@ class GiftAnimationPreview extends StatelessWidget {
                       minWidth: 34,
                       minHeight: 34,
                     ),
-                    onPressed: onClear,
+                    onPressed: widget.onClear,
                     icon: Icon(
                       Icons.close_rounded,
                       size: 18,
@@ -201,7 +635,7 @@ class GiftAnimationPreview extends StatelessWidget {
                       color: scheme.outlineVariant.withValues(alpha: 0.35),
                     ),
                   ),
-                  child: preview,
+                  child: _buildPreview(scheme),
                 ),
               ),
             ),
@@ -234,22 +668,252 @@ class GiftAnimationPreview extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _placeholder(ColorScheme scheme) {
+/// Picks playable animation JSON inside a DotLottie (.lottie) zip.
+/// Plain `decodeZip` / `firstWhere(.json)` often resolves `manifest.json` first,
+/// which is not a Lottie composition — preview then fails silently.
+Future<LottieComposition?> _giftLottieDecoder(List<int> bytes) async {
+  if (bytes.length < 2 || bytes[0] != 0x50 || bytes[1] != 0x4B) {
+    return null; // Not a zip → Lottie falls back to raw JSON parsing.
+  }
+
+  final archive = ZipDecoder().decodeBytes(bytes);
+  final candidates = _dotLottieJsonCandidates(archive.files);
+  if (candidates.isEmpty) {
+    debugPrint(
+      'Gift DotLottie: zip has no .json entries '
+      '(files: ${archive.files.map((f) => f.name).join(', ')})',
+    );
+    return null;
+  }
+
+  Object? lastError;
+  for (final candidate in candidates) {
+    try {
+      final composition = await LottieComposition.decodeZip(
+        bytes,
+        filePicker: (_) => candidate,
+      );
+      if (composition != null) {
+        debugPrint(
+          'Gift DotLottie: using ${candidate.name} '
+          '(frames=${composition.durationFrames})',
+        );
+        return composition;
+      }
+    } catch (e, st) {
+      lastError = e;
+      debugPrint('Gift DotLottie: candidate ${candidate.name} failed: $e\n$st');
+    }
+  }
+
+  debugPrint('Gift DotLottie: all candidates failed: $lastError');
+  return null;
+}
+
+List<ArchiveFile> _dotLottieJsonCandidates(List<ArchiveFile> files) {
+  String norm(String name) => name.replaceAll('\\', '/').toLowerCase();
+
+  bool isManifest(String name) {
+    final base = name.split('/').last;
+    return base == 'manifest.json' || base == 'm.json';
+  }
+
+  final scored = <({ArchiveFile file, int score})>[];
+  for (final f in files) {
+    if (!f.isFile) continue;
+    final name = norm(f.name);
+    if (!name.endsWith('.json') || isManifest(name)) continue;
+    var score = 0;
+    if (name.startsWith('animations/')) {
+      score = 300;
+    } else if (name.startsWith('a/')) {
+      score = 200;
+    } else if (!name.contains('/')) {
+      score = 100;
+    } else {
+      score = 50;
+    }
+    scored.add((file: f, score: score));
+  }
+  scored.sort((a, b) => b.score.compareTo(a.score));
+  return [for (final s in scored) s.file];
+}
+
+class _JsonLottiePreview extends StatefulWidget {
+  const _JsonLottiePreview({
+    super.key,
+    this.bytes,
+    this.networkUrl,
+  });
+
+  final Uint8List? bytes;
+  final String? networkUrl;
+
+  @override
+  State<_JsonLottiePreview> createState() => _JsonLottiePreviewState();
+}
+
+class _JsonLottiePreviewState extends State<_JsonLottiePreview> {
+  LottieComposition? _composition;
+  Uint8List? _fallbackBytes;
+  Object? _error;
+  var _loading = false;
+  int _loadToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startLoad();
+  }
+
+  @override
+  void didUpdateWidget(covariant _JsonLottiePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.bytes, widget.bytes) ||
+        oldWidget.networkUrl != widget.networkUrl) {
+      _startLoad();
+    }
+  }
+
+  Uint8List _stripBom(Uint8List raw) {
+    if (raw.length >= 3 &&
+        raw[0] == 0xEF &&
+        raw[1] == 0xBB &&
+        raw[2] == 0xBF) {
+      return raw.sublist(3);
+    }
+    return raw;
+  }
+
+  Future<void> _startLoad() async {
+    final token = ++_loadToken;
+    final local = widget.bytes;
+    final url = widget.networkUrl?.trim();
+
+    setState(() {
+      _composition = null;
+      _error = null;
+      _fallbackBytes = local;
+      _loading = true;
+    });
+
+    try {
+      Uint8List? data = local;
+      if ((data == null || data.isEmpty) &&
+          url != null &&
+          url.isNotEmpty) {
+        data = await GiftAnimationBytesCache.get(url);
+      }
+      if (!mounted || token != _loadToken) return;
+      if (data == null || data.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'No animation data';
+        });
+        return;
+      }
+
+      final cleaned = _stripBom(data);
+      final composition = await LottieComposition.fromBytes(
+        cleaned,
+        decoder: _giftLottieDecoder,
+      );
+      if (!mounted || token != _loadToken) return;
+      setState(() {
+        _composition = composition;
+        _fallbackBytes = cleaned;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e, st) {
+      debugPrint('Gift Lottie preview load failed: $e\n$st');
+      if (!mounted || token != _loadToken) return;
+      setState(() {
+        _composition = null;
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final composition = _composition;
+
+    if (composition != null) {
+      return Lottie(
+        composition: composition,
+        fit: BoxFit.contain,
+        repeat: true,
+      );
+    }
+
+    if (_loading) {
+      return Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.2,
+            color: scheme.primary,
+          ),
+        ),
+      );
+    }
+
+    return _jsonFallback(scheme, _fallbackBytes, _error);
+  }
+
+  Widget _jsonFallback(ColorScheme scheme, Uint8List? rawBytes, Object? error) {
+    var isObject = false;
+    var isDotLottie = false;
+    if (rawBytes != null) {
+      isDotLottie = giftBytesLookLikeLottieZip(rawBytes);
+      if (!isDotLottie) {
+        try {
+          isObject = jsonDecode(utf8.decode(rawBytes)) is Map;
+        } catch (_) {
+          // Cosmetic only.
+        }
+      }
+    }
+    final label = isDotLottie
+        ? 'Lottie ready to upload'
+        : (isObject ? 'JSON ready to upload' : 'JSON animation');
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.animation_rounded, size: 34, color: scheme.primary),
+          Icon(
+            isDotLottie ? Icons.animation_rounded : Icons.data_object_rounded,
+            size: 34,
+            color: scheme.primary,
+          ),
           const SizedBox(height: 8),
           Text(
-            'Animation preview',
-            style: TextStyle(
+            label,
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (error != null) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+            ),
+          ],
         ],
       ),
     );

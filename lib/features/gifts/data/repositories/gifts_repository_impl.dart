@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../domain/entities/bulk_gift_action_request.dart';
 import '../../domain/entities/bulk_gift_action_result.dart';
 import '../../domain/entities/gift_entity.dart';
@@ -22,11 +24,13 @@ class GiftsRepositoryImpl implements GiftsRepository {
       data.imageName,
     );
 
-    String? animationUrl;
-    if (data.animationBytes != null && data.animationBytes!.isNotEmpty) {
+    String? animationUrl = data.animationUrl;
+    if ((animationUrl == null || animationUrl.isEmpty) &&
+        data.animationBytes != null &&
+        data.animationBytes!.isNotEmpty) {
       animationUrl = await _dataSource.uploadGiftImage(
         data.animationBytes!,
-        data.animationName ?? 'gift-animation.gif',
+        data.animationName ?? 'gift-animation.pag',
       );
     }
 
@@ -44,7 +48,8 @@ class GiftsRepositoryImpl implements GiftsRepository {
   /// If [data.imageBytes] is provided the image is uploaded first and the
   /// resulting URL is used as [thumbnailUrl]; any explicit [data.thumbnailUrl]
   /// value is ignored in that case.
-  /// Same for [data.animationBytes] → [animationUrl].
+  /// Same for [data.animationBytes] → [animationUrl] when [data.animationUrl]
+  /// is not already set from a prior UI upload.
   @override
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data) async {
     String? resolvedThumbnailUrl = data.thumbnailUrl;
@@ -57,10 +62,12 @@ class GiftsRepositoryImpl implements GiftsRepository {
       );
     }
 
-    if (data.animationBytes != null && data.animationBytes!.isNotEmpty) {
+    if ((resolvedAnimationUrl == null || resolvedAnimationUrl.isEmpty) &&
+        data.animationBytes != null &&
+        data.animationBytes!.isNotEmpty) {
       resolvedAnimationUrl = await _dataSource.uploadGiftImage(
         data.animationBytes!,
-        data.animationName ?? 'gift-animation.gif',
+        data.animationName ?? 'gift-animation.pag',
       );
     }
 
@@ -75,6 +82,10 @@ class GiftsRepositoryImpl implements GiftsRepository {
 
     return _dataSource.updateGift(giftId, patchedData);
   }
+
+  @override
+  Future<String> uploadGiftFile(Uint8List bytes, String filename) =>
+      _dataSource.uploadGiftImage(bytes, filename);
 
   @override
   Future<void> deleteGift(String giftId) => _dataSource.deleteGift(giftId);

@@ -25,6 +25,7 @@ import '../../features/users/presentation/pages/user_detail_route_scope.dart';
 import '../../features/users/presentation/pages/user_locations_page.dart';
 import '../../features/users/presentation/pages/users_page.dart';
 import '../../features/search_history/presentation/pages/search_history_page.dart';
+import '../../features/search_management/presentation/pages/search_management_page.dart';
 import '../../features/chat_management/presentation/pages/chat_management_page.dart';
 import '../../features/categories/presentation/pages/categories_page.dart';
 import '../../features/create_post/presentation/pages/create_post_route_scope.dart';
@@ -198,7 +199,7 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const _tabCount = 16;
+  static const _tabCount = 17;
   int _index = 0;
 
   List<UserRole> _roles(BuildContext context) {
@@ -294,6 +295,11 @@ class _HomeShellChrome extends StatelessWidget {
           label: l10n.t('analytics'),
         ),
         DashboardNavItem(
+          icon: Icons.travel_explore_outlined,
+          selectedIcon: Icons.travel_explore,
+          label: l10n.tOr('searchManagement', 'Search Management'),
+        ),
+        DashboardNavItem(
           icon: Icons.people_outline,
           selectedIcon: Icons.people,
           label: l10n.t('users'),
@@ -383,7 +389,7 @@ class _DashboardTabStack extends StatefulWidget {
 }
 
 class _DashboardTabStackState extends State<_DashboardTabStack> {
-  static const _tabCount = 16;
+  static const _tabCount = 17;
   final List<Widget?> _tabCache = List<Widget?>.filled(_tabCount, null);
   Locale? _cachedLocale;
   Brightness? _cachedBrightness;
@@ -436,31 +442,34 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
     final suffix = _tabKeySuffix;
     return switch (index) {
       0 => AnalyticsPage(key: ValueKey('dashboard_tab_analytics_$suffix')),
-      1 => UsersPage(key: ValueKey('dashboard_tab_users_$suffix')),
-      2 => UserLocationsPage(
+      1 => SearchManagementPage(
+          key: ValueKey('dashboard_tab_search_management_$suffix'),
+        ),
+      2 => UsersPage(key: ValueKey('dashboard_tab_users_$suffix')),
+      3 => UserLocationsPage(
           key: ValueKey('dashboard_tab_user_locations_$suffix'),
         ),
-      3 => SearchHistoryPage(
+      4 => SearchHistoryPage(
           key: ValueKey('dashboard_tab_search_history_$suffix'),
         ),
-      4 => PostsPage(key: ValueKey('dashboard_tab_posts_$suffix')),
-      5 => CategoriesPage(key: ValueKey('dashboard_tab_categories_$suffix')),
-      6 => ChatManagementPage(key: ValueKey('dashboard_tab_chat_$suffix')),
-      7 => AuctionsPage(key: ValueKey('dashboard_tab_auctions_$suffix')),
-      8 => GiftsPage(key: ValueKey('dashboard_tab_gifts_$suffix')),
-      9 => WalletsShellPage(key: ValueKey('dashboard_tab_wallets_$suffix')),
-      10 => PromotionsShellPage(
+      5 => PostsPage(key: ValueKey('dashboard_tab_posts_$suffix')),
+      6 => CategoriesPage(key: ValueKey('dashboard_tab_categories_$suffix')),
+      7 => ChatManagementPage(key: ValueKey('dashboard_tab_chat_$suffix')),
+      8 => AuctionsPage(key: ValueKey('dashboard_tab_auctions_$suffix')),
+      9 => GiftsPage(key: ValueKey('dashboard_tab_gifts_$suffix')),
+      10 => WalletsShellPage(key: ValueKey('dashboard_tab_wallets_$suffix')),
+      11 => PromotionsShellPage(
           key: ValueKey('dashboard_tab_promotions_$suffix'),
         ),
-      11 => SoundManagementPage(key: ValueKey('dashboard_tab_sounds_$suffix')),
-      12 => ReportsPage(key: ValueKey('dashboard_tab_reports_$suffix')),
-      13 => NotificationsPage(
+      12 => SoundManagementPage(key: ValueKey('dashboard_tab_sounds_$suffix')),
+      13 => ReportsPage(key: ValueKey('dashboard_tab_reports_$suffix')),
+      14 => NotificationsPage(
           key: ValueKey('dashboard_tab_notifications_$suffix'),
         ),
-      14 => FiltersEffectsPage(
+      15 => FiltersEffectsPage(
           key: ValueKey('dashboard_tab_filters_effects_$suffix'),
         ),
-      15 => SettingsPage(key: ValueKey('dashboard_tab_settings_$suffix')),
+      16 => SettingsPage(key: ValueKey('dashboard_tab_settings_$suffix')),
       _ => SizedBox.shrink(key: ValueKey('dashboard_tab_empty_$suffix')),
     };
   }

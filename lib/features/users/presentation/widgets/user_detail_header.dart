@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
+import 'user_privacy_badges.dart';
 
 class UserDetailRoleChip extends StatelessWidget {
   const UserDetailRoleChip({super.key, required this.user});
@@ -161,6 +162,16 @@ class UserDetailHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
+                children: [
+                  UserPrivacyBadge(user: user),
+                  MessagePermissionBadge(permission: user.messagePermission),
+                ],
+              ),
             ],
           );
         }

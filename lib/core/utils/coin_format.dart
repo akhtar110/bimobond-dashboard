@@ -7,30 +7,20 @@ import 'money_format.dart';
 /// Coins are shown everywhere except coin pack store prices, purchase
 /// history, and admin money KPIs (use [MoneyFormat] with [currencyCode]).
 abstract final class CoinFormat {
-  static NumberFormat _compact([String? locale]) =>
-      NumberFormat.compact(locale: locale ?? 'en');
-
-  /// @deprecated Use [MoneyFormat.format] with [currencyCode].
-  static String fiatUsd(num value, {String? locale}) =>
-      MoneyFormat.format(value, 'USD', locale: locale);
-
   /// Raw purchase volume KPI (may mix currencies) — no symbol.
   static String purchaseVolume(num value, {String? locale}) =>
-      NumberFormat.decimalPattern(locale ?? 'en').format(value);
+      _compactNumber(value, locale: locale);
+
   static String coins(num value, {String? locale}) {
-    final n = value.toDouble();
-    final formatted =
-        n.abs() >= 1000 ? _compact(locale).format(n) : _formatCoinAmount(n);
-    return '$formatted coins';
+    return '${_compactNumber(value, locale: locale)} coins';
   }
 
   /// e.g. `500` without suffix — for tables with a coin icon column.
   static String coinsAmount(num value, {String? locale}) {
-    final n = value.toDouble();
-    return n.abs() >= 1000 ? _compact(locale).format(n) : _formatCoinAmount(n);
+    return _compactNumber(value, locale: locale);
   }
 
-  /// e.g. `500 coins`, `1.2K coins`
+  /// e.g. `500 coins`, `1.2m coins`
   static String coinsProgress({
     required num current,
     required num target,
@@ -39,8 +29,40 @@ abstract final class CoinFormat {
     return '${coinsAmount(current, locale: locale)} / ${coinsAmount(target, locale: locale)} coins';
   }
 
-  static String _formatCoinAmount(double n) {
-    if (n == n.roundToDouble()) return n.toInt().toString();
-    return n.toStringAsFixed(n.truncateToDouble() == n ? 0 : 2);
+  static String _compactNumber(num value, {String? locale}) {
+    final n = value.toDouble();
+    if (!n.isFinite) return '$value';
+
+    final abs = n.abs();
+    if (abs < 1000) return _formatPlainAmount(n, locale: locale);
+
+    final sign = n < 0 ? '-' : '';
+    if (abs >= 1e12) {
+      return '$sign${_formatScaled(abs / 1e12)}t';
+    }
+    if (abs >= 1e6) {
+      return '$sign${_formatScaled(abs / 1e6)}m';
+    }
+    return '$sign${_formatScaled(abs / 1e3)}k';
   }
+
+  static String _formatScaled(double scaled) {
+    if (scaled >= 100) return scaled.round().toString();
+    final rounded = (scaled * 10).round() / 10;
+    if (rounded == rounded.roundToDouble()) {
+      return rounded.toInt().toString();
+    }
+    return rounded.toStringAsFixed(1);
+  }
+
+  static String _formatPlainAmount(double n, {String? locale}) {
+    if (n == n.roundToDouble()) {
+      return NumberFormat.decimalPattern(locale ?? 'en').format(n.toInt());
+    }
+    return NumberFormat.decimalPattern(locale ?? 'en').format(n);
+  }
+
+  /// @deprecated Use [MoneyFormat.format] with [currencyCode].
+  static String fiatUsd(num value, {String? locale}) =>
+      MoneyFormat.format(value, 'USD', locale: locale);
 }

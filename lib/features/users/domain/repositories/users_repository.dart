@@ -1,4 +1,5 @@
 import '../entities/admin_bulk_users_result_entity.dart';
+import '../entities/message_permission.dart';
 import '../entities/user_detail_entity.dart';
 import '../entities/user_entity.dart';
 import '../entities/user_follow_entity.dart';
@@ -39,6 +40,11 @@ abstract class UsersRepository {
   Future<void> resetUserPassword(String userId);
   Future<void> setUserCanPost(String userId, {required bool canPost});
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
+  Future<void> setUserIsPrivate(String userId, {required bool isPrivate});
+  Future<void> setUserMessagePermission(
+    String userId, {
+    required MessagePermission permission,
+  });
   Future<void> deleteUser(String userId);
   Future<AdminBulkUsersResultEntity> suspendUsers(
     List<String> userIds, {

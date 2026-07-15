@@ -53,7 +53,6 @@ class _MoneyDashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final overview = data.economy.overview;
     final gifts = data.giftReports;
     final promos = data.promotions;
     final auctions = data.auctionReports;
@@ -71,43 +70,6 @@ class _MoneyDashboardBody extends StatelessWidget {
               'walletSubtitleMoneyDashboard',
               'Unified view of wallets, purchases, gifts, promotions, and auctions.',
             ),
-          ),
-          SizedBox(height: gap),
-          MoneyDashboardMetricsBlock(
-            metrics: metrics,
-            title: walletL10nOr(context, 'walletTitleWalletKpis', 'Wallet KPIs'),
-            subtitle: walletL10nOr(context,
-              'walletSubtitleWalletKpisMoneyDashboard',
-              'Core wallet health and fiat purchase metrics.',
-            ),
-            cards: [
-              AnalyticsCard(
-                label: walletL10nOr(context, 'walletKpiTotalWallets', 'Total wallets'),
-                value: '${overview.walletsTotal}',
-                icon: Icons.account_balance_wallet_outlined,
-              ),
-              AnalyticsCard(
-                label: walletL10nOr(context, 'walletKpiTotalBalance', 'Total balance'),
-                value: CoinFormat.coins(overview.totalBalanceCoins),
-                icon: Icons.monetization_on_outlined,
-                highlight: true,
-              ),
-              AnalyticsCard(
-                label: walletL10nOr(context, 'walletKpiPurchaseVolume', 'Purchase volume'),
-                value: CoinFormat.purchaseVolume(
-                  overview.completedPurchaseVolume,
-                ),
-                icon: Icons.payments_outlined,
-              ),
-              AnalyticsCard(
-                label: walletL10nOr(context,
-                  'walletKpiPendingWithdrawals',
-                  'Pending withdrawals',
-                ),
-                value: '${overview.withdrawalsPending}',
-                icon: Icons.hourglass_top_outlined,
-              ),
-            ],
           ),
           SizedBox(height: gap),
           MoneyDashboardMetricsBlock(

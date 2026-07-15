@@ -76,6 +76,8 @@ import 'features/users/domain/usecases/get_user_follow_list.dart';
 import 'features/users/domain/usecases/get_user_posts.dart';
 import 'features/users/domain/usecases/get_users.dart';
 import 'features/users/domain/usecases/promote_to_admin.dart';
+import 'features/users/domain/usecases/set_user_is_private.dart';
+import 'features/users/domain/usecases/set_user_message_permission.dart';
 import 'features/users/domain/usecases/updte_role.dart';
 import 'features/users/domain/usecases/unban_user.dart';
 import 'features/users/presentation/bloc/users_bloc.dart';
@@ -86,6 +88,18 @@ import 'features/search_history/data/repositories/search_history_repository_impl
 import 'features/search_history/domain/repositories/search_history_repository.dart';
 import 'features/search_history/domain/usecases/search_history_usecases.dart';
 import 'features/search_history/presentation/bloc/search_history_bloc.dart';
+
+import 'features/search_management/data/datasources/search_management_remote_datasource.dart';
+import 'features/search_management/data/repositories/search_management_repository_impl.dart';
+import 'features/search_management/domain/repositories/search_management_repository.dart';
+import 'features/search_management/domain/usecases/search_management_usecases.dart';
+import 'features/search_management/presentation/bloc/search_management_bloc.dart';
+
+import 'features/user_interests/data/datasources/user_interests_remote_data_source.dart';
+import 'features/user_interests/data/repositories/user_interests_repository_impl.dart';
+import 'features/user_interests/domain/repositories/user_interests_repository.dart';
+import 'features/user_interests/domain/usecases/get_user_interests.dart';
+import 'features/user_interests/presentation/bloc/user_interests_bloc.dart';
 
 import 'features/filters_effects/data/datasources/filters_effects_remote_datasource.dart';
 import 'features/filters_effects/data/repositories/filters_effects_repository_impl.dart';
@@ -533,6 +547,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => BulkDeleteUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BulkPromoteUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BulkDemoteUsers(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => SetUserIsPrivate(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => SetUserMessagePermission(sl<UsersRepository>()));
 
   /// BLOC
   sl.registerFactory(
@@ -544,6 +560,8 @@ Future<void> init() async {
       promoteUser: sl<PromoteUser>(),
       demoteUser: sl<DemoteUser>(),
       deleteUser: sl<DeleteUser>(),
+      setUserIsPrivate: sl<SetUserIsPrivate>(),
+      setUserMessagePermission: sl<SetUserMessagePermission>(),
     ),
   );
 
@@ -633,6 +651,50 @@ Future<void> init() async {
   );
 
   // =========================================================
+  // SEARCH MANAGEMENT MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<SearchManagementRemoteDataSource>(
+    () => SearchManagementRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<SearchManagementRepository>(
+    () => SearchManagementRepositoryImpl(
+      sl<SearchManagementRemoteDataSource>(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => SearchUnifiedUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSearchTrendsUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetMySearchHistoryUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => SaveSearchHistoryUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => ClearMySearchHistoryUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminSearchHistoryUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetSearchManagementOverviewUseCase(sl<SearchManagementRepository>()),
+  );
+  sl.registerFactory(
+    () => SearchManagementBloc(
+      search: sl<SearchUnifiedUseCase>(),
+      getTrends: sl<GetSearchTrendsUseCase>(),
+      getAdminHistory: sl<GetAdminSearchHistoryUseCase>(),
+      getOverview: sl<GetSearchManagementOverviewUseCase>(),
+      saveHistory: sl<SaveSearchHistoryUseCase>(),
+      clearHistory: sl<ClearMySearchHistoryUseCase>(),
+    ),
+  );
+
+  // =========================================================
   // SEARCH HISTORY MODULE
   // =========================================================
 
@@ -668,6 +730,25 @@ Future<void> init() async {
       deleteSearchHistory: sl<DeleteSearchHistoryUseCase>(),
       clearSearchHistory: sl<ClearSearchHistoryUseCase>(),
       bulkSearchHistory: sl<BulkSearchHistoryUseCase>(),
+    ),
+  );
+
+  // =========================================================
+  // USER INTERESTS MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<UserInterestsRemoteDataSource>(
+    () => UserInterestsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<UserInterestsRepository>(
+    () => UserInterestsRepositoryImpl(sl<UserInterestsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(
+    () => GetUserInterestsUseCase(sl<UserInterestsRepository>()),
+  );
+  sl.registerFactory(
+    () => UserInterestsBloc(
+      getUserInterests: sl<GetUserInterestsUseCase>(),
     ),
   );
 

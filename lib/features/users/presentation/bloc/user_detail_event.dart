@@ -1,3 +1,4 @@
+import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_entity.dart';
 
@@ -10,6 +11,15 @@ class LoadUserDetailEvent extends UserDetailEvent {
 }
 
 class ClearUserDetailActionFeedbackEvent extends UserDetailEvent {}
+
+/// Admin updates a user's privacy / messaging settings
+/// (`PATCH /users/:userId/admin/settings`).
+class UpdateUserPrivacySettingsEvent extends UserDetailEvent {
+  UpdateUserPrivacySettingsEvent({this.isPrivate, this.messagePermission});
+
+  final bool? isPrivate;
+  final MessagePermission? messagePermission;
+}
 
 sealed class UserDetailAdminActionEvent extends UserDetailEvent {
   UserAdminActionType get actionType;
