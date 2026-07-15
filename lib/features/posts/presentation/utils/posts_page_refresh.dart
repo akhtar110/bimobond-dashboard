@@ -6,7 +6,7 @@ import '../../../stories/presentation/bloc/stories_event.dart';
 import '../bloc/posts_bloc.dart';
 
 /// Posts dashboard tab index inside [_DashboardTabStack].
-const int postsDashboardTabIndex = 4;
+const int postsDashboardTabIndex = 5;
 
 /// Refreshes the posts feed and active stories strip together.
 void refreshPostsPageFeed(BuildContext context) {

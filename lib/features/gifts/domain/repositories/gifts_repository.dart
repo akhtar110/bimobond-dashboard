@@ -7,7 +7,7 @@ import '../entities/bulk_gift_action_result.dart';
 /// Payload for creating a new gift.
 /// The [imageBytes] + [imageName] are uploaded first; the returned URL
 /// is used as [thumbnailUrl] when calling POST /gifts/admin.
-/// Optional [animationBytes] are uploaded the same way and sent as [animationUrl].
+/// Prefer [animationUrl] when the animation was already uploaded in the UI.
 class CreateGiftData {
   const CreateGiftData({
     required this.name,
@@ -16,6 +16,7 @@ class CreateGiftData {
     required this.priceCoins,
     this.isActive = true,
     this.publishedAt,
+    this.animationUrl,
     this.animationBytes,
     this.animationName,
   });
@@ -29,7 +30,10 @@ class CreateGiftData {
   /// Explicit publish timestamp. Defaults to server-side `DateTime.now()` when null.
   final DateTime? publishedAt;
 
-  /// Optional animation file uploaded before create; result becomes `animationUrl`.
+  /// Already-uploaded animation URL (preferred over [animationBytes]).
+  final String? animationUrl;
+
+  /// Optional animation file uploaded during create when [animationUrl] is null.
   final Uint8List? animationBytes;
   final String? animationName;
 }
@@ -72,4 +76,7 @@ abstract class GiftsRepository {
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
   Future<BulkGiftActionResult> executeBulkAction(BulkGiftActionRequest request);
+
+  /// Upload a gift media file and return its absolute URL.
+  Future<String> uploadGiftFile(Uint8List bytes, String filename);
 }

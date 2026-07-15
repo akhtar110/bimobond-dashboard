@@ -10,12 +10,14 @@ Future<({String name, Uint8List bytes})?> pickGiftImage() async {
   return _pickFile(accept: 'image/*,.jpg,.jpeg,.png,.webp,.gif');
 }
 
-/// Opens the native file dialog for gift animation assets (image / gif / lottie / video).
+/// Opens the native file dialog for gift animation assets
+/// (MP4 / PAG / JSON / Lottie / GIF / SWF).
 /// Returns [null] if the user cancels.
 // ignore: avoid_web_libraries_in_flutter
 Future<({String name, Uint8List bytes})?> pickGiftAnimation() async {
   return _pickFile(
-    accept: 'video/mp4,video/webm,video/*,.mp4,.webm,.mov',
+    accept:
+        'video/mp4,video/webm,video/*,.mp4,.webm,.mov,.pag,.json,.lottie,.gif,.swf,image/gif,application/x-shockwave-flash,application/json,application/zip,application/octet-stream',
   );
 }
 

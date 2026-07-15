@@ -1,3 +1,4 @@
+import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
@@ -16,8 +17,10 @@ class UserModel extends UserEntity {
     super.instagramUrl,
     super.youtubeUrl,
     required super.isPrivate,
+    super.isProfileLocked,
     required super.allowComments,
     required super.allowDirectMsgs,
+    super.messagePermission,
     super.canPost,
     required super.language,
     required super.theme,
@@ -58,8 +61,13 @@ class UserModel extends UserEntity {
       instagramUrl: json['instagramUrl'],
       youtubeUrl: json['youtubeUrl'],
       isPrivate: json['isPrivate'] ?? false,
+      isProfileLocked: json['isProfileLocked'] ?? false,
       allowComments: json['allowComments'] ?? true,
       allowDirectMsgs: json['allowDirectMsgs'] ?? true,
+      messagePermission: MessagePermissionX.fromApi(
+        json['messagePermission']?.toString(),
+        allowDirectMsgsFallback: json['allowDirectMsgs'] ?? true,
+      ),
       canPost: json['canPost'] ?? !(json['isPostingBlocked'] as bool? ?? false),
       language: json['language'] ?? 'en',
       theme: json['theme'] ?? 'system',
@@ -115,8 +123,10 @@ class UserModel extends UserEntity {
       'instagramUrl': instagramUrl,
       'youtubeUrl': youtubeUrl,
       'isPrivate': isPrivate,
+      'isProfileLocked': isProfileLocked,
       'allowComments': allowComments,
       'allowDirectMsgs': allowDirectMsgs,
+      'messagePermission': messagePermission.apiValue,
       'canPost': canPost,
       'language': language,
       'theme': theme,

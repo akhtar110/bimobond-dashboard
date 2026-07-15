@@ -20,7 +20,28 @@ List<Widget> walletOverviewKpiCards(
   WalletOverviewEntity overview, {
   bool showPackageStat = false,
 }) {
-  final cards = <Widget>[
+  if (showPackageStat) {
+    return [
+      AnalyticsCard(
+        label: walletL10nOr(context, 'walletKpiCoinPackages', 'Coin packages'),
+        value: walletL10nArgs(
+          context,
+          'walletKpiPackagesActive',
+          {'active': '${overview.packagesActive}'},
+          '${overview.packagesActive} active',
+        ),
+        subtitle: walletL10nArgs(
+          context,
+          'walletKpiPackagesTotal',
+          {'total': '${overview.packagesTotal}'},
+          '${overview.packagesTotal} total in catalog',
+        ),
+        icon: Icons.inventory_2_outlined,
+      ),
+    ];
+  }
+
+  return [
     AnalyticsCard(
       label: walletL10nOr(context, 'walletKpiTotalWallets', 'Total wallets'),
       value: '${overview.walletsTotal}',
@@ -61,29 +82,6 @@ List<Widget> walletOverviewKpiCards(
       icon: Icons.receipt_long_outlined,
     ),
   ];
-
-  if (showPackageStat) {
-    cards.add(
-      AnalyticsCard(
-        label: walletL10nOr(context, 'walletKpiCoinPackages', 'Coin packages'),
-        value: walletL10nArgs(
-          context,
-          'walletKpiPackagesActive',
-          {'active': '${overview.packagesActive}'},
-          '${overview.packagesActive} active',
-        ),
-        subtitle: walletL10nArgs(
-          context,
-          'walletKpiPackagesTotal',
-          {'total': '${overview.packagesTotal}'},
-          '${overview.packagesTotal} total in catalog',
-        ),
-        icon: Icons.inventory_2_outlined,
-      ),
-    );
-  }
-
-  return cards;
 }
 
 class WalletOverviewHeader extends StatelessWidget {
@@ -113,20 +111,22 @@ class WalletOverviewKpiSection extends StatelessWidget {
     super.key,
     required this.overview,
     this.showPackageStat = false,
-    this.minTileWidth = 200,
+    this.minTileWidth,
   });
 
   final WalletOverviewEntity overview;
   final bool showPackageStat;
-  final double minTileWidth;
+  final double? minTileWidth;
 
   @override
   Widget build(BuildContext context) {
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
-    final l10n = context.l10n;
+    final metrics = walletsMetricsOf(context);
 
     return ResponsiveStatsGrid(
-      minTileWidth: minTileWidth,
+      minTileWidth: minTileWidth ?? metrics.statsMinTileWidth,
+      spacing: metrics.statsGridSpacing,
+      runSpacing: metrics.statsGridSpacing,
       children: walletOverviewKpiCards(
         context,
         overview,
@@ -164,7 +164,12 @@ class WalletLedgerByTypeSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            padding: EdgeInsets.fromLTRB(
+              metrics.cardPadding + 4,
+              metrics.cardPadding,
+              metrics.cardPadding + 4,
+              6,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -172,9 +177,10 @@ class WalletLedgerByTypeSection extends StatelessWidget {
                   walletL10nOr(context, 'walletSectionLedgerByType24h', title),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
+                        fontSize: metrics.sectionTitleFontSize,
                       ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   walletL10nOr(context,
                     'walletSubtitleLedgerByType24h',
@@ -182,7 +188,8 @@ class WalletLedgerByTypeSection extends StatelessWidget {
                   ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
-                        height: 1.35,
+                        fontSize: metrics.sectionSubtitleFontSize,
+                        height: 1.3,
                       ),
                 ),
               ],
@@ -205,14 +212,20 @@ class WalletLedgerByTypeSection extends StatelessWidget {
             )
           else if (metrics.useCompactTable)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: EdgeInsets.fromLTRB(
+                metrics.cardPadding,
+                0,
+                metrics.cardPadding,
+                metrics.cardPadding,
+              ),
               child: Column(
                 children: [
                   for (var i = 0; i < items.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 8),
+                    if (i > 0) SizedBox(height: metrics.statsGridSpacing),
                     _LedgerTypeCompactCard(
                       item: items[i],
                       maxAmount: maxAmount,
+                      metrics: metrics,
                     ),
                   ],
                 ],
@@ -233,10 +246,12 @@ class _LedgerTypeCompactCard extends StatelessWidget {
   const _LedgerTypeCompactCard({
     required this.item,
     required this.maxAmount,
+    required this.metrics,
   });
 
   final LedgerByTypeEntity item;
   final double maxAmount;
+  final WalletsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +264,7 @@ class _LedgerTypeCompactCard extends StatelessWidget {
     final count = '${item.count}';
 
     return WalletsCompactCard(
+      metrics: metrics,
       title: ledgerTypeLabel(context, item.type),
       trailing: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -258,9 +274,10 @@ class _LedgerTypeCompactCard extends StatelessWidget {
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: scheme.primary,
+                  fontSize: metrics.compactCardValueFontSize,
                 ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             walletL10nArgs(context,
               'walletLedgerTypeEntries',
@@ -269,6 +286,7 @@ class _LedgerTypeCompactCard extends StatelessWidget {
             ),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: scheme.onSurfaceVariant,
+                  fontSize: metrics.analyticsLabelFontSize,
                 ),
           ),
         ],
@@ -452,6 +470,7 @@ class WalletEconomySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = walletsMetricsOf(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -460,19 +479,21 @@ class WalletEconomySection extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
+                fontSize: metrics.sectionTitleFontSize,
               ),
         ),
         if (subtitle != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             subtitle!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
-                  height: 1.35,
+                  fontSize: metrics.sectionSubtitleFontSize,
+                  height: 1.3,
                 ),
           ),
         ],
-        const SizedBox(height: 10),
+        SizedBox(height: metrics.sectionGap + 6),
         WalletsDashboardCard(padding: EdgeInsets.zero, child: child),
       ],
     );
@@ -507,7 +528,7 @@ class WalletCoinPackagesCatalog extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(walletsMetricsOf(context).cardPadding),
       child: ResponsiveDataTable(
         columns: [
           DataColumn(
@@ -586,7 +607,7 @@ class WalletGiftCatalogTable extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(walletsMetricsOf(context).cardPadding),
       child: ResponsiveDataTable(
         columns: [
           DataColumn(
@@ -663,7 +684,7 @@ class WalletPromoPackagesCatalog extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(walletsMetricsOf(context).cardPadding),
       child: ResponsiveDataTable(
         columns: [
           DataColumn(
@@ -736,16 +757,17 @@ class _CatalogMobileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = walletsMetricsOf(context);
 
     return Material(
       color: scheme.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.65)),
+        borderRadius: BorderRadius.circular(metrics.compactCardRadius),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(metrics.compactCardPadding),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -759,14 +781,17 @@ class _CatalogMobileCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
+                          fontSize: metrics.compactCardTitleFontSize,
+                          height: 1.25,
                         ),
                   ),
                   if (secondary != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       secondary!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
+                            fontSize: metrics.sectionSubtitleFontSize,
                           ),
                     ),
                   ],
@@ -781,10 +806,11 @@ class _CatalogMobileCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: scheme.primary,
+                        fontSize: metrics.compactCardValueFontSize,
                       ),
                 ),
                 if (chip != null) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   chip!,
                 ],
               ],

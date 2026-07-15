@@ -71,15 +71,16 @@ class WalletsDashboardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = walletsMetricsOf(context);
     return Material(
       elevation: 0,
       color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(metrics.dashboardCardRadius),
         side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: padding ?? const EdgeInsets.all(WalletsSpace.lg),
+        padding: padding ?? EdgeInsets.all(metrics.cardPadding),
         child: child,
       ),
     );

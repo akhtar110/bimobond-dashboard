@@ -24,7 +24,7 @@ class ResponsiveDataTable extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var i = 0; i < mobileCards.length; i++) ...[
-                if (i > 0) const SizedBox(height: 10),
+                if (i > 0) const SizedBox(height: 8),
                 mobileCards[i],
               ],
             ],

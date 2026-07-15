@@ -2,6 +2,7 @@
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
 
 String formatUserLocation(BuildContext context, UserEntity user) {
@@ -191,9 +192,10 @@ class UserDetailPersonalInfo extends StatelessWidget {
           ),
           UserDetailInfoItem(
             l10n.t('directMessages'),
-            user.allowDirectMsgs
-                ? l10n.t('everyone')
-                : l10n.t('followers'),
+            l10n.tOr(
+              user.messagePermission.labelKey,
+              user.messagePermission.name,
+            ),
             Icons.message_outlined,
           ),
           UserDetailInfoItem(
@@ -201,6 +203,16 @@ class UserDetailPersonalInfo extends StatelessWidget {
             user.language.toUpperCase(),
             Icons.language_outlined,
           ),
+          if (user.isProfileLocked)
+            UserDetailInfoItem(
+              l10n.tOr('lockedProfileIndicator', 'Locked'),
+              l10n.tOr(
+                'profileLockedSectionHidden',
+                'Hidden while this profile is locked',
+              ),
+              Icons.lock_person_outlined,
+              valueColor: scheme.error,
+            ),
 
           if (user.isBanned) ...[
             Divider(height: 20, color: scheme.outlineVariant),

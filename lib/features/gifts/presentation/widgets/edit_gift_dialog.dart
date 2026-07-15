@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../bloc/gifts_bloc.dart';
+import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
 import 'gift_animation_preview.dart';
 import 'gift_price_coins_field.dart';
@@ -37,9 +39,12 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
   Uint8List? _newImageBytes;
   String? _newImageName;
-  Uint8List? _newAnimationBytes;
-  String? _newAnimationName;
+  String? _animationUrl;
+  String? _animationName;
+  Uint8List? _animationBytes;
   bool _clearAnimation = false;
+  bool _uploadingAnimation = false;
+  String? _animationError;
   DateTime? _publishedAt;
 
   @override
@@ -49,6 +54,8 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     _priceCtrl = TextEditingController(
         text: widget.gift.priceCoins.toStringAsFixed(2));
     _publishedAt = widget.gift.publishedAt;
+    _animationUrl = widget.gift.animationUrl;
+    _animationName = widget.gift.animationUrl;
   }
 
   @override
@@ -70,11 +77,34 @@ class EditGiftDialogState extends State<EditGiftDialog> {
   Future<void> _pickAnimation() async {
     final picked = await pickGiftAnimation();
     if (!mounted || picked == null) return;
+
     setState(() {
-      _newAnimationBytes = picked.bytes;
-      _newAnimationName = picked.name;
+      _animationBytes = picked.bytes;
+      _animationName = picked.name;
+      _animationUrl = null;
+      _uploadingAnimation = true;
+      _animationError = null;
       _clearAnimation = false;
     });
+
+    try {
+      final url = await di.sl<GiftsRepository>().uploadGiftFile(
+            picked.bytes,
+            picked.name,
+          );
+      if (!mounted) return;
+      GiftAnimationBytesCache.put(url, picked.bytes);
+      setState(() {
+        _animationUrl = url;
+        _uploadingAnimation = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingAnimation = false;
+        _animationError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   Future<void> _pickPublishedAt() async {
@@ -102,7 +132,20 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.pop(context);
+    if (_uploadingAnimation) return;
+
+    final originalUrl = widget.gift.animationUrl;
+    String? animationUrl;
+    if (_clearAnimation) {
+      animationUrl = '';
+    } else if (_animationUrl != null &&
+        _animationUrl!.trim().isNotEmpty &&
+        _animationUrl != originalUrl) {
+      animationUrl = _animationUrl;
+    }
+
+    // Keep dialog open until bloc finishes (listener pops). Closing early
+    // disposed the PAG player while WASM was still running.
     widget.pageContext.read<GiftsBloc>().add(UpdateGiftEvent(
           widget.gift.id,
           UpdateGiftData(
@@ -113,9 +156,7 @@ class EditGiftDialogState extends State<EditGiftDialog> {
             publishedAt: _publishedAt,
             imageBytes: _newImageBytes,
             imageName: _newImageName,
-            animationBytes: _newAnimationBytes,
-            animationName: _newAnimationName,
-            animationUrl: _clearAnimation ? '' : null,
+            animationUrl: animationUrl,
           ),
         ));
   }
@@ -127,21 +168,22 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     final screenW = MediaQuery.sizeOf(context).width;
     final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
     final hasNewImage = _newImageBytes != null;
-    final hasNewAnimation = _newAnimationBytes != null;
-    final existingAnimation = widget.gift.animationUrl;
-    final showExistingAnimation = !hasNewAnimation &&
-        !_clearAnimation &&
-        existingAnimation != null &&
-        existingAnimation.isNotEmpty;
+    final showAnimation = !_clearAnimation &&
+        ((_animationBytes != null && _animationBytes!.isNotEmpty) ||
+            (_animationUrl != null && _animationUrl!.trim().isNotEmpty));
 
     return BlocListener<GiftsBloc, GiftsState>(
       bloc: widget.pageContext.read<GiftsBloc>(),
+      // Only close after a save we started finishes — not on unrelated
+      // isActioning flips (those were disposing the PAG player mid-play).
       listenWhen: (p, c) =>
+          p is GiftsLoaded &&
           c is GiftsLoaded &&
-          (p is! GiftsLoaded || p.isActioning != c.isActioning),
+          p.isActioning &&
+          !c.isActioning,
       listener: (_, state) {
-        if (state is GiftsLoaded && !state.isActioning) {
-          if (mounted) Navigator.of(context, rootNavigator: true).maybePop();
+        if (state is GiftsLoaded && !state.isActioning && mounted) {
+          Navigator.of(context, rootNavigator: true).maybePop();
         }
       },
       child: BlocBuilder<GiftsBloc, GiftsState>(
@@ -238,15 +280,29 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                       const SizedBox(height: 14),
 
                       OutlinedButton.icon(
-                        onPressed: isActioning ? null : _pickAnimation,
-                        icon: const Icon(Icons.animation_rounded, size: 18),
+                        onPressed: (isActioning || _uploadingAnimation)
+                            ? null
+                            : _pickAnimation,
+                        icon: _uploadingAnimation
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.animation_rounded, size: 18),
                         label: Text(
-                          hasNewAnimation || showExistingAnimation
-                              ? l10n.tOr('changeAnimation', 'Change animation')
-                              : l10n.tOr(
-                                  'uploadAnimationOptional',
-                                  'Upload animation (MP4, optional)',
-                                ),
+                          _uploadingAnimation
+                              ? l10n.tOr('uploading', 'Uploading…')
+                              : showAnimation
+                                  ? l10n.tOr(
+                                      'changeAnimation',
+                                      'Change animation',
+                                    )
+                                  : l10n.tOr(
+                                      'uploadAnimationOptional',
+                                      'Upload animation (MP4 / PAG / JSON / Lottie / GIF / SWF, optional)',
+                                    ),
                         ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -255,22 +311,31 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                           ),
                         ),
                       ),
-                      if (hasNewAnimation || showExistingAnimation) ...[
+                      if (_animationError != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _animationError!,
+                          style: TextStyle(
+                            color: theme.colorScheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                      if (showAnimation) ...[
                         const SizedBox(height: 12),
                         GiftAnimationPreview(
-                          bytes: _newAnimationBytes,
-                          networkUrl: hasNewAnimation
-                              ? null
-                              : existingAnimation,
-                          fileName: hasNewAnimation
-                              ? _newAnimationName
-                              : existingAnimation,
-                          onClear: isActioning
+                          key: const ValueKey('edit-gift-animation-preview'),
+                          bytes: _animationBytes,
+                          networkUrl: _animationUrl,
+                          fileName: _animationName ?? _animationUrl,
+                          onClear: (isActioning || _uploadingAnimation)
                               ? null
                               : () => setState(() {
-                                    _newAnimationBytes = null;
-                                    _newAnimationName = null;
+                                    _animationBytes = null;
+                                    _animationUrl = null;
+                                    _animationName = null;
                                     _clearAnimation = true;
+                                    _animationError = null;
                                   }),
                         ),
                       ],
@@ -325,7 +390,8 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                 child: Text(l10n.t('cancel')),
               ),
               FilledButton(
-                onPressed: isActioning ? null : _submit,
+                onPressed:
+                    (isActioning || _uploadingAnimation) ? null : _submit,
                 child: Text(l10n.t('save')),
               ),
             ],

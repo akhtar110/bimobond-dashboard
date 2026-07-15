@@ -610,14 +610,62 @@ class _DetailPurchasesCompactList extends StatelessWidget {
                       ),
                 ),
               const SizedBox(height: 4),
-              WalletsStatusChip(
-                label: fiatPurchaseStatusLabel(context, purchase.status),
-                tone: statusChipTone(purchase.status),
-              ),
+              _DetailPurchaseStatusChip(status: purchase.status),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _DetailPurchaseStatusChip extends StatelessWidget {
+  const _DetailPurchaseStatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    context.select<SettingsCubit, Locale>((c) => c.state.locale);
+    final scheme = Theme.of(context).colorScheme;
+    final tone = statusChipTone(status);
+    final (bg, fg) = switch (tone) {
+      WalletsChipTone.success => (
+          scheme.tertiaryContainer,
+          scheme.onTertiaryContainer,
+        ),
+      WalletsChipTone.warning => (
+          scheme.secondaryContainer,
+          scheme.onSecondaryContainer,
+        ),
+      WalletsChipTone.error => (
+          scheme.errorContainer,
+          scheme.onErrorContainer,
+        ),
+      WalletsChipTone.neutral => (
+          scheme.surfaceContainerHighest,
+          scheme.onSurfaceVariant,
+        ),
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: fg.withValues(alpha: 0.25)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          fiatPurchaseStatusLabel(context, status),
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+            color: fg,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -747,9 +795,9 @@ class _DetailPurchaseRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: WalletsStatusChip(
-              label: fiatPurchaseStatusLabel(context, purchase.status),
-              tone: statusChipTone(purchase.status),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _DetailPurchaseStatusChip(status: purchase.status),
             ),
           ),
         ],

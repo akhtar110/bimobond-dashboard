@@ -99,28 +99,34 @@ class UserDetailStatsGrid extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
+    final followListsEnabled = !user.isProfileLocked;
+
     final stats = [
       (
         l10n.t('followers'),
         user.followerCount.toString(),
         Icons.people_alt_rounded,
         scheme.primary,
-        () => showUserFollowConnectionsSheet(
-          context,
-          user,
-          initialTab: 0,
-        ),
+        followListsEnabled
+            ? () => showUserFollowConnectionsSheet(
+                  context,
+                  user,
+                  initialTab: 0,
+                )
+            : null,
       ),
       (
         l10n.t('following'),
         user.followingCount.toString(),
         Icons.person_add_alt_1_rounded,
         scheme.tertiary,
-        () => showUserFollowConnectionsSheet(
-          context,
-          user,
-          initialTab: 1,
-        ),
+        followListsEnabled
+            ? () => showUserFollowConnectionsSheet(
+                  context,
+                  user,
+                  initialTab: 1,
+                )
+            : null,
       ),
       (
         l10n.t('posts'),

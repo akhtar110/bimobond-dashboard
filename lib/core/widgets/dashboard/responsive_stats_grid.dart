@@ -5,9 +5,9 @@ class ResponsiveStatsGrid extends StatelessWidget {
   const ResponsiveStatsGrid({
     super.key,
     required this.children,
-    this.minTileWidth = 200,
-    this.spacing = 12,
-    this.runSpacing = 12,
+    this.minTileWidth = 184,
+    this.spacing = 10,
+    this.runSpacing = 10,
   });
 
   final List<Widget> children;

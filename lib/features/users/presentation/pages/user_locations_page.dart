@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../promotions/presentation/bloc/location_intelligence_bloc.dart';

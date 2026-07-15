@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/utils/api_error_messages.dart';
 import '../../data/models/user_model.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_detail_entity.dart';
@@ -9,6 +10,8 @@ import '../../domain/usecases/demote_user.dart';
 import '../../domain/usecases/get_user_by_id.dart';
 import '../../domain/usecases/get_user_posts.dart';
 import '../../domain/usecases/promote_to_admin.dart';
+import '../../domain/usecases/set_user_is_private.dart';
+import '../../domain/usecases/set_user_message_permission.dart';
 import '../../domain/usecases/unban_user.dart';
 import 'user_detail_event.dart';
 import 'user_detail_state.dart';
@@ -22,6 +25,8 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     required PromoteUser promoteUser,
     required DemoteUser demoteUser,
     required DeleteUser deleteUser,
+    required SetUserIsPrivate setUserIsPrivate,
+    required SetUserMessagePermission setUserMessagePermission,
   })  : _getUserById = getUserById,
         _getUserPosts = getUserPosts,
         _banUser = banUser,
@@ -29,9 +34,12 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
         _promoteUser = promoteUser,
         _demoteUser = demoteUser,
         _deleteUser = deleteUser,
+        _setUserIsPrivate = setUserIsPrivate,
+        _setUserMessagePermission = setUserMessagePermission,
         super(UserDetailInitial()) {
     on<LoadUserDetailEvent>(_onLoad);
     on<UserDetailAdminActionEvent>(_onAdminAction);
+    on<UpdateUserPrivacySettingsEvent>(_onUpdatePrivacySettings);
     on<ClearUserDetailActionFeedbackEvent>(_onClearFeedback);
   }
 
@@ -42,6 +50,8 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
   final PromoteUser _promoteUser;
   final DemoteUser _demoteUser;
   final DeleteUser _deleteUser;
+  final SetUserIsPrivate _setUserIsPrivate;
+  final SetUserMessagePermission _setUserMessagePermission;
 
   Future<void> _onLoad(
     LoadUserDetailEvent event,
@@ -63,7 +73,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
   ) async {
     final current = state;
     if (current is! UserDetailLoaded) return;
-    if (current.executingAction != null) return;
+    if (current.isBusy) return;
 
     final userId = current.userDetail.user.id;
     final action = event.actionType;
@@ -108,6 +118,47 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     }
   }
 
+  Future<void> _onUpdatePrivacySettings(
+    UpdateUserPrivacySettingsEvent event,
+    Emitter<UserDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is! UserDetailLoaded) return;
+    if (current.isBusy) return;
+
+    final userId = current.userDetail.user.id;
+    emit(current.copyWith(isSavingPrivacy: true, clearActionFeedback: true));
+
+    try {
+      if (event.isPrivate != null) {
+        await _setUserIsPrivate(userId, isPrivate: event.isPrivate!);
+      }
+      if (event.messagePermission != null) {
+        await _setUserMessagePermission(
+          userId,
+          permission: event.messagePermission!,
+        );
+      }
+
+      final userDetail = await _fetchUserDetail(userId);
+      emit(
+        current.copyWith(
+          userDetail: userDetail,
+          isSavingPrivacy: false,
+          actionFeedback: 'adminSuccessPrivacyUpdated',
+        ),
+      );
+    } catch (e) {
+      emit(
+        current.copyWith(
+          isSavingPrivacy: false,
+          actionFeedback: ApiErrorMessages.from(e),
+          actionFeedbackIsError: true,
+        ),
+      );
+    }
+  }
+
   void _onClearFeedback(
     ClearUserDetailActionFeedbackEvent event,
     Emitter<UserDetailState> emit,
@@ -141,8 +192,10 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
             instagramUrl: user.instagramUrl,
             youtubeUrl: user.youtubeUrl,
             isPrivate: user.isPrivate,
+            isProfileLocked: user.isProfileLocked,
             allowComments: user.allowComments,
             allowDirectMsgs: user.allowDirectMsgs,
+            messagePermission: user.messagePermission,
             canPost: user.canPost,
             language: user.language,
             theme: user.theme,
@@ -190,7 +243,5 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     };
   }
 
-  String _messageFromError(Object error) {
-    return error.toString().replaceFirst('Exception: ', '');
-  }
+  String _messageFromError(Object error) => ApiErrorMessages.from(error);
 }

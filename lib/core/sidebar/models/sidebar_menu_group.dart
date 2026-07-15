@@ -26,24 +26,24 @@ const kSidebarMenuGroups = <SidebarMenuGroupConfig>[
     id: 'overview',
     titleL10nKey: 'sidebarGroupOverview',
     fallbackTitle: 'Overview',
-    itemIndices: [0],
+    itemIndices: [0, 1],
   ),
   SidebarMenuGroupConfig(
     id: 'users',
     titleL10nKey: 'sidebarGroupUsers',
     fallbackTitle: 'User Management',
-    itemIndices: [1, 2, 3],
+    itemIndices: [2, 3, 4],
   ),
   SidebarMenuGroupConfig(
     id: 'content',
     titleL10nKey: 'sidebarGroupContent',
     fallbackTitle: 'Content Management',
-    itemIndices: [4, 14, 5, 6, 7, 8, 9, 10],
+    itemIndices: [5, 15, 6, 7, 8, 9, 10, 11],
   ),
   SidebarMenuGroupConfig(
     id: 'platform',
     titleL10nKey: 'sidebarGroupPlatform',
     fallbackTitle: 'Platform',
-    itemIndices: [11, 12, 13, 15],
+    itemIndices: [12, 13, 14, 16],
   ),
 ];

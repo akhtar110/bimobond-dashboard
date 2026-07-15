@@ -1,4 +1,5 @@
 import '../../domain/entities/admin_bulk_users_result_entity.dart';
+import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_detail_entity.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_follow_entity.dart';
@@ -162,6 +163,22 @@ class UsersRepositoryImpl implements UsersRepository {
   @override
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow}) {
     return remoteDataSource.setUserAllowDirectMsgs(userId, allow: allow);
+  }
+
+  @override
+  Future<void> setUserIsPrivate(String userId, {required bool isPrivate}) {
+    return remoteDataSource.setUserIsPrivate(userId, isPrivate: isPrivate);
+  }
+
+  @override
+  Future<void> setUserMessagePermission(
+    String userId, {
+    required MessagePermission permission,
+  }) {
+    return remoteDataSource.setUserMessagePermission(
+      userId,
+      permission: permission,
+    );
   }
 
   @override
