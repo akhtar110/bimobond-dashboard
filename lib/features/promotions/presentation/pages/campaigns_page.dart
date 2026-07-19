@@ -267,6 +267,8 @@ class _CampaignsDataSection extends StatelessWidget {
           page: loaded.meta.page,
           totalPages: loaded.meta.totalPages,
           total: loaded.meta.total,
+          pageSize: loaded.meta.limit,
+          itemCount: loaded.campaigns.length,
           metrics: promotionsMetricsOf(context),
           showTopBorder: true,
           onPage: (p) =>

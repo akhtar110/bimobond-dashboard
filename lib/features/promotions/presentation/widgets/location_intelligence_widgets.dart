@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../../../core/widgets/toolbar_filter_style.dart';
 import '../../../users/domain/entities/user_entity.dart';
@@ -970,9 +971,7 @@ class LocationPaginationFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final bloc = context.read<LocationIntelligenceBloc>();
-    final scheme = Theme.of(context).colorScheme;
     final m = metrics ??
         LocationLayoutMetrics(
           getLocationDeviceType(MediaQuery.sizeOf(context).width),
@@ -982,170 +981,22 @@ class LocationPaginationFooter extends StatelessWidget {
       _ => false,
     };
 
-    void paginate(int page) {
-      bloc.add(
-        LoadLocationOverviewEvent(
-          page: page,
-          fullUserLocations: fullUserLocations,
-        ),
-      );
-    }
-
-    final start = meta.total == 0 ? 0 : ((meta.page - 1) * meta.limit) + 1;
-    final end = (meta.page * meta.limit).clamp(0, meta.total);
-    final compact = m.isMobile;
-    final tablet = m.deviceType == LocationDeviceType.tablet;
-
-    final summary = compact
-        ? 'Page ${meta.page} / ${meta.totalPages}'
-        : l10n.tArgs('promoShowingUsersRange', {
-            'start': '$start',
-            'end': '$end',
-            'total': '${meta.total}',
-          });
-
-    final visiblePages = <int>{
-      for (var i = meta.page - 2; i <= meta.page + 2; i++)
-        if (i >= 1 && i <= meta.totalPages) i,
-    };
-
-    Widget pageButton(int page) {
-      final isActive = page == meta.page;
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => paginate(page),
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              gradient: isActive
-                  ? LinearGradient(
-                      colors: [
-                        scheme.primary,
-                        scheme.primary.withValues(alpha: 0.8),
-                      ],
-                    )
-                  : null,
-              color: isActive ? null : scheme.surface,
-              border: Border.all(
-                color: isActive ? Colors.transparent : scheme.outlineVariant,
-              ),
-            ),
-            child: Text(
-              '$page',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isActive ? scheme.onPrimary : scheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget navIcon({
-      required IconData icon,
-      required bool enabled,
-      required VoidCallback onTap,
-    }) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: enabled
-                    ? scheme.outlineVariant
-                    : scheme.outlineVariant.withValues(alpha: 0.45),
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: enabled
-                  ? scheme.primary
-                  : scheme.onSurfaceVariant.withValues(alpha: 0.45),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final pageControls = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        navIcon(
-          icon: Icons.chevron_left_rounded,
-          enabled: meta.page > 1,
-          onTap: () => paginate(meta.page - 1),
-        ),
-        const SizedBox(width: 4),
-        if (!compact && !tablet)
-          for (final page in visiblePages) ...[
-            pageButton(page),
-            const SizedBox(width: 4),
-          ]
-        else
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              '${meta.page}/${meta.totalPages}',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-        navIcon(
-          icon: Icons.chevron_right_rounded,
-          enabled: meta.page < meta.totalPages,
-          onTap: () => paginate(meta.page + 1),
-        ),
-      ],
-    );
-
     return Padding(
       padding: EdgeInsets.only(top: m.sectionGap),
-      child: compact
-          ? Column(
-              children: [
-                Text(
-                  summary,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 11,
-                      ),
-                ),
-                SizedBox(height: m.filterGap),
-                pageControls,
-              ],
-            )
-          : Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 11.5,
-                        ),
-                  ),
-                ),
-                pageControls,
-              ],
-            ),
+      child: AppPaginationBar(
+        currentPage: meta.page < 1 ? 1 : meta.page,
+        lastPage: meta.totalPages < 1 ? 1 : meta.totalPages,
+        total: meta.total,
+        pageSize: meta.limit > 0 ? meta.limit : 20,
+        hideWhenSinglePage: false,
+        borderRadius: BorderRadius.circular(12),
+        onPageChanged: (page) => bloc.add(
+          LoadLocationOverviewEvent(
+            page: page,
+            fullUserLocations: fullUserLocations,
+          ),
+        ),
+      ),
     );
   }
 }

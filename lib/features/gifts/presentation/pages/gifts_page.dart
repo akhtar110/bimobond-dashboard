@@ -4,16 +4,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/bloc/persistent_bloc_provider.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../injection_container.dart' as di;
+import '../../domain/entities/gift_entity.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gifts_responsive.dart';
 import '../widgets/create_gift_dialog.dart';
+import '../widgets/edit_gift_dialog.dart';
 import '../widgets/gifts_bulk_selection_toolbar.dart';
 import '../widgets/gifts_filter_bar_delegate.dart';
 import '../widgets/gifts_grid_sliver.dart';
 import '../widgets/gifts_keyboard_intents.dart';
 import '../widgets/gifts_page_sliver_states.dart';
 import '../widgets/gifts_sliver_header.dart';
+
+void showGiftPreviewDialog(BuildContext context, GiftEntity gift) {
+  showPreviewGiftDialog(context, gift);
+}
 
 class GiftsPage extends StatelessWidget {
   const GiftsPage({super.key});
@@ -37,6 +44,37 @@ class _GiftsPageView extends StatefulWidget {
 }
 
 class _GiftsPageViewState extends State<_GiftsPageView> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!mounted || !_scrollController.hasClients) return;
+
+    final width = MediaQuery.sizeOf(context).width;
+    final metrics = GiftsLayoutMetrics(getGiftsDeviceType(width));
+    if (!metrics.useInfiniteScroll) return;
+
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+      return;
+    }
+    if (position.pixels >= position.maxScrollExtent - 300) {
+      context.read<GiftsBloc>().add(LoadMoreGiftsEvent());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -124,8 +162,10 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                   final metrics = GiftsLayoutMetrics(getGiftsDeviceType(width));
                   final pad = metrics.pageHorizontalPadding;
                   final isLoaded = state is GiftsLoaded;
+                  final loaded = isLoaded ? state : null;
 
                   return CustomScrollView(
+                    controller: _scrollController,
                     slivers: [
                       GiftsSliverHeader(
                         theme: theme,
@@ -136,21 +176,21 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                         onRefresh: () =>
                             ctx.read<GiftsBloc>().add(LoadAdminGiftsEvent()),
                       ),
-                      if (state is GiftsLoaded) ...[
+                      if (loaded != null) ...[
                         SliverPersistentHeader(
                           pinned: true,
                           delegate: GiftsFilterBarDelegate(
-                            selectedTab: state.selectedTab,
-                            selectedSort: state.selectedSort,
-                            searchQuery: state.searchQuery,
-                            fromDate: state.fromDate,
-                            toDate: state.toDate,
-                            minPrice: state.minPriceFilter,
-                            maxPrice: state.maxPriceFilter,
+                            selectedTab: loaded.selectedTab,
+                            selectedSort: loaded.selectedSort,
+                            searchQuery: loaded.searchQuery,
+                            fromDate: loaded.fromDate,
+                            toDate: loaded.toDate,
+                            minPrice: loaded.minPriceFilter,
+                            maxPrice: loaded.maxPriceFilter,
                             theme: theme,
-                            displayedCount: state.displayed.length,
-                            totalCount: state.gifts.length,
-                            hasActiveFilters: state.hasActiveFilters,
+                            displayedCount: loaded.displayed.length,
+                            totalCount: loaded.gifts.length,
+                            hasActiveFilters: loaded.hasActiveFilters,
                             screenWidth: width,
                           ),
                         ),
@@ -165,7 +205,33 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                             child: GiftsBulkSelectionToolbar(),
                           ),
                         ),
-                        const GiftsGridSliver(),
+                        const _GiftsPageGridSliver(),
+                        if (metrics.useDesktopPagination &&
+                            loaded.giftsTotalCount > 0)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                pad,
+                                metrics.isMobile ? 10 : 14,
+                                pad,
+                                0,
+                              ),
+                              child: AppPaginationBar(
+                                currentPage: loaded.currentPage,
+                                lastPage: loaded.lastPage,
+                                total: loaded.giftsTotalCount,
+                                pageSize: GiftsBloc.pageLimit,
+                                itemCount: loaded
+                                    .pagedDisplayed(infiniteScroll: false)
+                                    .length,
+                                hideWhenSinglePage: false,
+                                borderRadius: BorderRadius.circular(12),
+                                onPageChanged: (page) => ctx
+                                    .read<GiftsBloc>()
+                                    .add(GoToGiftsPageEvent(page)),
+                              ),
+                            ),
+                          ),
                       ] else if (state is GiftsLoading) ...[
                         const GiftsSliverSkeletons(),
                       ] else if (state is GiftsError) ...[
@@ -183,5 +249,14 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
         ),
       ),
     );
+  }
+}
+
+class _GiftsPageGridSliver extends StatelessWidget {
+  const _GiftsPageGridSliver();
+
+  @override
+  Widget build(BuildContext context) {
+    return GiftsGridSliver(onPreviewGift: showGiftPreviewDialog);
   }
 }

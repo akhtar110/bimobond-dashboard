@@ -22,6 +22,11 @@ class AuctionsLayoutMetrics {
       deviceType == AuctionsDeviceType.mobileSmall ||
       deviceType == AuctionsDeviceType.mobileLarge;
 
+  /// Desktop uses numbered pages; mobile/tablet keep infinite scroll.
+  bool get useDesktopPagination => deviceType == AuctionsDeviceType.desktop;
+
+  bool get useInfiniteScroll => !useDesktopPagination;
+
   double get pageHorizontalPadding => switch (deviceType) {
         AuctionsDeviceType.mobileSmall => 8,
         AuctionsDeviceType.mobileLarge => 10,

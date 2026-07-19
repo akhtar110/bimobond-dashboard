@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/status_chip.dart';
 import '../../../../core/widgets/state_widgets.dart';
@@ -20,7 +21,6 @@ import '../dialogs/fe_confirm_dialog.dart';
 import '../utils/filters_effects_responsive.dart';
 import '../utils/fe_effect_emoji_display.dart';
 import 'fe_tab_scaffold.dart';
-import 'filters_tab.dart';
 
 Future<void> _openEditor(BuildContext context, {String? effectId}) async {
   final saved = await openEffectEditor(context, effectId: effectId);
@@ -86,11 +86,17 @@ class EffectsTab extends StatelessWidget {
           if (canManage) SizedBox(height: metrics.filterGap),
         ],
       ),
-      footer: FePaginationBar(
-        page: loaded.query.page,
-        totalPages: loaded.effectsTotalPages,
-        totalItems: loaded.filteredEffects.length,
-        metrics: metrics,
+      footer: AppPaginationBar(
+        currentPage: loaded.query.page,
+        lastPage: loaded.effectsTotalPages,
+        total: loaded.filteredEffects.length,
+        pageSize: loaded.query.pageSize,
+        itemCount: items.length,
+        hideWhenSinglePage: false,
+        borderRadius: BorderRadius.circular(12),
+        onPageChanged: (page) => context.read<FiltersEffectsBloc>().add(
+              FiltersEffectsFilterChanged(page: page),
+            ),
       ),
       child: ResponsiveDataTable(
         mobileBreakpoint: 900,

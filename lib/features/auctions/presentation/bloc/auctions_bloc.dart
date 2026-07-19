@@ -36,6 +36,8 @@ class GoToAuctionsPageEvent extends AuctionsEvent {
   final int page;
 }
 
+class LoadMoreAuctionsEvent extends AuctionsEvent {}
+
 class FilterAuctionsEvent extends AuctionsEvent {
   FilterAuctionsEvent(this.status);
   final String? status;
@@ -92,6 +94,7 @@ class AuctionsLoaded extends AuctionsState {
     this.dateRange,
     this.isActioning = false,
     this.isFetching = false,
+    this.isLoadingMore = false,
     List<AuctionEntity>? displayedAuctions,
   }) : displayedAuctions = displayedAuctions ?? auctions;
 
@@ -106,6 +109,7 @@ class AuctionsLoaded extends AuctionsState {
   final DateTimeRange? dateRange;
   final bool isActioning;
   final bool isFetching;
+  final bool isLoadingMore;
 
   final List<AuctionEntity> displayedAuctions;
 
@@ -113,6 +117,7 @@ class AuctionsLoaded extends AuctionsState {
 
   int get displayedCount => displayedAuctions.length;
   int get totalCount => total;
+  bool get hasReachedMax => currentPage >= lastPage;
 
   int get activeCount =>
       auctions.where((a) => a.status == 'ACTIVE').length;
@@ -136,6 +141,7 @@ class AuctionsLoaded extends AuctionsState {
     bool clearDateRange = false,
     bool? isActioning,
     bool? isFetching,
+    bool? isLoadingMore,
     List<AuctionEntity>? displayedAuctions,
   }) {
     return AuctionsLoaded(
@@ -151,6 +157,7 @@ class AuctionsLoaded extends AuctionsState {
       dateRange: clearDateRange ? null : (dateRange ?? this.dateRange),
       isActioning: isActioning ?? this.isActioning,
       isFetching: isFetching ?? this.isFetching,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       displayedAuctions: displayedAuctions ?? this.displayedAuctions,
     );
   }
@@ -172,6 +179,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
         super(AuctionsInitial()) {
     on<LoadAllAuctionsEvent>(_onLoad);
     on<GoToAuctionsPageEvent>(_onGoToPage);
+    on<LoadMoreAuctionsEvent>(_onLoadMore);
     on<FilterAuctionsEvent>(_onFilter);
     on<UpdateAuctionSearchEvent>(_onUpdateSearch);
     on<UpdateAuctionSortEvent>(_onUpdateSort);
@@ -184,7 +192,8 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
   final GetAllAuctions _getAllAuctions;
   final AdminCancelAuction _cancelAuction;
 
-  static const _pageLimit = 20;
+  static const pageLimit = 20;
+  static const _pageLimit = pageLimit;
 
   Timer? _searchDebounce;
   static const _searchDebounceMs = 300;
@@ -254,6 +263,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     Emitter<AuctionsState> emit, {
     required int page,
     bool showLoading = true,
+    bool append = false,
   }) async {
     if (_busy) return;
     if (page < 1) return;
@@ -263,7 +273,12 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     if (showLoading && previous is! AuctionsLoaded) {
       emit(AuctionsLoading());
     } else if (previous is AuctionsLoaded) {
-      emit(previous.copyWith(isFetching: true));
+      emit(
+        previous.copyWith(
+          isFetching: !append,
+          isLoadingMore: append,
+        ),
+      );
     }
 
     try {
@@ -274,10 +289,23 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
       );
 
       _currentPage = response.currentPage;
-      final displayed = _applyLocalFilters(response.auctions);
+
+      List<AuctionEntity> auctions;
+      if (append && previous is AuctionsLoaded) {
+        final existingIds = previous.auctions.map((a) => a.id).toSet();
+        auctions = [
+          ...previous.auctions,
+          for (final auction in response.auctions)
+            if (!existingIds.contains(auction.id)) auction,
+        ];
+      } else {
+        auctions = response.auctions;
+      }
+
+      final displayed = _applyLocalFilters(auctions);
 
       emit(AuctionsLoaded(
-        auctions: response.auctions,
+        auctions: auctions,
         currentPage: response.currentPage,
         lastPage: response.lastPage,
         total: response.total,
@@ -288,10 +316,13 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
         dateRange: _dateRange,
         displayedAuctions: displayed,
         isFetching: false,
+        isLoadingMore: false,
       ));
     } catch (e) {
       if (previous is AuctionsLoaded) {
-        emit(previous.copyWith(isFetching: false));
+        emit(
+          previous.copyWith(isFetching: false, isLoadingMore: false),
+        );
       } else {
         emit(AuctionsError(e.toString()));
       }
@@ -310,6 +341,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
       emit,
       page: page,
       showLoading: !hasData,
+      append: false,
     );
   }
 
@@ -317,7 +349,27 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     GoToAuctionsPageEvent event,
     Emitter<AuctionsState> emit,
   ) async {
-    await _fetchPage(emit, page: event.page, showLoading: false);
+    await _fetchPage(
+      emit,
+      page: event.page,
+      showLoading: false,
+      append: false,
+    );
+  }
+
+  Future<void> _onLoadMore(
+    LoadMoreAuctionsEvent event,
+    Emitter<AuctionsState> emit,
+  ) async {
+    final current = state;
+    if (current is! AuctionsLoaded) return;
+    if (current.hasReachedMax || current.isLoadingMore || _busy) return;
+    await _fetchPage(
+      emit,
+      page: current.currentPage + 1,
+      showLoading: false,
+      append: true,
+    );
   }
 
   void _onFilter(FilterAuctionsEvent event, Emitter<AuctionsState> emit) {

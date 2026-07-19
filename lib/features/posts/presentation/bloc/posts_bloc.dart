@@ -20,6 +20,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   }) : super(PostsInitial()) {
     on<GetAllPostsEvent>(_onGetAll);
     on<LoadMorePostsEvent>(_onLoadMore);
+    on<GoToPostsPageEvent>(_onGoToPage);
     on<FilterPostsByCategoryEvent>(_onFilterCategory);
     on<FilterPostsByTypeEvent>(_onFilterByType);
     on<SearchPostsEvent>(_onSearch);
@@ -58,10 +59,12 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   final GetAllPosts getAllPosts;
   final BulkPostActionUseCase bulkPostAction;
 
-  static const _limit = 20;
+  static const pageLimit = 20;
+  static const _limit = pageLimit;
 
   int _loadRequestId = 0;
   bool _loadMoreBusy = false;
+  bool _goToPageBusy = false;
 
   PostFilters _filters = const PostFilters();
   PostsViewType _viewType = PostsViewType.grid;
@@ -384,6 +387,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           PostsLoaded(
             posts: page.posts,
             currentPage: page.currentPage,
+            lastPage: page.lastPage,
+            total: page.total,
             hasReachedMax: page.hasReachedMax,
             filters: _filters,
             isApplyingFilters: false,
@@ -404,7 +409,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   ) async {
     final current = state;
     if (current is! PostsLoaded) return;
-    if (current.hasReachedMax || _loadMoreBusy) return;
+    if (current.hasReachedMax || _loadMoreBusy || _goToPageBusy) return;
 
     _loadMoreBusy = true;
     emit(_withUiState(current.copyWith(isLoadingMore: true)));
@@ -421,6 +426,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           current.copyWith(
             posts: [...current.posts, ...page.posts],
             currentPage: page.currentPage,
+            lastPage: page.lastPage,
+            total: page.total,
             hasReachedMax: page.hasReachedMax,
             isLoadingMore: false,
           ),
@@ -430,6 +437,76 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       emit(_withUiState(current.copyWith(isLoadingMore: false)));
     } finally {
       _loadMoreBusy = false;
+    }
+  }
+
+  Future<void> _onGoToPage(
+    GoToPostsPageEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    if (event.page < 1 || _goToPageBusy || _loadMoreBusy) return;
+
+    final current = state;
+    if (current is PostsLoaded) {
+      if (event.page == current.currentPage &&
+          current.posts.length <= _limit) {
+        return;
+      }
+      _goToPageBusy = true;
+      emit(
+        _withUiState(
+          current.copyWith(isApplyingFilters: true, isLoadingMore: false),
+        ),
+      );
+    } else {
+      _goToPageBusy = true;
+      emit(PostsLoading());
+    }
+
+    final myId = ++_loadRequestId;
+    final filtersSnapshot = _filters;
+
+    try {
+      final page = await getAllPosts(
+        page: event.page,
+        limit: _limit,
+        filters: filtersSnapshot,
+      );
+
+      if (myId != _loadRequestId) return;
+
+      _selectedPostIds = {};
+
+      if (page.posts.isEmpty) {
+        emit(PostsEmpty(_filters));
+      } else {
+        emit(
+          PostsLoaded(
+            posts: page.posts,
+            currentPage: page.currentPage,
+            lastPage: page.lastPage,
+            total: page.total,
+            hasReachedMax: page.hasReachedMax,
+            filters: _filters,
+            isApplyingFilters: false,
+            viewType: _viewType,
+            selectedPostIds: const {},
+          ),
+        );
+      }
+    } catch (e) {
+      if (myId != _loadRequestId) return;
+      if (current is PostsLoaded) {
+        emit(
+          _withUiState(
+            current.copyWith(isApplyingFilters: false, isLoadingMore: false),
+          ),
+        );
+      } else {
+        emit(PostsError(_messageFrom(e), filters: _filters));
+      }
+    } finally {
+      _goToPageBusy = false;
     }
   }
 

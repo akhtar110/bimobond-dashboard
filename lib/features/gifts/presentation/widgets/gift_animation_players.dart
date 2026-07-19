@@ -5,11 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:video_player/video_player.dart';
-
 import '../../../create_post/presentation/utils/create_post_video_source.dart';
 import '../../../../core/utils/media_url_resolver.dart';
-import '../../domain/utils/gift_animation_byte_sniffer.dart';
 import '../utils/gift_animation_bytes.dart';
+import 'gift_animation_preview.dart';
 /// Picks playable animation JSON inside a DotLottie (.lottie) zip.
 /// Plain `decodeZip` / `firstWhere(.json)` often resolves `manifest.json` first,
 /// which is not a Lottie composition — preview then fails silently.

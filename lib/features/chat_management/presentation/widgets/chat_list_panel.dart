@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../bloc/chat_management_bloc.dart';
@@ -16,11 +17,13 @@ class ChatListPanel extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.onLoadMore,
+    this.useDesktopPagination = false,
   });
 
   final ChatManagementLoaded state;
   final ScrollController scrollController;
   final VoidCallback onLoadMore;
+  final bool useDesktopPagination;
 
   @override
   Widget build(BuildContext context) {
@@ -48,23 +51,6 @@ class ChatListPanel extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 10),
-                TextField(
-                  key: ValueKey('chat-search-${state.listFilterRevision}'),
-                  decoration: InputDecoration(
-                    hintText: l10n.t('searchChats'),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                    isDense: true,
-                    filled: true,
-                    fillColor: scheme.surfaceContainerLowest,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onChanged: (v) => context
-                      .read<ChatManagementBloc>()
-                      .add(ChatsSearchChanged(v)),
-                ),
-                const SizedBox(height: 8),
                 AdminUserSearchField(
                   key: ValueKey('chat-user-${state.listFilterRevision}'),
                   selectedUser: state.filterUser,
@@ -135,6 +121,7 @@ class ChatListPanel extends StatelessWidget {
                       )
                     : NotificationListener<ScrollNotification>(
                         onNotification: (n) {
+                          if (useDesktopPagination) return false;
                           if (n.metrics.pixels >=
                                   n.metrics.maxScrollExtent - 120 &&
                               !state.isLoadingMoreChats) {
@@ -146,7 +133,9 @@ class ChatListPanel extends StatelessWidget {
                           controller: scrollController,
                           padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
                           itemCount: state.chats.length +
-                              (state.isLoadingMoreChats ? 1 : 0),
+                              (!useDesktopPagination && state.isLoadingMoreChats
+                                  ? 1
+                                  : 0),
                           itemBuilder: (context, index) {
                             if (index >= state.chats.length) {
                               return const Padding(
@@ -155,7 +144,9 @@ class ChatListPanel extends StatelessWidget {
                                   child: SizedBox(
                                     width: 20,
                                     height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   ),
                                 ),
                               );
@@ -164,7 +155,8 @@ class ChatListPanel extends StatelessWidget {
                             return ChatCard(
                               chat: chat,
                               isSelected: state.selectedChat?.id == chat.id,
-                              isChecked: state.selectedChatIds.contains(chat.id),
+                              isChecked:
+                                  state.selectedChatIds.contains(chat.id),
                               onTap: () => context
                                   .read<ChatManagementBloc>()
                                   .add(ChatSelected(chat.id)),
@@ -176,6 +168,26 @@ class ChatListPanel extends StatelessWidget {
                         ),
                       ),
           ),
+          if (useDesktopPagination &&
+              state.chatsMeta != null &&
+              state.chatsMeta!.total > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: AppPaginationBar(
+                currentPage: state.chatsMeta!.page,
+                lastPage: state.chatsMeta!.totalPages,
+                total: state.chatsMeta!.total,
+                pageSize: state.chatsMeta!.limit,
+                itemCount: state.chats.length,
+                hideWhenSinglePage: false,
+                borderRadius: BorderRadius.circular(10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                onPageChanged: (page) => context
+                    .read<ChatManagementBloc>()
+                    .add(ChatsGoToPageRequested(page)),
+              ),
+            ),
         ],
       ),
     );

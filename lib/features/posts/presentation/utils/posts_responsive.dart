@@ -24,6 +24,11 @@ class PostsLayoutMetrics {
       deviceType == PostsDeviceType.mobileSmall ||
       deviceType == PostsDeviceType.mobileLarge;
 
+  /// Desktop uses numbered pages; mobile/tablet keep infinite scroll.
+  bool get useDesktopPagination => deviceType == PostsDeviceType.desktop;
+
+  bool get useInfiniteScroll => !useDesktopPagination;
+
   double get pageHorizontalPadding => switch (deviceType) {
         PostsDeviceType.mobileSmall => 8,
         PostsDeviceType.mobileLarge => 10,

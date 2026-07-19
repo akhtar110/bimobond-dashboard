@@ -6,7 +6,9 @@ import '../bloc/sound_crud_bloc.dart';
 import '../bloc/sound_overview_bloc.dart';
 import '../bloc/sounds_bloc.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/state_widgets.dart';
+import '../../../../core/widgets/web_dashboard_layout.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../promotions/presentation/widgets/promotions_dashboard_widgets.dart';
 import '../../../promotions/presentation/widgets/promotions_shared_widgets.dart';
@@ -53,7 +55,42 @@ class _SoundManagementView extends StatefulWidget {
 }
 
 class _SoundManagementViewState extends State<_SoundManagementView> {
+  /// Match [WebDashboardLayout.desktopBreakpoint] so the bar appears whenever
+  /// the permanent desktop sidebar is shown.
+  static const _desktopPaginationBreakpoint =
+      WebDashboardLayout.desktopBreakpoint;
+
+  final _scrollController = ScrollController();
   String? _pendingSoundId;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  bool get _useDesktopPagination =>
+      MediaQuery.sizeOf(context).width > _desktopPaginationBreakpoint;
+
+  void _onScroll() {
+    if (!mounted || !_scrollController.hasClients) return;
+    if (_useDesktopPagination) return;
+
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+      return;
+    }
+    if (position.pixels >= position.maxScrollExtent - 300) {
+      context.read<SoundsBloc>().add(const LoadMoreSoundsEvent());
+    }
+  }
 
   void _refreshOverview() {
     context
@@ -309,6 +346,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
         ),
       ],
       child: PromotionsDashboardShell(
+        scrollController: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -340,6 +378,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                   ),
                   _LibraryContent(
                     preview: preview,
+                    useDesktopPagination: _useDesktopPagination,
                     onEdit: _openEditDialog,
                     onToggleActive: _toggleActive,
                     onDelete: _deleteSound,
@@ -359,6 +398,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
 class _LibraryContent extends StatelessWidget {
   const _LibraryContent({
     required this.preview,
+    required this.useDesktopPagination,
     required this.onEdit,
     required this.onToggleActive,
     required this.onDelete,
@@ -366,6 +406,7 @@ class _LibraryContent extends StatelessWidget {
   });
 
   final SoundPreviewService preview;
+  final bool useDesktopPagination;
   final ValueChanged<SoundEntity> onEdit;
   final ValueChanged<SoundEntity> onToggleActive;
   final ValueChanged<SoundEntity> onDelete;
@@ -510,14 +551,45 @@ class _LibraryContent extends StatelessWidget {
                     onDelete: onDelete,
                   ),
                 ),
-                _PaginationBar(
-                  page: state.meta.page,
-                  totalPages: state.meta.totalPages,
-                  total: state.meta.total,
-                  onPage: (p) => context
-                      .read<SoundsBloc>()
-                      .add(LoadSoundsEvent(page: p)),
-                ),
+                if (useDesktopPagination &&
+                    (state.meta.total > 0 || state.sounds.isNotEmpty))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      PromotionsSpace.md,
+                      0,
+                      PromotionsSpace.md,
+                      PromotionsSpace.md,
+                    ),
+                    child: AppPaginationBar(
+                      currentPage: state.meta.page < 1 ? 1 : state.meta.page,
+                      lastPage: state.meta.totalPages < 1
+                          ? 1
+                          : state.meta.totalPages,
+                      total: state.meta.total > 0
+                          ? state.meta.total
+                          : state.sounds.length,
+                      pageSize: state.meta.limit > 0
+                          ? state.meta.limit
+                          : state.query.limit,
+                      itemCount: state.sounds.length,
+                      hideWhenSinglePage: false,
+                      borderRadius: BorderRadius.circular(12),
+                      onPageChanged: (page) => context
+                          .read<SoundsBloc>()
+                          .add(LoadSoundsEvent(page: page)),
+                    ),
+                  ),
+                if (!useDesktopPagination && state.isLoadingMore)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: PromotionsSpace.md),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -914,63 +986,6 @@ class _CompactFilterDropdown extends StatelessWidget {
               .toList(),
           onChanged: onChanged,
         ),
-      ),
-    );
-  }
-}
-
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({
-    required this.page,
-    required this.totalPages,
-    required this.total,
-    required this.onPage,
-  });
-
-  final int page;
-  final int totalPages;
-  final int total;
-  final ValueChanged<int> onPage;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final compact = MediaQuery.sizeOf(context).width < 520;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PromotionsSpace.lg,
-        vertical: PromotionsSpace.md,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(24),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              compact
-                  ? 'Page $page / $totalPages'
-                  : '$total sounds · Page $page of $totalPages',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-          IconButton(
-            onPressed: page > 1 ? () => onPage(page - 1) : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          IconButton(
-            onPressed: page < totalPages ? () => onPage(page + 1) : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-        ],
       ),
     );
   }

@@ -260,6 +260,11 @@ import 'features/wallets/presentation/bloc/wallets_list_bloc.dart';
 import 'features/wallets/presentation/bloc/withdrawals_bloc.dart';
 import 'features/money_dashboard/domain/usecases/load_money_dashboard_usecase.dart';
 import 'features/money_dashboard/presentation/bloc/money_dashboard_bloc.dart';
+import 'features/platform_profit/data/datasources/platform_profit_remote_datasource.dart';
+import 'features/platform_profit/data/repositories/platform_profit_repository_impl.dart';
+import 'features/platform_profit/domain/repositories/platform_profit_repository.dart';
+import 'features/platform_profit/domain/usecases/platform_profit_usecases.dart';
+import 'features/platform_profit/presentation/bloc/platform_profit_bloc.dart';
 import 'features/users/domain/entities/user_entity.dart';
 
 import 'features/promotions/data/datasources/promotions_remote_datasource.dart';
@@ -1294,6 +1299,46 @@ Future<void> init() async {
       createPackage: sl<CreateCoinPackageUseCase>(),
       updatePackage: sl<UpdateCoinPackageUseCase>(),
       deletePackage: sl<DeleteCoinPackageUseCase>(),
+    ),
+  );
+
+  // =========================================================
+  // PLATFORM PROFIT & REVENUE MODULE
+  // =========================================================
+
+  sl.registerLazySingleton<PlatformProfitRemoteDataSource>(
+    () => PlatformProfitRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<PlatformProfitRepository>(
+    () => PlatformProfitRepositoryImpl(sl<PlatformProfitRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton(
+    () => GetMonetizationAnalyticsUseCase(sl<PlatformProfitRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetGiftRevenueOverviewUseCase(sl<PlatformProfitRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPromotionRevenueUseCase(sl<PlatformProfitRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => LoadPlatformProfitUseCase(
+      getMonetization: sl<GetMonetizationAnalyticsUseCase>(),
+      getGiftRevenue: sl<GetGiftRevenueOverviewUseCase>(),
+      getPromotionRevenue: sl<GetPromotionRevenueUseCase>(),
+      getEconomySetting: sl<GetEconomySettingUseCase>(),
+    ),
+  );
+
+  sl.registerFactoryParam<PlatformProfitBloc, List<UserRole>, void>(
+    (roles, _) => PlatformProfitBloc(
+      loadPlatformProfit: sl<LoadPlatformProfitUseCase>(),
+      getMonetization: sl<GetMonetizationAnalyticsUseCase>(),
+      getGiftRevenue: sl<GetGiftRevenueOverviewUseCase>(),
+      getPromotionRevenue: sl<GetPromotionRevenueUseCase>(),
+      roles: roles,
     ),
   );
 

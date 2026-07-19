@@ -10,7 +10,9 @@ import '../bloc/gifts_bloc.dart';
 import '../utils/gifts_page_layout.dart';
 
 const double kGiftsTableHeaderHeight = 40;
-const double _kRowVPad = 8;
+const double _kRowVPadWide = 10;
+const double _kRowVPadMedium = 8;
+const double _kRowVPadNarrow = 7;
 
 class GiftsTableHeader extends StatelessWidget {
   const GiftsTableHeader({
@@ -58,8 +60,10 @@ class GiftsTableHeader extends StatelessWidget {
           l10n.t('giftNameLabel').replaceAll(' *', ''),
           style: style,
         ),
-        price: Text(l10n.t('giftPriceLabel').replaceAll(' *', ''), style: style),
-        status: Text(l10n.t('activeLabel'), style: style),
+        price: Text('coins', style: style),
+        status: density == GiftsTableDensity.narrow
+            ? const SizedBox.shrink()
+            : Text(l10n.t('activeLabel'), style: style),
         published: density == GiftsTableDensity.narrow
             ? const SizedBox.shrink()
             : Text(l10n.t('publishedAt'), style: style),
@@ -77,6 +81,7 @@ class GiftsTableRow extends StatefulWidget {
     required this.isSelected,
     required this.onSelectionChanged,
     required this.onEdit,
+    this.onPreview,
     required this.onDelete,
   });
 
@@ -85,6 +90,7 @@ class GiftsTableRow extends StatefulWidget {
   final bool isSelected;
   final ValueChanged<bool?> onSelectionChanged;
   final VoidCallback onEdit;
+  final VoidCallback? onPreview;
   final VoidCallback onDelete;
 
   @override
@@ -101,14 +107,20 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final gift = widget.gift;
+    final density = widget.density;
+    final fontSize = switch (density) {
+      GiftsTableDensity.wide => 12.5,
+      GiftsTableDensity.medium => 12.0,
+      GiftsTableDensity.narrow => 11.5,
+    };
     final cellStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize: 12,
+          fontSize: fontSize,
           height: 1.25,
         );
     final published = gift.publishedAt;
     final publishedLabel = published != null
-        ? widget.density == GiftsTableDensity.medium
-            ? DateFormat('MMM d, yyyy').format(published.toLocal())
+        ? density == GiftsTableDensity.medium
+            ? DateFormat('MMM d').format(published.toLocal())
             : _dateFmt.format(published.toLocal())
         : '—';
 
@@ -118,6 +130,12 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
             ? scheme.surfaceContainerHighest
             : scheme.surface;
 
+    final rowVPad = switch (density) {
+      GiftsTableDensity.wide => _kRowVPadWide,
+      GiftsTableDensity.medium => _kRowVPadMedium,
+      GiftsTableDensity.narrow => _kRowVPadNarrow,
+    };
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -125,11 +143,11 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
         color: bg,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: _rowHorizontalPadding(widget.density),
-            vertical: _kRowVPad,
+            horizontal: _rowHorizontalPadding(density),
+            vertical: rowVPad,
           ),
           child: _GiftsTableRowLayout(
-            density: widget.density,
+            density: density,
             checkbox: Checkbox(
               value: widget.isSelected,
               onChanged: widget.onSelectionChanged,
@@ -138,14 +156,14 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
             ),
             giftName: Row(
               children: [
-                _GiftTableThumb(gift: gift, density: widget.density),
+                _GiftTableThumb(gift: gift, density: density),
                 SizedBox(
-                  width: widget.density == GiftsTableDensity.narrow ? 8 : 10,
+                  width: density == GiftsTableDensity.narrow ? 6 : 10,
                 ),
                 Expanded(
                   child: Text(
                     gift.name,
-                    maxLines: widget.density == GiftsTableDensity.narrow ? 1 : 2,
+                    maxLines: density == GiftsTableDensity.narrow ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -153,13 +171,18 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
               ],
             ),
             price: Text(
-              CoinFormat.coins(gift.priceCoins),
+              '🪙 ${CoinFormat.coinsAmount(gift.priceCoins)}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cellStyle?.copyWith(fontWeight: FontWeight.w700),
             ),
-            status: _GiftStatusChip(isActive: gift.isActive),
-            published: widget.density == GiftsTableDensity.narrow
+            status: density == GiftsTableDensity.narrow
+                ? const SizedBox.shrink()
+                : _GiftStatusChip(
+                    isActive: gift.isActive,
+                    compact: density == GiftsTableDensity.medium,
+                  ),
+            published: density == GiftsTableDensity.narrow
                 ? const SizedBox.shrink()
                 : Text(
                     publishedLabel,
@@ -167,15 +190,16 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
                     overflow: TextOverflow.ellipsis,
                     style: cellStyle?.copyWith(
                       color: scheme.onSurfaceVariant,
-                      fontSize: 11,
+                      fontSize: density == GiftsTableDensity.medium ? 10.5 : 11,
                     ),
                   ),
             actions: _GiftTableActions(
               gift: gift,
               l10n: l10n,
               scheme: scheme,
-              compact: widget.density == GiftsTableDensity.narrow,
+              density: density,
               onEdit: widget.onEdit,
+              onPreview: widget.onPreview,
               onDelete: widget.onDelete,
             ),
           ),
@@ -278,24 +302,24 @@ class _GiftsTableColumnSpec {
 _GiftsTableColumnSpec _columnSpec(GiftsTableDensity density) =>
     switch (density) {
       GiftsTableDensity.wide => const _GiftsTableColumnSpec(
-          actionsWidth: 132,
+          actionsWidth: 156,
           nameFlex: 7,
           priceFlex: 2,
           statusFlex: 2,
           publishedFlex: 3,
         ),
       GiftsTableDensity.medium => const _GiftsTableColumnSpec(
-          actionsWidth: 118,
+          actionsWidth: 148,
           nameFlex: 6,
           priceFlex: 2,
           statusFlex: 2,
-          publishedFlex: 3,
+          publishedFlex: 2,
         ),
       GiftsTableDensity.narrow => const _GiftsTableColumnSpec(
-          actionsWidth: 96,
-          nameFlex: 6,
-          priceFlex: 2,
-          statusFlex: 2,
+          actionsWidth: 136,
+          nameFlex: 7,
+          priceFlex: 3,
+          statusFlex: 0,
           publishedFlex: 0,
         ),
     };
@@ -327,19 +351,36 @@ class _GiftsTableRowLayout extends StatelessWidget {
     final showPublished = density != GiftsTableDensity.narrow;
     final cellPad = _cellHorizontalPadding(density);
 
+    final showStatus =
+        density != GiftsTableDensity.narrow && spec.statusFlex > 0;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(width: _kCheckboxWidth, child: checkbox),
+        SizedBox(
+          width: density == GiftsTableDensity.narrow ? 32 : _kCheckboxWidth,
+          child: checkbox,
+        ),
         Expanded(flex: spec.nameFlex, child: _cell(giftName, cellPad)),
         Expanded(flex: spec.priceFlex, child: _cell(price, cellPad)),
-        Expanded(flex: spec.statusFlex, child: _cell(status, cellPad)),
+        if (showStatus)
+          Expanded(flex: spec.statusFlex, child: _cell(status, cellPad)),
         if (showPublished)
           Expanded(
             flex: spec.publishedFlex,
             child: _cell(published, cellPad),
           ),
-        SizedBox(width: spec.actionsWidth, child: _cell(actions, cellPad)),
+        SizedBox(
+          width: spec.actionsWidth,
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerEnd,
+              child: actions,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -368,9 +409,9 @@ class _GiftTableThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final size = switch (density) {
-      GiftsTableDensity.wide => 42.0,
-      GiftsTableDensity.medium => 40.0,
-      GiftsTableDensity.narrow => 34.0,
+      GiftsTableDensity.wide => 44.0,
+      GiftsTableDensity.medium => 38.0,
+      GiftsTableDensity.narrow => 32.0,
     };
 
     return ClipRRect(
@@ -406,8 +447,12 @@ class _GiftTableThumb extends StatelessWidget {
 }
 
 class _GiftStatusChip extends StatelessWidget {
-  const _GiftStatusChip({required this.isActive});
+  const _GiftStatusChip({
+    required this.isActive,
+    this.compact = false,
+  });
   final bool isActive;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -416,7 +461,10 @@ class _GiftStatusChip extends StatelessWidget {
     final color = isActive ? scheme.primary : scheme.onSurfaceVariant;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 7,
+        vertical: compact ? 2 : 3,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
@@ -426,7 +474,7 @@ class _GiftStatusChip extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 10.5,
+          fontSize: compact ? 10 : 10.5,
           fontWeight: FontWeight.w600,
           color: color,
         ),
@@ -440,81 +488,123 @@ class _GiftTableActions extends StatelessWidget {
     required this.gift,
     required this.l10n,
     required this.scheme,
-    required this.compact,
+    required this.density,
     required this.onEdit,
+    this.onPreview,
     required this.onDelete,
   });
 
   final GiftEntity gift;
   final AppLocalizations l10n;
   final ColorScheme scheme;
-  final bool compact;
+  final GiftsTableDensity density;
   final VoidCallback onEdit;
+  final VoidCallback? onPreview;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final toggleBtn = Tooltip(
-      message: gift.isActive ? l10n.t('deactivate') : l10n.t('activate'),
-      child: IconButton(
-        onPressed: () => context.read<GiftsBloc>().add(
-              ToggleGiftActiveEvent(gift.id, !gift.isActive),
-            ),
-        icon: Icon(
-          gift.isActive
-              ? Icons.visibility_rounded
-              : Icons.visibility_off_rounded,
-          size: 16,
-          color: gift.isActive ? scheme.tertiary : scheme.primary,
-        ),
-        visualDensity: VisualDensity.compact,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-      ),
-    );
-
-    final deleteBtn = IconButton(
-      onPressed: onDelete,
-      icon: Icon(Icons.delete_outline_rounded, size: 16, color: scheme.error),
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-    );
-
-    if (compact) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          IconButton(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded, size: 16),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-          ),
-          toggleBtn,
-          deleteBtn,
-        ],
-      );
-    }
+    final buttonSize = switch (density) {
+      GiftsTableDensity.wide => 30.0,
+      GiftsTableDensity.medium => 28.0,
+      GiftsTableDensity.narrow => 26.0,
+    };
+    final gap = density == GiftsTableDensity.narrow ? 3.0 : 4.0;
+    final iconSize = buttonSize <= 26 ? 13.0 : 15.0;
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        TextButton.icon(
+        if (onPreview != null) ...[
+          _TableActionIconButton(
+            size: buttonSize,
+            iconSize: iconSize,
+            tooltip: l10n.tOr('previewGift', 'Preview gift'),
+            icon: Icons.preview_outlined,
+            onPressed: onPreview,
+          ),
+          SizedBox(width: gap),
+        ],
+        _TableActionIconButton(
+          size: buttonSize,
+          iconSize: iconSize,
+          tooltip: l10n.t('edit'),
+          icon: Icons.edit_rounded,
           onPressed: onEdit,
-          icon: const Icon(Icons.edit_rounded, size: 14),
-          label: Text(l10n.t('edit'), style: const TextStyle(fontSize: 11)),
-          style: TextButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            minimumSize: const Size(0, 30),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        SizedBox(width: gap),
+        Tooltip(
+          message: gift.isActive ? l10n.t('deactivate') : l10n.t('activate'),
+          child: SizedBox(
+            width: buttonSize,
+            height: buttonSize,
+            child: IconButton.outlined(
+              onPressed: () => context.read<GiftsBloc>().add(
+                    ToggleGiftActiveEvent(gift.id, !gift.isActive),
+                  ),
+              icon: Icon(
+                gift.isActive
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_off_rounded,
+                size: iconSize,
+                color: gift.isActive ? scheme.tertiary : scheme.primary,
+              ),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints.tightFor(
+                width: buttonSize,
+                height: buttonSize,
+              ),
+            ),
           ),
         ),
-        toggleBtn,
-        deleteBtn,
+        SizedBox(width: gap),
+        _TableActionIconButton(
+          size: buttonSize,
+          iconSize: iconSize,
+          tooltip: l10n.t('delete'),
+          icon: Icons.delete_outline_rounded,
+          iconColor: scheme.error,
+          onPressed: onDelete,
+        ),
       ],
+    );
+  }
+}
+
+class _TableActionIconButton extends StatelessWidget {
+  const _TableActionIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    required this.size,
+    required this.iconSize,
+    this.iconColor,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final double size;
+  final double iconSize;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: IconButton.outlined(
+          onPressed: onPressed,
+          icon: Icon(icon, size: iconSize, color: iconColor),
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: BoxConstraints.tightFor(width: size, height: size),
+        ),
+      ),
     );
   }
 }

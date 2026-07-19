@@ -5,13 +5,13 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../features/categories/presentation/widgets/category_icon.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
-import '../utils/posts_responsive.dart';
+import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 import 'post_list_thumbnail.dart';
 import 'posts_table_view.dart';
-import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 
-/// Fixed thumbnail height — card body grows with content below.
-const double kPostCardThumbnailHeight = 176;
+/// Compact thumbnail aspect — wider than tall so cards stay shorter.
+const double kPostCardThumbnailAspectCompact = 1.65;
+const double kPostCardThumbnailAspect = 1.75;
 
 class PostCard extends StatefulWidget {
   const PostCard({super.key, required this.post, this.onTap});
@@ -33,81 +33,107 @@ class _PostCardState extends State<PostCard> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 220;
+        final compact = constraints.maxWidth < 170;
         final bodyPadding = compact ? 6.0 : 8.0;
-        final descFontSize = compact ? 11.5 : 12.5;
+        final radius = compact ? 10.0 : 12.0;
 
         return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: widget.onTap != null
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.basic,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(compact ? 10 : 12),
-            border: Border.all(
-              color: _hovered
-                  ? scheme.primary.withValues(alpha: 0.35)
-                  : scheme.outlineVariant,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: scheme.shadow.withValues(
-                  alpha: _hovered ? 0.08 : 0.03,
-                ),
-                blurRadius: _hovered ? 14 : 8,
-                offset: Offset(0, _hovered ? 4 : 2),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MediaPreview(
-                post: widget.post,
-                cardWidth: constraints.maxWidth,
-              ),
-              Padding(
-                padding: EdgeInsets.all(bodyPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _UserDateRow(post: widget.post, isDark: isDark, compact: compact),
-                    if (widget.post.description != null &&
-                        widget.post.description!.isNotEmpty) ...[
-                      SizedBox(height: compact ? 4 : 6),
-                      Text(
-                        widget.post.description!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurface,
-                          height: 1.35,
-                          fontSize: descFontSize,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          cursor: widget.onTap != null
+              ? SystemMouseCursors.click
+              : SystemMouseCursors.basic,
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: AnimatedScale(
+              scale: _hovered ? 1.01 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              child: AnimatedSlide(
+                offset: _hovered ? const Offset(0, -0.012) : Offset.zero,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(
+                      color: _hovered
+                          ? scheme.primary.withValues(alpha: 0.42)
+                          : scheme.outlineVariant.withValues(alpha: 0.85),
+                      width: _hovered ? 1.2 : 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(
+                          alpha: _hovered
+                              ? (isDark ? 0.45 : 0.12)
+                              : (isDark ? 0.28 : 0.05),
                         ),
+                        blurRadius: _hovered ? 18 : 10,
+                        spreadRadius: _hovered ? 0.5 : 0,
+                        offset: Offset(0, _hovered ? 8 : 3),
                       ),
+                      if (_hovered)
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: 0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
                     ],
-                    SizedBox(height: compact ? 4 : 6),
-                    _CategoryStatusRow(post: widget.post, compact: compact),
-                    SizedBox(height: compact ? 4 : 6),
-                    _StatsRow(post: widget.post, isDark: isDark, compact: compact),
-                  ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(radius),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _MediaPreview(
+                          post: widget.post,
+                          compact: compact,
+                          hovered: _hovered,
+                        ),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            bodyPadding,
+                            compact ? 5 : 6,
+                            bodyPadding,
+                            bodyPadding,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _UserDateRow(
+                                post: widget.post,
+                                isDark: isDark,
+                                compact: compact,
+                              ),
+                              SizedBox(height: compact ? 4 : 5),
+                              _CategoryStatusRow(
+                                post: widget.post,
+                                compact: compact,
+                              ),
+                              SizedBox(height: compact ? 4 : 5),
+                              _StatsRow(
+                                post: widget.post,
+                                isDark: isDark,
+                                compact: compact,
+                                hovered: _hovered,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
+        );
       },
     );
   }
@@ -118,10 +144,15 @@ class _PostCardState extends State<PostCard> {
 // ─────────────────────────────────────────────────────────────
 
 class _MediaPreview extends StatelessWidget {
-  const _MediaPreview({required this.post, required this.cardWidth});
+  const _MediaPreview({
+    required this.post,
+    required this.compact,
+    required this.hovered,
+  });
 
   final ManagedPostEntity post;
-  final double cardWidth;
+  final bool compact;
+  final bool hovered;
 
   String? get _mediaUrl => post.previewThumbnailUrl;
   bool get _isVideo => post.containsVideoMedia;
@@ -129,12 +160,13 @@ class _MediaPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mediaUrl = _mediaUrl;
 
-    return SizedBox(
-      height: postCardThumbnailHeight(cardWidth),
-      width: double.infinity,
+    return AspectRatio(
+      aspectRatio:
+          compact ? kPostCardThumbnailAspectCompact : kPostCardThumbnailAspect,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -150,51 +182,108 @@ class _MediaPreview extends StatelessWidget {
             )
           else
             _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
+          // Subtle readability gradient
+          IgnorePointer(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    scheme.scrim.withValues(alpha: hovered ? 0.08 : 0.04),
+                    Colors.transparent,
+                    Colors.transparent,
+                    scheme.scrim.withValues(alpha: hovered ? 0.28 : 0.18),
+                  ],
+                  stops: const [0, 0.35, 0.65, 1],
+                ),
+              ),
+            ),
+          ),
           if (_isVideo)
             Center(
-              child: Builder(
-                builder: (context) {
-                  final scheme = Theme.of(context).colorScheme;
-                  return Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: scheme.scrim.withValues(alpha: 0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: scheme.onPrimary,
-                      size: 22,
-                    ),
-                  );
-                },
-              ),
+              child: _GlassPlayBadge(compact: compact),
             ),
           if (_isCarousel)
             Positioned(
-              top: 6,
-              right: 6,
-              child: Builder(
-                builder: (context) {
-                  final scheme = Theme.of(context).colorScheme;
-                  return Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: scheme.scrim.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      Icons.collections_outlined,
-                      color: scheme.onPrimary,
-                      size: 12,
-                    ),
-                  );
-                },
+              top: compact ? 6 : 7,
+              right: compact ? 6 : 7,
+              child: const _GlassMediaBadge(
+                icon: Icons.collections_rounded,
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _GlassPlayBadge extends StatelessWidget {
+  const _GlassPlayBadge({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final size = compact ? 34.0 : 38.0;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: scheme.surface.withValues(alpha: 0.28),
+        border: Border.all(
+          color: scheme.onPrimary.withValues(alpha: 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.scrim.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Icon(
+        Icons.play_arrow_rounded,
+        color: scheme.onPrimary,
+        size: compact ? 20 : 22,
+      ),
+    );
+  }
+}
+
+class _GlassMediaBadge extends StatelessWidget {
+  const _GlassMediaBadge({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: scheme.onPrimary.withValues(alpha: 0.45),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.scrim.withValues(alpha: 0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Icon(
+        icon,
+        color: scheme.onPrimary,
+        size: 12,
       ),
     );
   }
@@ -245,29 +334,51 @@ class _UserDateRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final name = postDisplayAuthor(post);
     final dateStr = DateFormat('MMM d, yyyy').format(post.createdAt);
-    final nameSize = compact ? 11.0 : 12.0;
-    final dateSize = compact ? 9.5 : 10.5;
+    final nameSize = compact ? 10.5 : 11.5;
+    final dateSize = compact ? 9.0 : 10.0;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Avatar(url: post.userProfileImage, name: name, isDark: isDark, compact: compact),
+        _Avatar(
+          url: post.userProfileImage,
+          name: name,
+          isDark: isDark,
+          compact: compact,
+        ),
         SizedBox(width: compact ? 5 : 6),
         Expanded(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: nameSize,
-              color: scheme.onSurface,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                maxLines: 2,
+                softWrap: true,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: nameSize,
+                      height: 1.2,
+                      letterSpacing: -0.1,
+                      color: scheme.onSurface,
+                    ),
+              ),
+              SizedBox(height: compact ? 2 : 3),
+              Text(
+                dateStr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: dateSize,
+                  color: scheme.onSurfaceVariant,
+                  height: 1.1,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          dateStr,
-          style: TextStyle(fontSize: dateSize, color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -293,24 +404,40 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final radius = compact ? 12.0 : 14.0;
-    if (url != null && url!.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: CachedNetworkImageProvider(url!),
-        backgroundColor: scheme.surfaceContainerHighest,
-      );
-    }
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: scheme.primaryContainer,
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: TextStyle(
-          fontSize: compact ? 10 : 11,
-          fontWeight: FontWeight.w700,
-          color: scheme.onPrimaryContainer,
+
+    return Container(
+      padding: const EdgeInsets.all(1.5),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: scheme.primary.withValues(alpha: 0.22),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
+      child: url != null && url!.isNotEmpty
+          ? CircleAvatar(
+              radius: radius,
+              backgroundImage: CachedNetworkImageProvider(url!),
+              backgroundColor: scheme.surfaceContainerHighest,
+            )
+          : CircleAvatar(
+              radius: radius,
+              backgroundColor: scheme.primaryContainer,
+              child: Text(
+                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+            ),
     );
   }
 }
@@ -357,11 +484,11 @@ class _StatusBadge extends StatelessWidget {
     final icon = postStatusIcon(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: fg.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: fg.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: fg.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -374,6 +501,7 @@ class _StatusBadge extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: fg,
+              letterSpacing: 0.1,
             ),
           ),
         ],
@@ -414,11 +542,11 @@ class _CategoryBadge extends StatelessWidget {
     final color = _colorFor(slug);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -457,6 +585,7 @@ class _StatsRow extends StatelessWidget {
     required this.post,
     required this.isDark,
     this.compact = false,
+    this.hovered = false,
   });
 
   final ManagedPostEntity post;
@@ -464,45 +593,59 @@ class _StatsRow extends StatelessWidget {
   /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
   final bool compact;
+  final bool hovered;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = scheme.onSurfaceVariant;
 
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: compact ? 3 : 4),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: EdgeInsets.symmetric(
+        vertical: compact ? 3 : 4,
+        horizontal: compact ? 2 : 3,
+      ),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+        color: hovered
+            ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
+            : scheme.surfaceContainerLowest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: hovered ? 0.8 : 0.55),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
-            child: _Stat(
+            child: _StatChip(
               icon: Icons.visibility_outlined,
               value: post.viewCount,
-              color: color,
+              accent: scheme.primary,
+              compact: compact,
             ),
           ),
           Expanded(
-            child: _Stat(
-              icon: Icons.favorite_border,
+            child: _StatChip(
+              icon: Icons.favorite_border_rounded,
               value: post.likeCount,
-              color: color,
+              accent: scheme.error,
+              compact: compact,
             ),
           ),
           Expanded(
-            child: _Stat(
-              icon: Icons.chat_bubble_outline,
+            child: _StatChip(
+              icon: Icons.chat_bubble_outline_rounded,
               value: post.commentCount,
-              color: color,
+              accent: scheme.tertiary,
+              compact: compact,
             ),
           ),
           Expanded(
-            child: _Stat(
+            child: _StatChip(
               icon: Icons.share_outlined,
               value: post.shareCount,
-              color: color,
+              accent: scheme.secondary,
+              compact: compact,
             ),
           ),
         ],
@@ -511,16 +654,18 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
-class _Stat extends StatelessWidget {
-  const _Stat({
+class _StatChip extends StatelessWidget {
+  const _StatChip({
     required this.icon,
     required this.value,
-    required this.color,
+    required this.accent,
+    this.compact = false,
   });
 
   final IconData icon;
   final int value;
-  final Color color;
+  final Color accent;
+  final bool compact;
 
   String _format(int n) {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
@@ -530,21 +675,40 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 12, color: color),
-        const SizedBox(width: 2),
-        Text(
-          _format(value),
-          style: TextStyle(
-            fontSize: 10.5,
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 1 : 2),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 3 : 4,
+          vertical: compact ? 2 : 3,
         ),
-      ],
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: compact ? 11 : 12, color: accent),
+            SizedBox(width: compact ? 2 : 3),
+            Flexible(
+              child: Text(
+                _format(value),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 9.5 : 10.5,
+                  color: scheme.onSurface.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -619,18 +783,25 @@ class PostCardSkeleton extends StatelessWidget {
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: scheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: kPostCardThumbnailHeight,
+          AspectRatio(
+            aspectRatio: kPostCardThumbnailAspect,
             child: _ShimmerBox(isDark: isDark),
           ),
           Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -643,20 +814,16 @@ class PostCardSkeleton extends StatelessWidget {
                     _SkeletonLine(width: 52, height: 8, base: base),
                   ],
                 ),
-                const SizedBox(height: 8),
-                _SkeletonLine(width: double.infinity, height: 9, base: base),
-                const SizedBox(height: 4),
-                _SkeletonLine(width: 120, height: 9, base: base),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   children: [
-                    _SkeletonLine(width: 56, height: 18, base: base, radius: 20),
+                    _SkeletonLine(width: 56, height: 18, base: base, radius: 8),
                     const SizedBox(width: 6),
-                    _SkeletonLine(width: 48, height: 18, base: base, radius: 20),
+                    _SkeletonLine(width: 48, height: 18, base: base, radius: 8),
                   ],
                 ),
-                const SizedBox(height: 8),
-                _SkeletonLine(width: double.infinity, height: 20, base: base),
+                const SizedBox(height: 6),
+                _SkeletonLine(width: double.infinity, height: 24, base: base, radius: 8),
               ],
             ),
           ),

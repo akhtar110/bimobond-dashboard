@@ -285,6 +285,7 @@ class _DesktopTabletTable extends StatelessWidget {
                 currentPage: state.currentPage,
                 lastPage: state.lastPage,
                 total: state.total,
+                itemCount: state.users.length,
               );
             },
             builder: (context, data) {
@@ -293,6 +294,7 @@ class _DesktopTabletTable extends StatelessWidget {
                 currentPage: data.currentPage,
                 lastPage: data.lastPage,
                 total: data.total,
+                itemCount: data.itemCount,
               );
             },
           ),
@@ -429,17 +431,20 @@ class _PaginationData {
     required this.currentPage,
     required this.lastPage,
     required this.total,
+    required this.itemCount,
   }) : visible = true;
 
   const _PaginationData.empty()
       : currentPage = 1,
         lastPage = 1,
         total = 0,
+        itemCount = 0,
         visible = false;
 
   final int currentPage;
   final int lastPage;
   final int total;
+  final int itemCount;
   final bool visible;
 }
 

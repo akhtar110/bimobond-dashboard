@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../bloc/auctions_bloc.dart';
@@ -13,12 +14,14 @@ import '../utils/auctions_responsive.dart';
 import '../widgets/auction_card.dart';
 
 /// Responsive column count for admin catalog grids.
+/// Matches [giftsGridColumnCount] so auction cards share the same card width.
 int adminGridColumnCount(double width) {
-  if (width > 1600) return 6;
-  if (width > 1300) return 5;
-  if (width > 1000) return 4;
-  if (width > 700) return 3;
-  if (width > 500) return 2;
+  if (width > 1500) return 7;
+  if (width > 1200) return 6;
+  if (width > 980) return 5;
+  if (width > 760) return 4;
+  if (width > 520) return 3;
+  if (width > 360) return 2;
   return 1;
 }
 
@@ -45,6 +48,37 @@ class _AuctionsPageView extends StatefulWidget {
 }
 
 class _AuctionsPageViewState extends State<_AuctionsPageView> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!mounted || !_scrollController.hasClients) return;
+
+    final width = MediaQuery.sizeOf(context).width;
+    final metrics = AuctionsLayoutMetrics(getAuctionsDeviceType(width));
+    if (!metrics.useInfiniteScroll) return;
+
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+      return;
+    }
+    if (position.pixels >= position.maxScrollExtent - 300) {
+      context.read<AuctionsBloc>().add(LoadMoreAuctionsEvent());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -52,8 +86,9 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final windowWidth = MediaQuery.sizeOf(context).width;
         final metrics = AuctionsLayoutMetrics(
-          getAuctionsDeviceType(constraints.maxWidth),
+          getAuctionsDeviceType(windowWidth),
         );
 
         return Scaffold(
@@ -62,6 +97,7 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
             listener: (context, state) {},
             builder: (context, state) {
               return CustomScrollView(
+                controller: _scrollController,
                 slivers: [
                   _SliverHeader(
                     theme: theme,
@@ -76,8 +112,21 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
                       metrics: metrics,
                     ),
                     _SliverGrid(loaded: state, metrics: metrics),
-                    if (state.lastPage > 1)
+                    if (metrics.useDesktopPagination && state.total > 0)
                       _SliverPagination(loaded: state, metrics: metrics),
+                    if (metrics.useInfiniteScroll && state.isLoadingMore)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                      ),
                   ] else if (state is AuctionsLoading) ...[
                     _SliverSkeletons(metrics: metrics),
                   ] else if (state is AuctionsError) ...[
@@ -779,9 +828,6 @@ class _SliverPagination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bloc = context.read<AuctionsBloc>();
-    final scheme = Theme.of(context).colorScheme;
-
     return SliverToBoxAdapter(
       child: Center(
         child: ConstrainedBox(
@@ -793,36 +839,16 @@ class _SliverPagination extends StatelessWidget {
               metrics.pageHorizontalPadding,
               0,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  onPressed: loaded.currentPage > 1
-                      ? () => bloc.add(
-                            GoToAuctionsPageEvent(loaded.currentPage - 1),
-                          )
-                      : null,
-                  icon: const Icon(Icons.chevron_left_rounded),
-                  color: scheme.onSurfaceVariant,
-                ),
-                Text(
-                  '${loaded.currentPage} / ${loaded.lastPage}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                IconButton(
-                  onPressed: loaded.currentPage < loaded.lastPage
-                      ? () => bloc.add(
-                            GoToAuctionsPageEvent(loaded.currentPage + 1),
-                          )
-                      : null,
-                  icon: const Icon(Icons.chevron_right_rounded),
-                  color: scheme.onSurfaceVariant,
-                ),
-              ],
+            child: AppPaginationBar(
+              currentPage: loaded.currentPage,
+              lastPage: loaded.lastPage,
+              total: loaded.total,
+              pageSize: AuctionsBloc.pageLimit,
+              itemCount: loaded.auctions.length,
+              hideWhenSinglePage: false,
+              borderRadius: BorderRadius.circular(12),
+              onPageChanged: (page) =>
+                  context.read<AuctionsBloc>().add(GoToAuctionsPageEvent(page)),
             ),
           ),
         ),

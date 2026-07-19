@@ -11,6 +11,15 @@ class GetAllPostsEvent extends PostsEvent {}
 
 class LoadMorePostsEvent extends PostsEvent {}
 
+class GoToPostsPageEvent extends PostsEvent {
+  const GoToPostsPageEvent(this.page);
+
+  final int page;
+
+  @override
+  List<Object?> get props => [page];
+}
+
 class FilterPostsByCategoryEvent extends PostsEvent {
   FilterPostsByCategoryEvent({
     this.categoryId,

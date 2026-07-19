@@ -13,11 +13,13 @@ class PostsGridView extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.onPostTap,
+    this.useInfiniteScroll = true,
   });
 
   final PostsLoaded state;
   final ScrollController scrollController;
   final void Function(ManagedPostEntity) onPostTap;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -74,9 +76,11 @@ class PostsGridView extends StatelessWidget {
                 childCount: rowCount,
               ),
             ),
-            if (state.isLoadingMore)
+            if (useInfiniteScroll && state.isLoadingMore)
               const SliverToBoxAdapter(child: PostsLoadMoreIndicator()),
-            if (state.hasReachedMax && posts.isNotEmpty)
+            if (useInfiniteScroll &&
+                state.hasReachedMax &&
+                posts.isNotEmpty)
               SliverToBoxAdapter(child: PostsEndOfListLabel()),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],

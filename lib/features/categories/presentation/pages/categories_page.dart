@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/l10n_message.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../injection_container.dart' as di;
 import '../bloc/categories_bloc.dart';
 import '../utils/categories_page_layout.dart';
@@ -90,19 +91,24 @@ class _CategoriesPageBody extends StatelessWidget {
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
         final scheme = theme.colorScheme;
+        final metrics = categoriesMetricsOf(context);
 
         return LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            final hasTree = state is CategoriesLoaded &&
-                (state.catalogCategories.isNotEmpty ||
-                    state.searchQuery.trim().isNotEmpty ||
-                    state.filter != CategoryFilter.all ||
-                    state.typeFilter != CategoryTypeFilter.all);
+            final loaded = state is CategoriesLoaded ? state : null;
+            final hasTree = loaded != null &&
+                (loaded.catalogCategories.isNotEmpty ||
+                    loaded.searchQuery.trim().isNotEmpty ||
+                    loaded.filter != CategoryFilter.all ||
+                    loaded.typeFilter != CategoryTypeFilter.all);
             final hPad = _horizontalPadding(width);
             final vPad = _verticalPadding(width, hasTree);
             final sectionGap = _sectionSpacing(width, hasTree);
             final compactHeader = width < 720;
+            final showDesktopPagination = metrics.useDesktopPagination &&
+                loaded != null &&
+                loaded.rootsTotalCount > 0;
 
             return ColoredBox(
               color: scheme.surfaceContainerLowest,
@@ -158,6 +164,10 @@ class _CategoriesPageBody extends StatelessWidget {
                                 )
                               : _buildBody(context, state, isDark),
                         ),
+                        if (showDesktopPagination) ...[
+                          SizedBox(height: width < 720 ? 8 : 10),
+                          _CategoriesDesktopPagination(state: loaded),
+                        ],
                       ],
                     ),
                   ),
@@ -202,5 +212,29 @@ class _CategoriesPageBody extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+class _CategoriesDesktopPagination extends StatelessWidget {
+  const _CategoriesDesktopPagination({required this.state});
+
+  final CategoriesLoaded state;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = state.pagedLeftPanelRoots(infiniteScroll: false);
+
+    return AppPaginationBar(
+      currentPage: state.currentPage,
+      lastPage: state.lastPage,
+      total: state.rootsTotalCount,
+      pageSize: CategoriesBloc.pageLimit,
+      itemCount: visible.length,
+      // Keep visible even for a single page so the footer is never missing.
+      hideWhenSinglePage: false,
+      borderRadius: BorderRadius.circular(12),
+      onPageChanged: (page) =>
+          context.read<CategoriesBloc>().add(GoToCategoriesPageEvent(page)),
+    );
   }
 }

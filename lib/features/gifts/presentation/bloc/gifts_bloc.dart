@@ -113,6 +113,13 @@ class ClearGiftSelectionEvent extends GiftsEvent {}
 
 class ClearGiftsBulkFeedbackEvent extends GiftsEvent {}
 
+class GoToGiftsPageEvent extends GiftsEvent {
+  GoToGiftsPageEvent(this.page);
+  final int page;
+}
+
+class LoadMoreGiftsEvent extends GiftsEvent {}
+
 class DeleteSelectedGiftsEvent extends GiftsEvent {}
 
 class ActivateSelectedGiftsEvent extends GiftsEvent {}
@@ -147,6 +154,7 @@ class GiftsLoaded extends GiftsState {
     this.isPerformingBulkAction = false,
     this.bulkActionMessage,
     this.bulkActionIsError = false,
+    this.currentPage = 1,
   }) : selectedGiftIds = Set.unmodifiable(selectedGiftIds ?? const {});
 
   final List<GiftEntity> gifts;
@@ -177,6 +185,9 @@ class GiftsLoaded extends GiftsState {
   final String? bulkActionMessage;
   final bool bulkActionIsError;
 
+  /// 1-based page for desktop paging / infinite-scroll accumulation.
+  final int currentPage;
+
   bool get isSelectionMode => selectedGiftIds.isNotEmpty;
   int get selectedCount => selectedGiftIds.length;
 
@@ -186,6 +197,33 @@ class GiftsLoaded extends GiftsState {
 
   bool get someVisibleSelected =>
       displayed.any((g) => selectedGiftIds.contains(g.id));
+
+  int get giftsTotalCount => displayed.length;
+
+  int get lastPage {
+    final total = giftsTotalCount;
+    if (total <= 0) return 1;
+    return (total + GiftsBloc.pageLimit - 1) ~/ GiftsBloc.pageLimit;
+  }
+
+  bool get hasReachedMaxGifts => currentPage >= lastPage;
+
+  /// Desktop: one page slice. Infinite scroll: first N pages accumulated.
+  List<GiftEntity> pagedDisplayed({required bool infiniteScroll}) {
+    final items = displayed;
+    if (items.isEmpty) return const [];
+
+    final pageSize = GiftsBloc.pageLimit;
+    if (infiniteScroll) {
+      final end = (currentPage * pageSize).clamp(0, items.length);
+      return items.sublist(0, end);
+    }
+
+    final start = (currentPage - 1) * pageSize;
+    if (start >= items.length) return const [];
+    final end = (start + pageSize).clamp(0, items.length);
+    return items.sublist(start, end);
+  }
 
   // ── All filters + sort applied here, never in the UI ─────────────────────
 
@@ -314,6 +352,7 @@ class GiftsLoaded extends GiftsState {
     String? bulkActionMessage,
     bool? bulkActionIsError,
     bool clearBulkActionMessage = false,
+    int? currentPage,
   }) {
     return GiftsLoaded(
       gifts: gifts ?? this.gifts,
@@ -347,6 +386,7 @@ class GiftsLoaded extends GiftsState {
           ? null
           : (bulkActionMessage ?? this.bulkActionMessage),
       bulkActionIsError: bulkActionIsError ?? this.bulkActionIsError,
+      currentPage: currentPage ?? this.currentPage,
     );
   }
 }
@@ -392,6 +432,8 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     on<DeleteSelectedGiftsEvent>(_onBulkAction);
     on<ActivateSelectedGiftsEvent>(_onBulkAction);
     on<DeactivateSelectedGiftsEvent>(_onBulkAction);
+    on<GoToGiftsPageEvent>(_onGoToPage);
+    on<LoadMoreGiftsEvent>(_onLoadMore);
   }
 
   final GetAdminGifts _getAdminGifts;
@@ -399,6 +441,8 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   final UpdateGift _updateGift;
   final DeleteGift _deleteGift;
   final BulkGiftActionUseCase _bulkGiftAction;
+
+  static const pageLimit = 20;
 
   GiftsViewType _viewType = GiftsViewType.grid;
   Set<String> _selectedGiftIds = {};
@@ -574,7 +618,9 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
       final gifts = await _getAdminGifts();
       if (prev is GiftsLoaded) {
         _viewType = prev.viewType;
-        emit(_withUiState(prev.copyWith(gifts: gifts, clearMessages: true)));
+        emit(_withUiState(
+          prev.copyWith(gifts: gifts, currentPage: 1, clearMessages: true),
+        ));
       } else {
         emit(GiftsLoaded(gifts: gifts, viewType: _viewType));
       }
@@ -591,7 +637,11 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   ) {
     final c = state;
     if (c is GiftsLoaded) {
-      emit(c.copyWith(selectedTab: event.filter, clearMessages: true));
+      emit(c.copyWith(
+        selectedTab: event.filter,
+        currentPage: 1,
+        clearMessages: true,
+      ));
     }
   }
 
@@ -601,15 +651,38 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   ) {
     final c = state;
     if (c is GiftsLoaded) {
-      emit(c.copyWith(selectedSort: event.sortType, clearMessages: true));
+      emit(c.copyWith(
+        selectedSort: event.sortType,
+        currentPage: 1,
+        clearMessages: true,
+      ));
     }
   }
 
   void _onSearch(SearchGiftsEvent event, Emitter<GiftsState> emit) {
     final c = state;
     if (c is GiftsLoaded) {
-      emit(c.copyWith(searchQuery: event.query, clearMessages: true));
+      emit(c.copyWith(
+        searchQuery: event.query,
+        currentPage: 1,
+        clearMessages: true,
+      ));
     }
+  }
+
+  void _onGoToPage(GoToGiftsPageEvent event, Emitter<GiftsState> emit) {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+    final page = event.page.clamp(1, c.lastPage);
+    if (page == c.currentPage) return;
+    emit(c.copyWith(currentPage: page, clearMessages: true));
+  }
+
+  void _onLoadMore(LoadMoreGiftsEvent event, Emitter<GiftsState> emit) {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+    if (c.hasReachedMaxGifts) return;
+    emit(c.copyWith(currentPage: c.currentPage + 1, clearMessages: true));
   }
 
   void _onSetDateRange(
@@ -622,6 +695,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         setDateRange: true,
         fromDate: event.fromDate,
         toDate: event.toDate,
+        currentPage: 1,
         clearMessages: true,
       ));
     }
@@ -639,6 +713,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
       setPriceRange: true,
       minPriceFilter: normalized.$1,
       maxPriceFilter: normalized.$2,
+      currentPage: 1,
       clearMessages: true,
     ));
   }

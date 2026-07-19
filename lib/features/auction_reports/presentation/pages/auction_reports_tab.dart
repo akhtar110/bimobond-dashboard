@@ -153,6 +153,8 @@ class _AuctionReportsTabState extends State<AuctionReportsTab>
                   page: state.currentPage,
                   totalPages: state.lastPage,
                   total: state.total,
+                  pageSize: 20,
+                  itemCount: state.auctions.length,
                   itemLabel: 'auctions',
                   onPage: (page) => context
                       .read<AuctionReportsBloc>()

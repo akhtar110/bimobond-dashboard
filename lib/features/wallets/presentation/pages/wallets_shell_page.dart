@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../auth/domain/utils/dashboard_permissions.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../money_dashboard/presentation/bloc/money_dashboard_bloc.dart';
 import '../../../money_dashboard/presentation/pages/money_dashboard_page.dart';
+import '../../../platform_profit/presentation/bloc/platform_profit_bloc.dart';
+import '../../../platform_profit/presentation/pages/platform_profit_page.dart';
 import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../bloc/coin_packages_bloc.dart';
@@ -36,6 +37,7 @@ enum WalletsSection {
   fiatPurchases,
   withdrawals,
   coinPackages,
+  platformProfit,
 }
 
 class WalletsShellPage extends StatefulWidget {
@@ -60,7 +62,9 @@ class _WalletsShellPageState extends State<WalletsShellPage> {
             e.$1 == WalletsSection.overview ||
             e.$1 == WalletsSection.ledger ||
             e.$1 == WalletsSection.fiatPurchases ||
-            e.$1 == WalletsSection.withdrawals)
+            e.$1 == WalletsSection.withdrawals ||
+            (e.$1 == WalletsSection.platformProfit &&
+                roles.contains(UserRole.moderator)))
         .toList();
   }
 
@@ -104,6 +108,10 @@ class _WalletsShellPageState extends State<WalletsShellPage> {
         BlocProvider(
           create: (_) =>
               di.sl<CoinPackagesBloc>()..add(LoadCoinPackagesEvent()),
+        ),
+        BlocProvider(
+          create: (_) => di.sl<PlatformProfitBloc>(param1: roles)
+            ..add(const LoadPlatformProfit()),
         ),
       ],
       child: ColoredBox(
@@ -197,6 +205,9 @@ class _WalletsSectionView extends StatelessWidget {
       WalletsSection.coinPackages => CoinPackagesPage(
           key: ValueKey('wallets_section_packages_$localeCode'),
         ),
+      WalletsSection.platformProfit => PlatformProfitPage(
+          key: ValueKey('wallets_section_platform_profit_$localeCode'),
+        ),
     };
   }
 }
@@ -244,6 +255,14 @@ List<(WalletsSection, IconData, String)> _walletsNavItems(
       WalletsSection.coinPackages,
       Icons.inventory_2_outlined,
       walletL10nOr(context, 'walletNavCoinPackages', 'Coin Packages'),
+    ),
+    (
+      WalletsSection.platformProfit,
+      Icons.workspace_premium_outlined,
+      walletL10nOr(context,
+        'walletNavPlatformProfit',
+        'Platform Profit & Revenue',
+      ),
     ),
   ];
 }

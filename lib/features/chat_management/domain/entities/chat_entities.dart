@@ -1,6 +1,14 @@
 import 'package:equatable/equatable.dart';
 
-enum ChatMessageType { text, audio, image, video, postShare, unknown }
+enum ChatMessageType {
+  text,
+  audio,
+  image,
+  video,
+  postShare,
+  location,
+  unknown,
+}
 
 enum ChatBulkAction { deleteChats, deleteMessages }
 
@@ -22,6 +30,8 @@ ChatMessageType chatMessageTypeFromApi(String? raw) {
       return ChatMessageType.video;
     case 'POST_SHARE':
       return ChatMessageType.postShare;
+    case 'LOCATION':
+      return ChatMessageType.location;
     default:
       return ChatMessageType.unknown;
   }
@@ -39,6 +49,8 @@ String chatMessageTypeToApi(ChatMessageType type) {
       return 'VIDEO';
     case ChatMessageType.postShare:
       return 'POST_SHARE';
+    case ChatMessageType.location:
+      return 'LOCATION';
     case ChatMessageType.unknown:
       return 'TEXT';
   }
@@ -235,6 +247,83 @@ class ChatReadReceipt extends Equatable {
   List<Object?> get props => [id, messageId, userId, readAt, user];
 }
 
+/// Embedded post summary on POST_SHARE messages (`sharedPost` from API).
+class ChatSharedPostSummary extends Equatable {
+  const ChatSharedPostSummary({
+    required this.id,
+    this.description,
+    this.thumbnailUrl,
+    this.type,
+    this.userName,
+    this.userFullName,
+    this.userProfileImage,
+  });
+
+  final String id;
+  final String? description;
+  final String? thumbnailUrl;
+  final String? type;
+  final String? userName;
+  final String? userFullName;
+  final String? userProfileImage;
+
+  @override
+  List<Object?> get props => [
+        id,
+        description,
+        thumbnailUrl,
+        type,
+        userName,
+        userFullName,
+        userProfileImage,
+      ];
+}
+
+/// LOCATION message payload (`payload` from API).
+class ChatMessageLocationPayload extends Equatable {
+  const ChatMessageLocationPayload({
+    required this.latitude,
+    required this.longitude,
+    this.name,
+    this.address,
+    this.placeId,
+  });
+
+  final double latitude;
+  final double longitude;
+  final String? name;
+  final String? address;
+  final String? placeId;
+
+  String get displayTitle {
+    final trimmedName = name?.trim();
+    if (trimmedName != null && trimmedName.isNotEmpty) return trimmedName;
+    final trimmedAddress = address?.trim();
+    if (trimmedAddress != null && trimmedAddress.isNotEmpty) return trimmedAddress;
+    return '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+  }
+
+  String? get displaySubtitle {
+    final trimmedName = name?.trim();
+    final trimmedAddress = address?.trim();
+    if (trimmedName != null &&
+        trimmedName.isNotEmpty &&
+        trimmedAddress != null &&
+        trimmedAddress.isNotEmpty &&
+        trimmedAddress != trimmedName) {
+      return trimmedAddress;
+    }
+    return null;
+  }
+
+  String get mapsQueryUrl =>
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
+
+  @override
+  List<Object?> get props =>
+      [latitude, longitude, name, address, placeId];
+}
+
 class ChatMessageEntity extends Equatable {
   const ChatMessageEntity({
     required this.id,
@@ -244,6 +333,8 @@ class ChatMessageEntity extends Equatable {
     this.content,
     this.mediaUrl,
     this.sharedPostId,
+    this.sharedPost,
+    this.locationPayload,
     this.replyToId,
     required this.isDeleted,
     required this.createdAt,
@@ -261,6 +352,8 @@ class ChatMessageEntity extends Equatable {
   final String? content;
   final String? mediaUrl;
   final String? sharedPostId;
+  final ChatSharedPostSummary? sharedPost;
+  final ChatMessageLocationPayload? locationPayload;
   final String? replyToId;
   final bool isDeleted;
   final DateTime createdAt;
@@ -279,6 +372,8 @@ class ChatMessageEntity extends Equatable {
         content,
         mediaUrl,
         sharedPostId,
+        sharedPost,
+        locationPayload,
         replyToId,
         isDeleted,
         createdAt,
@@ -371,6 +466,8 @@ class ChatMessageAnalytics extends Equatable {
           audio++;
         case ChatMessageType.postShare:
           postShare++;
+        case ChatMessageType.location:
+          break;
         case ChatMessageType.unknown:
           text++;
       }

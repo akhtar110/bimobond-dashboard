@@ -15,153 +15,108 @@ class GiftCard extends StatelessWidget {
     super.key,
     required this.gift,
     this.onEdit,
+    this.onPreview,
     this.onDelete,
   });
 
   final GiftEntity gift;
   final VoidCallback? onEdit;
+  final VoidCallback? onPreview;
   final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 220;
-        final bodyPadding = compact
-            ? const EdgeInsets.fromLTRB(10, 8, 10, 10)
-            : const EdgeInsets.fromLTRB(14, 12, 14, 14);
-        final sectionGap = compact ? 6.0 : 8.0;
-        final actionGap = compact ? 6.0 : 8.0;
-        final borderRadius = compact ? 10.0 : 14.0;
-        final actionSize = compact ? 32.0 : 36.0;
+        final width = constraints.maxWidth;
+        final compact = width < 170;
+        final dense = width < 210;
+        final bodyPadding = EdgeInsets.fromLTRB(
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+        );
+        final gap = compact ? 4.0 : 5.0;
+        final borderRadius = compact ? 10.0 : 12.0;
+        final actionSize = compact ? 26.0 : 28.0;
+        final actionGap = compact ? 4.0 : 5.0;
 
         return Container(
           decoration: BoxDecoration(
             color: scheme.surface,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: scheme.outlineVariant),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.8),
+            ),
             boxShadow: [
               BoxShadow(
                 color: scheme.shadow.withValues(alpha: 0.04),
-                blurRadius: compact ? 8 : 14,
-                offset: Offset(0, compact ? 2 : 4),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          clipBehavior: Clip.hardEdge,
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
               _GiftThumbnail(gift: gift, compact: compact),
               Padding(
                 padding: bodyPadding,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    Text(
+                      gift.name,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                        fontSize: compact ? 12 : 12.5,
+                        letterSpacing: -0.1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: gap),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            gift.name,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.25,
-                                  fontSize: compact ? 13 : null,
-                                ),
-                            maxLines: compact ? 1 : 2,
-                            overflow: TextOverflow.ellipsis,
+                        Flexible(
+                          child: _PriceChip(
+                            priceCoins: gift.priceCoins,
+                            compact: true,
                           ),
                         ),
-                        SizedBox(width: actionGap),
-                        _ActiveBadge(isActive: gift.isActive, compact: compact),
-                      ],
-                    ),
-                    SizedBox(height: sectionGap),
-                    _PublishedDate(gift: gift, compact: compact),
-                    SizedBox(height: sectionGap),
-                    Wrap(
-                      spacing: actionGap,
-                      runSpacing: compact ? 4 : 6,
-                      children: [
-                        _PriceChip(priceCoins: gift.priceCoins, compact: compact),
                         if (gift.animationUrl != null &&
-                            gift.animationUrl!.isNotEmpty)
-                          _MiniChip(
-                            icon: Icons.animation_rounded,
-                            label: compact ? '' : 'Animated',
-                            compact: compact,
+                            gift.animationUrl!.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.animation_rounded,
+                            size: 13,
+                            color: scheme.onSurfaceVariant,
                           ),
+                        ],
+                        const Spacer(),
+                        _PublishedDate(gift: gift, compact: true),
                       ],
                     ),
-                    SizedBox(height: compact ? 8 : 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: actionSize,
-                            child: OutlinedButton.icon(
-                              onPressed: onEdit,
-                              icon: Icon(
-                                Icons.edit_rounded,
-                                size: compact ? 14 : 16,
-                              ),
-                              label: Text(
-                                l10n.t('edit'),
-                                style: TextStyle(fontSize: compact ? 11 : 12),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: compact ? 8 : 10,
-                                ),
-                                minimumSize: Size(0, actionSize),
-                                maximumSize: Size(double.infinity, actionSize),
-                                fixedSize: Size.fromHeight(actionSize),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    compact ? 6 : 8,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: actionGap),
-                        _ToggleButton(gift: gift, size: actionSize),
-                        SizedBox(width: actionGap),
-                        SizedBox(
-                          width: actionSize,
-                          height: actionSize,
-                          child: IconButton.outlined(
-                            onPressed: onDelete,
-                            icon: Icon(
-                              Icons.delete_outline_rounded,
-                              size: compact ? 14 : 16,
-                              color: scheme.error,
-                            ),
-                            padding: EdgeInsets.zero,
-                            style: IconButton.styleFrom(
-                              minimumSize: Size(actionSize, actionSize),
-                              maximumSize: Size(actionSize, actionSize),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  compact ? 6 : 8,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    SizedBox(height: dense ? 6 : 8),
+                    _GiftActionBar(
+                      gift: gift,
+                      actionSize: actionSize,
+                      actionGap: actionGap,
+                      onPreview: onPreview,
+                      onEdit: onEdit,
+                      onDelete: onDelete,
+                      previewTooltip: l10n.tOr('previewGift', 'Preview gift'),
+                      editTooltip: l10n.t('edit'),
+                      deleteTooltip: l10n.t('delete'),
                     ),
                   ],
                 ),
@@ -174,6 +129,87 @@ class GiftCard extends StatelessWidget {
   }
 }
 
+class _GiftActionBar extends StatelessWidget {
+  const _GiftActionBar({
+    required this.gift,
+    required this.actionSize,
+    required this.actionGap,
+    required this.previewTooltip,
+    required this.editTooltip,
+    required this.deleteTooltip,
+    this.onPreview,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  final GiftEntity gift;
+  final double actionSize;
+  final double actionGap;
+  final String previewTooltip;
+  final String editTooltip;
+  final String deleteTooltip;
+  final VoidCallback? onPreview;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final actions = <Widget>[
+      if (onPreview != null)
+        _ActionIconButton(
+          size: actionSize,
+          icon: Icons.preview_outlined,
+          tooltip: previewTooltip,
+          onPressed: onPreview,
+        ),
+      _ActionIconButton(
+        size: actionSize,
+        icon: Icons.edit_rounded,
+        tooltip: editTooltip,
+        onPressed: onEdit,
+      ),
+      _ToggleButton(gift: gift, size: actionSize),
+      _ActionIconButton(
+        size: actionSize,
+        icon: Icons.delete_outline_rounded,
+        tooltip: deleteTooltip,
+        iconColor: scheme.error,
+        onPressed: onDelete,
+      ),
+    ];
+
+    return Align(
+      alignment: Alignment.center,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow.withValues(alpha: 0.75),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: actionGap + 2,
+            vertical: 3,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) SizedBox(width: actionGap),
+                actions[i],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Published date ───────────────────────────────────────────────────────────
 
 class _PublishedDate extends StatelessWidget {
@@ -181,35 +217,30 @@ class _PublishedDate extends StatelessWidget {
   final GiftEntity gift;
   final bool compact;
 
-  static final _fmt = DateFormat('MMM d, yyyy · HH:mm');
+  static final _fmt = DateFormat('MMM d');
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final date = gift.publishedAt;
+    if (date == null) return const SizedBox.shrink();
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           Icons.calendar_today_outlined,
-          size: compact ? 11 : 12,
+          size: compact ? 10 : 11,
           color: scheme.onSurfaceVariant,
         ),
-        SizedBox(width: compact ? 4 : 5),
-        Expanded(
-          child: Text(
-            date != null
-                ? (compact
-                    ? DateFormat('MMM d, yyyy').format(date.toLocal())
-                    : 'Published ${_fmt.format(date.toLocal())}')
-                : 'Publish date unavailable',
-            style: TextStyle(
-              fontSize: compact ? 10 : 11,
-              color: scheme.onSurfaceVariant,
-              height: 1.3,
-            ),
-            maxLines: compact ? 1 : 2,
-            overflow: TextOverflow.ellipsis,
+        SizedBox(width: compact ? 3 : 4),
+        Text(
+          _fmt.format(date.toLocal()),
+          style: TextStyle(
+            fontSize: compact ? 9.5 : 10.5,
+            color: scheme.onSurfaceVariant,
+            height: 1.1,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -229,17 +260,19 @@ class _PriceChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 10,
-        vertical: compact ? 4 : 5,
+        horizontal: compact ? 6 : 8,
+        vertical: compact ? 2 : 3,
       ),
       decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(compact ? 6 : 8),
+        color: scheme.primaryContainer.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        CoinFormat.coins(priceCoins),
+        '🪙 ${CoinFormat.coinsAmount(priceCoins)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: compact ? 12 : 13,
+          fontSize: compact ? 11 : 12,
           fontWeight: FontWeight.w700,
           color: scheme.onPrimaryContainer,
         ),
@@ -248,55 +281,13 @@ class _PriceChip extends StatelessWidget {
   }
 }
 
-// ─── Mini chip ────────────────────────────────────────────────────────────────
-
-class _MiniChip extends StatelessWidget {
-  const _MiniChip({
-    required this.icon,
-    required this.label,
-    this.compact = false,
-  });
-  final IconData icon;
-  final String label;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 6 : 8,
-        vertical: compact ? 3 : 4,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(compact ? 6 : 8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: compact ? 11 : 12, color: scheme.onSurfaceVariant),
-          if (label.isNotEmpty) ...[
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: compact ? 10 : 11,
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Thumbnail ────────────────────────────────────────────────────────────────
 
 class _GiftThumbnail extends StatelessWidget {
-  const _GiftThumbnail({required this.gift, this.compact = false});
+  const _GiftThumbnail({
+    required this.gift,
+    this.compact = false,
+  });
   final GiftEntity gift;
   final bool compact;
 
@@ -304,29 +295,39 @@ class _GiftThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return AspectRatio(
-      aspectRatio: compact ? 1.1 : 4 / 3,
-      child: gift.thumbnailUrl.isNotEmpty
-          ? ColoredBox(
-              color: scheme.surfaceContainerHighest,
-              child: CachedNetworkImage(
-                imageUrl: gift.thumbnailUrl,
-                fit: BoxFit.contain,
-                placeholder: (_, __) => _placeholder(scheme, compact),
-                errorWidget: (_, __, ___) => _placeholder(scheme, compact),
-              ),
-            )
-          : _placeholder(scheme, compact),
+      // Wider than tall so grid cards stay shorter.
+      aspectRatio: compact ? 1.45 : 1.55,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+            child: gift.thumbnailUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: gift.thumbnailUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) =>
+                        _placeholder(scheme, compact),
+                    errorWidget: (context, url, error) =>
+                        _placeholder(scheme, compact),
+                  )
+                : _placeholder(scheme, compact),
+          ),
+          Positioned(
+            top: compact ? 5 : 6,
+            right: compact ? 5 : 6,
+            child: _ActiveBadge(isActive: gift.isActive, compact: true),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _placeholder(ColorScheme scheme, bool compact) => ColoredBox(
-        color: scheme.surfaceContainerHighest,
-        child: Center(
-          child: Icon(
-            Icons.card_giftcard_rounded,
-            size: compact ? 28 : 40,
-            color: scheme.onSurfaceVariant,
-          ),
+  Widget _placeholder(ColorScheme scheme, bool compact) => Center(
+        child: Icon(
+          Icons.card_giftcard_rounded,
+          size: compact ? 24 : 28,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
         ),
       );
 }
@@ -343,25 +344,27 @@ class _ActiveBadge extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final fg = isActive ? scheme.primary : scheme.onSurfaceVariant;
-    final bg =
-        isActive ? scheme.primaryContainer : scheme.surfaceContainerHigh;
+    final bg = isActive
+        ? scheme.primaryContainer.withValues(alpha: 0.95)
+        : scheme.surface.withValues(alpha: 0.92);
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 6 : 8,
-        vertical: compact ? 3 : 4,
+        horizontal: compact ? 5 : 7,
+        vertical: compact ? 2 : 3,
       ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: fg.withValues(alpha: 0.16)),
       ),
       child: Text(
         isActive ? l10n.t('activeLabel') : l10n.t('inactive'),
         style: TextStyle(
           color: fg,
-          fontSize: compact ? 9 : 10,
+          fontSize: compact ? 8.5 : 9.5,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
+          letterSpacing: 0.15,
         ),
       ),
     );
@@ -371,7 +374,7 @@ class _ActiveBadge extends StatelessWidget {
 // ─── Toggle button ────────────────────────────────────────────────────────────
 
 class _ToggleButton extends StatelessWidget {
-  const _ToggleButton({required this.gift, this.size = 36});
+  const _ToggleButton({required this.gift, this.size = 28});
   final GiftEntity gift;
   final double size;
 
@@ -392,7 +395,7 @@ class _ToggleButton extends StatelessWidget {
             gift.isActive
                 ? Icons.visibility_rounded
                 : Icons.visibility_off_rounded,
-            size: size <= 32 ? 14 : 16,
+            size: size <= 26 ? 13 : 14,
             color: gift.isActive ? scheme.tertiary : scheme.primary,
           ),
           padding: EdgeInsets.zero,
@@ -402,7 +405,52 @@ class _ToggleButton extends StatelessWidget {
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(size <= 32 ? 6 : 8),
+              borderRadius: BorderRadius.circular(7),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionIconButton extends StatelessWidget {
+  const _ActionIconButton({
+    required this.size,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.iconColor,
+  });
+
+  final double size;
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Tooltip(
+        message: tooltip,
+        child: IconButton.outlined(
+          onPressed: onPressed,
+          icon: Icon(
+            icon,
+            size: size <= 26 ? 13 : 14,
+            color: iconColor,
+          ),
+          padding: EdgeInsets.zero,
+          style: IconButton.styleFrom(
+            minimumSize: Size(size, size),
+            maximumSize: Size(size, size),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(7),
             ),
           ),
         ),
@@ -449,15 +497,18 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 220;
-        final borderRadius = compact ? 10.0 : 14.0;
-        final bodyPadding = compact
-            ? const EdgeInsets.fromLTRB(10, 8, 10, 10)
-            : const EdgeInsets.fromLTRB(14, 12, 14, 14);
+        final compact = constraints.maxWidth < 170;
+        final borderRadius = compact ? 10.0 : 12.0;
+        final bodyPadding = EdgeInsets.fromLTRB(
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+        );
 
         return AnimatedBuilder(
           animation: _anim,
-          builder: (_, __) {
+          builder: (context, child) {
             final c = Color.lerp(base, hi, _anim.value)!;
             return Container(
               decoration: BoxDecoration(
@@ -465,12 +516,13 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
                 borderRadius: BorderRadius.circular(borderRadius),
                 border: Border.all(color: scheme.outlineVariant),
               ),
-              clipBehavior: Clip.hardEdge,
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   AspectRatio(
-                    aspectRatio: compact ? 1.1 : 4 / 3,
+                    aspectRatio: compact ? 1.45 : 1.55,
                     child: ColoredBox(color: c),
                   ),
                   Padding(
@@ -478,13 +530,11 @@ class _GiftCardSkeletonState extends State<GiftCardSkeleton>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sh(c, compact ? 120 : 150, compact ? 12 : 14),
-                        SizedBox(height: compact ? 6 : 8),
-                        _sh(c, compact ? 90 : 110, compact ? 10 : 11),
-                        SizedBox(height: compact ? 6 : 8),
-                        _sh(c, compact ? 70 : 80, compact ? 22 : 26, r: 8),
-                        SizedBox(height: compact ? 8 : 12),
-                        _sh(c, double.infinity, compact ? 32 : 36, r: 8),
+                        _sh(c, compact ? 90 : 110, 12),
+                        const SizedBox(height: 5),
+                        _sh(c, compact ? 70 : 90, 16, r: 6),
+                        const SizedBox(height: 7),
+                        _sh(c, compact ? 108 : 124, 32, r: 8),
                       ],
                     ),
                   ),

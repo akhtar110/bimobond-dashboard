@@ -21,6 +21,10 @@ class LoadSoundsEvent extends SoundsEvent {
   List<Object?> get props => [refresh, page];
 }
 
+class LoadMoreSoundsEvent extends SoundsEvent {
+  const LoadMoreSoundsEvent();
+}
+
 class SearchSoundsEvent extends SoundsEvent {
   const SearchSoundsEvent(this.query);
   final String query;
@@ -111,6 +115,7 @@ class SoundsLoaded extends SoundsState {
     required this.query,
     this.selectedIds = const {},
     this.isRefreshing = false,
+    this.isLoadingMore = false,
   });
 
   final List<SoundEntity> sounds;
@@ -118,6 +123,7 @@ class SoundsLoaded extends SoundsState {
   final SoundsQuery query;
   final Set<String> selectedIds;
   final bool isRefreshing;
+  final bool isLoadingMore;
 
   SoundsLoaded copyWith({
     List<SoundEntity>? sounds,
@@ -125,6 +131,7 @@ class SoundsLoaded extends SoundsState {
     SoundsQuery? query,
     Set<String>? selectedIds,
     bool? isRefreshing,
+    bool? isLoadingMore,
     bool clearSelection = false,
   }) {
     return SoundsLoaded(
@@ -133,6 +140,7 @@ class SoundsLoaded extends SoundsState {
       query: query ?? this.query,
       selectedIds: clearSelection ? const {} : (selectedIds ?? this.selectedIds),
       isRefreshing: isRefreshing ?? this.isRefreshing,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
@@ -146,9 +154,11 @@ class SoundsLoaded extends SoundsState {
   bool get someVisibleSelected =>
       selectedIds.isNotEmpty && !allVisibleSelected;
 
+  bool get hasReachedMax => meta.hasReachedMax;
+
   @override
   List<Object?> get props =>
-      [sounds, meta, query, selectedIds, isRefreshing];
+      [sounds, meta, query, selectedIds, isRefreshing, isLoadingMore];
 }
 
 class SoundsEmpty extends SoundsState {
@@ -171,6 +181,7 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
       : _getSounds = getSounds,
         super(SoundsInitial()) {
     on<LoadSoundsEvent>(_onLoad);
+    on<LoadMoreSoundsEvent>(_onLoadMore);
     on<SearchSoundsEvent>(_onSearch);
     on<SortSoundsEvent>(_onSort);
     on<FilterSoundsActiveEvent>(_onFilterActive);
@@ -185,6 +196,7 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
   final GetSoundsUseCase _getSounds;
   Timer? _searchDebounce;
   SoundsQuery _query = const SoundsQuery();
+  bool _busy = false;
 
   @override
   Future<void> close() {
@@ -198,14 +210,15 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
   ) async {
     final current = state;
     if (current is SoundsLoaded) {
-      emit(current.copyWith(isRefreshing: true));
+      emit(current.copyWith(isRefreshing: true, isLoadingMore: false));
     } else if (current is SoundsEmpty) {
       emit(SoundsEmpty(query: _query, isLoading: true));
     } else {
       emit(SoundsLoading());
     }
 
-    _query = _query.copyWith(page: event.page ?? _query.page);
+    final page = event.refresh ? 1 : (event.page ?? _query.page);
+    _query = _query.copyWith(page: page);
 
     try {
       final result = await _getSounds(_query);
@@ -225,12 +238,48 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
       }
     } catch (e) {
       if (current is SoundsLoaded) {
-        emit(current.copyWith(isRefreshing: false));
+        emit(current.copyWith(isRefreshing: false, isLoadingMore: false));
       } else if (current is SoundsEmpty) {
         emit(SoundsEmpty(query: _query));
       } else {
         emit(SoundsError(e.toString()));
       }
+    }
+  }
+
+  Future<void> _onLoadMore(
+    LoadMoreSoundsEvent event,
+    Emitter<SoundsState> emit,
+  ) async {
+    final current = state;
+    if (current is! SoundsLoaded) return;
+    if (current.hasReachedMax || current.isLoadingMore || _busy) return;
+
+    _busy = true;
+    emit(current.copyWith(isLoadingMore: true));
+    final nextPage = current.meta.page + 1;
+    _query = _query.copyWith(page: nextPage);
+
+    try {
+      final result = await _getSounds(_query);
+      final existingIds = current.sounds.map((s) => s.id).toSet();
+      final appended = [
+        ...current.sounds,
+        for (final sound in result.data)
+          if (!existingIds.contains(sound.id)) sound,
+      ];
+      emit(
+        SoundsLoaded(
+          sounds: appended,
+          meta: result.meta,
+          query: _query,
+          selectedIds: current.selectedIds,
+        ),
+      );
+    } catch (_) {
+      emit(current.copyWith(isLoadingMore: false));
+    } finally {
+      _busy = false;
     }
   }
 

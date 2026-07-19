@@ -22,6 +22,11 @@ class GiftsLayoutMetrics {
       deviceType == GiftsDeviceType.mobileSmall ||
       deviceType == GiftsDeviceType.mobileLarge;
 
+  /// Desktop uses numbered pages; mobile/tablet keep infinite scroll.
+  bool get useDesktopPagination => deviceType == GiftsDeviceType.desktop;
+
+  bool get useInfiniteScroll => !useDesktopPagination;
+
   double get pageHorizontalPadding => switch (deviceType) {
         GiftsDeviceType.mobileSmall => 8,
         GiftsDeviceType.mobileLarge => 10,

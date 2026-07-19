@@ -38,8 +38,10 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     on<ChatManagementStopped>(_onStopped);
     on<ChatsRefreshed>(_onChatsRefreshed);
     on<ChatsLoadMoreRequested>(_onChatsLoadMore);
+    on<ChatsGoToPageRequested>(_onChatsGoToPage);
     on<ChatSelected>(_onChatSelected);
     on<MessagesLoadMoreRequested>(_onMessagesLoadMore);
+    on<MessagesGoToPageRequested>(_onMessagesGoToPage);
     on<ChatsSearchChanged>(_onChatsSearchChanged);
     on<ChatsTypeFilterChanged>(_onChatsTypeFilterChanged);
     on<ChatsParticipantFilterChanged>(_onChatsParticipantFilterChanged);
@@ -244,7 +246,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
       _joinedChatId = chatId;
       _socketService.joinChat(chatId);
       if (refreshMessages) {
-        await _loadAllMessagePages(emit, chatId: chatId, refresh: true);
+        await _fetchMessages(emit, chatId: chatId, refresh: true);
       }
     } catch (e) {
       _failureMessage = _errorMessage(e);
@@ -351,25 +353,6 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     }
   }
 
-  Future<void> _loadAllMessagePages(
-    Emitter<ChatManagementState> emit, {
-    required String chatId,
-    required bool refresh,
-    int maxPages = 25,
-  }) async {
-    await _fetchMessages(emit, chatId: chatId, refresh: refresh);
-    var pagesLoaded = 1;
-    while (_messagesMeta?.hasNextPage == true && pagesLoaded < maxPages) {
-      await _fetchMessages(
-        emit,
-        chatId: chatId,
-        refresh: false,
-        loadMore: true,
-      );
-      pagesLoaded++;
-    }
-  }
-
   Future<void> _onChatsLoadMore(
     ChatsLoadMoreRequested event,
     Emitter<ChatManagementState> emit,
@@ -380,6 +363,44 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
         loadMore: true,
         generation: _chatLoadGeneration,
       );
+
+  Future<void> _onChatsGoToPage(
+    ChatsGoToPageRequested event,
+    Emitter<ChatManagementState> emit,
+  ) async {
+    final target = event.page < 1 ? 1 : event.page;
+    final last = _chatsMeta?.totalPages ?? 1;
+    if (target > last && _chatsMeta != null) return;
+    if (target == (_chatsMeta?.page ?? _listQuery.page) && _chats.isNotEmpty) {
+      return;
+    }
+
+    final generation = ++_chatLoadGeneration;
+    _listQuery = _listQuery.copyWith(page: target);
+    _chats = [];
+    _chatsMeta = null;
+    _selectedChatIds.clear();
+    _isLoadingChats = true;
+    _emitLoaded(emit);
+
+    try {
+      final page = await _fetchChatsPage(_listQuery);
+      if (generation != _chatLoadGeneration) return;
+      _chats = page.chats;
+      _chatsMeta = page.meta;
+      _listQuery = _listQuery.copyWith(page: page.meta.page);
+      _failureMessage = null;
+    } catch (e) {
+      if (generation == _chatLoadGeneration) {
+        _failureMessage = _errorMessage(e);
+      }
+    } finally {
+      if (generation == _chatLoadGeneration) {
+        _isLoadingChats = false;
+        _emitLoaded(emit);
+      }
+    }
+  }
 
   Future<void> _onChatSelected(
     ChatSelected event,
@@ -416,6 +437,25 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     final chatId = _selectedChat?.id;
     if (chatId == null) return;
     await _fetchMessages(emit, chatId: chatId, refresh: false, loadMore: true);
+  }
+
+  Future<void> _onMessagesGoToPage(
+    MessagesGoToPageRequested event,
+    Emitter<ChatManagementState> emit,
+  ) async {
+    final chatId = _selectedChat?.id;
+    if (chatId == null) return;
+
+    final target = event.page < 1 ? 1 : event.page;
+    final last = _messagesMeta?.totalPages ?? 1;
+    if (target > last && _messagesMeta != null) return;
+    if (target == (_messagesMeta?.page ?? _messagesQuery.page) &&
+        _messages.isNotEmpty) {
+      return;
+    }
+
+    _messagesQuery = _messagesQuery.copyWith(page: target);
+    await _fetchMessages(emit, chatId: chatId, refresh: false, loadMore: false);
   }
 
   Future<void> _onChatsSearchChanged(
@@ -612,7 +652,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     Emitter<ChatManagementState> emit,
   ) async {
     if (_selectedChat?.id != event.chatId) return;
-    await _loadAllMessagePages(emit, chatId: event.chatId, refresh: true);
+    await _fetchMessages(emit, chatId: event.chatId, refresh: true);
   }
 
   Future<void> _onMessagesTypeFilterChanged(
@@ -626,7 +666,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     _selectedMessageIds.clear();
     _messagesFilterRevision++;
     _emitLoaded(emit);
-    await _loadAllMessagePages(emit, chatId: chatId, refresh: true);
+    await _fetchMessages(emit, chatId: chatId, refresh: true);
   }
 
   Future<void> _onMessagesDeletedFilterChanged(
@@ -641,7 +681,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     _selectedMessageIds.clear();
     _messagesFilterRevision++;
     _emitLoaded(emit);
-    await _loadAllMessagePages(emit, chatId: chatId, refresh: true);
+    await _fetchMessages(emit, chatId: chatId, refresh: true);
   }
 
   void _onChatSelectionToggled(

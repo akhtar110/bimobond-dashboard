@@ -561,6 +561,8 @@ class _LoadedTable extends StatelessWidget {
             page: state.currentPage,
             totalPages: state.lastPage,
             total: state.total,
+            pageSize: 20,
+            itemCount: state.items.length,
             itemLabel: 'users',
             showTopBorder: true,
             onPage: (page) =>

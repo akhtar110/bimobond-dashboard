@@ -11,11 +11,13 @@ class GiftReportsPaginationBar extends StatelessWidget {
     required this.currentPage,
     required this.lastPage,
     required this.total,
+    this.itemCount,
   });
 
   final int currentPage;
   final int lastPage;
   final int total;
+  final int? itemCount;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +29,8 @@ class GiftReportsPaginationBar extends StatelessWidget {
       page: currentPage,
       totalPages: lastPage,
       total: total,
+      pageSize: 20,
+      itemCount: itemCount,
       itemLabel: 'gifts',
       onPage: (page) =>
           context.read<GiftReportsBloc>().add(GoToGiftReportsPageEvent(page)),
