@@ -14,10 +14,38 @@ import '../widgets/package_dialog.dart';
 import '../widgets/packages_table.dart';
 import '../widgets/promotions_dashboard_widgets.dart';
 import '../widgets/promotions_data_display_widgets.dart';
+import '../widgets/promotions_pagination_bar.dart';
 import '../widgets/promotions_shared_widgets.dart';
 
-class PackagesPage extends StatelessWidget {
+class PackagesPage extends StatefulWidget {
   const PackagesPage({super.key});
+
+  @override
+  State<PackagesPage> createState() => _PackagesPageState();
+}
+
+class _PackagesPageState extends State<PackagesPage> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    if (!promotionsMetricsOf(context).useInfiniteScroll) return;
+    if (!promotionsShouldLoadMore(_scrollController)) return;
+    context.read<PackagesBloc>().add(LoadMorePackagesEvent());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +81,12 @@ class PackagesPage extends StatelessWidget {
         final showProgress = isLoading ||
             isInitial ||
             (loaded != null && (loaded.isSaving || loaded.isRefreshing));
-        final visible = loaded?.visiblePackages ?? const <PromotionPackageEntity>[];
-        final isEmpty = loaded != null && visible.isEmpty;
+        final metrics = promotionsMetricsOf(context);
+        final visible = loaded?.pagedPackages(
+              infiniteScroll: metrics.useInfiniteScroll,
+            ) ??
+            const <PromotionPackageEntity>[];
+        final isEmpty = loaded != null && loaded.filteredCount == 0;
         final dateFmt = DateFormat.yMMMd();
         final canWrite = context.select<AuthBloc, bool>((b) {
           final auth = b.state;
@@ -62,119 +94,135 @@ class PackagesPage extends StatelessWidget {
           return false;
         });
 
+        Widget? footer;
+        if (loaded != null && loaded.filteredCount > 0) {
+          if (metrics.useDesktopPagination) {
+            footer = PromotionsPaginationBar(
+              page: loaded.currentPage,
+              totalPages: loaded.lastPage,
+              total: loaded.filteredCount,
+              pageSize: PackagesBloc.pageLimit,
+              itemCount: visible.length,
+              metrics: metrics,
+              showTopBorder: true,
+              onPage: (p) =>
+                  context.read<PackagesBloc>().add(GoToPackagesPageEvent(p)),
+            );
+          } else if (loaded.hasReachedMax) {
+            footer = const PromotionsEndOfListLabel();
+          }
+        }
+
         return PromotionsDashboardShell(
-          child: Builder(
-            builder: (context) {
-              final metrics = promotionsMetricsOf(context);
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _PackagesHeader(
-                    canWrite: canWrite,
-                    isSaving: loaded?.isSaving == true,
-                    onCreate: () => _openDialog(context, null),
-                    onRefresh: () =>
-                        context.read<PackagesBloc>().add(LoadPackagesEvent()),
-                  ),
-                  SizedBox(height: metrics.sectionGap),
-                  if (loaded != null) ...[
-                    _PackagesSummaryStrip(state: loaded),
-                    SizedBox(height: metrics.sectionGap),
-                  ],
-                  _PackagesToolbar(canWrite: canWrite),
-                  if (showProgress) ...[
-                    SizedBox(height: metrics.sectionGap),
-                    const LinearProgressIndicator(minHeight: 2),
-                  ],
-                  SizedBox(
-                    height: metrics.isMobile
-                        ? PromotionsSpace.md
-                        : PromotionsSpace.lg,
-                  ),
-                  if (canWrite && loaded != null && loaded.selectedCount > 0) ...[
-                    BulkActionToolbar(
-                      selectedCount: loaded.selectedCount,
-                      allVisibleSelected: loaded.allVisibleSelected,
-                      someVisibleSelected: loaded.someVisibleSelected,
-                      onSelectAll: () => context
-                          .read<PackagesBloc>()
-                          .add(SelectAllVisiblePackagesEvent()),
-                      onClear: () => context
-                          .read<PackagesBloc>()
-                          .add(ClearPackageSelectionEvent()),
-                      actions: [
-                        FilledButton.tonal(
-                          onPressed: loaded.isSaving
-                              ? null
-                              : () => context
-                                  .read<PackagesBloc>()
-                                  .add(BulkActivatePackagesEvent()),
-                          child: Text(
-                            l10n.tOr(
-                              'promoBulkActivatePackages',
-                              'Activate selected',
-                            ),
-                          ),
+          scrollController: _scrollController,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _PackagesHeader(
+                canWrite: canWrite,
+                isSaving: loaded?.isSaving == true,
+                onCreate: () => _openDialog(context, null),
+                onRefresh: () =>
+                    context.read<PackagesBloc>().add(LoadPackagesEvent()),
+              ),
+              SizedBox(height: metrics.sectionGap),
+              if (loaded != null) ...[
+                _PackagesSummaryStrip(state: loaded),
+                SizedBox(height: metrics.sectionGap),
+              ],
+              _PackagesToolbar(canWrite: canWrite),
+              if (showProgress) ...[
+                SizedBox(height: metrics.sectionGap),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
+              SizedBox(
+                height: metrics.isMobile
+                    ? PromotionsSpace.md
+                    : PromotionsSpace.lg,
+              ),
+              if (canWrite && loaded != null && loaded.selectedCount > 0) ...[
+                BulkActionToolbar(
+                  selectedCount: loaded.selectedCount,
+                  allVisibleSelected: loaded.allVisibleSelected,
+                  someVisibleSelected: loaded.someVisibleSelected,
+                  onSelectAll: () => context
+                      .read<PackagesBloc>()
+                      .add(SelectAllVisiblePackagesEvent()),
+                  onClear: () => context
+                      .read<PackagesBloc>()
+                      .add(ClearPackageSelectionEvent()),
+                  actions: [
+                    FilledButton.tonal(
+                      onPressed: loaded.isSaving
+                          ? null
+                          : () => context
+                              .read<PackagesBloc>()
+                              .add(BulkActivatePackagesEvent()),
+                      child: Text(
+                        l10n.tOr(
+                          'promoBulkActivatePackages',
+                          'Activate selected',
                         ),
-                        FilledButton.tonal(
-                          onPressed: loaded.isSaving
-                              ? null
-                              : () => context
-                                  .read<PackagesBloc>()
-                                  .add(BulkDeactivatePackagesEvent()),
-                          child: Text(
-                            l10n.tOr(
-                              'promoBulkDeactivatePackages',
-                              'Deactivate selected',
-                            ),
-                          ),
+                      ),
+                    ),
+                    FilledButton.tonal(
+                      onPressed: loaded.isSaving
+                          ? null
+                          : () => context
+                              .read<PackagesBloc>()
+                              .add(BulkDeactivatePackagesEvent()),
+                      child: Text(
+                        l10n.tOr(
+                          'promoBulkDeactivatePackages',
+                          'Deactivate selected',
                         ),
-                      ],
+                      ),
                     ),
-                    SizedBox(height: metrics.sectionGap),
                   ],
-                  PromotionsDataSection(
-                    child: PromotionsDataBody(
-                      isLoading: isLoading || isInitial,
-                      errorMessage: errorMessage,
-                      onRetry: () =>
-                          context.read<PackagesBloc>().add(LoadPackagesEvent()),
-                      isEmpty: isEmpty,
-                      emptyMessage: loaded?.hasActiveFilters == true
-                          ? l10n.tOr(
-                              'promoPackagesNoSearchResults',
-                              'No packages match your search or filters.',
-                            )
-                          : l10n.t('noData'),
-                      child: loaded == null
-                          ? const SizedBox.shrink()
-                          : PackagesTable(
-                              packages: visible,
-                              dateFmt: dateFmt,
-                              selectedIds: loaded.selectedIds,
-                              isSaving: loaded.isSaving,
-                              canWrite: canWrite,
-                              onEdit: (pkg) => _openDialog(context, pkg),
-                              onToggleActive: (pkg, {required activate}) =>
-                                  _confirmToggle(
-                                    context,
-                                    pkg,
-                                    activate: activate,
-                                  ),
-                              onDelete: (pkg) => _confirmDelete(context, pkg),
-                              onToggleSelect: (id) => context
-                                  .read<PackagesBloc>()
-                                  .add(TogglePackageSelectionEvent(id)),
-                              onSelectAllVisible: () => context
-                                  .read<PackagesBloc>()
-                                  .add(SelectAllVisiblePackagesEvent()),
-                            ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+                SizedBox(height: metrics.sectionGap),
+              ],
+              PromotionsDataSection(
+                footer: footer,
+                child: PromotionsDataBody(
+                  isLoading: isLoading || isInitial,
+                  errorMessage: errorMessage,
+                  onRetry: () =>
+                      context.read<PackagesBloc>().add(LoadPackagesEvent()),
+                  isEmpty: isEmpty,
+                  emptyMessage: loaded?.hasActiveFilters == true
+                      ? l10n.tOr(
+                          'promoPackagesNoSearchResults',
+                          'No packages match your search or filters.',
+                        )
+                      : l10n.t('noData'),
+                  child: loaded == null
+                      ? const SizedBox.shrink()
+                      : PackagesTable(
+                          packages: visible,
+                          dateFmt: dateFmt,
+                          selectedIds: loaded.selectedIds,
+                          isSaving: loaded.isSaving,
+                          canWrite: canWrite,
+                          onEdit: (pkg) => _openDialog(context, pkg),
+                          onToggleActive: (pkg, {required activate}) =>
+                              _confirmToggle(
+                                context,
+                                pkg,
+                                activate: activate,
+                              ),
+                          onDelete: (pkg) => _confirmDelete(context, pkg),
+                          onToggleSelect: (id) => context
+                              .read<PackagesBloc>()
+                              .add(TogglePackageSelectionEvent(id)),
+                          onSelectAllVisible: () => context
+                              .read<PackagesBloc>()
+                              .add(SelectAllVisiblePackagesEvent()),
+                        ),
+                ),
+              ),
+            ],
           ),
         );
       },

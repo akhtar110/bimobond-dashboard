@@ -2,6 +2,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gifts_view_type.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gifts_page_layout.dart';
@@ -31,7 +32,8 @@ class GiftsContentSliver extends StatelessWidget {
             prev.minPriceFilter != curr.minPriceFilter ||
             prev.maxPriceFilter != curr.maxPriceFilter ||
             prev.selectedGiftIds != curr.selectedGiftIds ||
-            prev.isPerformingBulkAction != curr.isPerformingBulkAction;
+            prev.isPerformingBulkAction != curr.isPerformingBulkAction ||
+            prev.currentPage != curr.currentPage;
       },
       builder: (context, state) {
         if (state is! GiftsLoaded) return const SliverToBoxAdapter();
@@ -44,6 +46,7 @@ class GiftsContentSliver extends StatelessWidget {
             '${state.minPriceFilter}-'
             '${state.maxPriceFilter}-'
             '${state.selectedSort.name}-'
+            '${state.currentPage}-'
             '${state.displayed.length}';
 
         return state.viewType == GiftsViewType.grid
@@ -61,16 +64,77 @@ class GiftsContentSliver extends StatelessWidget {
 }
 
 class GiftsGridSliver extends GiftsContentSliver {
-  const GiftsGridSliver();
-}
+  const GiftsGridSliver({this.onPreviewGift});
 
-class GiftsSliverGrid extends StatelessWidget {
-  const GiftsSliverGrid({super.key, required this.loaded});
-  final GiftsLoaded loaded;
+  final void Function(BuildContext context, GiftEntity gift)? onPreviewGift;
 
   @override
   Widget build(BuildContext context) {
-    final gifts = loaded.displayed;
+    return BlocBuilder<GiftsBloc, GiftsState>(
+      buildWhen: (prev, curr) {
+        if (prev is! GiftsLoaded || curr is! GiftsLoaded) {
+          return prev.runtimeType != curr.runtimeType;
+        }
+        return prev.gifts != curr.gifts ||
+            prev.selectedTab != curr.selectedTab ||
+            prev.selectedSort != curr.selectedSort ||
+            prev.viewType != curr.viewType ||
+            prev.searchQuery != curr.searchQuery ||
+            prev.fromDate != curr.fromDate ||
+            prev.toDate != curr.toDate ||
+            prev.minPriceFilter != curr.minPriceFilter ||
+            prev.maxPriceFilter != curr.maxPriceFilter ||
+            prev.selectedGiftIds != curr.selectedGiftIds ||
+            prev.isPerformingBulkAction != curr.isPerformingBulkAction ||
+            prev.currentPage != curr.currentPage;
+      },
+      builder: (context, state) {
+        if (state is! GiftsLoaded) return const SliverToBoxAdapter();
+
+        final contentKey =
+            'gifts-${state.viewType.name}-${state.selectedTab.name}-'
+            '${state.searchQuery}-'
+            '${state.fromDate?.millisecondsSinceEpoch}-'
+            '${state.toDate?.millisecondsSinceEpoch}-'
+            '${state.minPriceFilter}-'
+            '${state.maxPriceFilter}-'
+            '${state.selectedSort.name}-'
+            '${state.currentPage}-'
+            '${state.displayed.length}';
+
+        return state.viewType == GiftsViewType.grid
+            ? GiftsSliverGrid(
+                key: ValueKey('grid-$contentKey'),
+                loaded: state,
+                onPreviewGift: onPreviewGift,
+              )
+            : GiftsSliverList(
+                key: ValueKey('list-$contentKey'),
+                loaded: state,
+                onPreviewGift: onPreviewGift,
+              );
+      },
+    );
+  }
+}
+
+class GiftsSliverGrid extends StatelessWidget {
+  const GiftsSliverGrid({
+    super.key,
+    required this.loaded,
+    this.onPreviewGift,
+  });
+  final GiftsLoaded loaded;
+  final void Function(BuildContext context, GiftEntity gift)? onPreviewGift;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = GiftsLayoutMetrics(
+      getGiftsDeviceType(MediaQuery.sizeOf(context).width),
+    );
+    final gifts = loaded.pagedDisplayed(
+      infiniteScroll: metrics.useInfiniteScroll,
+    );
 
     if (gifts.isEmpty) {
       return const GiftsSliverEmptyState(
@@ -121,6 +185,9 @@ class GiftsSliverGrid extends StatelessWidget {
                                   ),
                                   onEdit: () =>
                                       showEditGiftDialog(context, row[i]),
+                                  onPreview: onPreviewGift == null
+                                      ? null
+                                      : () => onPreviewGift!(context, row[i]),
                                   onDelete: () => confirmDeleteGift(
                                     context,
                                     row[i].id,
@@ -144,12 +211,22 @@ class GiftsSliverGrid extends StatelessWidget {
 }
 
 class GiftsSliverList extends StatelessWidget {
-  const GiftsSliverList({super.key, required this.loaded});
+  const GiftsSliverList({
+    super.key,
+    required this.loaded,
+    this.onPreviewGift,
+  });
   final GiftsLoaded loaded;
+  final void Function(BuildContext context, GiftEntity gift)? onPreviewGift;
 
   @override
   Widget build(BuildContext context) {
-    final gifts = loaded.displayed;
+    final metrics = GiftsLayoutMetrics(
+      getGiftsDeviceType(MediaQuery.sizeOf(context).width),
+    );
+    final gifts = loaded.pagedDisplayed(
+      infiniteScroll: metrics.useInfiniteScroll,
+    );
 
     if (gifts.isEmpty) {
       return const GiftsSliverEmptyState(
@@ -216,6 +293,9 @@ class GiftsSliverList extends StatelessWidget {
                           selected ?? false,
                         ),
                         onEdit: () => showEditGiftDialog(context, gift),
+                        onPreview: onPreviewGift == null
+                            ? null
+                            : () => onPreviewGift!(context, gift),
                         onDelete: () =>
                             confirmDeleteGift(context, gift.id, gift.name),
                       ),

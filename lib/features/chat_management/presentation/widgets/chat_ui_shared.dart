@@ -20,6 +20,7 @@ String messageTypeLabel(AppLocalizations l10n, ChatMessageType type) {
     ChatMessageType.video => l10n.t('chatMessageVideo'),
     ChatMessageType.audio => l10n.t('chatMessageAudio'),
     ChatMessageType.postShare => l10n.t('chatMessagePostShare'),
+    ChatMessageType.location => l10n.t('chatMessageLocation'),
     ChatMessageType.unknown => l10n.t('chatMessageText'),
   };
 }

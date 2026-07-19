@@ -14,11 +14,13 @@ class PostsListView extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.onPostTap,
+    this.useInfiniteScroll = true,
   });
 
   final PostsLoaded state;
   final ScrollController scrollController;
   final void Function(ManagedPostEntity) onPostTap;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -41,12 +43,14 @@ class PostsListView extends StatelessWidget {
                   metrics: metrics,
                   scrollController: scrollController,
                   onPostTap: onPostTap,
+                  useInfiniteScroll: useInfiniteScroll,
                 )
               : _PostsDesktopTableList(
                   state: state,
                   metrics: metrics,
                   scrollController: scrollController,
                   onPostTap: onPostTap,
+                  useInfiniteScroll: useInfiniteScroll,
                 ),
         );
       },
@@ -118,19 +122,21 @@ class _PostsCompactScrollList extends StatelessWidget {
     required this.metrics,
     required this.scrollController,
     required this.onPostTap,
+    required this.useInfiniteScroll,
   });
 
   final PostsLoaded state;
   final PostsLayoutMetrics metrics;
   final ScrollController scrollController;
   final void Function(ManagedPostEntity) onPostTap;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
     final posts = state.posts;
     final itemCount = posts.length +
-        (state.isLoadingMore ? 1 : 0) +
-        (state.hasReachedMax && posts.isNotEmpty ? 1 : 0);
+        (useInfiniteScroll && state.isLoadingMore ? 1 : 0) +
+        (useInfiniteScroll && state.hasReachedMax && posts.isNotEmpty ? 1 : 0);
 
     return ListView.builder(
       controller: scrollController,
@@ -159,7 +165,9 @@ class _PostsCompactScrollList extends StatelessWidget {
             ),
           );
         }
-        if (state.isLoadingMore) return const PostsLoadMoreIndicator();
+        if (useInfiniteScroll && state.isLoadingMore) {
+          return const PostsLoadMoreIndicator();
+        }
         return PostsEndOfListLabel();
       },
     );
@@ -172,12 +180,14 @@ class _PostsDesktopTableList extends StatelessWidget {
     required this.metrics,
     required this.scrollController,
     required this.onPostTap,
+    required this.useInfiniteScroll,
   });
 
   final PostsLoaded state;
   final PostsLayoutMetrics metrics;
   final ScrollController scrollController;
   final void Function(ManagedPostEntity) onPostTap;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -248,9 +258,11 @@ class _PostsDesktopTableList extends StatelessWidget {
                   childCount: posts.length,
                 ),
               ),
-              if (state.isLoadingMore)
+              if (useInfiniteScroll && state.isLoadingMore)
                 const SliverToBoxAdapter(child: PostsLoadMoreIndicator()),
-              if (state.hasReachedMax && posts.isNotEmpty)
+              if (useInfiniteScroll &&
+                  state.hasReachedMax &&
+                  posts.isNotEmpty)
                 SliverToBoxAdapter(child: PostsEndOfListLabel()),
               SliverToBoxAdapter(
                 child: SizedBox(height: metrics.cardPadding),

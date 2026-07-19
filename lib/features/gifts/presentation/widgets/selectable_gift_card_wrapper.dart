@@ -13,6 +13,7 @@ class SelectableGiftCard extends StatelessWidget {
     required this.isSelected,
     required this.onSelectionChanged,
     required this.onEdit,
+    this.onPreview,
     required this.onDelete,
   });
 
@@ -20,6 +21,7 @@ class SelectableGiftCard extends StatelessWidget {
   final bool isSelected;
   final ValueChanged<bool?> onSelectionChanged;
   final VoidCallback onEdit;
+  final VoidCallback? onPreview;
   final VoidCallback onDelete;
 
   @override
@@ -33,6 +35,7 @@ class SelectableGiftCard extends StatelessWidget {
           key: ValueKey('gift_card_${gift.id}'),
           gift: gift,
           onEdit: onEdit,
+          onPreview: onPreview,
           onDelete: onDelete,
         ),
         PositionedDirectional(

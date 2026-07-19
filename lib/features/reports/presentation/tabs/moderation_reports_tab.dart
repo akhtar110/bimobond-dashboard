@@ -186,6 +186,8 @@ class _ModerationTable extends StatelessWidget {
                   page: state.currentPage,
                   totalPages: state.lastPage,
                   total: state.total,
+                  pageSize: 15,
+                  itemCount: state.reports.length,
                   itemLabel: 'reports',
                   onPage: (page) => context.read<ReportsBloc>().add(
                         GoToReportsPageEvent(page),
@@ -857,6 +859,8 @@ class _ReportsCardList extends StatelessWidget {
               page: state.currentPage,
               totalPages: state.lastPage,
               total: state.total,
+              pageSize: 15,
+              itemCount: state.reports.length,
               itemLabel: 'reports',
               showTopBorder: false,
               onPage: (page) => context.read<ReportsBloc>().add(

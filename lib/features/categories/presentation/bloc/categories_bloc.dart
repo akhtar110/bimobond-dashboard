@@ -114,6 +114,13 @@ class BulkMoveCategoriesEvent extends CategoriesEvent {
   final String? parentId;
 }
 
+class GoToCategoriesPageEvent extends CategoriesEvent {
+  GoToCategoriesPageEvent(this.page);
+  final int page;
+}
+
+class LoadMoreCategoriesEvent extends CategoriesEvent {}
+
 class _RefetchCategoriesEvent extends CategoriesEvent {
   _RefetchCategoriesEvent(this.state);
   final CategoriesLoaded state;
@@ -166,6 +173,7 @@ class CategoriesLoaded extends CategoriesState {
     this.focusedRootId,
     this.sortOption = CategorySortOption.name,
     this.hasChildrenFilter = CategoryHasChildrenFilter.all,
+    this.currentPage = 1,
   })  : catalogCategories = catalogCategories ?? categories,
         filteredRoots = filteredRoots ?? const [],
         visibleChildren = visibleChildren ?? const {},
@@ -200,9 +208,39 @@ class CategoriesLoaded extends CategoriesState {
   final CategorySortOption sortOption;
   final CategoryHasChildrenFilter hasChildrenFilter;
 
+  /// 1-based page for root-list pagination (desktop pages / infinite scroll).
+  final int currentPage;
+
   int get totalCount => categories.length;
   int get selectedCount => selectedCategoryIds.length;
   bool get isSelectionMode => selectedCategoryIds.isNotEmpty;
+
+  int get rootsTotalCount => leftPanelRoots.length;
+
+  int get lastPage {
+    final total = rootsTotalCount;
+    if (total <= 0) return 1;
+    return ((total + CategoriesBloc.pageLimit - 1) ~/ CategoriesBloc.pageLimit);
+  }
+
+  bool get hasReachedMaxRoots => currentPage >= lastPage;
+
+  /// Desktop: one page slice. Infinite scroll: first N pages accumulated.
+  List<CategoryEntity> pagedLeftPanelRoots({required bool infiniteScroll}) {
+    final roots = leftPanelRoots;
+    if (roots.isEmpty) return const [];
+
+    final pageSize = CategoriesBloc.pageLimit;
+    if (infiniteScroll) {
+      final end = (currentPage * pageSize).clamp(0, roots.length);
+      return roots.sublist(0, end);
+    }
+
+    final start = (currentPage - 1) * pageSize;
+    if (start >= roots.length) return const [];
+    final end = (start + pageSize).clamp(0, roots.length);
+    return roots.sublist(start, end);
+  }
 
   bool isCategoryExpanded(String id) => expandedCategoryIds.contains(id);
 
@@ -428,6 +466,7 @@ class CategoriesLoaded extends CategoriesState {
     CategorySortOption? sortOption,
     CategoryHasChildrenFilter? hasChildrenFilter,
     bool clearSelection = false,
+    int? currentPage,
   }) =>
       CategoriesLoaded(
         categories ?? this.categories,
@@ -454,6 +493,7 @@ class CategoriesLoaded extends CategoriesState {
             clearFocusedRoot ? null : (focusedRootId ?? this.focusedRootId),
         sortOption: sortOption ?? this.sortOption,
         hasChildrenFilter: hasChildrenFilter ?? this.hasChildrenFilter,
+        currentPage: currentPage ?? this.currentPage,
       );
 }
 
@@ -495,6 +535,8 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     on<BulkDeactivateCategoriesEvent>(_onBulkDeactivate);
     on<BulkDeleteCategoriesEvent>(_onBulkDelete);
     on<BulkMoveCategoriesEvent>(_onBulkMove);
+    on<GoToCategoriesPageEvent>(_onGoToPage);
+    on<LoadMoreCategoriesEvent>(_onLoadMore);
   }
 
   final GetAllCategories _getAll;
@@ -504,6 +546,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
 
   Timer? _searchDebounce;
   static const _searchDebounceMs = 300;
+  static const pageLimit = 20;
   static const _fullCatalogQuery = CategoriesAdminListQuery(includeInactive: true);
 
   bool _useLocalCatalog(CategoriesLoaded state) =>
@@ -570,6 +613,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
         ...cache.autoExpandRootIds,
         if (focusedRootId != null) focusedRootId,
       },
+      currentPage: 1,
       clearMessages: true,
     );
   }
@@ -1224,7 +1268,11 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   ) {
     final current = state;
     if (current is! CategoriesLoaded) return;
-    emit(current.copyWith(sortOption: event.sort, clearMessages: true));
+    emit(current.copyWith(
+      sortOption: event.sort,
+      currentPage: 1,
+      clearMessages: true,
+    ));
   }
 
   void _onUpdateHasChildrenFilter(
@@ -1235,8 +1283,36 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     if (current is! CategoriesLoaded) return;
     emit(current.copyWith(
       hasChildrenFilter: event.filter,
+      currentPage: 1,
       clearMessages: true,
     ));
+  }
+
+  void _onGoToPage(
+    GoToCategoriesPageEvent event,
+    Emitter<CategoriesState> emit,
+  ) {
+    final current = state;
+    if (current is! CategoriesLoaded) return;
+    final last = current.lastPage;
+    final page = event.page.clamp(1, last);
+    if (page == current.currentPage) return;
+    emit(current.copyWith(currentPage: page, clearMessages: true));
+  }
+
+  void _onLoadMore(
+    LoadMoreCategoriesEvent event,
+    Emitter<CategoriesState> emit,
+  ) {
+    final current = state;
+    if (current is! CategoriesLoaded) return;
+    if (current.hasReachedMaxRoots) return;
+    emit(
+      current.copyWith(
+        currentPage: current.currentPage + 1,
+        clearMessages: true,
+      ),
+    );
   }
 
   Future<void> _onBulkActivate(

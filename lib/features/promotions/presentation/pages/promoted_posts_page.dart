@@ -489,6 +489,8 @@ class _PromotedPostsDataSection extends StatelessWidget {
           page: loaded.meta.page,
           totalPages: loaded.meta.totalPages,
           total: loaded.meta.total,
+          pageSize: loaded.meta.limit,
+          itemCount: loaded.posts.length,
           metrics: metrics,
           showTopBorder: true,
           onPage: (p) => context

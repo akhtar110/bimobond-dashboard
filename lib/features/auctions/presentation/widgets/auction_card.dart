@@ -2,10 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/utils/coin_format.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/auction_entity.dart';
-import '../utils/auctions_responsive.dart';
 
 /// Status badge colors derived from the active [ColorScheme].
 ({Color fg, Color bg, String label}) auctionStatusStyle(
@@ -69,60 +68,74 @@ class AuctionCard extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 220;
-        final bodyPadding = compact ? 10.0 : 14.0;
-        final sectionGap = compact ? 8.0 : 12.0;
-        final smallGap = compact ? 6.0 : 8.0;
+        final width = constraints.maxWidth;
+        final compact = width < 170;
+        final dense = width < 210;
+        final bodyPadding = EdgeInsets.fromLTRB(
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+        );
+        final gap = compact ? 4.0 : 5.0;
         final borderRadius = compact ? 10.0 : 12.0;
 
         return Container(
           decoration: BoxDecoration(
             color: scheme.surface,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: scheme.outlineVariant),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.8),
+            ),
             boxShadow: [
               BoxShadow(
                 color: scheme.shadow.withValues(alpha: 0.04),
-                blurRadius: compact ? 8 : 12,
-                offset: Offset(0, compact ? 2 : 3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          clipBehavior: Clip.hardEdge,
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
               _ItemImage(
                 auction: auction,
                 previewImageUrl: previewImageUrl,
-                cardWidth: constraints.maxWidth,
+                compact: compact,
               ),
               Padding(
-                padding: EdgeInsets.all(bodyPadding),
+                padding: bodyPadding,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _HeaderRow(
                       auction: auction,
                       onCancel: onCancel,
                       compact: compact,
                     ),
-                    SizedBox(height: smallGap),
-                    _HostRow(auction: auction, compact: compact),
-                    SizedBox(height: sectionGap),
-                    _ProgressSection(
-                      auction: auction,
-                      compact: compact,
+                    SizedBox(height: gap),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _HostRow(auction: auction, compact: true),
+                        ),
+                        const SizedBox(width: 4),
+                        _TimestampRow(auction: auction, compact: true),
+                      ],
                     ),
-                    SizedBox(height: sectionGap),
-                    _TimestampRow(auction: auction, compact: compact),
-                    SizedBox(height: sectionGap),
+                    SizedBox(height: gap),
+                    _ProgressSection(auction: auction, compact: true),
+                    SizedBox(height: dense ? 6 : 8),
                     FilledButton(
                       onPressed: onViewDetails,
                       style: FilledButton.styleFrom(
-                        minimumSize: Size.fromHeight(compact ? 34 : 38),
+                        minimumSize: Size.fromHeight(compact ? 32 : 34),
                         textStyle: TextStyle(
-                          fontSize: compact ? 12 : 14,
+                          fontSize: compact ? 12 : 13,
+                          fontWeight: FontWeight.w600,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(
@@ -139,52 +152,6 @@ class AuctionCard extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-// ─── Item Image ───────────────────────────────────────────────────────────────
-
-class _ItemImage extends StatelessWidget {
-  const _ItemImage({
-    required this.auction,
-    this.previewImageUrl,
-    required this.cardWidth,
-  });
-  final AuctionEntity auction;
-  final String? previewImageUrl;
-  final double cardWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = previewImageUrl ?? auction.displayImageUrl;
-    final imageHeight = auctionCardImageHeight(cardWidth);
-    final compact = cardWidth < 220;
-    return SizedBox(
-      height: imageHeight,
-      child: url != null && url.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: url,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => _placeholder(context, compact),
-              errorWidget: (context, url, error) =>
-                  _placeholder(context, compact),
-            )
-          : _placeholder(context, compact),
-    );
-  }
-
-  Widget _placeholder(BuildContext context, bool compact) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      color: scheme.surfaceContainerLow,
-      child: Center(
-        child: Icon(
-          Icons.gavel_rounded,
-          size: compact ? 36 : 48,
-          color: scheme.onSurfaceVariant,
-        ),
-      ),
     );
   }
 }
@@ -214,7 +181,9 @@ class _HeaderRow extends StatelessWidget {
                 : l10n.t('noData'),
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: compact ? 13 : 15,
+              fontSize: compact ? 12 : 12.5,
+              letterSpacing: -0.1,
+              height: 1.15,
               color: scheme.onSurface,
             ),
             maxLines: 1,
@@ -222,7 +191,7 @@ class _HeaderRow extends StatelessWidget {
           ),
         ),
         SizedBox(width: compact ? 4 : 6),
-        _StatusBadge(status: auction.status, compact: compact),
+        AuctionStatusBadge(status: auction.status, compact: compact),
         if (auction.isActive && onCancel != null) ...[
           SizedBox(width: compact ? 2 : 4),
           SizedBox(
@@ -261,6 +230,60 @@ class _HeaderRow extends StatelessWidget {
   }
 }
 
+// ─── Item Image ───────────────────────────────────────────────────────────────
+
+class _ItemImage extends StatelessWidget {
+  const _ItemImage({
+    required this.auction,
+    this.previewImageUrl,
+    this.compact = false,
+  });
+  final AuctionEntity auction;
+  final String? previewImageUrl;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = previewImageUrl ?? auction.displayImageUrl;
+
+    return AspectRatio(
+      // Wider than tall so grid cards stay shorter — same as GiftCard.
+      aspectRatio: compact ? 1.45 : 1.55,
+      child: ColoredBox(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        child: url != null && url.isNotEmpty
+            ? LayoutBuilder(
+                builder: (context, constraints) {
+                  return CachedNetworkImage(
+                    imageUrl: url,
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    placeholder: (context, imageUrl) =>
+                        _placeholder(scheme, compact),
+                    errorWidget: (context, imageUrl, error) =>
+                        _placeholder(scheme, compact),
+                  );
+                },
+              )
+            : _placeholder(scheme, compact),
+      ),
+    );
+  }
+
+  Widget _placeholder(ColorScheme scheme, bool compact) => Center(
+        child: Icon(
+          Icons.gavel_rounded,
+          size: compact ? 24 : 28,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
+        ),
+      );
+}
+
 // ─── Host row ─────────────────────────────────────────────────────────────────
 
 class _HostRow extends StatelessWidget {
@@ -272,7 +295,7 @@ class _HostRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final avatarRadius = compact ? 10.0 : 12.0;
+    final avatarRadius = compact ? 9.0 : 11.0;
     return Row(
       children: [
         CircleAvatar(
@@ -284,7 +307,7 @@ class _HostRow extends StatelessWidget {
           child: auction.hostAvatar == null
               ? Icon(
                   Icons.person_rounded,
-                  size: compact ? 12 : 14,
+                  size: compact ? 11 : 13,
                   color: scheme.onSurfaceVariant,
                 )
               : null,
@@ -294,8 +317,9 @@ class _HostRow extends StatelessWidget {
           child: Text(
             '${l10n.t('owner')}: ${auction.hostName}',
             style: TextStyle(
-              fontSize: compact ? 11 : 12,
+              fontSize: compact ? 10.5 : 11.5,
               color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -323,31 +347,41 @@ class _ProgressSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              CoinFormat.coinsAmount(auction.currentTotalCoins),
-              style: TextStyle(
-                fontSize: compact ? 14 : 16,
-                fontWeight: FontWeight.w700,
-                color: color,
+            Flexible(
+              child: Text(
+                '🪙 ${CoinFormat.coinsAmount(auction.currentTotalCoins)}',
+                style: TextStyle(
+                  fontSize: compact ? 12 : 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            Text(
-              'of ${CoinFormat.coins(auction.effectiveTargetPriceCoins)}',
-              style: TextStyle(
-                fontSize: compact ? 11 : 12,
-                color: scheme.onSurfaceVariant,
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '/ 🪙 ${CoinFormat.coinsAmount(auction.effectiveTargetPriceCoins)}',
+                style: TextStyle(
+                  fontSize: compact ? 10.5 : 11,
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
               ),
             ),
           ],
         ),
-        SizedBox(height: compact ? 4 : 6),
+        SizedBox(height: compact ? 4 : 5),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: pct,
-            minHeight: compact ? 5 : 6,
+            minHeight: compact ? 4 : 5,
             backgroundColor: scheme.surfaceContainerHighest,
             color: color,
           ),
@@ -356,8 +390,9 @@ class _ProgressSection extends StatelessWidget {
         Text(
           '${(pct * 100).toStringAsFixed(1)}% funded',
           style: TextStyle(
-            fontSize: compact ? 10 : 11,
+            fontSize: compact ? 9.5 : 10.5,
             color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -375,36 +410,30 @@ class _TimestampRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final fmt = DateFormat('MMM d, yyyy');
-    final fontSize = compact ? 10.0 : 11.0;
+    final fmt = DateFormat('MMM d');
+    final fontSize = compact ? 9.5 : 10.5;
+    final ended = auction.endedAt;
+
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           Icons.access_time_rounded,
-          size: compact ? 11 : 12,
+          size: compact ? 10 : 11,
           color: scheme.onSurfaceVariant,
         ),
         SizedBox(width: compact ? 3 : 4),
-        Flexible(
-          child: Text(
-            fmt.format(auction.startedAt.toLocal()),
-            style: TextStyle(fontSize: fontSize, color: scheme.onSurfaceVariant),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+        Text(
+          ended != null
+              ? '${fmt.format(auction.startedAt.toLocal())} → ${fmt.format(ended.toLocal())}'
+              : fmt.format(auction.startedAt.toLocal()),
+          style: TextStyle(
+            fontSize: fontSize,
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+            height: 1.1,
           ),
         ),
-        if (auction.endedAt != null)
-          Flexible(
-            child: Text(
-              ' → ${fmt.format(auction.endedAt!.toLocal())}',
-              style: TextStyle(
-                fontSize: fontSize,
-                color: scheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
       ],
     );
   }
@@ -413,7 +442,11 @@ class _TimestampRow extends StatelessWidget {
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 class AuctionStatusBadge extends StatelessWidget {
-  const AuctionStatusBadge({super.key, required this.status, this.compact = false});
+  const AuctionStatusBadge({
+    super.key,
+    required this.status,
+    this.compact = false,
+  });
 
   final String status;
   final bool compact;
@@ -422,40 +455,38 @@ class AuctionStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final style = auctionStatusStyle(scheme, context.l10n, status);
+    final fg = style.fg;
+    final bg = style.bg.withValues(alpha: compact ? 0.95 : 1);
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 10,
-        vertical: compact ? 3 : 4,
+        horizontal: compact ? 5 : 8,
+        vertical: compact ? 2 : 3,
       ),
       decoration: BoxDecoration(
-        color: style.bg,
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: style.fg.withValues(alpha: 0.45),
-        ),
+        border: Border.all(color: fg.withValues(alpha: 0.18)),
+        boxShadow: compact
+            ? [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: 0.08),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ]
+            : null,
       ),
       child: Text(
         style.label,
         style: TextStyle(
-          color: style.fg,
-          fontSize: compact ? 10 : 11,
+          color: fg,
+          fontSize: compact ? 8.5 : 10,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
+          letterSpacing: 0.15,
         ),
       ),
     );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, this.compact = false});
-  final String status;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return AuctionStatusBadge(status: status, compact: compact);
   }
 }
 
@@ -497,9 +528,13 @@ class _AuctionCardSkeletonState extends State<AuctionCardSkeleton>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 220;
-        final imageHeight = auctionCardImageHeight(constraints.maxWidth);
-        final bodyPadding = compact ? 10.0 : 14.0;
+        final compact = constraints.maxWidth < 170;
+        final bodyPadding = EdgeInsets.fromLTRB(
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+          compact ? 8 : 10,
+          compact ? 6 : 8,
+        );
 
         return AnimatedBuilder(
           animation: _anim,
@@ -511,28 +546,27 @@ class _AuctionCardSkeletonState extends State<AuctionCardSkeleton>
                 borderRadius: BorderRadius.circular(compact ? 10 : 12),
                 border: Border.all(color: scheme.outlineVariant),
               ),
-              clipBehavior: Clip.hardEdge,
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(height: imageHeight, color: color),
+                  AspectRatio(
+                    aspectRatio: compact ? 1.45 : 1.55,
+                    child: ColoredBox(color: color),
+                  ),
                   Padding(
-                    padding: EdgeInsets.all(bodyPadding),
+                    padding: bodyPadding,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _shimmerBox(color, compact ? 140 : 180, compact ? 12 : 14),
-                        SizedBox(height: compact ? 8 : 10),
-                        _shimmerBox(color, compact ? 100 : 120, compact ? 10 : 12),
-                        SizedBox(height: compact ? 8 : 12),
-                        _shimmerBox(color, double.infinity, compact ? 5 : 6),
-                        SizedBox(height: compact ? 8 : 12),
-                        _shimmerBox(
-                          color,
-                          100,
-                          compact ? 34 : 38,
-                          radius: compact ? 8 : 10,
-                        ),
+                        _shimmerBox(color, compact ? 90 : 110, 12),
+                        const SizedBox(height: 5),
+                        _shimmerBox(color, compact ? 80 : 100, 11),
+                        const SizedBox(height: 5),
+                        _shimmerBox(color, double.infinity, 4),
+                        const SizedBox(height: 7),
+                        _shimmerBox(color, compact ? 72 : 84, 32, radius: 8),
                       ],
                     ),
                   ),

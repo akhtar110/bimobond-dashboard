@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/status_chip.dart';
 import '../../../../core/widgets/state_widgets.dart';
@@ -84,11 +85,17 @@ class FiltersTab extends StatelessWidget {
           if (canManage) SizedBox(height: metrics.filterGap),
         ],
       ),
-      footer: FePaginationBar(
-        page: loaded.query.page,
-        totalPages: loaded.filtersTotalPages,
-        totalItems: loaded.filteredFilters.length,
-        metrics: metrics,
+      footer: AppPaginationBar(
+        currentPage: loaded.query.page,
+        lastPage: loaded.filtersTotalPages,
+        total: loaded.filteredFilters.length,
+        pageSize: loaded.query.pageSize,
+        itemCount: items.length,
+        hideWhenSinglePage: false,
+        borderRadius: BorderRadius.circular(12),
+        onPageChanged: (page) => context.read<FiltersEffectsBloc>().add(
+              FiltersEffectsFilterChanged(page: page),
+            ),
       ),
       child: ResponsiveDataTable(
         mobileBreakpoint: 900,
@@ -276,59 +283,6 @@ class _FilterMobileCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class FePaginationBar extends StatelessWidget {
-  const FePaginationBar({
-    required this.page,
-    required this.totalPages,
-    required this.totalItems,
-    required this.metrics,
-  });
-
-  final int page;
-  final int totalPages;
-  final int totalItems;
-  final FiltersEffectsLayoutMetrics metrics;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            context.tr('fePaginationSummary', {
-              'total': '$totalItems',
-              'page': '$page',
-              'totalPages': '$totalPages',
-            }),
-            textAlign: TextAlign.start,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-        IconButton(
-          tooltip: l10n.tOr('fePrevPage', 'Previous page'),
-          onPressed: page > 1
-              ? () => context.read<FiltersEffectsBloc>().add(
-                    FiltersEffectsFilterChanged(page: page - 1),
-                  )
-              : null,
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
-        IconButton(
-          tooltip: l10n.tOr('feNextPage', 'Next page'),
-          onPressed: page < totalPages
-              ? () => context.read<FiltersEffectsBloc>().add(
-                    FiltersEffectsFilterChanged(page: page + 1),
-                  )
-              : null,
-          icon: const Icon(Icons.chevron_right_rounded),
-        ),
-      ],
     );
   }
 }

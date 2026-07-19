@@ -217,6 +217,8 @@ class ChatMessageModel extends ChatMessageEntity {
     super.content,
     super.mediaUrl,
     super.sharedPostId,
+    super.sharedPost,
+    super.locationPayload,
     super.replyToId,
     required super.isDeleted,
     required super.createdAt,
@@ -233,14 +235,30 @@ class ChatMessageModel extends ChatMessageEntity {
       replyTo = ChatMessageModel.fromJson(json['replyTo'] as Map<String, dynamic>);
     }
 
+    final type = chatMessageTypeFromApi(json['type']?.toString());
+    final payloadMap = _parsePayloadMap(json['payload']);
+    final sharedPost = _parseSharedPost(json['sharedPost']);
+    final sharedPostId =
+        json['sharedPostId']?.toString() ?? sharedPost?.id;
+
+    ChatMessageLocationPayload? locationPayload;
+    if (type == ChatMessageType.location || type == ChatMessageType.unknown) {
+      locationPayload = ChatMessageLocationPayloadModel.fromPayload(payloadMap);
+    }
+    final resolvedType = locationPayload != null && type == ChatMessageType.unknown
+        ? ChatMessageType.location
+        : type;
+
     return ChatMessageModel(
       id: json['id']?.toString() ?? '',
       chatId: json['chatId']?.toString() ?? '',
       senderId: json['senderId']?.toString() ?? '',
-      type: chatMessageTypeFromApi(json['type']?.toString()),
+      type: resolvedType,
       content: json['content']?.toString(),
       mediaUrl: json['mediaUrl']?.toString(),
-      sharedPostId: json['sharedPostId']?.toString(),
+      sharedPostId: sharedPostId,
+      sharedPost: sharedPost,
+      locationPayload: locationPayload,
       replyToId: json['replyToId']?.toString(),
       isDeleted: json['isDeleted'] == true,
       createdAt: _date(json['createdAt']) ?? DateTime.now(),
@@ -259,6 +277,86 @@ class ChatMessageModel extends ChatMessageEntity {
       replyTo: replyTo,
     );
   }
+}
+
+class ChatSharedPostSummaryModel extends ChatSharedPostSummary {
+  const ChatSharedPostSummaryModel({
+    required super.id,
+    super.description,
+    super.thumbnailUrl,
+    super.type,
+    super.userName,
+    super.userFullName,
+    super.userProfileImage,
+  });
+
+  factory ChatSharedPostSummaryModel.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] is Map<String, dynamic>
+        ? json['user'] as Map<String, dynamic>
+        : json['author'] is Map<String, dynamic>
+            ? json['author'] as Map<String, dynamic>
+            : null;
+
+    return ChatSharedPostSummaryModel(
+      id: json['id']?.toString() ?? '',
+      description: json['description']?.toString() ??
+          json['caption']?.toString(),
+      thumbnailUrl: json['thumbnailUrl']?.toString() ??
+          json['thumbnail']?.toString(),
+      type: json['type']?.toString(),
+      userName: user?['username']?.toString(),
+      userFullName: user?['fullName']?.toString() ?? user?['name']?.toString(),
+      userProfileImage: user?['avatarUrl']?.toString() ??
+          user?['profileImage']?.toString(),
+    );
+  }
+}
+
+class ChatMessageLocationPayloadModel extends ChatMessageLocationPayload {
+  const ChatMessageLocationPayloadModel({
+    required super.latitude,
+    required super.longitude,
+    super.name,
+    super.address,
+    super.placeId,
+  });
+
+  static ChatMessageLocationPayload? fromPayload(Map<String, dynamic>? json) {
+    if (json == null || json.isEmpty) return null;
+    final lat = _double(json['latitude'] ?? json['lat']);
+    final lng = _double(json['longitude'] ?? json['lng']);
+    if (!lat.isFinite || !lng.isFinite) return null;
+    if (lat == 0 && lng == 0) return null;
+
+    return ChatMessageLocationPayloadModel(
+      latitude: lat,
+      longitude: lng,
+      name: json['name']?.toString(),
+      address: json['address']?.toString(),
+      placeId: json['placeId']?.toString(),
+    );
+  }
+}
+
+Map<String, dynamic>? _parsePayloadMap(dynamic raw) {
+  if (raw is Map<String, dynamic>) return raw;
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  return null;
+}
+
+ChatSharedPostSummary? _parseSharedPost(dynamic raw) {
+  if (raw is Map<String, dynamic>) {
+    return ChatSharedPostSummaryModel.fromJson(raw);
+  }
+  if (raw is Map) {
+    return ChatSharedPostSummaryModel.fromJson(Map<String, dynamic>.from(raw));
+  }
+  return null;
+}
+
+double _double(dynamic value, {double fallback = 0}) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? fallback;
 }
 
 class ChatBulkResultModel extends ChatBulkResultEntity {

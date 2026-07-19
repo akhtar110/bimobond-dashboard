@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/category_entity.dart';
 import '../bloc/categories_bloc.dart';
+import '../utils/categories_page_layout.dart';
 import 'category_bulk_actions_bar.dart';
 import 'category_callbacks.dart';
 import 'category_children_panel.dart';
@@ -31,14 +32,54 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
   final _rootsScrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    _rootsScrollController.addListener(_onRootsScroll);
+  }
+
+  @override
   void dispose() {
+    _rootsScrollController.removeListener(_onRootsScroll);
     _rootsScrollController.dispose();
     super.dispose();
+  }
+
+  void _onRootsScroll() {
+    if (!mounted || !_rootsScrollController.hasClients) return;
+
+    final metrics = categoriesMetricsOf(context);
+    if (!metrics.useInfiniteScroll) return;
+
+    final position = _rootsScrollController.position;
+    if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+      return;
+    }
+    if (position.pixels >= position.maxScrollExtent - 240) {
+      context.read<CategoriesBloc>().add(LoadMoreCategoriesEvent());
+    }
+  }
+
+  void _maybeFillViewport() {
+    if (!mounted || !_rootsScrollController.hasClients) return;
+    final metrics = categoriesMetricsOf(context);
+    if (!metrics.useInfiniteScroll) return;
+
+    final state = context.read<CategoriesBloc>().state;
+    if (state is! CategoriesLoaded || state.hasReachedMaxRoots) return;
+
+    final position = _rootsScrollController.position;
+    if (!position.hasContentDimensions) return;
+    if (position.maxScrollExtent <= 0) {
+      context.read<CategoriesBloc>().add(LoadMoreCategoriesEvent());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = categoriesMetricsOf(context);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeFillViewport());
 
     return ColoredBox(
       color: scheme.surface,
@@ -57,6 +98,7 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
                     rootsScrollController: _rootsScrollController,
                     onFormRequest: widget.onFormRequest,
                     onDeleteRequest: widget.onDeleteRequest,
+                    useInfiniteScroll: metrics.useInfiniteScroll,
                   );
                 }
                 return _MobileMasterDetailView(
@@ -64,6 +106,7 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
                   rootsScrollController: _rootsScrollController,
                   onFormRequest: widget.onFormRequest,
                   onDeleteRequest: widget.onDeleteRequest,
+                  useInfiniteScroll: metrics.useInfiniteScroll,
                 );
               },
             ),
@@ -122,12 +165,14 @@ class _SplitMasterDetailView extends StatelessWidget {
     required this.rootsScrollController,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    required this.useInfiniteScroll,
   });
 
   final CategoriesLoaded state;
   final ScrollController rootsScrollController;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +196,7 @@ class _SplitMasterDetailView extends StatelessWidget {
               hideSubcategories: hideSubs,
               onFormRequest: onFormRequest,
               onDeleteRequest: onDeleteRequest,
+              useInfiniteScroll: useInfiniteScroll,
             ),
           ),
         ),
@@ -184,12 +230,14 @@ class _MobileMasterDetailView extends StatelessWidget {
     required this.rootsScrollController,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    required this.useInfiniteScroll,
   });
 
   final CategoriesLoaded state;
   final ScrollController rootsScrollController;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -217,6 +265,7 @@ class _MobileMasterDetailView extends StatelessWidget {
           hideSubcategories: hideSubs,
           onFormRequest: onFormRequest,
           onDeleteRequest: onDeleteRequest,
+          useInfiniteScroll: useInfiniteScroll,
         );
       },
     );
@@ -229,12 +278,14 @@ class _RootCategoriesPanel extends StatelessWidget {
     required this.hideSubcategories,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    required this.useInfiniteScroll,
   });
 
   final ScrollController scrollController;
   final bool hideSubcategories;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final bool useInfiniteScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -246,15 +297,20 @@ class _RootCategoriesPanel extends StatelessWidget {
         if (state is! CategoriesLoaded) {
           return const _RootsPanelData.empty();
         }
+        final roots = state.pagedLeftPanelRoots(
+          infiniteScroll: useInfiniteScroll,
+        );
         final counts = <String, int>{
-          for (final root in state.leftPanelRoots)
+          for (final root in roots)
             root.id: state.subcategoryCountFor(root.id),
         };
         return _RootsPanelData(
-          roots: state.leftPanelRoots,
+          roots: roots,
           subcategoryCounts: counts,
           focusedRootId: state.focusedRootId,
           selectedIds: state.selectedCategoryIds,
+          hasReachedMax: state.hasReachedMaxRoots,
+          totalRoots: state.rootsTotalCount,
         );
       },
       builder: (context, data) {
@@ -287,6 +343,10 @@ class _RootCategoriesPanel extends StatelessWidget {
           );
         }
 
+        final showEndLabel = useInfiniteScroll &&
+            data.hasReachedMax &&
+            data.totalRoots > CategoriesBloc.pageLimit;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -304,8 +364,25 @@ class _RootCategoriesPanel extends StatelessWidget {
               child: ListView.builder(
                 controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                itemCount: data.roots.length,
+                itemCount: data.roots.length + (showEndLabel ? 1 : 0),
                 itemBuilder: (context, index) {
+                  if (index >= data.roots.length) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: Text(
+                          l10n.tOr(
+                            'allCategoriesLoaded',
+                            'All categories loaded',
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                        ),
+                      ),
+                    );
+                  }
                   final root = data.roots[index];
                   return RootCategoryTile(
                     key: ValueKey(root.id),
@@ -332,18 +409,24 @@ class _RootsPanelData {
     required this.subcategoryCounts,
     required this.focusedRootId,
     required this.selectedIds,
+    required this.hasReachedMax,
+    required this.totalRoots,
   });
 
   const _RootsPanelData.empty()
       : roots = const [],
         subcategoryCounts = const {},
         focusedRootId = null,
-        selectedIds = const {};
+        selectedIds = const {},
+        hasReachedMax = true,
+        totalRoots = 0;
 
   final List<CategoryEntity> roots;
   final Map<String, int> subcategoryCounts;
   final String? focusedRootId;
   final Set<String> selectedIds;
+  final bool hasReachedMax;
+  final int totalRoots;
 }
 
 String _categoryResultsLabel(AppLocalizations l10n, CategoriesLoaded state) {

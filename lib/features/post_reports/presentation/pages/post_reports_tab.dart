@@ -149,6 +149,8 @@ class _PostReportsTabState extends State<PostReportsTab>
                 page: state.currentPage,
                 totalPages: state.lastPage,
                 total: state.total,
+                pageSize: 20,
+                itemCount: state.posts.length,
                 itemLabel: 'posts',
                 onPage: (page) => context
                     .read<PostReportsBloc>()

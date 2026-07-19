@@ -99,11 +99,13 @@ class _ChatManagementPageViewState extends State<_ChatManagementPageView> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
+              final useDesktopPagination = width >= 1200;
               if (width >= 1400) {
                 return _DesktopLayout(
                   state: state,
                   chatsScroll: _chatsScroll,
                   messagesScroll: _messagesScroll,
+                  useDesktopPagination: useDesktopPagination,
                 );
               }
               if (width >= 900) {
@@ -111,12 +113,14 @@ class _ChatManagementPageViewState extends State<_ChatManagementPageView> {
                   state: state,
                   chatsScroll: _chatsScroll,
                   messagesScroll: _messagesScroll,
+                  useDesktopPagination: useDesktopPagination,
                 );
               }
               return _MobileLayout(
                 state: state,
                 chatsScroll: _chatsScroll,
                 messagesScroll: _messagesScroll,
+                useDesktopPagination: useDesktopPagination,
               );
             },
           ),
@@ -155,11 +159,13 @@ class _DesktopLayout extends StatelessWidget {
     required this.state,
     required this.chatsScroll,
     required this.messagesScroll,
+    required this.useDesktopPagination,
   });
 
   final ChatManagementLoaded state;
   final ScrollController chatsScroll;
   final ScrollController messagesScroll;
+  final bool useDesktopPagination;
 
   @override
   Widget build(BuildContext context) {
@@ -175,6 +181,7 @@ class _DesktopLayout extends StatelessWidget {
                 child: ChatListPanel(
                   state: state,
                   scrollController: chatsScroll,
+                  useDesktopPagination: useDesktopPagination,
                   onLoadMore: () => bloc.add(const ChatsLoadMoreRequested()),
                 ),
               ),
@@ -182,6 +189,7 @@ class _DesktopLayout extends StatelessWidget {
                 child: ChatMessagesPanel(
                   state: state,
                   scrollController: messagesScroll,
+                  useDesktopPagination: false,
                   onLoadMore: () =>
                       bloc.add(const MessagesLoadMoreRequested()),
                 ),
@@ -204,11 +212,13 @@ class _TabletLayout extends StatelessWidget {
     required this.state,
     required this.chatsScroll,
     required this.messagesScroll,
+    required this.useDesktopPagination,
   });
 
   final ChatManagementLoaded state;
   final ScrollController chatsScroll;
   final ScrollController messagesScroll;
+  final bool useDesktopPagination;
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +237,7 @@ class _TabletLayout extends StatelessWidget {
                   child: ChatListPanel(
                     state: state,
                     scrollController: chatsScroll,
+                    useDesktopPagination: useDesktopPagination,
                     onLoadMore: () => bloc.add(const ChatsLoadMoreRequested()),
                   ),
                 ),
@@ -246,6 +257,7 @@ class _TabletLayout extends StatelessWidget {
                             ChatMessagesPanel(
                               state: state,
                               scrollController: messagesScroll,
+                              useDesktopPagination: false,
                               onLoadMore: () => bloc
                                   .add(const MessagesLoadMoreRequested()),
                             ),
@@ -272,11 +284,13 @@ class _MobileLayout extends StatelessWidget {
     required this.state,
     required this.chatsScroll,
     required this.messagesScroll,
+    required this.useDesktopPagination,
   });
 
   final ChatManagementLoaded state;
   final ScrollController chatsScroll;
   final ScrollController messagesScroll;
+  final bool useDesktopPagination;
 
   @override
   Widget build(BuildContext context) {
@@ -288,6 +302,7 @@ class _MobileLayout extends StatelessWidget {
             child: ChatListPanel(
               state: state,
               scrollController: chatsScroll,
+              useDesktopPagination: useDesktopPagination,
               onLoadMore: () => bloc.add(const ChatsLoadMoreRequested()),
             ),
           ),
@@ -312,6 +327,7 @@ class _MobileLayout extends StatelessWidget {
           child: ChatMessagesPanel(
             state: state,
             scrollController: messagesScroll,
+            useDesktopPagination: false,
             onLoadMore: () => bloc.add(const MessagesLoadMoreRequested()),
           ),
         ),

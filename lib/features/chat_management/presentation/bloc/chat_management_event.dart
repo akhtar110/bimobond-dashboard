@@ -23,6 +23,14 @@ class ChatsLoadMoreRequested extends ChatManagementEvent {
   const ChatsLoadMoreRequested();
 }
 
+class ChatsGoToPageRequested extends ChatManagementEvent {
+  const ChatsGoToPageRequested(this.page);
+  final int page;
+
+  @override
+  List<Object?> get props => [page];
+}
+
 class ChatSelected extends ChatManagementEvent {
   const ChatSelected(this.chatId);
   final String chatId;
@@ -33,6 +41,14 @@ class ChatSelected extends ChatManagementEvent {
 
 class MessagesLoadMoreRequested extends ChatManagementEvent {
   const MessagesLoadMoreRequested();
+}
+
+class MessagesGoToPageRequested extends ChatManagementEvent {
+  const MessagesGoToPageRequested(this.page);
+  final int page;
+
+  @override
+  List<Object?> get props => [page];
 }
 
 class ChatsSearchChanged extends ChatManagementEvent {

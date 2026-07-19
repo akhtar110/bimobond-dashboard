@@ -143,6 +143,7 @@ class _GiftReportsTablePanelState extends State<GiftReportsTablePanel> {
                     currentPage: state.currentPage,
                     lastPage: state.lastPage,
                     total: state.total,
+                    itemCount: state.items.length,
                   ),
                   if (reportsMetricsOf(context).useInfiniteScroll &&
                       state.hasReachedMax &&

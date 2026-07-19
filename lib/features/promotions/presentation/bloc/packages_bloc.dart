@@ -12,6 +12,13 @@ abstract class PackagesEvent {}
 
 class LoadPackagesEvent extends PackagesEvent {}
 
+class GoToPackagesPageEvent extends PackagesEvent {
+  GoToPackagesPageEvent(this.page);
+  final int page;
+}
+
+class LoadMorePackagesEvent extends PackagesEvent {}
+
 class CreatePackageEvent extends PackagesEvent {
   CreatePackageEvent(this.data);
   final CreatePackageData data;
@@ -71,6 +78,7 @@ class PackagesLoaded extends PackagesState {
     this.search = '',
     this.statusFilter = PackageStatusFilter.all,
     this.selectedIds = const {},
+    this.currentPage = 1,
     this.isSaving = false,
     this.isRefreshing = false,
     this.message,
@@ -81,12 +89,13 @@ class PackagesLoaded extends PackagesState {
   final String search;
   final PackageStatusFilter statusFilter;
   final Set<String> selectedIds;
+  final int currentPage;
   final bool isSaving;
   final bool isRefreshing;
   final String? message;
   final bool isError;
 
-  List<PromotionPackageEntity> get visiblePackages {
+  List<PromotionPackageEntity> get filteredPackages {
     switch (statusFilter) {
       case PackageStatusFilter.active:
         return packages.where((p) => p.isActive).toList();
@@ -97,6 +106,33 @@ class PackagesLoaded extends PackagesState {
     }
   }
 
+  /// Kept for call sites; returns status-filtered packages.
+  List<PromotionPackageEntity> get visiblePackages => filteredPackages;
+
+  int get filteredCount => filteredPackages.length;
+
+  int get lastPage {
+    final total = filteredCount;
+    if (total <= 0) return 1;
+    return (total + PackagesBloc.pageLimit - 1) ~/ PackagesBloc.pageLimit;
+  }
+
+  bool get hasReachedMax => currentPage >= lastPage;
+
+  List<PromotionPackageEntity> pagedPackages({required bool infiniteScroll}) {
+    final items = filteredPackages;
+    if (items.isEmpty) return const [];
+    final pageSize = PackagesBloc.pageLimit;
+    if (infiniteScroll) {
+      final end = (currentPage * pageSize).clamp(0, items.length);
+      return items.sublist(0, end);
+    }
+    final start = (currentPage - 1) * pageSize;
+    if (start >= items.length) return const [];
+    final end = (start + pageSize).clamp(0, items.length);
+    return items.sublist(start, end);
+  }
+
   int get totalCount => packages.length;
   int get activeCount => packages.where((p) => p.isActive).length;
   int get inactiveCount => packages.length - activeCount;
@@ -104,14 +140,15 @@ class PackagesLoaded extends PackagesState {
   int get selectedCount => selectedIds.length;
 
   bool get allVisibleSelected {
-    final visible = visiblePackages;
+    final visible = pagedPackages(infiniteScroll: false);
     if (visible.isEmpty) return false;
     return visible.every((p) => selectedIds.contains(p.id));
   }
 
   bool get someVisibleSelected {
     if (selectedIds.isEmpty) return false;
-    final visibleIds = visiblePackages.map((p) => p.id).toSet();
+    final visibleIds =
+        pagedPackages(infiniteScroll: false).map((p) => p.id).toSet();
     return selectedIds.any(visibleIds.contains) && !allVisibleSelected;
   }
 
@@ -123,6 +160,7 @@ class PackagesLoaded extends PackagesState {
     String? search,
     PackageStatusFilter? statusFilter,
     Set<String>? selectedIds,
+    int? currentPage,
     bool? isSaving,
     bool? isRefreshing,
     String? message,
@@ -134,6 +172,7 @@ class PackagesLoaded extends PackagesState {
       search: search ?? this.search,
       statusFilter: statusFilter ?? this.statusFilter,
       selectedIds: selectedIds ?? this.selectedIds,
+      currentPage: currentPage ?? this.currentPage,
       isSaving: isSaving ?? this.isSaving,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       message: clearMessage ? null : (message ?? this.message),
@@ -163,6 +202,8 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
         _bulkAction = bulkAction,
         super(PackagesInitial()) {
     on<LoadPackagesEvent>(_onLoad);
+    on<GoToPackagesPageEvent>(_onGoToPage);
+    on<LoadMorePackagesEvent>(_onLoadMore);
     on<CreatePackageEvent>(_onCreate);
     on<UpdatePackageEvent>(_onUpdate);
     on<TogglePackageActiveEvent>(_onToggle);
@@ -176,6 +217,8 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
     on<BulkActivatePackagesEvent>(_onBulkActivate);
     on<BulkDeactivatePackagesEvent>(_onBulkDeactivate);
   }
+
+  static const pageLimit = 20;
 
   final GetPackagesUseCase _getPackages;
   final CreatePackageUseCase _createPackage;
@@ -230,6 +273,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
           search: _query.search ?? '',
           statusFilter: _statusFilter,
           selectedIds: selected,
+          currentPage: 1,
           message: successMessage,
           isError: false,
         ),
@@ -248,11 +292,33 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
     }
   }
 
+  void _onGoToPage(GoToPackagesPageEvent event, Emitter<PackagesState> emit) {
+    final current = state;
+    if (current is! PackagesLoaded) return;
+    final page = event.page.clamp(1, current.lastPage);
+    if (page == current.currentPage) return;
+    emit(current.copyWith(currentPage: page, clearMessage: true));
+  }
+
+  void _onLoadMore(LoadMorePackagesEvent event, Emitter<PackagesState> emit) {
+    final current = state;
+    if (current is! PackagesLoaded) return;
+    if (current.hasReachedMax) return;
+    emit(current.copyWith(
+      currentPage: current.currentPage + 1,
+      clearMessage: true,
+    ));
+  }
+
   void _onSearch(SearchPackagesEvent event, Emitter<PackagesState> emit) {
     _searchDebounce?.cancel();
     final current = state;
     if (current is PackagesLoaded) {
-      emit(current.copyWith(search: event.query, clearMessage: true));
+      emit(current.copyWith(
+        search: event.query,
+        currentPage: 1,
+        clearMessage: true,
+      ));
     }
     _searchDebounce = Timer(const Duration(milliseconds: 400), () {
       final term = event.query.trim();
@@ -273,6 +339,7 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
     if (current is PackagesLoaded) {
       emit(current.copyWith(
         statusFilter: event.filter,
+        currentPage: 1,
         clearMessage: true,
       ));
     }
@@ -309,7 +376,8 @@ class PackagesBloc extends Bloc<PackagesEvent, PackagesState> {
   ) {
     final current = state;
     if (current is! PackagesLoaded) return;
-    final visibleIds = current.visiblePackages.map((p) => p.id).toSet();
+    final visibleIds =
+        current.pagedPackages(infiniteScroll: false).map((p) => p.id).toSet();
     if (current.allVisibleSelected) {
       emit(current.copyWith(
         selectedIds: current.selectedIds.difference(visibleIds),

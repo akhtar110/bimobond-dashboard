@@ -5,9 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../bloc/chat_management_bloc.dart';
 import 'chat_message_media.dart';
+import 'chat_message_rich_previews.dart';
 import 'chat_ui_shared.dart';
 import 'messages_selection_header.dart';
 
@@ -17,11 +19,13 @@ class ChatMessagesPanel extends StatelessWidget {
     required this.state,
     required this.scrollController,
     required this.onLoadMore,
+    this.useDesktopPagination = false,
   });
 
   final ChatManagementLoaded state;
   final ScrollController scrollController;
   final VoidCallback onLoadMore;
+  final bool useDesktopPagination;
 
   @override
   Widget build(BuildContext context) {
@@ -134,58 +138,100 @@ class ChatMessagesPanel extends StatelessWidget {
                       title: l10n.t('noMessagesFound'),
                       subtitle: l10n.t('noMessagesFoundHint'),
                     )
-                  : NotificationListener<ScrollNotification>(
-                      onNotification: (n) {
-                        if (n.metrics.pixels >=
-                                n.metrics.maxScrollExtent - 120 &&
-                            !state.isLoadingMoreMessages) {
-                          onLoadMore();
-                        }
-                        return false;
-                      },
-                      child: ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                        itemCount: state.messages.length +
-                            (state.isLoadingMoreMessages ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index >= state.messages.length) {
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              ),
-                            );
-                          }
-                          final message = state.messages[index];
-                          return MessageBubble(
-                            message: message,
-                            isChecked:
-                                state.selectedMessageIds.contains(message.id),
-                            onToggleSelect: () => context
-                                .read<ChatManagementBloc>()
-                                .add(MessageSelectionToggled(message.id)),
-                            onDelete: () async {
-                              final ok = await confirmChatModerationAction(
-                                context,
-                                title: l10n.t('deleteMessageTitle'),
-                                message: l10n.t('deleteMessageConfirm'),
-                                destructive: true,
-                              );
-                              if (ok && context.mounted) {
-                                context.read<ChatManagementBloc>().add(
-                                      MessageDeleteRequested(message.id),
-                                    );
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: (n) {
+                              if (!useDesktopPagination &&
+                                  n.metrics.pixels >=
+                                      n.metrics.maxScrollExtent - 120 &&
+                                  !state.isLoadingMoreMessages) {
+                                onLoadMore();
                               }
+                              return false;
                             },
-                          );
-                        },
-                      ),
+                            child: ListView.builder(
+                              controller: scrollController,
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                              itemCount: state.messages.length +
+                                  (!useDesktopPagination &&
+                                          state.isLoadingMoreMessages
+                                      ? 1
+                                      : 0),
+                              itemBuilder: (context, index) {
+                                if (index >= state.messages.length) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                final message = state.messages[index];
+                                return MessageBubble(
+                                  message: message,
+                                  isChecked: state.selectedMessageIds
+                                      .contains(message.id),
+                                  onToggleSelect: () => context
+                                      .read<ChatManagementBloc>()
+                                      .add(
+                                        MessageSelectionToggled(message.id),
+                                      ),
+                                  onDelete: () async {
+                                    final ok =
+                                        await confirmChatModerationAction(
+                                      context,
+                                      title: l10n.t('deleteMessageTitle'),
+                                      message:
+                                          l10n.t('deleteMessageConfirm'),
+                                      destructive: true,
+                                    );
+                                    if (ok && context.mounted) {
+                                      context
+                                          .read<ChatManagementBloc>()
+                                          .add(
+                                            MessageDeleteRequested(
+                                              message.id,
+                                            ),
+                                          );
+                                    }
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        if (useDesktopPagination &&
+                            state.messagesMeta != null &&
+                            state.messagesMeta!.total > 0)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                            child: AppPaginationBar(
+                              currentPage: state.messagesMeta!.page,
+                              lastPage: state.messagesMeta!.totalPages,
+                              total: state.messagesMeta!.total,
+                              pageSize: state.messagesMeta!.limit,
+                              itemCount: state.messages.length,
+                              hideWhenSinglePage: false,
+                              borderRadius: BorderRadius.circular(10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              onPageChanged: (page) => context
+                                  .read<ChatManagementBloc>()
+                                  .add(MessagesGoToPageRequested(page)),
+                            ),
+                          ),
+                      ],
                     ),
         ),
       ],
@@ -656,9 +702,18 @@ class _MessageBody extends StatelessWidget {
         if (url == null) return Text(message.content ?? '');
         return ChatAudioMessage(audioUrl: url, embedded: embedded);
       case ChatMessageType.postShare:
-        return _PostSharePreview(message: message);
+        return ChatPostSharePreview(message: message);
+      case ChatMessageType.location:
+        final payload = message.locationPayload;
+        if (payload != null) {
+          return ChatLocationSharePreview(payload: payload);
+        }
+        return Text(message.content ?? '');
       case ChatMessageType.text:
       case ChatMessageType.unknown:
+        if (message.locationPayload != null) {
+          return ChatLocationSharePreview(payload: message.locationPayload!);
+        }
         return Text(
           message.content ?? '',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -669,35 +724,3 @@ class _MessageBody extends StatelessWidget {
   }
 }
 
-class _PostSharePreview extends StatelessWidget {
-  const _PostSharePreview({required this.message});
-
-  final ChatMessageEntity message;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.share_rounded, size: 20, color: scheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message.sharedPostId ?? message.content ?? '',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

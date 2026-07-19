@@ -22,11 +22,27 @@ void showEditGiftDialog(BuildContext pageContext, GiftEntity gift) {
   );
 }
 
+void showPreviewGiftDialog(BuildContext pageContext, GiftEntity gift) {
+  showDialog<void>(
+    context: pageContext,
+    builder: (_) => EditGiftDialog(
+      pageContext: pageContext,
+      gift: gift,
+      previewOnly: true,
+    ),
+  );
+}
+
 class EditGiftDialog extends StatefulWidget {
-  const EditGiftDialog({required this.pageContext, required this.gift});
+  const EditGiftDialog({
+    required this.pageContext,
+    required this.gift,
+    this.previewOnly = false,
+  });
 
   final BuildContext pageContext;
   final GiftEntity gift;
+  final bool previewOnly;
 
   @override
   State<EditGiftDialog> createState() => EditGiftDialogState();
@@ -163,6 +179,10 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.previewOnly) {
+      return _buildPreviewDialog(context);
+    }
+
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final screenW = MediaQuery.sizeOf(context).width;
@@ -398,6 +418,74 @@ class EditGiftDialogState extends State<EditGiftDialog> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPreviewDialog(BuildContext context) {
+    final l10n = context.l10n;
+    final screenW = MediaQuery.sizeOf(context).width;
+    final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
+    final showAnimation = widget.gift.animationUrl != null &&
+        widget.gift.animationUrl!.trim().isNotEmpty;
+
+    return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: screenW < 560 ? 16 : 24,
+        vertical: 24,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(l10n.tOr('previewGift', 'Preview gift')),
+      content: SizedBox(
+        width: dialogW,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: widget.gift.thumbnailUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: widget.gift.thumbnailUrl,
+                          fit: BoxFit.contain,
+                          placeholder: (context, url) => _imagePlaceholder(),
+                          errorWidget: (context, url, error) =>
+                              _imagePlaceholder(),
+                        )
+                      : _imagePlaceholder(),
+                ),
+              ),
+              if (showAnimation) ...[
+                const SizedBox(height: 14),
+                GiftAnimationPreview(
+                  key: const ValueKey('preview-gift-animation-preview'),
+                  networkUrl: widget.gift.animationUrl,
+                  fileName: widget.gift.animationUrl,
+                ),
+              ],
+              const SizedBox(height: 14),
+              GiftPriceCoinsField(
+                controller: _priceCtrl,
+                enabled: false,
+                validator: (_) => null,
+              ),
+              const SizedBox(height: 14),
+              GiftPublishedAtPicker(
+                value: _publishedAt,
+                onTap: null,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.t('close')),
+        ),
+      ],
     );
   }
 

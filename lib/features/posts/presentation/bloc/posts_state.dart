@@ -15,6 +15,8 @@ class PostsLoaded extends PostsState {
   PostsLoaded({
     required this.posts,
     required this.currentPage,
+    required this.lastPage,
+    required this.total,
     required this.hasReachedMax,
     required this.filters,
     this.isLoadingMore = false,
@@ -28,6 +30,8 @@ class PostsLoaded extends PostsState {
 
   final List<ManagedPostEntity> posts;
   final int currentPage;
+  final int lastPage;
+  final int total;
   final bool hasReachedMax;
   final bool isLoadingMore;
   final bool isApplyingFilters;
@@ -54,6 +58,8 @@ class PostsLoaded extends PostsState {
   PostsLoaded copyWith({
     List<ManagedPostEntity>? posts,
     int? currentPage,
+    int? lastPage,
+    int? total,
     bool? hasReachedMax,
     bool? isLoadingMore,
     bool? isApplyingFilters,
@@ -68,6 +74,8 @@ class PostsLoaded extends PostsState {
     return PostsLoaded(
       posts: posts ?? this.posts,
       currentPage: currentPage ?? this.currentPage,
+      lastPage: lastPage ?? this.lastPage,
+      total: total ?? this.total,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       isApplyingFilters: isApplyingFilters ?? this.isApplyingFilters,
@@ -87,6 +95,8 @@ class PostsLoaded extends PostsState {
   List<Object?> get props => [
         posts,
         currentPage,
+        lastPage,
+        total,
         hasReachedMax,
         isLoadingMore,
         isApplyingFilters,

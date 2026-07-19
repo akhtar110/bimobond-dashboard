@@ -229,7 +229,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   final BulkPromoteUsers bulkPromoteUsers;
   final BulkDemoteUsers bulkDemoteUsers;
 
-  static const int _limit = 20;
+  static const int pageLimit = 20;
+  static const int _limit = pageLimit;
 
   int _currentPage = 1;
   int _lastPage = 1;
@@ -387,6 +388,12 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
 
   void _onFilter(FilterUsersEvent event, Emitter<UsersState> emit) {
     _filter = event.filter;
+    if (_selectedUserIds.isNotEmpty) {
+      _selectedUserIds.clear();
+      if (state is UsersLoaded) {
+        _emitLoaded(emit, clearBulkActionMessage: true);
+      }
+    }
     add(LoadUsersEvent(refresh: true));
   }
 

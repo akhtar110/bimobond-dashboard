@@ -89,8 +89,17 @@ class _PostsPageViewState extends State<_PostsPageView> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 300) {
+    if (!mounted || !_scrollController.hasClients) return;
+
+    final width = MediaQuery.sizeOf(context).width;
+    final metrics = PostsLayoutMetrics(getPostsDeviceType(width));
+    if (!metrics.useInfiniteScroll) return;
+
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+      return;
+    }
+    if (position.pixels >= position.maxScrollExtent - 300) {
       context.read<PostsBloc>().add(LoadMorePostsEvent());
     }
   }
@@ -205,6 +214,12 @@ class _PostsPageViewState extends State<_PostsPageView> {
                                                 next.selectedPostIds ||
                                             prev.isLoadingMore !=
                                                 next.isLoadingMore ||
+                                            prev.isApplyingFilters !=
+                                                next.isApplyingFilters ||
+                                            prev.currentPage !=
+                                                next.currentPage ||
+                                            prev.lastPage != next.lastPage ||
+                                            prev.total != next.total ||
                                             prev.isPerformingBulkAction !=
                                                 next.isPerformingBulkAction)),
                                 builder: (context, state) => switch (state) {
