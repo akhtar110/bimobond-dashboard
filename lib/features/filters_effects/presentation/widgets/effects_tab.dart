@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/status_chip.dart';
 import '../../../../core/widgets/state_widgets.dart';
-import '../../../auth/domain/utils/dashboard_permissions.dart';
-import '../../../auth/presentation/bloc/auth_bloc.dart';
-import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../users/domain/entities/user_entity.dart';
+import '../../../rbac/presentation/bloc/rbac_bloc.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
@@ -18,8 +15,11 @@ import '../bloc/filters_effects_state.dart';
 import '../dialogs/effect_form_dialog.dart';
 import '../dialogs/fe_item_preview_dialog.dart';
 import '../dialogs/fe_confirm_dialog.dart';
+import '../utils/fe_display_filters.dart';
 import '../utils/filters_effects_responsive.dart';
 import '../utils/fe_effect_emoji_display.dart';
+import 'fe_catalog_item_preview.dart' show feEffectRenderTypeLabel;
+import 'fe_selected_category_banner.dart';
 import 'fe_tab_scaffold.dart';
 
 Future<void> _openEditor(BuildContext context, {String? effectId}) async {
@@ -50,89 +50,167 @@ class EffectsTab extends StatelessWidget {
     super.key,
     required this.loaded,
     required this.metrics,
+    this.selectedCategoryId,
+    this.onClearCategory,
   });
 
   final FiltersEffectsLoaded loaded;
   final FiltersEffectsLayoutMetrics metrics;
+  final String? selectedCategoryId;
+  final VoidCallback? onClearCategory;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final canManage = _canManage(context);
-    final items = loaded.pagedEffects;
-    final dateFmt = DateFormat.yMMMd();
+    final items = effectsForDisplay(
+      pagedEffects: loaded.pagedEffects,
+      effectCategories: loaded.effectCategories,
+      query: loaded.query,
+      selectedCategoryId: selectedCategoryId,
+    );
+    final selectionEnabled = canManage && !loaded.isBulkDeleting;
+    final categorySelected = selectedCategoryId != null;
 
-    if (loaded.filteredEffects.isEmpty) {
-      return Center(
-        child: EmptyView(
-          message: l10n.tOr('feNoEffects', 'No effects match your filters.'),
-        ),
+    CameraEffectCategoryEntity? selectedCategory;
+    if (categorySelected) {
+      for (final c in loaded.effectCategories) {
+        if (c.id == selectedCategoryId) {
+          selectedCategory = c;
+          break;
+        }
+      }
+    }
+
+    final allVisibleSelected = items.isNotEmpty &&
+        items.every((e) => loaded.selectedEffectIds.contains(e.id));
+    final someVisibleSelected = items.any(
+          (e) => loaded.selectedEffectIds.contains(e.id),
+        ) &&
+        !allVisibleSelected;
+
+    if (items.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (selectedCategory != null) ...[
+            FeSelectedCategoryBanner(
+              label: selectedCategory.displayLabel,
+              itemCount: 0,
+              isEffectCategory: true,
+              onClear: onClearCategory ?? () {},
+            ),
+            const SizedBox(height: 12),
+          ],
+          Expanded(
+            child: Center(
+              child: EmptyView(
+                message: l10n.tOr(
+                  'feNoEffects',
+                  'No effects match your filters.',
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     return FeTabScaffold(
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (canManage)
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: FilledButton.icon(
-                onPressed: () => _openEditor(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(l10n.tOr('feCreateEffect', 'Create effect')),
+      header: selectedCategory == null
+          ? null
+          : FeSelectedCategoryBanner(
+              label: selectedCategory.displayLabel,
+              itemCount: items.length,
+              isEffectCategory: true,
+              onClear: onClearCategory ?? () {},
+            ),
+      footer: categorySelected
+          ? null
+          : AppPaginationBar(
+              currentPage: loaded.query.page,
+              lastPage: loaded.effectsTotalPages,
+              total: loaded.effectsTotalCount,
+              pageSize: loaded.query.pageSize,
+              itemCount: items.length,
+              hideWhenSinglePage: false,
+              borderRadius: BorderRadius.circular(12),
+              onPageChanged: (page) => context.read<FiltersEffectsBloc>().add(
+                FiltersEffectsFilterChanged(page: page),
               ),
             ),
-          if (canManage) SizedBox(height: metrics.filterGap),
-        ],
-      ),
-      footer: AppPaginationBar(
-        currentPage: loaded.query.page,
-        lastPage: loaded.effectsTotalPages,
-        total: loaded.filteredEffects.length,
-        pageSize: loaded.query.pageSize,
-        itemCount: items.length,
-        hideWhenSinglePage: false,
-        borderRadius: BorderRadius.circular(12),
-        onPageChanged: (page) => context.read<FiltersEffectsBloc>().add(
-              FiltersEffectsFilterChanged(page: page),
-            ),
-      ),
       child: ResponsiveDataTable(
         mobileBreakpoint: 900,
         columns: [
+          if (selectionEnabled)
+            DataColumn(
+              label: Checkbox(
+                tristate: true,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                value: allVisibleSelected
+                    ? true
+                    : someVisibleSelected
+                        ? null
+                        : false,
+                onChanged: (_) {
+                  if (!categorySelected) {
+                    context.read<FiltersEffectsBloc>().add(
+                      const SelectAllVisibleEffectsEvent(),
+                    );
+                    return;
+                  }
+                  final bloc = context.read<FiltersEffectsBloc>();
+                  for (final effect in items) {
+                    final selected =
+                        loaded.selectedEffectIds.contains(effect.id);
+                    if (allVisibleSelected == selected) {
+                      bloc.add(ToggleEffectSelectionEvent(effect.id));
+                    }
+                  }
+                },
+              ),
+            ),
+          DataColumn(label: Text(l10n.tOr('feColThumbnail', 'Thumb'))),
+          DataColumn(label: Text(l10n.tOr('feColName', 'Name'))),
           DataColumn(label: Text(l10n.tOr('feColSlug', 'Slug'))),
-          DataColumn(label: Text(l10n.tOr('feColEffectType', 'Type'))),
-          DataColumn(label: Text(l10n.tOr('feColLabelKey', 'Label key'))),
-          DataColumn(label: Text(l10n.tOr('feColEmoji', 'Emoji'))),
+          DataColumn(label: Text(l10n.tOr('feColRenderType', 'Render type'))),
           DataColumn(label: Text(l10n.tOr('feColStatus', 'Status'))),
-          DataColumn(label: Text(l10n.tOr('feColFlags', 'Flags'))),
           DataColumn(label: Text(l10n.tOr('feColSortOrder', 'Order'))),
-          DataColumn(label: Text(l10n.tOr('feColUpdated', 'Updated'))),
           DataColumn(label: Text(l10n.tOr('feColActions', 'Actions'))),
         ],
         rows: [
           for (final effect in items)
             DataRow(
+              selected: loaded.selectedEffectIds.contains(effect.id),
               cells: [
-                DataCell(Text(effect.slug)),
-                DataCell(Text(_effectTypeLabel(context, effect.effectType))),
-                DataCell(Text(effect.labelKey)),
+                if (selectionEnabled)
+                  DataCell(
+                    Checkbox(
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      value: loaded.selectedEffectIds.contains(effect.id),
+                      onChanged: (_) => context.read<FiltersEffectsBloc>().add(
+                        ToggleEffectSelectionEvent(effect.id),
+                      ),
+                    ),
+                  ),
                 DataCell(
                   FeEffectEmojiDisplay.build(
                     emoji: effect.emoji,
                     assetUrl: effect.assetUrl,
                   ),
                 ),
+                DataCell(Text(effect.displayLabel)),
+                DataCell(Text(effect.slug)),
+                DataCell(
+                  Text(feEffectRenderTypeLabel(context, effect.renderType)),
+                ),
                 DataCell(_statusChip(context, effect.isActive)),
-                DataCell(Text(_flagsLabel(context, effect))),
                 DataCell(Text('${effect.sortOrder}')),
-                DataCell(Text(
-                  effect.updatedAt != null
-                      ? dateFmt.format(effect.updatedAt!.toLocal())
-                      : '—',
-                )),
-                DataCell(_actionsMenu(context, effect, canManage)),
+                DataCell(
+                  _EffectActionsMenu(effect: effect, canManage: canManage),
+                ),
               ],
             ),
         ],
@@ -140,8 +218,9 @@ class EffectsTab extends StatelessWidget {
           for (final effect in items)
             _EffectMobileCard(
               effect: effect,
-              effectTypeLabel: _effectTypeLabel(context, effect.effectType),
               canManage: canManage,
+              selectionEnabled: selectionEnabled,
+              isSelected: loaded.selectedEffectIds.contains(effect.id),
             ),
         ],
       ),
@@ -149,12 +228,10 @@ class EffectsTab extends StatelessWidget {
   }
 
   bool _canManage(BuildContext context) {
-    final roles = context.select<AuthBloc, List<UserRole>>((b) {
-      final state = b.state;
-      if (state is Authenticated) return state.user.roles;
-      return const <UserRole>[];
-    });
-    return canManageFiltersEffects(roles);
+    context.select<RbacBloc, Set<String>?>(
+      (b) => b.state.authContext?.permissionKeys,
+    );
+    return PermissionManager.canManageCameraStudio(context);
   }
 
   Widget _statusChip(BuildContext context, bool isActive) {
@@ -163,41 +240,27 @@ class EffectsTab extends StatelessWidget {
       label: isActive
           ? l10n.tOr('feActive', 'Active')
           : l10n.tOr('feInactive', 'Inactive'),
-      tone: isActive ? DashboardStatusTone.success : DashboardStatusTone.neutral,
+      tone: isActive
+          ? DashboardStatusTone.success
+          : DashboardStatusTone.neutral,
     );
   }
+}
 
-  String _effectTypeLabel(BuildContext context, String value) {
-    final l10n = context.l10n;
-    return switch (CameraEffectTypeApi.normalize(value)) {
-      CameraEffectTypeApi.screenOverlay =>
-        l10n.tOr('feEffectTypeScreenOverlay', 'Screen overlay'),
-      _ => l10n.tOr('feEffectTypeFaceAr', 'Face AR'),
-    };
-  }
+class _EffectActionsMenu extends StatelessWidget {
+  const _EffectActionsMenu({required this.effect, required this.canManage});
 
-  String _flagsLabel(BuildContext context, CameraEffectEntity effect) {
-    final l10n = context.l10n;
-    final flags = <String>[];
-    if (effect.requiresFaceDetection) {
-      flags.add(l10n.tOr('feFlagFaceDetection', 'Face detection'));
-    }
-    if (effect.isScreenEffect) {
-      flags.add(l10n.tOr('feFlagScreenEffect', 'Screen effect'));
-    }
-    return flags.isEmpty ? '—' : flags.join(', ');
-  }
+  final CameraEffectEntity effect;
+  final bool canManage;
 
-  Widget _actionsMenu(
-    BuildContext context,
-    CameraEffectEntity effect,
-    bool canManage,
-  ) {
+  @override
+  Widget build(BuildContext context) {
     if (!canManage) return const SizedBox.shrink();
     final l10n = context.l10n;
     final bloc = context.read<FiltersEffectsBloc>();
 
     return PopupMenuButton<String>(
+      tooltip: l10n.tOr('feActions', 'Actions'),
       onSelected: (action) {
         switch (action) {
           case 'preview':
@@ -225,10 +288,7 @@ class EffectsTab extends StatelessWidget {
           value: 'preview',
           child: Text(l10n.tOr('fePreview', 'Preview')),
         ),
-        PopupMenuItem(
-          value: 'edit',
-          child: Text(l10n.tOr('feEdit', 'Edit')),
-        ),
+        PopupMenuItem(value: 'edit', child: Text(l10n.tOr('feEdit', 'Edit'))),
         PopupMenuItem(
           value: effect.isActive ? 'deactivate' : 'activate',
           child: Text(
@@ -249,38 +309,100 @@ class EffectsTab extends StatelessWidget {
 class _EffectMobileCard extends StatelessWidget {
   const _EffectMobileCard({
     required this.effect,
-    required this.effectTypeLabel,
     required this.canManage,
+    required this.selectionEnabled,
+    required this.isSelected,
   });
 
   final CameraEffectEntity effect;
-  final String effectTypeLabel;
   final bool canManage;
+  final bool selectionEnabled;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: isSelected
+            ? scheme.primaryContainer.withValues(alpha: 0.22)
+            : scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: ListTile(
-        leading: FeEffectEmojiDisplay.build(
-          emoji: effect.emoji,
-          assetUrl: effect.assetUrl,
-          size: 36,
+        border: Border.all(
+          color: isSelected ? scheme.primary : scheme.outlineVariant,
         ),
-        title: Text(effect.labelKey),
-        subtitle: Text('${effect.slug} · $effectTypeLabel'),
-        trailing: canManage
-            ? IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () => _openEditor(context, effectId: effect.id),
-              )
-            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                if (selectionEnabled) ...[
+                  Checkbox(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    value: isSelected,
+                    onChanged: (_) => context.read<FiltersEffectsBloc>().add(
+                      ToggleEffectSelectionEvent(effect.id),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                FeEffectEmojiDisplay.build(
+                  emoji: effect.emoji,
+                  assetUrl: effect.assetUrl,
+                  size: 36,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        effect.displayLabel,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${effect.slug} · '
+                        '${feEffectRenderTypeLabel(context, effect.renderType)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _EffectActionsMenu(effect: effect, canManage: canManage),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                DashboardStatusChip(
+                  label: effect.isActive
+                      ? l10n.tOr('feActive', 'Active')
+                      : l10n.tOr('feInactive', 'Inactive'),
+                  tone: effect.isActive
+                      ? DashboardStatusTone.success
+                      : DashboardStatusTone.neutral,
+                ),
+                Text(
+                  '${l10n.tOr('feColSortOrder', 'Order')}: ${effect.sortOrder}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

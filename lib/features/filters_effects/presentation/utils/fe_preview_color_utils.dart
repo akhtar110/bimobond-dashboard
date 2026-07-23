@@ -145,14 +145,18 @@ List<Color> previewGradientForHex(String? hex) {
 FePreviewColorOption resolvePreviewColorOption(String? hex) {
   return findPreviewColorOption(hex) ??
       FePreviewColorOption(
-        hex: hex?.trim().isNotEmpty == true ? hex!.trim() : kFePreviewColorPalette.first.hex,
+        hex: hex?.trim().isNotEmpty == true
+            ? hex!.trim()
+            : kFePreviewColorPalette.first.hex,
         colors: previewGradientForHex(hex),
         label: 'Custom',
       );
 }
 
 String defaultPreviewColorHex({bool required = false}) {
-  return required ? kFePreviewColorPalette.first.hex : kFePreviewColorPalette.first.hex;
+  return required
+      ? kFePreviewColorPalette.first.hex
+      : kFePreviewColorPalette.first.hex;
 }
 
 bool isValidFePreviewHex(String? hex) => parsePreviewColorHex(hex) != null;

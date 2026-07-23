@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../data/datasources/filters_effects_remote_datasource.dart';
+import '../../domain/entities/filters_effects_entities.dart';
 
 /// Form chrome for the filter create/edit dialog — colors from [ColorScheme] only.
 class FeFilterFormTheme extends StatelessWidget {
@@ -58,9 +58,18 @@ class FeFilterFormTheme extends StatelessWidget {
   }
 }
 
-/// Engine key picker styled with the ambient [ColorScheme].
-class FeFilterEngineKeyField extends StatelessWidget {
-  const FeFilterEngineKeyField({
+String feFilterRenderTypeLabel(BuildContext context, String type) {
+  final l10n = context.l10n;
+  return switch (CameraFilterRenderTypeApi.fromResponse(type)) {
+    CameraFilterRenderTypeApi.matrix => l10n.tOr('feRenderTypeMatrix', 'Matrix'),
+    CameraFilterRenderTypeApi.lut => l10n.tOr('feRenderTypeLut', 'LUT'),
+    _ => type,
+  };
+}
+
+/// Filter render type picker (MATRIX | LUT).
+class FeFilterRenderTypeField extends StatelessWidget {
+  const FeFilterRenderTypeField({
     super.key,
     required this.value,
     required this.onChanged,
@@ -77,52 +86,33 @@ class FeFilterEngineKeyField extends StatelessWidget {
     final itemStyle = theme.textTheme.bodyLarge?.copyWith(
       color: scheme.onSurface,
     );
-    final engineKeys = kCameraAwesomeEngineKeys.contains(value)
-        ? kCameraAwesomeEngineKeys
-        : [value, ...kCameraAwesomeEngineKeys];
+    final selected = CameraFilterRenderTypeApi.fromResponse(value);
+    final options = CameraFilterRenderTypeApi.values.contains(selected)
+        ? CameraFilterRenderTypeApi.values
+        : [...CameraFilterRenderTypeApi.values, selected];
 
     return InputDecorator(
       decoration: InputDecoration(
-        labelText: l10n.tOr('feFieldEngineKey', 'Engine key'),
+        labelText: l10n.tOr('feFieldRenderType', 'Render type'),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: selected,
           isExpanded: true,
           isDense: true,
           borderRadius: BorderRadius.circular(12),
           dropdownColor: scheme.surface,
-          focusColor: scheme.primary.withValues(alpha: 0.12),
-          icon: Icon(
-            Icons.expand_more_rounded,
-            color: scheme.onSurfaceVariant,
-          ),
+          icon: Icon(Icons.expand_more_rounded, color: scheme.onSurfaceVariant),
           style: itemStyle,
-          selectedItemBuilder: (context) => [
-            for (final key in engineKeys)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  key,
-                  style: itemStyle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
           items: [
-            for (final key in engineKeys)
+            for (final type in options)
               DropdownMenuItem<String>(
-                value: key,
-                child: Text(
-                  key,
-                  style: itemStyle,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                value: type,
+                child: Text(feFilterRenderTypeLabel(context, type)),
               ),
           ],
-          onChanged: (v) {
-            if (v != null) onChanged(v);
+          onChanged: (next) {
+            if (next != null) onChanged(next);
           },
         ),
       ),

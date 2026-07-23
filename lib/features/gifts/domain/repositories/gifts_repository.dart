@@ -1,41 +1,40 @@
 import 'dart:typed_data';
 
-import '../entities/gift_entity.dart';
 import '../entities/bulk_gift_action_request.dart';
 import '../entities/bulk_gift_action_result.dart';
+import '../entities/gift_entity.dart';
+import '../entities/gift_group_entities.dart';
+import '../enums/gift_size.dart';
 
 /// Payload for creating a new gift.
-/// The [imageBytes] + [imageName] are uploaded first; the returned URL
-/// is used as [thumbnailUrl] when calling POST /gifts/admin.
-/// Prefer [animationUrl] when the animation was already uploaded in the UI.
 class CreateGiftData {
   const CreateGiftData({
     required this.name,
     required this.imageBytes,
     required this.imageName,
     required this.priceCoins,
+    this.size = GiftSize.medium,
     this.isActive = true,
     this.publishedAt,
     this.animationUrl,
     this.animationBytes,
     this.animationName,
+    this.assignGroupId,
   });
 
   final String name;
   final Uint8List imageBytes;
   final String imageName;
   final double priceCoins;
+  final GiftSize size;
   final bool isActive;
-
-  /// Explicit publish timestamp. Defaults to server-side `DateTime.now()` when null.
   final DateTime? publishedAt;
-
-  /// Already-uploaded animation URL (preferred over [animationBytes]).
   final String? animationUrl;
-
-  /// Optional animation file uploaded during create when [animationUrl] is null.
   final Uint8List? animationBytes;
   final String? animationName;
+
+  /// Optional panel tab to add the gift to after create.
+  final String? assignGroupId;
 }
 
 class UpdateGiftData {
@@ -44,30 +43,30 @@ class UpdateGiftData {
     this.thumbnailUrl,
     this.animationUrl,
     this.priceCoins,
+    this.size,
     this.isActive,
     this.publishedAt,
+    this.clearPublishedAt = false,
     this.imageBytes,
     this.imageName,
     this.animationBytes,
     this.animationName,
+    this.clearAnimationUrl = false,
   });
 
   final String? name;
   final String? thumbnailUrl;
   final String? animationUrl;
   final double? priceCoins;
+  final GiftSize? size;
   final bool? isActive;
-
-  /// Update the published timestamp. Pass `null` to leave it unchanged.
   final DateTime? publishedAt;
-
-  /// When set, the image is uploaded first and the resulting URL replaces [thumbnailUrl].
+  final bool clearPublishedAt;
   final Uint8List? imageBytes;
   final String? imageName;
-
-  /// When set, the animation is uploaded first and the resulting URL replaces [animationUrl].
   final Uint8List? animationBytes;
   final String? animationName;
+  final bool clearAnimationUrl;
 }
 
 abstract class GiftsRepository {
@@ -76,7 +75,20 @@ abstract class GiftsRepository {
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
   Future<BulkGiftActionResult> executeBulkAction(BulkGiftActionRequest request);
-
-  /// Upload a gift media file and return its absolute URL.
   Future<String> uploadGiftFile(Uint8List bytes, String filename);
+
+  Future<List<GiftGroupEntity>> getGiftGroups();
+  Future<GiftGroupEntity> createGiftGroup(CreateGiftGroupData data);
+  Future<List<GiftGroupEntity>> reorderGiftGroups(
+    List<GiftGroupReorderItem> items,
+  );
+  Future<GiftGroupEntity> updateGiftGroup(
+    String groupId,
+    UpdateGiftGroupData data,
+  );
+  Future<void> deleteGiftGroup(String groupId);
+  Future<GiftGroupEntity> replaceGroupGifts(
+    String groupId,
+    List<GiftGroupMembershipItem> gifts,
+  );
 }

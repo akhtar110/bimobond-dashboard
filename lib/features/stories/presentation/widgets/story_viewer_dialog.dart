@@ -2,36 +2,20 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../../post_management/domain/entities/managed_post_entity.dart';
-import '../../../post_management/presentation/widgets/post_media_carousel.dart';
 import '../../../posts/presentation/utils/posts_responsive.dart';
 import '../../../../core/widgets/post_media_preview.dart';
-import '../../domain/entities/active_story_entity.dart';
-import '../utils/stories_l10n.dart';
+import '../../domain/entities/story_viewer_slide.dart';
+import '../utils/stories_admin_l10n.dart';
+import 'story_viewer_media.dart';
 
 const Duration _kImageStoryDuration = Duration(seconds: 5);
 
 typedef StoryIndexChanged = void Function(int index);
-typedef StoryViewDetailsCallback = Future<void> Function(ActiveStoryEntity story);
-
-String? storyProgressMediaUrl(ManagedPostEntity post) {
-  if (post.containsVideoMedia) {
-    for (final candidate in [
-      post.videoUrl,
-      post.hlsUrl,
-      ...post.playableMediaUrls,
-    ]) {
-      final value = candidate?.trim();
-      if (value != null && value.isNotEmpty) return value;
-    }
-  }
-  if (post.shouldPlayAttachedSound) return post.attachedSoundPlayUrl;
-  return null;
-}
+typedef StoryViewDetailsCallback = Future<void> Function(StoryViewerSlide story);
 
 Future<bool?> showStoryViewerDialog(
   BuildContext context, {
-  required List<ActiveStoryEntity> stories,
+  required List<StoryViewerSlide> stories,
   required int initialIndex,
   StoryIndexChanged? onIndexChanged,
   VoidCallback? onStoryCompleted,
@@ -76,7 +60,7 @@ class StoryViewerDialog extends StatefulWidget {
     this.onViewDetails,
   });
 
-  final List<ActiveStoryEntity> stories;
+  final List<StoryViewerSlide> stories;
   final int initialIndex;
   final StoryIndexChanged? onIndexChanged;
   final VoidCallback? onStoryCompleted;
@@ -92,6 +76,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
   late final AnimationController _imageProgressController;
 
   VideoPlayerController? _trackedController;
+  String? _trackedUrl;
   int _setupGeneration = 0;
   bool _isPaused = false;
   double _dragOffset = 0;
@@ -112,6 +97,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
   @override
   void dispose() {
     _detachMediaListener();
+    _releaseTrackedController();
     PostVideoControllerCache.instance.pauseAll();
     _imageProgressController
       ..removeStatusListener(_onImageProgressStatus)
@@ -119,7 +105,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     super.dispose();
   }
 
-  ActiveStoryEntity get _currentStory => widget.stories[_currentIndex];
+  StoryViewerSlide get _currentStory => widget.stories[_currentIndex];
 
   void _onImageProgressStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed && mounted && !_isPaused) {
@@ -129,6 +115,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
 
   Future<void> _loadCurrentStory() async {
     _detachMediaListener();
+    _releaseTrackedController();
     _imageProgressController.stop();
     _imageProgressController.reset();
     if (!mounted) return;
@@ -136,10 +123,12 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     setState(() => _isPaused = false);
 
     final generation = ++_setupGeneration;
-    final mediaUrl = storyProgressMediaUrl(_currentStory.postData);
+    final mediaUrl = storyProgressMediaUrl(_currentStory);
 
     if (mediaUrl != null) {
+      PostVideoControllerCache.instance.obtain(mediaUrl, looping: false);
       await _attachProgressTracking(mediaUrl, generation: generation);
+      _trackedController?.play();
       return;
     }
 
@@ -151,6 +140,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     String url, {
     required int generation,
   }) async {
+    _trackedUrl = url;
     for (var attempt = 0; attempt < 40; attempt++) {
       if (!mounted || generation != _setupGeneration) return;
 
@@ -165,6 +155,14 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
+  }
+
+  void _releaseTrackedController() {
+    final url = _trackedUrl;
+    if (url != null) {
+      PostVideoControllerCache.instance.release(url);
+    }
+    _trackedUrl = null;
   }
 
   void _onMediaTick() {
@@ -201,7 +199,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     if (!_isPaused) return;
     _isPaused = false;
 
-    final mediaUrl = storyProgressMediaUrl(_currentStory.postData);
+    final mediaUrl = storyProgressMediaUrl(_currentStory);
     if (mediaUrl != null) {
       _trackedController?.play();
     } else if (_imageProgressController.value < 1) {
@@ -246,7 +244,6 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
     if (index < _currentIndex) return 1;
     if (index > _currentIndex) return 0;
 
-    final post = _currentStory.postData;
     final controller = _trackedController;
     if (controller != null && controller.value.isInitialized) {
       final duration = controller.value.duration.inMilliseconds;
@@ -255,7 +252,7 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
           .clamp(0.0, 1.0);
     }
 
-    if (storyProgressMediaUrl(post) != null) return 0;
+    if (storyProgressMediaUrl(_currentStory) != null) return 0;
 
     return _imageProgressController.value.clamp(0.0, 1.0);
   }
@@ -362,13 +359,10 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    PostMediaCarousel(
-                                      key: ValueKey(_currentStory.postData.id),
-                                      post: _currentStory.postData,
+                                    StoryViewerMedia(
+                                      key: ValueKey(_currentStory.id),
+                                      slide: _currentStory,
                                       fit: BoxFit.contain,
-                                      videoLooping: false,
-                                      soundLooping: false,
-                                      showSeekBar: false,
                                     ),
                                     Positioned(
                                       left: 12,
@@ -390,22 +384,26 @@ class _StoryViewerDialogState extends State<StoryViewerDialog>
                                                   ),
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          FilledButton.tonal(
-                                            onPressed: _openDetails,
-                                            style: FilledButton.styleFrom(
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 8,
+                                          if (widget.onViewDetails != null) ...[
+                                            const SizedBox(width: 8),
+                                            FilledButton.tonal(
+                                              onPressed: _openDetails,
+                                              style: FilledButton.styleFrom(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 8,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                StoriesAdminL10n.viewDetails(
+                                                  context,
+                                                ),
                                               ),
                                             ),
-                                            child: Text(
-                                              StoriesL10n.viewDetails(context),
-                                            ),
-                                          ),
+                                          ],
                                         ],
                                       ),
                                     ),
@@ -437,10 +435,10 @@ class _StoryProgressHeader extends StatelessWidget {
     required this.onClose,
   });
 
-  final List<ActiveStoryEntity> stories;
+  final List<StoryViewerSlide> stories;
   final int currentIndex;
   final double Function(int index) segmentProgressFor;
-  final ActiveStoryEntity story;
+  final StoryViewerSlide story;
   final VoidCallback onClose;
 
   @override
@@ -497,7 +495,7 @@ class _StoryProgressHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      StoriesL10n.authorName(context, story.author),
+                      StoriesAdminL10n.viewerAuthorName(context, story.author),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -505,7 +503,7 @@ class _StoryProgressHeader extends StatelessWidget {
                           ),
                     ),
                     Text(
-                      StoriesL10n.formatCreatedAt(context, story.createdAt),
+                      StoriesAdminL10n.formatDate(context, story.createdAt),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),

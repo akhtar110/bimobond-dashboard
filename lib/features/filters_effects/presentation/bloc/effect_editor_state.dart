@@ -1,88 +1,112 @@
 import 'package:equatable/equatable.dart';
 
-import '../../domain/entities/effect_placement_entities.dart';
+import '../../domain/entities/filters_effects_entities.dart';
+import '../utils/effect_anchor_form_data.dart';
+
 class EffectEditorFormData extends Equatable {
   const EffectEditorFormData({
     required this.slug,
-    required this.effectType,
+    required this.renderType,
+    required this.label,
+    this.labelKey,
     this.emoji,
-    this.assetUrl,
+    this.thumbnailUrl,
     this.previewColorHex,
-    required this.labelKey,
-    this.requiresFaceDetection = false,
-    this.isScreenEffect = false,
+    this.assetUrl,
+    this.assetAsset,
+    this.anchor = EffectAnchorFormData.empty,
+    this.stickers = const [],
+    this.distortionPreset,
     this.isActive = true,
     this.sortOrder = 0,
-    this.placement = EffectPlacementSettingsEntity.empty,
   });
 
   final String slug;
-  final String effectType;
+  final String renderType;
+  final String label;
+  final String? labelKey;
   final String? emoji;
-  final String? assetUrl;
+  final String? thumbnailUrl;
   final String? previewColorHex;
-  final String labelKey;
-  final bool requiresFaceDetection;
-  final bool isScreenEffect;
+  final String? assetUrl;
+  final String? assetAsset;
+  final EffectAnchorFormData anchor;
+  final List<CameraEffectStickerLayer> stickers;
+  final String? distortionPreset;
   final bool isActive;
   final int sortOrder;
-  final EffectPlacementSettingsEntity placement;
 
   String get displayLabel {
-    final key = labelKey.trim();
-    if (key.isNotEmpty) return key;
+    final primary = label.trim();
+    if (primary.isNotEmpty) return primary;
     final s = slug.trim();
     return s.isNotEmpty ? s : '—';
   }
 
   EffectEditorFormData copyWith({
     String? slug,
-    String? effectType,
-    String? emoji,
-    String? assetUrl,
-    String? previewColorHex,
+    String? renderType,
+    String? label,
     String? labelKey,
-    bool? requiresFaceDetection,
-    bool? isScreenEffect,
+    String? emoji,
+    String? thumbnailUrl,
+    String? previewColorHex,
+    String? assetUrl,
+    String? assetAsset,
+    EffectAnchorFormData? anchor,
+    List<CameraEffectStickerLayer>? stickers,
+    String? distortionPreset,
     bool? isActive,
     int? sortOrder,
-    EffectPlacementSettingsEntity? placement,
+    bool clearLabelKey = false,
     bool clearEmoji = false,
-    bool clearAssetUrl = false,
+    bool clearThumbnailUrl = false,
     bool clearPreviewColorHex = false,
+    bool clearAssetUrl = false,
+    bool clearAssetAsset = false,
+    bool clearDistortionPreset = false,
   }) {
     return EffectEditorFormData(
       slug: slug ?? this.slug,
-      effectType: effectType ?? this.effectType,
+      renderType: renderType ?? this.renderType,
+      label: label ?? this.label,
+      labelKey: clearLabelKey ? null : (labelKey ?? this.labelKey),
       emoji: clearEmoji ? null : (emoji ?? this.emoji),
-      assetUrl: clearAssetUrl ? null : (assetUrl ?? this.assetUrl),
+      thumbnailUrl: clearThumbnailUrl
+          ? null
+          : (thumbnailUrl ?? this.thumbnailUrl),
       previewColorHex: clearPreviewColorHex
           ? null
           : (previewColorHex ?? this.previewColorHex),
-      labelKey: labelKey ?? this.labelKey,
-      requiresFaceDetection:
-          requiresFaceDetection ?? this.requiresFaceDetection,
-      isScreenEffect: isScreenEffect ?? this.isScreenEffect,
+      assetUrl: clearAssetUrl ? null : (assetUrl ?? this.assetUrl),
+      assetAsset: clearAssetAsset ? null : (assetAsset ?? this.assetAsset),
+      anchor: anchor ?? this.anchor,
+      stickers: stickers ?? this.stickers,
+      distortionPreset: clearDistortionPreset
+          ? null
+          : (distortionPreset ?? this.distortionPreset),
       isActive: isActive ?? this.isActive,
       sortOrder: sortOrder ?? this.sortOrder,
-      placement: placement ?? this.placement,
     );
   }
 
   @override
   List<Object?> get props => [
-        slug,
-        effectType,
-        emoji,
-        assetUrl,
-        previewColorHex,
-        labelKey,
-        requiresFaceDetection,
-        isScreenEffect,
-        isActive,
-        sortOrder,
-        placement,
-      ];
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    assetUrl,
+    assetAsset,
+    anchor,
+    stickers,
+    distortionPreset,
+    isActive,
+    sortOrder,
+  ];
 }
 
 abstract class EffectEditorState extends Equatable {
@@ -104,9 +128,7 @@ class EffectEditorReady extends EffectEditorState {
   const EffectEditorReady({
     required this.form,
     required this.baseline,
-    required this.schema,
     this.effectId,
-    this.placementExpanded = true,
     this.fieldErrors = const {},
     this.isSaving = false,
     this.isUploadingAsset = false,
@@ -118,8 +140,6 @@ class EffectEditorReady extends EffectEditorState {
   final String? effectId;
   final EffectEditorFormData form;
   final EffectEditorFormData baseline;
-  final EffectPlacementSchemaEntity schema;
-  final bool placementExpanded;
   final Map<String, String> fieldErrors;
   final bool isSaving;
   final bool isUploadingAsset;
@@ -131,15 +151,10 @@ class EffectEditorReady extends EffectEditorState {
 
   bool get hasUnsavedChanges => form != baseline;
 
-  bool get hasSlugDefaults =>
-      schema.defaultsForSlug(form.slug.trim()) != null;
-
   EffectEditorReady copyWith({
     EffectEditorFormData? form,
     EffectEditorFormData? baseline,
-    EffectPlacementSchemaEntity? schema,
     String? effectId,
-    bool? placementExpanded,
     Map<String, String>? fieldErrors,
     bool? isSaving,
     bool? isUploadingAsset,
@@ -154,35 +169,31 @@ class EffectEditorReady extends EffectEditorState {
       effectId: effectId ?? this.effectId,
       form: form ?? this.form,
       baseline: baseline ?? this.baseline,
-      schema: schema ?? this.schema,
-      placementExpanded: placementExpanded ?? this.placementExpanded,
       fieldErrors: clearFieldErrors
           ? const {}
           : (fieldErrors ?? this.fieldErrors),
       isSaving: isSaving ?? this.isSaving,
       isUploadingAsset: isUploadingAsset ?? this.isUploadingAsset,
-      assetFileName:
-          clearAssetFileName ? null : (assetFileName ?? this.assetFileName),
+      assetFileName: clearAssetFileName
+          ? null
+          : (assetFileName ?? this.assetFileName),
       saveSucceeded: saveSucceeded ?? this.saveSucceeded,
-      submitError:
-          clearSubmitError ? null : (submitError ?? this.submitError),
+      submitError: clearSubmitError ? null : (submitError ?? this.submitError),
     );
   }
 
   @override
   List<Object?> get props => [
-        effectId,
-        form,
-        baseline,
-        schema,
-        placementExpanded,
-        fieldErrors,
-        isSaving,
-        isUploadingAsset,
-        assetFileName,
-        saveSucceeded,
-        submitError,
-      ];
+    effectId,
+    form,
+    baseline,
+    fieldErrors,
+    isSaving,
+    isUploadingAsset,
+    assetFileName,
+    saveSucceeded,
+    submitError,
+  ];
 }
 
 class EffectEditorError extends EffectEditorState {

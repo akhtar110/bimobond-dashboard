@@ -6,12 +6,17 @@ import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../bloc/auctions_bloc.dart';
 import '../services/auction_image_lookup.dart';
+import '../utils/auctions_page_tab.dart';
 import '../utils/auctions_responsive.dart';
 import '../widgets/auction_card.dart';
+import '../widgets/auctions_page_header_tabs.dart';
+import '../../../seller_verification/presentation/bloc/seller_verification_bloc.dart';
+import '../../../seller_verification/presentation/widgets/seller_verification_panel.dart';
 
 /// Responsive column count for admin catalog grids.
 /// Matches [giftsGridColumnCount] so auction cards share the same card width.
@@ -35,7 +40,11 @@ class AuctionsPage extends StatelessWidget {
       debugLabel: 'AuctionsPage',
       create: () =>
           sl<AuctionsBloc>()..add(LoadAllAuctionsEvent(refresh: true)),
-      child: const _AuctionsPageView(),
+      child: BlocProvider(
+        create: (_) => sl<SellerVerificationBloc>()
+          ..add(const LoadSellerVerificationsEvent(refresh: true)),
+        child: const _AuctionsPageView(),
+      ),
     );
   }
 }
@@ -49,6 +58,7 @@ class _AuctionsPageView extends StatefulWidget {
 
 class _AuctionsPageViewState extends State<_AuctionsPageView> {
   final _scrollController = ScrollController();
+  AuctionsPageTab _activeTab = AuctionsPageTab.auctions;
 
   @override
   void initState() {
@@ -75,7 +85,23 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
       return;
     }
     if (position.pixels >= position.maxScrollExtent - 300) {
-      context.read<AuctionsBloc>().add(LoadMoreAuctionsEvent());
+      if (_activeTab == AuctionsPageTab.sellerVerification) {
+        context.read<SellerVerificationBloc>().add(
+              const LoadMoreSellerVerificationsEvent(),
+            );
+      } else {
+        context.read<AuctionsBloc>().add(LoadMoreAuctionsEvent());
+      }
+    }
+  }
+
+  void _onRefresh() {
+    if (_activeTab == AuctionsPageTab.sellerVerification) {
+      context
+          .read<SellerVerificationBloc>()
+          .add(const LoadSellerVerificationsEvent(refresh: true));
+    } else {
+      context.read<AuctionsBloc>().add(LoadAllAuctionsEvent(refresh: true));
     }
   }
 
@@ -93,51 +119,103 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
 
         return Scaffold(
           backgroundColor: scheme.surfaceContainerLowest,
-          body: BlocConsumer<AuctionsBloc, AuctionsState>(
-            listener: (context, state) {},
-            builder: (context, state) {
-              return CustomScrollView(
-                controller: _scrollController,
-                slivers: [
-                  _SliverHeader(
-                    theme: theme,
-                    state: state,
-                    metrics: metrics,
-                  ),
-                  if (state is AuctionsLoaded) ...[
-                    _SliverFilters(
-                      key: const ValueKey('auctions_filter_bar'),
-                      loaded: state,
-                      theme: theme,
-                      metrics: metrics,
-                    ),
-                    _SliverGrid(loaded: state, metrics: metrics),
-                    if (metrics.useDesktopPagination && state.total > 0)
-                      _SliverPagination(loaded: state, metrics: metrics),
-                    if (metrics.useInfiniteScroll && state.isLoadingMore)
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+          body: BlocBuilder<SellerVerificationBloc, SellerVerificationState>(
+            builder: (context, sellerState) {
+              return BlocConsumer<AuctionsBloc, AuctionsState>(
+                listener: (context, state) {},
+                builder: (context, state) {
+                  final showAuctionsTab =
+                      _activeTab == AuctionsPageTab.auctions;
+                  final isHeaderLoading = showAuctionsTab
+                      ? state is AuctionsLoading
+                      : sellerState is SellerVerificationLoading;
+
+                  return CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      _SliverHeader(
+                        theme: theme,
+                        auctionsState: state,
+                        sellerState: sellerState,
+                        metrics: metrics,
+                        activeTab: _activeTab,
+                        isLoading: isHeaderLoading,
+                        onTabChanged: (tab) {
+                          setState(() => _activeTab = tab);
+                          if (tab == AuctionsPageTab.sellerVerification) {
+                            final sellerBloc =
+                                context.read<SellerVerificationBloc>();
+                            if (sellerBloc.state is! SellerVerificationLoaded) {
+                              sellerBloc.add(
+                                const LoadSellerVerificationsEvent(
+                                  refresh: true,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        onRefresh: _onRefresh,
+                      ),
+                      if (showAuctionsTab) ...[
+                        if (state is AuctionsLoaded) ...[
+                          _SliverFilters(
+                            key: const ValueKey('auctions_filter_bar'),
+                            loaded: state,
+                            theme: theme,
+                            metrics: metrics,
+                          ),
+                          _SliverGrid(loaded: state, metrics: metrics),
+                          if (metrics.useDesktopPagination && state.total > 0)
+                            _SliverPagination(loaded: state, metrics: metrics),
+                          if (metrics.useInfiniteScroll && state.isLoadingMore)
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 20),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ] else if (state is AuctionsLoading) ...[
+                          _SliverSkeletons(metrics: metrics),
+                        ] else if (state is AuctionsError) ...[
+                          _SliverError(message: state.message),
+                        ],
+                      ] else if (PermissionManager.canReadSellerVerification(
+                        context,
+                      )) ...[
+                        SellerVerificationPanel(
+                          screenWidth: windowWidth,
+                          useDesktopPagination: metrics.useDesktopPagination,
+                          pageHorizontalPadding: metrics.pageHorizontalPadding,
+                        ),
+                      ] else
+                        SliverPadding(
+                          padding: EdgeInsets.all(metrics.pageHorizontalPadding),
+                          sliver: SliverToBoxAdapter(
+                            child: Text(
+                              context.l10n.tOr(
+                                'sellerVerificationNoAccess',
+                                'You do not have permission to review seller applications.',
+                              ),
+                              style: TextStyle(color: scheme.onSurfaceVariant),
                             ),
                           ),
                         ),
+                      SliverPadding(
+                        padding: EdgeInsets.only(
+                          bottom: metrics.isMobile ? 16 : 24,
+                        ),
                       ),
-                  ] else if (state is AuctionsLoading) ...[
-                    _SliverSkeletons(metrics: metrics),
-                  ] else if (state is AuctionsError) ...[
-                    _SliverError(message: state.message),
-                  ],
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                      bottom: metrics.isMobile ? 16 : 24,
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -152,26 +230,185 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
 class _SliverHeader extends StatelessWidget {
   const _SliverHeader({
     required this.theme,
-    required this.state,
+    required this.auctionsState,
+    required this.sellerState,
     required this.metrics,
+    required this.activeTab,
+    required this.isLoading,
+    required this.onTabChanged,
+    required this.onRefresh,
   });
 
   final ThemeData theme;
-  final AuctionsState state;
+  final AuctionsState auctionsState;
+  final SellerVerificationState sellerState;
   final AuctionsLayoutMetrics metrics;
+  final AuctionsPageTab activeTab;
+  final bool isLoading;
+  final ValueChanged<AuctionsPageTab> onTabChanged;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = theme.colorScheme;
-    final isLoading = state is AuctionsLoading;
-    final AuctionsLoaded? loaded =
-        state is AuctionsLoaded ? state as AuctionsLoaded : null;
+    final loaded = auctionsState is AuctionsLoaded
+        ? auctionsState as AuctionsLoaded
+        : null;
+    final sellerLoaded = sellerState is SellerVerificationLoaded
+        ? sellerState as SellerVerificationLoaded
+        : null;
+    final showAuctionStats = activeTab == AuctionsPageTab.auctions;
+    final compact = metrics.isCompact;
+    final radius = metrics.panelRadius;
+    final pad = metrics.panelPadding;
+
+    Widget statChips() {
+      if (showAuctionStats && loaded != null) {
+        return Wrap(
+          spacing: compact ? 6 : 8,
+          runSpacing: compact ? 6 : 8,
+          alignment: WrapAlignment.start,
+          children: [
+            _StatChip(
+              label: l10n.t('total'),
+              value: loaded.total.toString(),
+              icon: Icons.gavel_rounded,
+              color: scheme.primary,
+              compact: compact,
+            ),
+            _StatChip(
+              label: l10n.t('active'),
+              value: loaded.activeCount.toString(),
+              icon: Icons.play_circle_rounded,
+              color: scheme.primary,
+              compact: compact,
+            ),
+            _StatChip(
+              label: l10n.t('completed'),
+              value: loaded.completedCount.toString(),
+              icon: Icons.check_circle_rounded,
+              color: scheme.secondary,
+              compact: compact,
+            ),
+            _StatChip(
+              label: l10n.t('cancelled'),
+              value: loaded.cancelledCount.toString(),
+              icon: Icons.cancel_rounded,
+              color: scheme.error,
+              compact: compact,
+            ),
+            if (loaded.bannedCount > 0)
+              _StatChip(
+                label: l10n.tOr('banned', 'Banned'),
+                value: loaded.bannedCount.toString(),
+                icon: Icons.block_rounded,
+                color: scheme.error,
+                compact: compact,
+              ),
+          ],
+        );
+      }
+
+      if (!showAuctionStats && sellerLoaded != null) {
+        return Wrap(
+          spacing: compact ? 6 : 8,
+          runSpacing: compact ? 6 : 8,
+          children: [
+            _StatChip(
+              label: l10n.t('total'),
+              value: sellerLoaded.total.toString(),
+              icon: Icons.inbox_rounded,
+              color: scheme.primary,
+              compact: compact,
+            ),
+            _StatChip(
+              label: l10n.tOr('pending', 'Pending'),
+              value: sellerLoaded.pendingCount.toString(),
+              icon: Icons.hourglass_top_rounded,
+              color: scheme.tertiary,
+              compact: compact,
+            ),
+          ],
+        );
+      }
+
+      return const SizedBox.shrink();
+    }
+
+    final refreshBtn = Material(
+      color: scheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: isLoading ? null : onRefresh,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Center(
+            child: isLoading
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  )
+                : Icon(
+                    Icons.refresh_rounded,
+                    size: 20,
+                    color: scheme.onSurfaceVariant,
+                  ),
+          ),
+        ),
+      ),
+    );
+
+    final title = showAuctionStats
+        ? l10n.t('auctions')
+        : l10n.tOr('sellerVerificationTab', 'Seller verification');
+    final subtitle = showAuctionStats
+        ? l10n.tOr(
+            'auctionsSubtitle',
+            'Monitor and manage all auction activities',
+          )
+        : l10n.tOr(
+            'sellerVerificationSubtitle',
+            'Review seller applications before they can host auctions.',
+          );
+
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
+            color: scheme.onSurface,
+            height: 1.15,
+            fontSize: compact ? 22 : null,
+          ),
+        ),
+        SizedBox(height: compact ? 6 : 8),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontSize: compact ? 13 : 14,
+            height: 1.45,
+          ),
+        ),
+      ],
+    );
 
     return SliverToBoxAdapter(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1680),
+          constraints: const BoxConstraints(
+            maxWidth: AuctionsLayoutMetrics.maxContentWidth,
+          ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               metrics.pageHorizontalPadding,
@@ -179,112 +416,87 @@ class _SliverHeader extends StatelessWidget {
               metrics.pageHorizontalPadding,
               0,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(radius),
+                border: Border.all(color: scheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.shadow.withValues(alpha: 0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(pad),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 960;
+                    final medium = constraints.maxWidth >= 640;
+
+                    final tabs = AuctionsPageHeaderTabs(
+                      activeTab: activeTab,
+                      onTabChanged: onTabChanged,
+                      compact: compact,
+                      fullWidth: !wide,
+                    );
+
+                    final stats = (loaded != null || sellerLoaded != null)
+                        ? Padding(
+                            padding: EdgeInsets.only(top: compact ? 12 : 14),
+                            child: statChips(),
+                          )
+                        : const SizedBox.shrink();
+
+                    if (wide) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            l10n.t('auctions'),
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.3,
-                              color: scheme.onSurface,
-                              height: 1.2,
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(child: titleBlock),
+                              const SizedBox(width: 16),
+                              SizedBox(width: 380, child: tabs),
+                              const SizedBox(width: 12),
+                              refreshBtn,
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Monitor and manage all auction activities',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              fontSize: 13,
-                              height: 1.3,
-                            ),
-                          ),
-                          if (loaded != null) ...[
-                            SizedBox(height: metrics.isMobile ? 8 : 12),
-                            Wrap(
-                              spacing: metrics.isMobile ? 6 : 8,
-                              runSpacing: metrics.isMobile ? 6 : 8,
-                              alignment: WrapAlignment.start,
-                              children: [
-                                _StatChip(
-                                  label: l10n.t('total'),
-                                  value: loaded.total.toString(),
-                                  icon: Icons.gavel_rounded,
-                                  color: scheme.primary,
-                                  compact: metrics.isMobile,
-                                ),
-                                _StatChip(
-                                  label: l10n.t('active'),
-                                  value: loaded.activeCount.toString(),
-                                  icon: Icons.play_circle_rounded,
-                                  color: scheme.primary,
-                                  compact: metrics.isMobile,
-                                ),
-                                _StatChip(
-                                  label: l10n.t('completed'),
-                                  value: loaded.completedCount.toString(),
-                                  icon: Icons.check_circle_rounded,
-                                  color: scheme.secondary,
-                                  compact: metrics.isMobile,
-                                ),
-                                _StatChip(
-                                  label: l10n.t('cancelled'),
-                                  value: loaded.cancelledCount.toString(),
-                                  icon: Icons.cancel_rounded,
-                                  color: scheme.error,
-                                  compact: metrics.isMobile,
-                                ),
-                              ],
-                            ),
-                          ],
+                          stats,
                         ],
-                      ),
-                    ),
-                    Material(
-                      color: scheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        onTap: isLoading
-                            ? null
-                            : () => context
-                                .read<AuctionsBloc>()
-                                .add(LoadAllAuctionsEvent(refresh: true)),
-                        borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          width: 36,
-                          height: 36,
-                          child: Center(
-                            child: isLoading
-                                ? SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.refresh_rounded,
-                                    size: 20,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                          ),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: titleBlock),
+                            if (medium) ...[
+                              const SizedBox(width: 12),
+                              refreshBtn,
+                            ],
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
+                        SizedBox(height: compact ? 12 : 14),
+                        tabs,
+                        if (!medium) ...[
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: refreshBtn,
+                          ),
+                        ],
+                        stats,
+                      ],
+                    );
+                  },
                 ),
-                SizedBox(height: metrics.sectionGap),
-                Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
-              ],
+              ),
             ),
           ),
         ),
@@ -315,17 +527,17 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
-        vertical: compact ? 4 : 6,
+        vertical: compact ? 5 : 7,
       ),
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(compact ? 10 : 12),
-        border: Border.all(color: scheme.outlineVariant),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: compact ? 12 : 14, color: color),
+          Icon(icon, size: compact ? 13 : 15, color: color),
           SizedBox(width: compact ? 4 : 6),
           Text(
             value,
@@ -340,6 +552,7 @@ class _StatChip extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: compact ? 10 : 11,
+              fontWeight: FontWeight.w500,
               color: scheme.onSurfaceVariant,
             ),
           ),
@@ -425,13 +638,18 @@ class _SliverFiltersState extends State<_SliverFilters> {
       (null, l10n.t('all')),
       ('ACTIVE', l10n.t('active')),
       ('COMPLETED', l10n.t('completed')),
+      ('SETTLED', l10n.tOr('settled', 'Settled')),
+      ('DISPUTED', l10n.tOr('disputed', 'Disputed')),
       ('CANCELLED', l10n.t('cancelled')),
+      ('BANNED', l10n.tOr('banned', 'Banned')),
     ];
 
     return SliverToBoxAdapter(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1680),
+          constraints: const BoxConstraints(
+            maxWidth: AuctionsLayoutMetrics.maxContentWidth,
+          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final metrics = widget.metrics;
@@ -498,7 +716,8 @@ class _SliverFiltersState extends State<_SliverFilters> {
                     l10n.tOr('auctionSortOldest', 'Oldest auctions'),
                   AuctionSortOption.highestBid => l10n.t('sortHighestBid'),
                   AuctionSortOption.lowestBid => l10n.t('sortLowestBid'),
-                  AuctionSortOption.mostViewed => l10n.t('sortMostViewed'),
+                  AuctionSortOption.targetPrice =>
+                    l10n.tOr('auctionSortTargetPrice', 'Target price'),
                   AuctionSortOption.endingSoon => l10n.t('sortEndingSoon'),
                 },
                 onSelected: (value) =>
@@ -573,91 +792,121 @@ class _SliverFiltersState extends State<_SliverFilters> {
                 );
               }
 
+              final fieldRadius = BorderRadius.circular(
+                metrics.isMobile ? 10 : 12,
+              );
+
               return Padding(
                 padding: EdgeInsets.fromLTRB(
                   metrics.pageHorizontalPadding,
-                  metrics.isMobile ? 4 : 8,
+                  metrics.sectionGap,
                   metrics.pageHorizontalPadding,
                   0,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: _searchCtrl,
-                      focusNode: _searchFocus,
-                      onChanged: _onSearchChanged,
-                      style: TextStyle(
-                        fontSize: metrics.isMobile ? 13 : 14,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(metrics.panelRadius),
+                    border: Border.all(color: scheme.outlineVariant),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                      decoration: InputDecoration(
-                        hintText:
-                            l10n.tOr('searchAuctions', 'Search auctions…'),
-                        hintStyle: TextStyle(
-                          fontSize: metrics.isMobile ? 13 : 14,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search_rounded,
-                          size: metrics.isMobile ? 16 : 18,
-                        ),
-                        suffixIcon: _searchCtrl.text.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.close_rounded,
-                                  size: metrics.isMobile ? 14 : 16,
-                                ),
-                                onPressed: _clearSearch,
-                              )
-                            : null,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: metrics.isMobile ? 10 : 12,
-                          vertical: metrics.isMobile ? 8 : 10,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            metrics.isMobile ? 8 : 10,
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(metrics.panelPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _searchCtrl,
+                          focusNode: _searchFocus,
+                          onChanged: _onSearchChanged,
+                          style: TextStyle(
+                            fontSize: metrics.isMobile ? 13 : 14,
                           ),
-                          borderSide:
-                              BorderSide(color: scheme.outlineVariant),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            metrics.isMobile ? 8 : 10,
+                          decoration: InputDecoration(
+                            hintText: l10n.tOr(
+                              'searchAuctions',
+                              'Search auctions…',
+                            ),
+                            hintStyle: TextStyle(
+                              fontSize: metrics.isMobile ? 13 : 14,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search_rounded,
+                              size: metrics.isMobile ? 18 : 20,
+                            ),
+                            suffixIcon: _searchCtrl.text.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      size: metrics.isMobile ? 16 : 18,
+                                    ),
+                                    onPressed: _clearSearch,
+                                  )
+                                : null,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: metrics.isMobile ? 12 : 14,
+                              vertical: metrics.isMobile ? 10 : 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: fieldRadius,
+                              borderSide:
+                                  BorderSide(color: scheme.outlineVariant),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: fieldRadius,
+                              borderSide:
+                                  BorderSide(color: scheme.outlineVariant),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: fieldRadius,
+                              borderSide: BorderSide(
+                                color: scheme.primary,
+                                width: 1.4,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: scheme.surfaceContainerLowest,
                           ),
-                          borderSide:
-                              BorderSide(color: scheme.outlineVariant),
                         ),
-                        filled: true,
-                        fillColor: scheme.surface,
-                      ),
+                        SizedBox(height: metrics.filterGap),
+                        filterToolbar(),
+                        SizedBox(height: metrics.toolbarFilterGap + 2),
+                        if (loaded.isFetching)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: metrics.toolbarFilterGap,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                minHeight: 2,
+                                color: scheme.primary,
+                                backgroundColor:
+                                    scheme.surfaceContainerHighest,
+                              ),
+                            ),
+                          ),
+                        Text(
+                          _resultsCountLabel(
+                            l10n,
+                            loaded.displayedCount,
+                            loaded.totalCount,
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: metrics.isMobile ? 11 : 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: metrics.filterGap),
-                    filterToolbar(),
-                    SizedBox(height: metrics.toolbarFilterGap),
-                    if (loaded.isFetching)
-                      Padding(
-                        padding: EdgeInsets.only(
-                          bottom: metrics.toolbarFilterGap,
-                        ),
-                        child: LinearProgressIndicator(
-                          minHeight: 2,
-                          color: scheme.primary,
-                          backgroundColor: scheme.surfaceContainerHighest,
-                        ),
-                      ),
-                    Text(
-                      _resultsCountLabel(
-                        l10n,
-                        loaded.displayedCount,
-                        loaded.totalCount,
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: metrics.isMobile ? 11 : 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -831,7 +1080,9 @@ class _SliverPagination extends StatelessWidget {
     return SliverToBoxAdapter(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1680),
+          constraints: const BoxConstraints(
+            maxWidth: AuctionsLayoutMetrics.maxContentWidth,
+          ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               metrics.pageHorizontalPadding,
@@ -936,15 +1187,21 @@ class _SliverGrid extends StatelessWidget {
 
     return SliverLayoutBuilder(
       builder: (context, constraints) {
-        final columns = adminGridColumnCount(constraints.crossAxisExtent);
+        final extent = constraints.crossAxisExtent;
+        final maxW = AuctionsLayoutMetrics.maxContentWidth;
+        final sideInset = extent > maxW
+            ? ((extent - maxW) / 2) + metrics.pageHorizontalPadding
+            : metrics.pageHorizontalPadding;
+        final contentWidth = (extent - sideInset * 2).clamp(0.0, maxW);
+        final columns = adminGridColumnCount(contentWidth);
         final rowCount = (auctions.length / columns).ceil();
         final gap = metrics.gridGap;
 
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(
-            metrics.pageHorizontalPadding,
+            sideInset,
             metrics.gridTopPadding,
-            metrics.pageHorizontalPadding,
+            sideInset,
             0,
           ),
           sliver: SliverList(
@@ -966,24 +1223,26 @@ class _SliverGrid extends StatelessWidget {
                         Expanded(
                           child: i < rowAuctions.length
                               ? _AuctionCardWithImage(
-                                    auction: rowAuctions[i],
-                                    onViewDetails: () {
-                                      Navigator.pushNamed(
-                                        context,
-                                        AppRoutes.auctionDetail,
-                                        arguments: rowAuctions[i],
-                                      );
-                                    },
-                                    onCancel: rowAuctions[i].isActive
-                                        ? () {
-                                            _confirmCancel(
-                                              context,
-                                              rowAuctions[i].id,
-                                              rowAuctions[i].itemName,
-                                            );
-                                          }
-                                        : null,
-                                  )
+                                  auction: rowAuctions[i],
+                                  onViewDetails: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.auctionDetail,
+                                      arguments: rowAuctions[i],
+                                    );
+                                  },
+                                  onCancel: PermissionManager
+                                              .canModerateAuctions(context) &&
+                                          rowAuctions[i].canAdminCancelOrBan
+                                      ? () {
+                                          _confirmCancel(
+                                            context,
+                                            rowAuctions[i].id,
+                                            rowAuctions[i].itemName,
+                                          );
+                                        }
+                                      : null,
+                                )
                               : const SizedBox.shrink(),
                         ),
                       ],
@@ -1045,15 +1304,21 @@ class _SliverSkeletons extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
-        final columns = adminGridColumnCount(constraints.crossAxisExtent);
+        final extent = constraints.crossAxisExtent;
+        final maxW = AuctionsLayoutMetrics.maxContentWidth;
+        final sideInset = extent > maxW
+            ? ((extent - maxW) / 2) + metrics.pageHorizontalPadding
+            : metrics.pageHorizontalPadding;
+        final contentWidth = (extent - sideInset * 2).clamp(0.0, maxW);
+        final columns = adminGridColumnCount(contentWidth);
         final gap = metrics.gridGap;
         const rows = 2;
 
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(
-            metrics.pageHorizontalPadding,
+            sideInset,
             metrics.gridTopPadding,
-            metrics.pageHorizontalPadding,
+            sideInset,
             0,
           ),
           sliver: SliverList(

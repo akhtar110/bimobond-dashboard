@@ -18,10 +18,7 @@ class FeTabScaffold extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (header != null) ...[
-          header!,
-          const SizedBox(height: 8),
-        ],
+        if (header != null) ...[header!, const SizedBox(height: 8)],
         Expanded(
           child: SingleChildScrollView(
             clipBehavior: Clip.hardEdge,

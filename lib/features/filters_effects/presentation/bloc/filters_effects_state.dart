@@ -23,10 +23,18 @@ class FiltersEffectsLoaded extends FiltersEffectsState {
     required this.effectCategories,
     required this.query,
     required this.activeTab,
+    this.filtersMeta,
+    this.effectsMeta,
+    this.allFiltersForPicker = const [],
+    this.allEffectsForPicker = const [],
     this.isActioning = false,
     this.message,
+    this.messageParams,
     this.isErrorMessage = false,
     this.operationSuccess = false,
+    this.selectedFilterIds = const {},
+    this.selectedEffectIds = const {},
+    this.isBulkDeleting = false,
   });
 
   final FiltersEffectsOverviewEntity? overview;
@@ -37,84 +45,58 @@ class FiltersEffectsLoaded extends FiltersEffectsState {
   final List<CameraEffectCategoryEntity> effectCategories;
   final FiltersEffectsListQuery query;
   final FiltersEffectsTab activeTab;
+  final FiltersEffectsPaginationMeta? filtersMeta;
+  final FiltersEffectsPaginationMeta? effectsMeta;
+  final List<CameraFilterEntity> allFiltersForPicker;
+  final List<CameraEffectEntity> allEffectsForPicker;
   final bool isActioning;
   final String? message;
+  final Map<String, String>? messageParams;
   final bool isErrorMessage;
   final bool operationSuccess;
+  final Set<String> selectedFilterIds;
+  final Set<String> selectedEffectIds;
+  final bool isBulkDeleting;
 
-  List<CameraFilterEntity> get filteredFilters {
-    var items = filters;
-    final search = query.search.trim().toLowerCase();
-    if (search.isNotEmpty) {
-      items = items
-          .where(
-            (f) =>
-                f.slug.toLowerCase().contains(search) ||
-                f.engineKey.toLowerCase().contains(search) ||
-                (f.customLabel?.toLowerCase().contains(search) ?? false) ||
-                (f.labelKey?.toLowerCase().contains(search) ?? false),
-          )
-          .toList();
-    }
-    if (query.status == FiltersEffectsStatusFilter.active) {
-      items = items.where((f) => f.isActive).toList();
-    } else if (query.status == FiltersEffectsStatusFilter.inactive) {
-      items = items.where((f) => !f.isActive).toList();
-    }
-    if (query.engineKey != null && query.engineKey!.isNotEmpty) {
-      items = items.where((f) => f.engineKey == query.engineKey).toList();
-    }
-    return items;
-  }
+  bool get hasFilterSelection => selectedFilterIds.isNotEmpty;
 
-  List<CameraEffectEntity> get filteredEffects {
-    var items = effects;
-    final search = query.search.trim().toLowerCase();
-    if (search.isNotEmpty) {
-      items = items
-          .where(
-            (e) =>
-                e.slug.toLowerCase().contains(search) ||
-                e.labelKey.toLowerCase().contains(search) ||
-                (e.emoji?.contains(search) ?? false),
-          )
-          .toList();
-    }
-    if (query.status == FiltersEffectsStatusFilter.active) {
-      items = items.where((e) => e.isActive).toList();
-    } else if (query.status == FiltersEffectsStatusFilter.inactive) {
-      items = items.where((e) => !e.isActive).toList();
-    }
-    return items;
-  }
+  bool get hasEffectSelection => selectedEffectIds.isNotEmpty;
 
-  int get filtersTotalPages {
-    final total = filteredFilters.length;
-    if (total == 0) return 1;
-    return (total / query.pageSize).ceil();
-  }
+  int get selectedFilterCount => selectedFilterIds.length;
 
-  int get effectsTotalPages {
-    final total = filteredEffects.length;
-    if (total == 0) return 1;
-    return (total / query.pageSize).ceil();
-  }
+  int get selectedEffectCount => selectedEffectIds.length;
 
-  List<CameraFilterEntity> get pagedFilters {
-    final items = filteredFilters;
-    final start = (query.page - 1) * query.pageSize;
-    if (start >= items.length) return const [];
-    final end = (start + query.pageSize).clamp(0, items.length);
-    return items.sublist(start, end);
-  }
+  bool get allVisibleFiltersSelected =>
+      filteredFilters.isNotEmpty &&
+      filteredFilters.every((f) => selectedFilterIds.contains(f.id));
 
-  List<CameraEffectEntity> get pagedEffects {
-    final items = filteredEffects;
-    final start = (query.page - 1) * query.pageSize;
-    if (start >= items.length) return const [];
-    final end = (start + query.pageSize).clamp(0, items.length);
-    return items.sublist(start, end);
-  }
+  bool get someVisibleFiltersSelected =>
+      filteredFilters.any((f) => selectedFilterIds.contains(f.id)) &&
+      !allVisibleFiltersSelected;
+
+  bool get allVisibleEffectsSelected =>
+      filteredEffects.isNotEmpty &&
+      filteredEffects.every((e) => selectedEffectIds.contains(e.id));
+
+  bool get someVisibleEffectsSelected =>
+      filteredEffects.any((e) => selectedEffectIds.contains(e.id)) &&
+      !allVisibleEffectsSelected;
+
+  List<CameraFilterEntity> get filteredFilters => filters;
+
+  List<CameraEffectEntity> get filteredEffects => effects;
+
+  int get filtersTotalPages => filtersMeta?.totalPages ?? 1;
+
+  int get effectsTotalPages => effectsMeta?.totalPages ?? 1;
+
+  int get filtersTotalCount => filtersMeta?.total ?? filters.length;
+
+  int get effectsTotalCount => effectsMeta?.total ?? effects.length;
+
+  List<CameraFilterEntity> get pagedFilters => filters;
+
+  List<CameraEffectEntity> get pagedEffects => effects;
 
   FiltersEffectsLoaded copyWith({
     FiltersEffectsOverviewEntity? overview,
@@ -125,11 +107,21 @@ class FiltersEffectsLoaded extends FiltersEffectsState {
     List<CameraEffectCategoryEntity>? effectCategories,
     FiltersEffectsListQuery? query,
     FiltersEffectsTab? activeTab,
+    FiltersEffectsPaginationMeta? filtersMeta,
+    FiltersEffectsPaginationMeta? effectsMeta,
+    List<CameraFilterEntity>? allFiltersForPicker,
+    List<CameraEffectEntity>? allEffectsForPicker,
     bool? isActioning,
     String? message,
+    Map<String, String>? messageParams,
     bool clearMessage = false,
     bool? isErrorMessage,
     bool? operationSuccess,
+    Set<String>? selectedFilterIds,
+    Set<String>? selectedEffectIds,
+    bool clearFilterSelection = false,
+    bool clearEffectSelection = false,
+    bool? isBulkDeleting,
   }) {
     return FiltersEffectsLoaded(
       overview: overview ?? this.overview,
@@ -140,28 +132,48 @@ class FiltersEffectsLoaded extends FiltersEffectsState {
       effectCategories: effectCategories ?? this.effectCategories,
       query: query ?? this.query,
       activeTab: activeTab ?? this.activeTab,
+      filtersMeta: filtersMeta ?? this.filtersMeta,
+      effectsMeta: effectsMeta ?? this.effectsMeta,
+      allFiltersForPicker: allFiltersForPicker ?? this.allFiltersForPicker,
+      allEffectsForPicker: allEffectsForPicker ?? this.allEffectsForPicker,
       isActioning: isActioning ?? this.isActioning,
       message: clearMessage ? null : (message ?? this.message),
+      messageParams: clearMessage ? null : (messageParams ?? this.messageParams),
       isErrorMessage: isErrorMessage ?? this.isErrorMessage,
       operationSuccess: operationSuccess ?? this.operationSuccess,
+      selectedFilterIds: clearFilterSelection
+          ? const {}
+          : (selectedFilterIds ?? this.selectedFilterIds),
+      selectedEffectIds: clearEffectSelection
+          ? const {}
+          : (selectedEffectIds ?? this.selectedEffectIds),
+      isBulkDeleting: isBulkDeleting ?? this.isBulkDeleting,
     );
   }
 
   @override
   List<Object?> get props => [
-        overview,
-        catalog,
-        filters,
-        filterCategories,
-        effects,
-        effectCategories,
-        query,
-        activeTab,
-        isActioning,
-        message,
-        isErrorMessage,
-        operationSuccess,
-      ];
+    overview,
+    catalog,
+    filters,
+    filterCategories,
+    effects,
+    effectCategories,
+    query,
+    activeTab,
+    filtersMeta,
+    effectsMeta,
+    allFiltersForPicker,
+    allEffectsForPicker,
+    isActioning,
+    message,
+    messageParams,
+    isErrorMessage,
+    operationSuccess,
+    selectedFilterIds,
+    selectedEffectIds,
+    isBulkDeleting,
+  ];
 }
 
 class FiltersEffectsError extends FiltersEffectsState {

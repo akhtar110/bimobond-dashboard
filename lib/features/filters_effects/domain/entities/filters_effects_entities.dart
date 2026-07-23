@@ -1,8 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-import 'effect_placement_entities.dart';
-import 'filter_settings_entities.dart';
-
 class FiltersEffectsCountSummary extends Equatable {
   const FiltersEffectsCountSummary({
     required this.total,
@@ -24,7 +21,7 @@ class FiltersEffectsOverviewEntity extends Equatable {
     required this.filterCategories,
     required this.effects,
     required this.effectCategories,
-    required this.catalogVersion,
+    this.catalogVersion,
     this.catalogPublishedAt,
   });
 
@@ -32,85 +29,131 @@ class FiltersEffectsOverviewEntity extends Equatable {
   final FiltersEffectsCountSummary filterCategories;
   final FiltersEffectsCountSummary effects;
   final FiltersEffectsCountSummary effectCategories;
-  final String catalogVersion;
+  final String? catalogVersion;
   final DateTime? catalogPublishedAt;
 
   @override
   List<Object?> get props => [
-        filters,
-        filterCategories,
-        effects,
-        effectCategories,
-        catalogVersion,
-        catalogPublishedAt,
-      ];
+    filters,
+    filterCategories,
+    effects,
+    effectCategories,
+    catalogVersion,
+    catalogPublishedAt,
+  ];
+}
+
+/// Free-form adjustment map from the admin API (`adjustments` / `filterSettings`).
+class CameraFilterAdjustments extends Equatable {
+  const CameraFilterAdjustments([this.values = const {}]);
+
+  final Map<String, num> values;
+
+  bool get isEmpty => values.isEmpty;
+
+  CameraFilterAdjustments withValue(String key, num value) =>
+      CameraFilterAdjustments({...values, key: value});
+
+  CameraFilterAdjustments without(String key) {
+    final next = Map<String, num>.from(values)..remove(key);
+    return CameraFilterAdjustments(next);
+  }
+
+  Map<String, dynamic> toJson() =>
+      values.map((key, value) => MapEntry(key, value));
+
+  @override
+  List<Object?> get props => [values];
 }
 
 class CameraFilterEntity extends Equatable {
   const CameraFilterEntity({
     required this.id,
     required this.slug,
-    required this.engineType,
-    required this.engineKey,
-    this.labelKey,
+    required this.renderType,
+    required this.label,
     this.customLabel,
+    this.labelKey,
+    this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
+    this.colorMatrix = const [],
+    this.lutUrl,
+    this.lutAsset,
+    this.adjustments = const CameraFilterAdjustments(),
+    this.filterSettings = const CameraFilterAdjustments(),
     this.isOriginal = false,
     this.isBeautyDefault = false,
     this.isActive = true,
     this.sortOrder = 0,
-    this.filterSettings = const FilterSettingsEntity({}),
-    this.colorMatrix = const [],
     this.createdAt,
     this.updatedAt,
   });
 
   final String id;
   final String slug;
-  final String engineType;
-  final String engineKey;
-  final String? labelKey;
+  final String renderType;
+  final String label;
   final String? customLabel;
+  final String? labelKey;
+  final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
+  final List<double> colorMatrix;
+  final String? lutUrl;
+  final String? lutAsset;
+  final CameraFilterAdjustments adjustments;
+  final CameraFilterAdjustments filterSettings;
   final bool isOriginal;
   final bool isBeautyDefault;
   final bool isActive;
   final int sortOrder;
-  final FilterSettingsEntity filterSettings;
-  final List<double> colorMatrix;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  String get displayLabel => customLabel ?? labelKey ?? engineKey;
+  /// Prefer `adjustments`; fall back to legacy `filterSettings`.
+  CameraFilterAdjustments get effectiveAdjustments =>
+      adjustments.isEmpty ? filterSettings : adjustments;
+
+  String get displayLabel {
+    final custom = customLabel?.trim();
+    if (custom != null && custom.isNotEmpty) return custom;
+    final primary = label.trim();
+    if (primary.isNotEmpty) return primary;
+    return slug;
+  }
 
   @override
   List<Object?> get props => [
-        id,
-        slug,
-        engineType,
-        engineKey,
-        labelKey,
-        customLabel,
-        thumbnailUrl,
-        previewColorHex,
-        isOriginal,
-        isBeautyDefault,
-        isActive,
-        sortOrder,
-        filterSettings,
-        colorMatrix,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    slug,
+    renderType,
+    label,
+    customLabel,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    colorMatrix,
+    lutUrl,
+    lutAsset,
+    adjustments,
+    filterSettings,
+    isOriginal,
+    isBeautyDefault,
+    isActive,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class CameraFilterCategoryEntity extends Equatable {
   const CameraFilterCategoryEntity({
     required this.id,
     required this.slug,
-    required this.labelKey,
+    required this.label,
+    this.labelKey,
     required this.sortOrder,
     required this.isActive,
     this.filters = const [],
@@ -120,7 +163,8 @@ class CameraFilterCategoryEntity extends Equatable {
 
   final String id;
   final String slug;
-  final String labelKey;
+  final String label;
+  final String? labelKey;
   final int sortOrder;
   final bool isActive;
   final List<CameraFilterEntity> filters;
@@ -129,112 +173,149 @@ class CameraFilterCategoryEntity extends Equatable {
 
   int get filtersCount => filters.length;
 
+  String get displayLabel {
+    final primary = label.trim();
+    if (primary.isNotEmpty) return primary;
+    final key = labelKey?.trim();
+    if (key != null && key.isNotEmpty) return key;
+    return slug;
+  }
+
   @override
   List<Object?> get props => [
-        id,
-        slug,
-        labelKey,
-        sortOrder,
-        isActive,
-        filters,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    slug,
+    label,
+    labelKey,
+    sortOrder,
+    isActive,
+    filters,
+    createdAt,
+    updatedAt,
+  ];
+}
+
+class CameraEffectStickerLayer extends Equatable {
+  const CameraEffectStickerLayer({
+    this.assetUrl,
+    this.assetAsset,
+    this.anchor = const {},
+  });
+
+  final String? assetUrl;
+  final String? assetAsset;
+  final Map<String, dynamic> anchor;
+
+  bool get hasAsset {
+    final url = assetUrl?.trim() ?? '';
+    final asset = assetAsset?.trim() ?? '';
+    return url.isNotEmpty || asset.isNotEmpty;
+  }
+
+  Map<String, dynamic> toJson() => {
+    if (assetUrl != null && assetUrl!.trim().isNotEmpty)
+      'assetUrl': assetUrl!.trim(),
+    if (assetAsset != null && assetAsset!.trim().isNotEmpty)
+      'assetAsset': assetAsset!.trim(),
+    'anchor': anchor,
+  };
+
+  factory CameraEffectStickerLayer.fromJson(Map<String, dynamic> json) {
+    final rawAnchor = json['anchor'];
+    return CameraEffectStickerLayer(
+      assetUrl: json['assetUrl']?.toString(),
+      assetAsset: json['assetAsset']?.toString(),
+      anchor: rawAnchor is Map<String, dynamic>
+          ? Map<String, dynamic>.from(rawAnchor)
+          : const {},
+    );
+  }
+
+  @override
+  List<Object?> get props => [assetUrl, assetAsset, anchor];
 }
 
 class CameraEffectEntity extends Equatable {
   const CameraEffectEntity({
     required this.id,
     required this.slug,
-    required this.effectType,
+    required this.renderType,
+    required this.label,
+    this.labelKey,
     this.emoji,
-    this.assetUrl,
+    this.thumbnailUrl,
     this.previewColorHex,
-    required this.labelKey,
-    this.requiresFaceDetection = false,
-    this.isScreenEffect = false,
+    this.assetUrl,
+    this.assetAsset,
+    this.anchor = const {},
+    this.stickers = const [],
+    this.distortionPreset,
     this.isActive = true,
     this.sortOrder = 0,
-    this.anchorType,
-    this.anchorLandmarks = const [],
-    this.scaleFactor,
-    this.offsetX,
-    this.offsetY,
-    this.landmarkSize,
-    this.fallbackAnchorType,
-    this.fallbackOffsetY,
-    this.fallbackScaleFactor,
     this.createdAt,
     this.updatedAt,
   });
 
   final String id;
   final String slug;
-  final String effectType;
+  final String renderType;
+  final String label;
+  final String? labelKey;
   final String? emoji;
-  final String? assetUrl;
+  final String? thumbnailUrl;
   final String? previewColorHex;
-  final String labelKey;
-  final bool requiresFaceDetection;
-  final bool isScreenEffect;
+  final String? assetUrl;
+  final String? assetAsset;
+  final Map<String, dynamic> anchor;
+  final List<CameraEffectStickerLayer> stickers;
+  final String? distortionPreset;
   final bool isActive;
   final int sortOrder;
-  final String? anchorType;
-  final List<String> anchorLandmarks;
-  final double? scaleFactor;
-  final double? offsetX;
-  final double? offsetY;
-  final double? landmarkSize;
-  final String? fallbackAnchorType;
-  final double? fallbackOffsetY;
-  final double? fallbackScaleFactor;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  EffectPlacementSettingsEntity get placement => EffectPlacementSettingsEntity(
-        anchorType: anchorType,
-        anchorLandmarks: anchorLandmarks,
-        scaleFactor: scaleFactor,
-        offsetX: offsetX,
-        offsetY: offsetY,
-        landmarkSize: landmarkSize,
-        fallbackAnchorType: fallbackAnchorType,
-        fallbackOffsetY: fallbackOffsetY,
-        fallbackScaleFactor: fallbackScaleFactor,
-      );
+  String get displayLabel {
+    final primary = label.trim();
+    if (primary.isNotEmpty) return primary;
+    final key = labelKey?.trim();
+    if (key != null && key.isNotEmpty) return key;
+    return slug;
+  }
+
+  bool get hasAsset {
+    final url = assetUrl?.trim() ?? '';
+    final asset = assetAsset?.trim() ?? '';
+    return url.isNotEmpty || asset.isNotEmpty;
+  }
 
   @override
   List<Object?> get props => [
-        id,
-        slug,
-        effectType,
-        emoji,
-        assetUrl,
-        previewColorHex,
-        labelKey,
-        requiresFaceDetection,
-        isScreenEffect,
-        isActive,
-        sortOrder,
-        anchorType,
-        anchorLandmarks,
-        scaleFactor,
-        offsetX,
-        offsetY,
-        landmarkSize,
-        fallbackAnchorType,
-        fallbackOffsetY,
-        fallbackScaleFactor,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    assetUrl,
+    assetAsset,
+    anchor,
+    stickers,
+    distortionPreset,
+    isActive,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class CameraEffectCategoryEntity extends Equatable {
   const CameraEffectCategoryEntity({
     required this.id,
     required this.slug,
-    required this.labelKey,
+    required this.label,
+    this.labelKey,
     required this.sortOrder,
     required this.isActive,
     this.effects = const [],
@@ -244,7 +325,8 @@ class CameraEffectCategoryEntity extends Equatable {
 
   final String id;
   final String slug;
-  final String labelKey;
+  final String label;
+  final String? labelKey;
   final int sortOrder;
   final bool isActive;
   final List<CameraEffectEntity> effects;
@@ -253,27 +335,36 @@ class CameraEffectCategoryEntity extends Equatable {
 
   int get effectsCount => effects.length;
 
+  String get displayLabel {
+    final primary = label.trim();
+    if (primary.isNotEmpty) return primary;
+    final key = labelKey?.trim();
+    if (key != null && key.isNotEmpty) return key;
+    return slug;
+  }
+
   @override
   List<Object?> get props => [
-        id,
-        slug,
-        labelKey,
-        sortOrder,
-        isActive,
-        effects,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    slug,
+    label,
+    labelKey,
+    sortOrder,
+    isActive,
+    effects,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class CameraStudioCatalogEntity extends Equatable {
   const CameraStudioCatalogEntity({
-    required this.version,
+    this.version,
     required this.filterCategories,
     required this.effectCategories,
   });
 
-  final String version;
+  final String? version;
   final List<CameraFilterCategoryEntity> filterCategories;
   final List<CameraEffectCategoryEntity> effectCategories;
 
@@ -298,126 +389,289 @@ class CatalogPublishResultEntity extends Equatable {
   List<Object?> get props => [id, version, publishedAt, notes];
 }
 
+class CatalogSeedResultEntity extends Equatable {
+  const CatalogSeedResultEntity({required this.success, this.message});
+
+  final bool success;
+  final String? message;
+
+  @override
+  List<Object?> get props => [success, message];
+}
+
+/// Filter render types: responses lowercase, requests UPPERCASE.
+abstract final class CameraFilterRenderTypeApi {
+  static const matrix = 'matrix';
+  static const lut = 'lut';
+
+  static const values = [matrix, lut];
+
+  static String fromResponse(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll('-', '_');
+    switch (normalized) {
+      case 'matrix':
+        return matrix;
+      case 'lut':
+        return lut;
+      default:
+        return normalized.isEmpty ? matrix : normalized;
+    }
+  }
+
+  static String toRequestJson(String value) {
+    return switch (fromResponse(value)) {
+      matrix => 'MATRIX',
+      lut => 'LUT',
+      _ => value.trim().toUpperCase().replaceAll('-', '_'),
+    };
+  }
+
+  static String forAdminApi(String value) => toRequestJson(value);
+
+  static bool matches(String a, String b) =>
+      fromResponse(a) == fromResponse(b);
+
+  static bool isMatrix(String value) => fromResponse(value) == matrix;
+
+  static bool isLut(String value) => fromResponse(value) == lut;
+}
+
+/// Effect render types: responses lowercase, requests UPPERCASE.
+abstract final class CameraEffectRenderTypeApi {
+  static const none = 'none';
+  static const sticker = 'sticker';
+  static const composite = 'composite';
+  static const distortion = 'distortion';
+
+  static const values = [none, sticker, composite, distortion];
+
+  static String fromResponse(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll('-', '_');
+    switch (normalized) {
+      case 'none':
+        return none;
+      case 'sticker':
+        return sticker;
+      case 'composite':
+        return composite;
+      case 'distortion':
+        return distortion;
+      default:
+        return normalized.isEmpty ? none : normalized;
+    }
+  }
+
+  static String toRequestJson(String value) {
+    return switch (fromResponse(value)) {
+      none => 'NONE',
+      sticker => 'STICKER',
+      composite => 'COMPOSITE',
+      distortion => 'DISTORTION',
+      _ => value.trim().toUpperCase().replaceAll('-', '_'),
+    };
+  }
+
+  static String forAdminApi(String value) => toRequestJson(value);
+
+  static bool matches(String a, String b) =>
+      fromResponse(a) == fromResponse(b);
+
+  static bool isNone(String value) => fromResponse(value) == none;
+
+  static bool isSticker(String value) => fromResponse(value) == sticker;
+
+  static bool isComposite(String value) => fromResponse(value) == composite;
+
+  static bool isDistortion(String value) => fromResponse(value) == distortion;
+}
+
+abstract final class CameraDistortionPresetApi {
+  static const bigEyes = 'big_eyes';
+  static const bigLips = 'big_lips';
+  static const longNose = 'long_nose';
+
+  static const values = [bigEyes, bigLips, longNose];
+
+  static String fromResponse(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll('-', '_');
+    switch (normalized) {
+      case 'big_eyes':
+        return bigEyes;
+      case 'big_lips':
+        return bigLips;
+      case 'long_nose':
+        return longNose;
+      default:
+        return normalized;
+    }
+  }
+
+  static String toRequestJson(String value) {
+    return switch (fromResponse(value)) {
+      bigEyes => 'BIG_EYES',
+      bigLips => 'BIG_LIPS',
+      longNose => 'LONG_NOSE',
+      _ => value.trim().toUpperCase().replaceAll('-', '_'),
+    };
+  }
+
+  static String forAdminApi(String value) => toRequestJson(value);
+
+  static bool matches(String a, String b) =>
+      fromResponse(a) == fromResponse(b);
+}
+
+/// Result of uploading a LUT source file (.cube or PNG) for a filter.
+class FilterLutUploadResult extends Equatable {
+  const FilterLutUploadResult({
+    required this.lutUrl,
+    this.lutAsset,
+    this.sourceFilename,
+  });
+
+  final String lutUrl;
+  final String? lutAsset;
+  final String? sourceFilename;
+
+  @override
+  List<Object?> get props => [lutUrl, lutAsset, sourceFilename];
+}
+
 class CreateFilterRequest extends Equatable {
   const CreateFilterRequest({
     required this.slug,
-    required this.engineKey,
-    this.engineType = 'CAMERAAWESOME',
+    required this.renderType,
+    required this.label,
     this.labelKey,
-    this.customLabel,
+    this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
-    this.isOriginal = false,
-    this.isBeautyDefault = false,
+    this.colorMatrix = const [],
+    this.lutUrl,
+    this.lutAsset,
+    this.adjustments = const CameraFilterAdjustments(),
     this.sortOrder = 0,
     this.isActive = true,
-    this.filterSettings = const FilterSettingsEntity({}),
   });
 
   final String slug;
-  final String engineKey;
-  final String engineType;
+  final String renderType;
+  final String label;
   final String? labelKey;
-  final String? customLabel;
+  final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
-  final bool isOriginal;
-  final bool isBeautyDefault;
+  final List<double> colorMatrix;
+  final String? lutUrl;
+  final String? lutAsset;
+  final CameraFilterAdjustments adjustments;
   final int sortOrder;
   final bool isActive;
-  final FilterSettingsEntity filterSettings;
 
-  Map<String, dynamic> toJson({FilterSettingsSchemaEntity? schema}) => {
-        'slug': slug,
-        'engineKey': engineKey,
-        'engineType': CameraFilterEngineTypeApi.forAdminApi(engineType),
-        if (labelKey != null && labelKey!.isNotEmpty) 'labelKey': labelKey,
-        if (customLabel != null && customLabel!.isNotEmpty)
-          'customLabel': customLabel,
-        if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
-          'thumbnailUrl': thumbnailUrl,
-        if (previewColorHex != null && previewColorHex!.isNotEmpty)
-          'previewColorHex': previewColorHex,
-        'isOriginal': isOriginal,
-        'isBeautyDefault': isBeautyDefault,
-        'sortOrder': sortOrder,
-        'isActive': isActive,
-        if (schema != null)
-          'filterSettings': filterSettings.toFullApiJson(schema),
-      };
+  Map<String, dynamic> toJson() {
+    final normalized = CameraFilterRenderTypeApi.fromResponse(renderType);
+    return {
+      'slug': slug,
+      'renderType': CameraFilterRenderTypeApi.toRequestJson(normalized),
+      'label': label,
+      if (labelKey != null && labelKey!.isNotEmpty) 'labelKey': labelKey,
+      if (emoji != null && emoji!.isNotEmpty) 'emoji': emoji,
+      if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
+        'thumbnailUrl': thumbnailUrl,
+      if (previewColorHex != null && previewColorHex!.isNotEmpty)
+        'previewColorHex': previewColorHex,
+      if (CameraFilterRenderTypeApi.isLut(normalized)) ...{
+        if (lutUrl != null && lutUrl!.isNotEmpty) 'lutUrl': lutUrl,
+        if (lutAsset != null && lutAsset!.isNotEmpty) 'lutAsset': lutAsset,
+      },
+      if (CameraFilterRenderTypeApi.isMatrix(normalized)) ...{
+        if (colorMatrix.length == 20) 'colorMatrix': colorMatrix,
+        if (!adjustments.isEmpty) 'adjustments': adjustments.toJson(),
+      },
+      'sortOrder': sortOrder,
+      'isActive': isActive,
+    };
+  }
 
   @override
   List<Object?> get props => [
-        slug,
-        engineKey,
-        engineType,
-        labelKey,
-        customLabel,
-        thumbnailUrl,
-        previewColorHex,
-        isOriginal,
-        isBeautyDefault,
-        sortOrder,
-        isActive,
-        filterSettings,
-      ];
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    colorMatrix,
+    lutUrl,
+    lutAsset,
+    adjustments,
+    sortOrder,
+    isActive,
+  ];
 }
 
 class UpdateFilterRequest extends Equatable {
   const UpdateFilterRequest({
     this.slug,
-    this.engineKey,
-    this.engineType,
+    this.renderType,
+    this.label,
     this.labelKey,
-    this.customLabel,
+    this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
-    this.isOriginal,
-    this.isBeautyDefault,
+    this.colorMatrix,
+    this.lutUrl,
+    this.lutAsset,
+    this.adjustments,
     this.sortOrder,
     this.isActive,
-    this.filterSettings,
     this.clearLabelKey = false,
-    this.clearCustomLabel = false,
+    this.clearEmoji = false,
     this.clearThumbnailUrl = false,
     this.clearPreviewColorHex = false,
-    this.clearFilterSettings = false,
+    this.clearLutUrl = false,
+    this.clearLutAsset = false,
+    this.clearAdjustments = false,
   });
 
   final String? slug;
-  final String? engineKey;
-  final String? engineType;
+  final String? renderType;
+  final String? label;
   final String? labelKey;
-  final String? customLabel;
+  final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
-  final bool? isOriginal;
-  final bool? isBeautyDefault;
+  final List<double>? colorMatrix;
+  final String? lutUrl;
+  final String? lutAsset;
+  final CameraFilterAdjustments? adjustments;
   final int? sortOrder;
   final bool? isActive;
-  final FilterSettingsEntity? filterSettings;
   final bool clearLabelKey;
-  final bool clearCustomLabel;
+  final bool clearEmoji;
   final bool clearThumbnailUrl;
   final bool clearPreviewColorHex;
-  final bool clearFilterSettings;
+  final bool clearLutUrl;
+  final bool clearLutAsset;
+  final bool clearAdjustments;
 
-  Map<String, dynamic> toJson({FilterSettingsSchemaEntity? schema}) {
+  Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
-    if (engineKey != null) json['engineKey'] = engineKey;
-    if (engineType != null) {
-      json['engineType'] = CameraFilterEngineTypeApi.forAdminApi(engineType!);
+    if (renderType != null) {
+      json['renderType'] = CameraFilterRenderTypeApi.toRequestJson(renderType!);
     }
+    if (label != null) json['label'] = label;
     if (clearLabelKey) {
       json['labelKey'] = null;
     } else if (labelKey != null) {
       json['labelKey'] = labelKey;
     }
-    if (clearCustomLabel) {
-      json['customLabel'] = null;
-    } else if (customLabel != null) {
-      json['customLabel'] = customLabel;
+    if (clearEmoji) {
+      json['emoji'] = null;
+    } else if (emoji != null) {
+      json['emoji'] = emoji;
     }
     if (clearThumbnailUrl) {
       json['thumbnailUrl'] = null;
@@ -429,299 +683,329 @@ class UpdateFilterRequest extends Equatable {
     } else if (previewColorHex != null) {
       json['previewColorHex'] = previewColorHex;
     }
-    if (isOriginal != null) json['isOriginal'] = isOriginal;
-    if (isBeautyDefault != null) json['isBeautyDefault'] = isBeautyDefault;
+    if (clearLutUrl) {
+      json['lutUrl'] = null;
+    } else if (lutUrl != null) {
+      json['lutUrl'] = lutUrl;
+    }
+    if (clearLutAsset) {
+      json['lutAsset'] = null;
+    } else if (lutAsset != null) {
+      json['lutAsset'] = lutAsset;
+    }
+    if (clearAdjustments) {
+      json['adjustments'] = {};
+    } else if (adjustments != null) {
+      json['adjustments'] = adjustments!.toJson();
+    }
+    if (colorMatrix != null && colorMatrix!.length == 20) {
+      json['colorMatrix'] = colorMatrix;
+    }
     if (sortOrder != null) json['sortOrder'] = sortOrder;
     if (isActive != null) json['isActive'] = isActive;
-    if (clearFilterSettings) {
-      json['filterSettings'] = {};
-    } else if (filterSettings != null && schema != null) {
-      // Full snapshot so beauty/client-only keys reset cleanly on PATCH.
-      json['filterSettings'] = filterSettings!.toFullApiJson(schema);
-    }
     return json;
   }
 
   @override
   List<Object?> get props => [
-        slug,
-        engineKey,
-        engineType,
-        labelKey,
-        customLabel,
-        thumbnailUrl,
-        previewColorHex,
-        isOriginal,
-        isBeautyDefault,
-        sortOrder,
-        isActive,
-        filterSettings,
-        clearLabelKey,
-        clearCustomLabel,
-        clearThumbnailUrl,
-        clearPreviewColorHex,
-        clearFilterSettings,
-      ];
-}
-
-/// Admin write enum (`CAMERAAWESOME`) vs catalog read value (`camerawesome`).
-abstract final class CameraFilterEngineTypeApi {
-  static const camerawesome = 'CAMERAAWESOME';
-
-  static String forAdminApi(String value) {
-    final normalized = value.trim().toUpperCase().replaceAll('-', '_');
-    switch (normalized) {
-      case 'CAMERAAWESOME':
-      case 'CAMERAWESOME':
-        return camerawesome;
-      default:
-        if (value.trim().toLowerCase() == 'camerawesome') return camerawesome;
-        return normalized.isEmpty ? camerawesome : normalized;
-    }
-  }
-}
-
-/// Admin API effect types (`FACE_AR`, `SCREEN_OVERLAY`) vs catalog snake_case.
-abstract final class CameraEffectTypeApi {
-  static const faceAr = 'FACE_AR';
-  static const screenOverlay = 'SCREEN_OVERLAY';
-
-  static const values = [faceAr, screenOverlay];
-
-  static String normalize(String value) {
-    final normalized = value.trim().toUpperCase().replaceAll('-', '_');
-    switch (normalized) {
-      case 'FACE_AR':
-      case 'FACEAR':
-        return faceAr;
-      case 'SCREEN_OVERLAY':
-      case 'SCREENOVERLAY':
-      case 'OVERLAY':
-        return screenOverlay;
-      default:
-        final lower = value.trim().toLowerCase();
-        if (lower == 'face_ar') return faceAr;
-        if (lower == 'screen_overlay') return screenOverlay;
-        return normalized.isEmpty ? faceAr : normalized;
-    }
-  }
-
-  static bool isScreenOverlay(String value) =>
-      normalize(value) == screenOverlay;
-
-  /// Keeps effect flags aligned with the selected admin enum.
-  static ({bool requiresFaceDetection, bool isScreenEffect}) flagsForType(
-    String value, {
-    bool requiresFaceDetection = false,
-  }) {
-    if (isScreenOverlay(value)) {
-      return (requiresFaceDetection: false, isScreenEffect: true);
-    }
-    return (requiresFaceDetection: requiresFaceDetection, isScreenEffect: false);
-  }
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    colorMatrix,
+    lutUrl,
+    lutAsset,
+    adjustments,
+    sortOrder,
+    isActive,
+    clearLabelKey,
+    clearEmoji,
+    clearThumbnailUrl,
+    clearPreviewColorHex,
+    clearLutUrl,
+    clearLutAsset,
+    clearAdjustments,
+  ];
 }
 
 class CreateEffectRequest extends Equatable {
   const CreateEffectRequest({
     required this.slug,
-    required this.effectType,
+    required this.renderType,
+    required this.label,
+    this.labelKey,
     this.emoji,
+    this.thumbnailUrl,
+    this.previewColorHex,
     this.assetUrl,
-    required this.previewColorHex,
-    required this.labelKey,
-    this.requiresFaceDetection = false,
-    this.isScreenEffect = false,
+    this.assetAsset,
+    this.anchor = const {},
+    this.stickers = const [],
+    this.distortionPreset,
     this.sortOrder = 0,
     this.isActive = true,
-    this.placement = EffectPlacementSettingsEntity.empty,
   });
 
   final String slug;
-  final String effectType;
+  final String renderType;
+  final String label;
+  final String? labelKey;
   final String? emoji;
+  final String? thumbnailUrl;
+  final String? previewColorHex;
   final String? assetUrl;
-  final String previewColorHex;
-  final String labelKey;
-  final bool requiresFaceDetection;
-  final bool isScreenEffect;
+  final String? assetAsset;
+  final Map<String, dynamic> anchor;
+  final List<CameraEffectStickerLayer> stickers;
+  final String? distortionPreset;
   final int sortOrder;
   final bool isActive;
-  final EffectPlacementSettingsEntity placement;
 
   Map<String, dynamic> toJson() {
-    final includePlacement = !isScreenEffect && requiresFaceDetection;
     return {
       'slug': slug,
-      'effectType': CameraEffectTypeApi.normalize(effectType),
+      'renderType': CameraEffectRenderTypeApi.toRequestJson(renderType),
+      'label': label,
+      if (labelKey != null && labelKey!.isNotEmpty) 'labelKey': labelKey,
       if (emoji != null && emoji!.isNotEmpty) 'emoji': emoji,
-      if (assetUrl != null && assetUrl!.isNotEmpty) 'assetUrl': assetUrl,
-      'previewColorHex': previewColorHex,
-      'labelKey': labelKey,
-      'requiresFaceDetection': requiresFaceDetection,
-      'isScreenEffect': isScreenEffect,
+      if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
+        'thumbnailUrl': thumbnailUrl,
+      if (previewColorHex != null && previewColorHex!.isNotEmpty)
+        'previewColorHex': previewColorHex,
+      if (CameraEffectRenderTypeApi.isSticker(renderType)) ...{
+        if (assetUrl != null && assetUrl!.isNotEmpty) 'assetUrl': assetUrl,
+        if (assetAsset != null && assetAsset!.isNotEmpty)
+          'assetAsset': assetAsset,
+        'anchor': anchor,
+      },
+      if (CameraEffectRenderTypeApi.isComposite(renderType))
+        'stickers': stickers.map((e) => e.toJson()).toList(),
+      if (CameraEffectRenderTypeApi.isDistortion(renderType) &&
+          distortionPreset != null &&
+          distortionPreset!.isNotEmpty)
+        'distortionPreset': CameraDistortionPresetApi.toRequestJson(
+          distortionPreset!,
+        ),
       'sortOrder': sortOrder,
       'isActive': isActive,
-      ...placement.toCreateJson(
-        includePlacement: includePlacement || isScreenEffect,
-      ),
-      if (isScreenEffect)
-        'anchorType': CameraEffectAnchorTypeApi.forApi(
-          CameraEffectAnchorTypeApi.screen,
-        ),
     };
   }
 
   @override
   List<Object?> get props => [
-        slug,
-        effectType,
-        emoji,
-        assetUrl,
-        previewColorHex,
-        labelKey,
-        requiresFaceDetection,
-        isScreenEffect,
-        sortOrder,
-        isActive,
-        placement,
-      ];
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    assetUrl,
+    assetAsset,
+    anchor,
+    stickers,
+    distortionPreset,
+    sortOrder,
+    isActive,
+  ];
 }
 
 class UpdateEffectRequest extends Equatable {
   const UpdateEffectRequest({
     this.slug,
-    this.effectType,
-    this.emoji,
-    this.assetUrl,
-    this.previewColorHex,
+    this.renderType,
+    this.label,
     this.labelKey,
-    this.requiresFaceDetection,
-    this.isScreenEffect,
+    this.emoji,
+    this.thumbnailUrl,
+    this.previewColorHex,
+    this.assetUrl,
+    this.assetAsset,
+    this.anchor,
+    this.stickers,
+    this.distortionPreset,
     this.sortOrder,
     this.isActive,
-    this.placement,
+    this.clearLabelKey = false,
     this.clearEmoji = false,
+    this.clearThumbnailUrl = false,
+    this.clearPreviewColorHex = false,
     this.clearAssetUrl = false,
-    this.clearAnchorLandmarks = false,
+    this.clearAssetAsset = false,
+    this.clearDistortionPreset = false,
   });
 
   final String? slug;
-  final String? effectType;
-  final String? emoji;
-  final String? assetUrl;
-  final String? previewColorHex;
+  final String? renderType;
+  final String? label;
   final String? labelKey;
-  final bool? requiresFaceDetection;
-  final bool? isScreenEffect;
+  final String? emoji;
+  final String? thumbnailUrl;
+  final String? previewColorHex;
+  final String? assetUrl;
+  final String? assetAsset;
+  final Map<String, dynamic>? anchor;
+  final List<CameraEffectStickerLayer>? stickers;
+  final String? distortionPreset;
   final int? sortOrder;
   final bool? isActive;
-  final EffectPlacementSettingsEntity? placement;
+  final bool clearLabelKey;
   final bool clearEmoji;
+  final bool clearThumbnailUrl;
+  final bool clearPreviewColorHex;
   final bool clearAssetUrl;
-  final bool clearAnchorLandmarks;
+  final bool clearAssetAsset;
+  final bool clearDistortionPreset;
 
-  Map<String, dynamic> toJson({EffectPlacementSettingsEntity? baselinePlacement}) {
+  Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
-    if (effectType != null) {
-      json['effectType'] = CameraEffectTypeApi.normalize(effectType!);
+    if (renderType != null) {
+      json['renderType'] = CameraEffectRenderTypeApi.forAdminApi(renderType!);
+    }
+    if (label != null) json['label'] = label;
+    if (clearLabelKey) {
+      json['labelKey'] = null;
+    } else if (labelKey != null) {
+      json['labelKey'] = labelKey;
     }
     if (clearEmoji) {
       json['emoji'] = null;
     } else if (emoji != null) {
       json['emoji'] = emoji;
     }
+    if (clearThumbnailUrl) {
+      json['thumbnailUrl'] = null;
+    } else if (thumbnailUrl != null) {
+      json['thumbnailUrl'] = thumbnailUrl;
+    }
+    if (clearPreviewColorHex) {
+      json['previewColorHex'] = null;
+    } else if (previewColorHex != null) {
+      json['previewColorHex'] = previewColorHex;
+    }
     if (clearAssetUrl) {
       json['assetUrl'] = null;
     } else if (assetUrl != null) {
       json['assetUrl'] = assetUrl;
     }
-    if (previewColorHex != null) json['previewColorHex'] = previewColorHex;
-    if (labelKey != null) json['labelKey'] = labelKey;
-    if (requiresFaceDetection != null) {
-      json['requiresFaceDetection'] = requiresFaceDetection;
+    if (clearAssetAsset) {
+      json['assetAsset'] = null;
+    } else if (assetAsset != null) {
+      json['assetAsset'] = assetAsset;
     }
-    if (isScreenEffect != null) json['isScreenEffect'] = isScreenEffect;
-    if (sortOrder != null) json['sortOrder'] = sortOrder;
-    if (isActive != null) json['isActive'] = isActive;
-    if (placement != null) {
-      json.addAll(
-        placement!.toUpdateJson(
-          baseline: baselinePlacement,
-          clearAnchorLandmarks: clearAnchorLandmarks,
-        ),
+    if (anchor != null) json['anchor'] = anchor;
+    if (stickers != null) {
+      json['stickers'] = stickers!.map((e) => e.toJson()).toList();
+    }
+    if (clearDistortionPreset) {
+      json['distortionPreset'] = null;
+    } else if (distortionPreset != null) {
+      json['distortionPreset'] = CameraDistortionPresetApi.forAdminApi(
+        distortionPreset!,
       );
     }
+    if (sortOrder != null) json['sortOrder'] = sortOrder;
+    if (isActive != null) json['isActive'] = isActive;
     return json;
   }
 
   @override
   List<Object?> get props => [
-        slug,
-        effectType,
-        emoji,
-        assetUrl,
-        previewColorHex,
-        labelKey,
-        requiresFaceDetection,
-        isScreenEffect,
-        sortOrder,
-        isActive,
-        placement,
-        clearEmoji,
-        clearAssetUrl,
-        clearAnchorLandmarks,
-      ];
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    assetUrl,
+    assetAsset,
+    anchor,
+    stickers,
+    distortionPreset,
+    sortOrder,
+    isActive,
+    clearLabelKey,
+    clearEmoji,
+    clearThumbnailUrl,
+    clearPreviewColorHex,
+    clearAssetUrl,
+    clearAssetAsset,
+    clearDistortionPreset,
+  ];
 }
 
 class CreateCategoryRequest extends Equatable {
   const CreateCategoryRequest({
     required this.slug,
-    required this.labelKey,
+    required this.label,
+    this.labelKey,
     this.sortOrder = 0,
     this.isActive = true,
   });
 
   final String slug;
-  final String labelKey;
+  final String label;
+  final String? labelKey;
   final int sortOrder;
   final bool isActive;
 
   Map<String, dynamic> toJson() => {
-        'slug': slug,
-        'labelKey': labelKey,
-        'sortOrder': sortOrder,
-        'isActive': isActive,
-      };
+    'slug': slug,
+    'label': label,
+    if (labelKey != null && labelKey!.isNotEmpty) 'labelKey': labelKey,
+    'sortOrder': sortOrder,
+    'isActive': isActive,
+  };
 
   @override
-  List<Object?> get props => [slug, labelKey, sortOrder, isActive];
+  List<Object?> get props => [slug, label, labelKey, sortOrder, isActive];
 }
 
 class UpdateCategoryRequest extends Equatable {
   const UpdateCategoryRequest({
     this.slug,
+    this.label,
     this.labelKey,
     this.sortOrder,
     this.isActive,
+    this.clearLabelKey = false,
   });
 
   final String? slug;
+  final String? label;
   final String? labelKey;
   final int? sortOrder;
   final bool? isActive;
+  final bool clearLabelKey;
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
-    if (labelKey != null) json['labelKey'] = labelKey;
+    if (label != null) json['label'] = label;
+    if (clearLabelKey) {
+      json['labelKey'] = null;
+    } else if (labelKey != null) {
+      json['labelKey'] = labelKey;
+    }
     if (sortOrder != null) json['sortOrder'] = sortOrder;
     if (isActive != null) json['isActive'] = isActive;
     return json;
   }
 
   @override
-  List<Object?> get props => [slug, labelKey, sortOrder, isActive];
+  List<Object?> get props => [
+    slug,
+    label,
+    labelKey,
+    sortOrder,
+    isActive,
+    clearLabelKey,
+  ];
 }
 
 class CategoryReorderItem extends Equatable {
@@ -743,9 +1027,9 @@ class FilterAssignmentItem extends Equatable {
   final int sortOrder;
 
   Map<String, dynamic> toJson() => {
-        'filterId': filterId,
-        'sortOrder': sortOrder,
-      };
+    'filterId': filterId,
+    'sortOrder': sortOrder,
+  };
 
   @override
   List<Object?> get props => [filterId, sortOrder];
@@ -758,9 +1042,9 @@ class EffectAssignmentItem extends Equatable {
   final int sortOrder;
 
   Map<String, dynamic> toJson() => {
-        'effectId': effectId,
-        'sortOrder': sortOrder,
-      };
+    'effectId': effectId,
+    'sortOrder': sortOrder,
+  };
 
   @override
   List<Object?> get props => [effectId, sortOrder];
@@ -773,9 +1057,9 @@ class PublishCatalogRequest extends Equatable {
   final String? notes;
 
   Map<String, dynamic> toJson() => {
-        'version': version,
-        if (notes != null && notes!.isNotEmpty) 'notes': notes,
-      };
+    'version': version,
+    if (notes != null && notes!.isNotEmpty) 'notes': notes,
+  };
 
   @override
   List<Object?> get props => [version, notes];
@@ -791,38 +1075,233 @@ enum FiltersEffectsTab {
 
 enum FiltersEffectsStatusFilter { all, active, inactive }
 
+class FiltersEffectsPaginationMeta extends Equatable {
+  const FiltersEffectsPaginationMeta({
+    required this.total,
+    required this.page,
+    required this.limit,
+    required this.totalPages,
+  });
+
+  final int total;
+  final int page;
+  final int limit;
+  final int totalPages;
+
+  @override
+  List<Object?> get props => [total, page, limit, totalPages];
+}
+
+class PaginatedCameraFiltersEntity extends Equatable {
+  const PaginatedCameraFiltersEntity({
+    required this.data,
+    required this.meta,
+  });
+
+  final List<CameraFilterEntity> data;
+  final FiltersEffectsPaginationMeta meta;
+
+  @override
+  List<Object?> get props => [data, meta];
+}
+
+class PaginatedCameraEffectsEntity extends Equatable {
+  const PaginatedCameraEffectsEntity({
+    required this.data,
+    required this.meta,
+  });
+
+  final List<CameraEffectEntity> data;
+  final FiltersEffectsPaginationMeta meta;
+
+  @override
+  List<Object?> get props => [data, meta];
+}
+
+enum FiltersEffectsBulkAction { activate, deactivate, delete }
+
+class BulkCameraFiltersRequest extends Equatable {
+  const BulkCameraFiltersRequest({
+    required this.filterIds,
+    required this.action,
+  });
+
+  final List<String> filterIds;
+  final FiltersEffectsBulkAction action;
+
+  Map<String, dynamic> toJson() => {
+    'filterIds': filterIds,
+    'action': switch (action) {
+      FiltersEffectsBulkAction.activate => 'ACTIVATE',
+      FiltersEffectsBulkAction.deactivate => 'DEACTIVATE',
+      FiltersEffectsBulkAction.delete => 'DELETE',
+    },
+  };
+
+  @override
+  List<Object?> get props => [filterIds, action];
+}
+
+class BulkCameraEffectsRequest extends Equatable {
+  const BulkCameraEffectsRequest({
+    required this.effectIds,
+    required this.action,
+  });
+
+  final List<String> effectIds;
+  final FiltersEffectsBulkAction action;
+
+  Map<String, dynamic> toJson() => {
+    'effectIds': effectIds,
+    'action': switch (action) {
+      FiltersEffectsBulkAction.activate => 'ACTIVATE',
+      FiltersEffectsBulkAction.deactivate => 'DEACTIVATE',
+      FiltersEffectsBulkAction.delete => 'DELETE',
+    },
+  };
+
+  @override
+  List<Object?> get props => [effectIds, action];
+}
+
+class BulkCameraFiltersResult extends Equatable {
+  const BulkCameraFiltersResult({
+    required this.action,
+    required this.successCount,
+    required this.notFoundCount,
+    required this.filterIds,
+    required this.notFoundIds,
+  });
+
+  final String action;
+  final int successCount;
+  final int notFoundCount;
+  final List<String> filterIds;
+  final List<String> notFoundIds;
+
+  @override
+  List<Object?> get props => [
+    action,
+    successCount,
+    notFoundCount,
+    filterIds,
+    notFoundIds,
+  ];
+}
+
+class BulkCameraEffectsResult extends Equatable {
+  const BulkCameraEffectsResult({
+    required this.action,
+    required this.successCount,
+    required this.notFoundCount,
+    required this.effectIds,
+    required this.notFoundIds,
+  });
+
+  final String action;
+  final int successCount;
+  final int notFoundCount;
+  final List<String> effectIds;
+  final List<String> notFoundIds;
+
+  @override
+  List<Object?> get props => [
+    action,
+    successCount,
+    notFoundCount,
+    effectIds,
+    notFoundIds,
+  ];
+}
+
 class FiltersEffectsListQuery extends Equatable {
   const FiltersEffectsListQuery({
     this.search = '',
     this.status = FiltersEffectsStatusFilter.all,
-    this.engineKey,
+    this.renderType,
+    this.category,
+    this.categoryId,
     this.page = 1,
     this.pageSize = 25,
   });
 
   final String search;
   final FiltersEffectsStatusFilter status;
-  final String? engineKey;
+  final String? renderType;
+  final String? category;
+  final String? categoryId;
   final int page;
   final int pageSize;
+
+  /// Maps UI query state to admin list API query params.
+  Map<String, dynamic> toQueryParameters() {
+    final params = <String, dynamic>{
+      'page': page,
+      'limit': pageSize.clamp(1, 100),
+    };
+    final trimmedSearch = search.trim();
+    if (trimmedSearch.isNotEmpty) params['search'] = trimmedSearch;
+    if (status == FiltersEffectsStatusFilter.active) {
+      params['isActive'] = true;
+    } else if (status == FiltersEffectsStatusFilter.inactive) {
+      params['isActive'] = false;
+    }
+    if (renderType != null && renderType!.trim().isNotEmpty) {
+      params['renderType'] = CameraFilterRenderTypeApi.toRequestJson(
+        renderType!,
+      );
+    }
+    if (category != null && category!.trim().isNotEmpty) {
+      params['category'] = category!.trim();
+    }
+    if (categoryId != null && categoryId!.trim().isNotEmpty) {
+      params['categoryId'] = categoryId!.trim();
+    }
+    return params;
+  }
+
+  /// Effect lists use the same params; render types differ per resource.
+  Map<String, dynamic> toEffectQueryParameters() {
+    final params = toQueryParameters();
+    if (renderType != null && renderType!.trim().isNotEmpty) {
+      params['renderType'] = CameraEffectRenderTypeApi.toRequestJson(
+        renderType!,
+      );
+    }
+    return params;
+  }
 
   FiltersEffectsListQuery copyWith({
     String? search,
     FiltersEffectsStatusFilter? status,
-    String? engineKey,
+    String? renderType,
+    String? category,
+    String? categoryId,
     int? page,
     int? pageSize,
-    bool clearEngineKey = false,
+    bool clearRenderType = false,
+    bool clearCategory = false,
+    bool clearCategoryId = false,
   }) {
     return FiltersEffectsListQuery(
       search: search ?? this.search,
       status: status ?? this.status,
-      engineKey: clearEngineKey ? null : (engineKey ?? this.engineKey),
+      renderType: clearRenderType ? null : (renderType ?? this.renderType),
+      category: clearCategory ? null : (category ?? this.category),
+      categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
       page: page ?? this.page,
       pageSize: pageSize ?? this.pageSize,
     );
   }
 
   @override
-  List<Object?> get props => [search, status, engineKey, page, pageSize];
+  List<Object?> get props => [
+    search,
+    status,
+    renderType,
+    category,
+    categoryId,
+    page,
+    pageSize,
+  ];
 }

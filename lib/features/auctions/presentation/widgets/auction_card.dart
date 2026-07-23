@@ -33,6 +33,16 @@ import '../../domain/entities/auction_entity.dart';
         bg: scheme.errorContainer,
         label: l10n.tOr('banned', 'Banned'),
       ),
+    'SETTLED' => (
+        fg: scheme.tertiary,
+        bg: scheme.tertiaryContainer,
+        label: l10n.tOr('settled', 'Settled'),
+      ),
+    'DISPUTED' => (
+        fg: scheme.error,
+        bg: scheme.errorContainer.withValues(alpha: 0.65),
+        label: l10n.tOr('disputed', 'Disputed'),
+      ),
     _ => (
         fg: scheme.onSurfaceVariant,
         bg: scheme.surfaceContainerHigh,

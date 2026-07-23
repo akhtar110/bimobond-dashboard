@@ -27,9 +27,9 @@ class FePreviewColorPicker extends StatelessWidget {
       children: [
         Text(
           l10n.tOr('feSelectPreviewColor', 'Select preview color'),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -66,8 +66,8 @@ class FePreviewColorPicker extends StatelessWidget {
                 Text(
                   l10n.tOr('fePreviewColorHexLabel', 'Stored hex'),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -77,9 +77,9 @@ class FePreviewColorPicker extends StatelessWidget {
                         : l10n.tOr('fePreviewColorNone', 'None'),
                     textAlign: TextAlign.end,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'monospace',
-                        ),
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
               ],
@@ -141,7 +141,11 @@ class _ColorSwatch extends StatelessWidget {
                     : null,
               ),
               child: selected
-                  ? Icon(Icons.check_rounded, color: _contrastIconColor(gradient.first), size: 20)
+                  ? Icon(
+                      Icons.check_rounded,
+                      color: _contrastIconColor(gradient.first),
+                      size: 20,
+                    )
                   : null,
             ),
             const SizedBox(height: 4),

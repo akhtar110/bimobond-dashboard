@@ -9,7 +9,7 @@ import '../bloc/effect_editor_bloc.dart';
 import '../bloc/effect_editor_event.dart';
 import '../bloc/effect_editor_state.dart';
 import '../widgets/effect_editor_basic_section.dart';
-import '../widgets/effect_editor_placement_section.dart';
+import '../widgets/effect_editor_composition_section.dart';
 import '../widgets/effect_editor_preview_panel.dart';
 
 Future<bool?> openEffectEditor(BuildContext context, {String? effectId}) {
@@ -17,17 +17,15 @@ Future<bool?> openEffectEditor(BuildContext context, {String? effectId}) {
     context: context,
     barrierDismissible: false,
     builder: (ctx) => BlocProvider(
-      create: (_) => di.sl<EffectEditorBloc>()
-        ..add(LoadEffectEditorEvent(effectId: effectId)),
+      create: (_) =>
+          di.sl<EffectEditorBloc>()
+            ..add(LoadEffectEditorEvent(effectId: effectId)),
       child: EffectFormDialog(effectId: effectId),
     ),
   );
 }
 
-void showEffectFormDialog(
-  BuildContext context, {
-  CameraEffectEntity? editing,
-}) {
+void showEffectFormDialog(BuildContext context, {CameraEffectEntity? editing}) {
   openEffectEditor(context, effectId: editing?.id);
 }
 
@@ -63,7 +61,10 @@ class EffectFormDialog extends StatelessWidget {
     return result ?? false;
   }
 
-  Future<void> _handleClose(BuildContext context, EffectEditorState state) async {
+  Future<void> _handleClose(
+    BuildContext context,
+    EffectEditorState state,
+  ) async {
     final ready = state is EffectEditorReady ? state : null;
     if (ready != null && ready.hasUnsavedChanges) {
       final discard = await _confirmDiscard(context);
@@ -94,9 +95,9 @@ class EffectFormDialog extends StatelessWidget {
       listener: (context, state) {
         if (state is! EffectEditorReady) return;
         if (state.saveSucceeded) {
-          context
-              .read<EffectEditorBloc>()
-              .add(const ClearEffectEditorSaveFlagEvent());
+          context.read<EffectEditorBloc>().add(
+            const ClearEffectEditorSaveFlagEvent(),
+          );
           Navigator.of(context).pop(true);
           return;
         }
@@ -114,9 +115,9 @@ class EffectFormDialog extends StatelessWidget {
                 behavior: SnackBarBehavior.floating,
               ),
             );
-          context
-              .read<EffectEditorBloc>()
-              .add(const ClearEffectEditorSubmitErrorEvent());
+          context.read<EffectEditorBloc>().add(
+            const ClearEffectEditorSubmitErrorEvent(),
+          );
         }
       },
       child: BlocBuilder<EffectEditorBloc, EffectEditorState>(
@@ -171,9 +172,9 @@ class EffectFormDialog extends StatelessWidget {
                 FilledButton(
                   onPressed: ready.isSaving || ready.isUploadingAsset
                       ? null
-                      : () => context
-                          .read<EffectEditorBloc>()
-                          .add(const SubmitEffectEditorEvent()),
+                      : () => context.read<EffectEditorBloc>().add(
+                          const SubmitEffectEditorEvent(),
+                        ),
                   child: ready.isSaving
                       ? const SizedBox(
                           width: 18,
@@ -211,8 +212,8 @@ class _EffectEditorDialogBody extends StatelessWidget {
               message: state.message,
               retryLabel: context.l10n.t('retry'),
               onRetry: () => context.read<EffectEditorBloc>().add(
-                    LoadEffectEditorEvent(effectId: effectId),
-                  ),
+                LoadEffectEditorEvent(effectId: effectId),
+              ),
             ),
           );
         }
@@ -250,23 +251,31 @@ class _EffectEditorReadyBody extends StatelessWidget {
                       'feEffectSectionBasic',
                       'Basic information',
                     ),
-                    child: BlocSelector<EffectEditorBloc, EffectEditorState,
-                        _BasicPanelState?>(
-                      selector: _selectBasicPanelState,
-                      builder: (context, panelState) {
-                        if (panelState == null) return const SizedBox.shrink();
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.only(right: 4, bottom: 8),
-                          child: EffectEditorBasicSection(
-                            key: ValueKey(
-                              panelState.ready.effectId ?? 'new-effect',
-                            ),
-                            state: panelState.ready,
-                            embedded: true,
-                          ),
-                        );
-                      },
-                    ),
+                    child:
+                        BlocSelector<
+                          EffectEditorBloc,
+                          EffectEditorState,
+                          _BasicPanelState?
+                        >(
+                          selector: _selectBasicPanelState,
+                          builder: (context, panelState) {
+                            if (panelState == null)
+                              return const SizedBox.shrink();
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.only(
+                                right: 4,
+                                bottom: 8,
+                              ),
+                              child: EffectEditorBasicSection(
+                                key: ValueKey(
+                                  panelState.ready.effectId ?? 'new-effect',
+                                ),
+                                state: panelState.ready,
+                                embedded: true,
+                              ),
+                            );
+                          },
+                        ),
                   ),
                 ),
                 VerticalDivider(width: 1, color: scheme.outlineVariant),
@@ -274,23 +283,31 @@ class _EffectEditorReadyBody extends StatelessWidget {
                   flex: 40,
                   child: _DialogColumn(
                     title: context.l10n.tOr(
-                      'feEffectSectionPlacement',
-                      'Effect placement & settings',
+                      'feEffectSectionComposition',
+                      'Effect composition',
                     ),
-                    child: BlocSelector<EffectEditorBloc, EffectEditorState,
-                        _PlacementPanelState?>(
-                      selector: _selectPlacementPanelState,
-                      builder: (context, panelState) {
-                        if (panelState == null) return const SizedBox.shrink();
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.only(right: 4, bottom: 8),
-                          child: EffectEditorPlacementSection(
-                            state: panelState.ready,
-                            embedded: true,
-                          ),
-                        );
-                      },
-                    ),
+                    child:
+                        BlocSelector<
+                          EffectEditorBloc,
+                          EffectEditorState,
+                          _CompositionPanelState?
+                        >(
+                          selector: _selectCompositionPanelState,
+                          builder: (context, panelState) {
+                            if (panelState == null)
+                              return const SizedBox.shrink();
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.only(
+                                right: 4,
+                                bottom: 8,
+                              ),
+                              child: EffectEditorCompositionSection(
+                                state: panelState.ready,
+                                embedded: true,
+                              ),
+                            );
+                          },
+                        ),
                   ),
                 ),
                 VerticalDivider(width: 1, color: scheme.outlineVariant),
@@ -334,13 +351,13 @@ class _BasicPanelState {
     if (other is! _BasicPanelState) return false;
     final a = ready.form;
     final b = other.ready.form;
-    return a.effectType == b.effectType &&
+    return a.renderType == b.renderType &&
         a.previewColorHex == b.previewColorHex &&
-        a.requiresFaceDetection == b.requiresFaceDetection &&
-        a.isScreenEffect == b.isScreenEffect &&
+        a.distortionPreset == b.distortionPreset &&
         a.isActive == b.isActive &&
         a.emoji == b.emoji &&
         a.assetUrl == b.assetUrl &&
+        a.assetAsset == b.assetAsset &&
         ready.fieldErrors == other.ready.fieldErrors &&
         ready.isUploadingAsset == other.ready.isUploadingAsset &&
         ready.assetFileName == other.ready.assetFileName;
@@ -348,17 +365,17 @@ class _BasicPanelState {
 
   @override
   int get hashCode => Object.hash(
-        ready.form.effectType,
-        ready.form.previewColorHex,
-        ready.form.requiresFaceDetection,
-        ready.form.isScreenEffect,
-        ready.form.isActive,
-        ready.form.emoji,
-        ready.form.assetUrl,
-        ready.fieldErrors,
-        ready.isUploadingAsset,
-        ready.assetFileName,
-      );
+    ready.form.renderType,
+    ready.form.previewColorHex,
+    ready.form.distortionPreset,
+    ready.form.isActive,
+    ready.form.emoji,
+    ready.form.assetUrl,
+    ready.form.assetAsset,
+    ready.fieldErrors,
+    ready.isUploadingAsset,
+    ready.assetFileName,
+  );
 }
 
 _BasicPanelState? _selectBasicPanelState(EffectEditorState state) {
@@ -366,46 +383,41 @@ _BasicPanelState? _selectBasicPanelState(EffectEditorState state) {
   return _BasicPanelState(ready: state);
 }
 
-class _PlacementPanelState {
-  const _PlacementPanelState({required this.ready});
+class _CompositionPanelState {
+  const _CompositionPanelState({required this.ready});
 
   final EffectEditorReady ready;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    if (other is! _PlacementPanelState) return false;
-    final a = ready;
-    final b = other.ready;
-    return a.form.placement == b.form.placement &&
-        a.form.slug == b.form.slug &&
-        a.form.requiresFaceDetection == b.form.requiresFaceDetection &&
-        a.form.isScreenEffect == b.form.isScreenEffect &&
-        a.schema == b.schema &&
-        a.fieldErrors == b.fieldErrors;
+    if (other is! _CompositionPanelState) return false;
+    final a = ready.form;
+    final b = other.ready.form;
+    return a.renderType == b.renderType &&
+        a.anchor == b.anchor &&
+        a.stickers == b.stickers &&
+        a.distortionPreset == b.distortionPreset &&
+        ready.fieldErrors == other.ready.fieldErrors;
   }
 
   @override
   int get hashCode => Object.hash(
-        ready.form.placement,
-        ready.form.slug,
-        ready.form.requiresFaceDetection,
-        ready.form.isScreenEffect,
-        ready.schema,
-        ready.fieldErrors,
-      );
+    ready.form.renderType,
+    ready.form.anchor,
+    ready.form.stickers,
+    ready.form.distortionPreset,
+    ready.fieldErrors,
+  );
 }
 
-_PlacementPanelState? _selectPlacementPanelState(EffectEditorState state) {
+_CompositionPanelState? _selectCompositionPanelState(EffectEditorState state) {
   if (state is! EffectEditorReady) return null;
-  return _PlacementPanelState(ready: state);
+  return _CompositionPanelState(ready: state);
 }
 
 class _DialogColumn extends StatelessWidget {
-  const _DialogColumn({
-    required this.title,
-    required this.child,
-  });
+  const _DialogColumn({required this.title, required this.child});
 
   final String title;
   final Widget child;
@@ -422,9 +434,9 @@ class _DialogColumn extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: scheme.primary,
-                ),
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(child: child),

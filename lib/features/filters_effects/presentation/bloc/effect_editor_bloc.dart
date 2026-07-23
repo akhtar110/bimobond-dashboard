@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/entities/effect_placement_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../../domain/usecases/filters_effects_usecases.dart';
-import '../utils/effect_placement_visibility.dart';
+import '../utils/effect_anchor_form_data.dart';
+import '../utils/fe_api_errors.dart';
 import '../utils/fe_effect_emoji_display.dart';
 import '../utils/fe_preview_color_utils.dart';
 import 'effect_editor_event.dart';
@@ -12,35 +12,27 @@ import 'effect_editor_state.dart';
 
 class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
   EffectEditorBloc({
-    required GetEffectPlacementSchemaUseCase getSchema,
     required GetCameraEffectUseCase getEffect,
     required CreateCameraEffectUseCase createEffect,
     required UpdateCameraEffectUseCase updateEffect,
     required UploadEffectAssetUseCase uploadEffectAsset,
-  })  : _getSchema = getSchema,
-        _getEffect = getEffect,
-        _createEffect = createEffect,
-        _updateEffect = updateEffect,
-        _uploadEffectAsset = uploadEffectAsset,
-        super(const EffectEditorInitial()) {
+  }) : _getEffect = getEffect,
+       _createEffect = createEffect,
+       _updateEffect = updateEffect,
+       _uploadEffectAsset = uploadEffectAsset,
+       super(const EffectEditorInitial()) {
     on<LoadEffectEditorEvent>(_onLoad);
     on<EffectBasicFieldChanged>(_onBasicChanged);
+    on<EffectAnchorChanged>(_onAnchorChanged);
+    on<EffectStickersChanged>(_onStickersChanged);
     on<UploadEffectAssetEvent>(_onUploadAsset);
     on<EffectPreviewColorChanged>(_onPreviewColorChanged);
-    on<EffectAnchorTypeChanged>(_onAnchorTypeChanged);
-    on<EffectLandmarksChanged>(_onLandmarksChanged);
-    on<EffectPlacementNumericChanged>(_onPlacementNumericChanged);
-    on<EffectFallbackAnchorTypeChanged>(_onFallbackAnchorChanged);
-    on<ApplyPlacementDefaultsEvent>(_onApplyDefaults);
-    on<ResetPlacementEvent>(_onResetPlacement);
     on<ResetEffectEditorEvent>(_onResetEditor);
-    on<EffectPlacementExpansionToggled>(_onPlacementExpansionToggled);
     on<SubmitEffectEditorEvent>(_onSubmit);
     on<ClearEffectEditorSaveFlagEvent>(_onClearSaveFlag);
     on<ClearEffectEditorSubmitErrorEvent>(_onClearSubmitError);
   }
 
-  final GetEffectPlacementSchemaUseCase _getSchema;
   final GetCameraEffectUseCase _getEffect;
   final CreateCameraEffectUseCase _createEffect;
   final UpdateCameraEffectUseCase _updateEffect;
@@ -52,7 +44,6 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
   ) async {
     emit(const EffectEditorLoading());
     try {
-      final schema = await _getSchema();
       if (event.effectId != null) {
         final effect = await _getEffect(event.effectId!);
         final form = _formFromEntity(effect);
@@ -61,31 +52,21 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
             effectId: effect.id,
             form: form,
             baseline: form,
-            schema: schema,
-            assetFileName: _assetFileNameFromUrl(effect.assetUrl),
+            assetFileName:
+                _assetFileNameFromUrl(effect.assetUrl) ?? effect.assetAsset,
           ),
         );
         return;
       }
 
-      final form = EffectEditorFormData(
+      const form = EffectEditorFormData(
         slug: '',
-        effectType: CameraEffectTypeApi.faceAr,
-        previewColorHex: defaultPreviewColorHex(required: true),
-        labelKey: '',
-        placement: const EffectPlacementSettingsEntity(
-          anchorType: CameraEffectAnchorTypeApi.onFace,
-        ),
+        renderType: CameraEffectRenderTypeApi.none,
+        label: '',
       );
-      emit(
-        EffectEditorReady(
-          form: form,
-          baseline: form,
-          schema: schema,
-        ),
-      );
+      emit(const EffectEditorReady(form: form, baseline: form));
     } catch (e) {
-      emit(EffectEditorError(_formatError(e)));
+      emit(EffectEditorError(formatFeApiError(e)));
     }
   }
 
@@ -95,33 +76,62 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
   ) {
     final current = state;
     if (current is! EffectEditorReady) return;
-
     var form = current.form.copyWith(
       slug: event.slug,
-      effectType: event.effectType,
-      emoji: event.emoji,
-      assetUrl: event.assetUrl,
+      renderType: event.renderType,
+      label: event.label,
       labelKey: event.labelKey,
-      requiresFaceDetection: event.requiresFaceDetection,
-      isScreenEffect: event.isScreenEffect,
+      emoji: event.emoji,
+      thumbnailUrl: event.thumbnailUrl,
+      previewColorHex: event.previewColorHex,
+      assetUrl: event.assetUrl,
+      assetAsset: event.assetAsset,
+      distortionPreset: event.distortionPreset,
       isActive: event.isActive,
       sortOrder: event.sortOrder,
+      clearLabelKey: event.clearLabelKey,
       clearEmoji: event.clearEmoji,
+      clearThumbnailUrl: event.clearThumbnailUrl,
+      clearPreviewColorHex: event.clearPreviewColorHex,
       clearAssetUrl: event.clearAssetUrl,
+      clearAssetAsset: event.clearAssetAsset,
+      clearDistortionPreset: event.clearDistortionPreset,
     );
-
-    if (event.effectType != null) {
-      form = _syncFlagsForEffectType(form, event.effectType!);
+    if (event.renderType != null) {
+      final type = CameraEffectRenderTypeApi.fromResponse(event.renderType!);
+      form = form.copyWith(renderType: type);
+      form = _normalizeFormForRenderType(form);
+      if (CameraEffectRenderTypeApi.isSticker(type) && form.anchor.isEmpty) {
+        form = form.copyWith(anchor: EffectAnchorFormData.glassesPreset);
+      }
     }
-    if (event.isScreenEffect == true) {
-      form = _applyScreenEffectPlacement(form);
-    }
+    emit(current.copyWith(form: form, clearFieldErrors: true));
+  }
 
+  void _onAnchorChanged(
+    EffectAnchorChanged event,
+    Emitter<EffectEditorState> emit,
+  ) {
+    final current = state;
+    if (current is! EffectEditorReady) return;
     emit(
       current.copyWith(
-        form: form,
+        form: current.form.copyWith(anchor: event.anchor),
         clearFieldErrors: true,
-        clearAssetFileName: event.clearAssetUrl,
+      ),
+    );
+  }
+
+  void _onStickersChanged(
+    EffectStickersChanged event,
+    Emitter<EffectEditorState> emit,
+  ) {
+    final current = state;
+    if (current is! EffectEditorReady) return;
+    emit(
+      current.copyWith(
+        form: current.form.copyWith(stickers: event.stickers),
+        clearFieldErrors: true,
       ),
     );
   }
@@ -158,7 +168,7 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
       emit(
         latest.copyWith(
           isUploadingAsset: false,
-          fieldErrors: {'assetUrl': _formatError(e)},
+          fieldErrors: {'assetUrl': formatFeApiError(e)},
         ),
       );
     }
@@ -181,126 +191,6 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
     );
   }
 
-  void _onAnchorTypeChanged(
-    EffectAnchorTypeChanged event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    final anchorType = event.anchorType == null || event.anchorType!.isEmpty
-        ? null
-        : CameraEffectAnchorTypeApi.normalize(event.anchorType!);
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          placement: current.form.placement.copyWith(
-            anchorType: anchorType,
-            clearAnchorLandmarks: true,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onLandmarksChanged(
-    EffectLandmarksChanged event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          placement: current.form.placement.copyWith(
-            anchorLandmarks: event.landmarks,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onPlacementNumericChanged(
-    EffectPlacementNumericChanged event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          placement: current.form.placement.copyWith(
-            scaleFactor: event.scaleFactor,
-            offsetX: event.offsetX,
-            offsetY: event.offsetY,
-            landmarkSize: event.landmarkSize,
-            fallbackOffsetY: event.fallbackOffsetY,
-            fallbackScaleFactor: event.fallbackScaleFactor,
-            clearScaleFactor: event.clearScaleFactor,
-            clearOffsetX: event.clearOffsetX,
-            clearOffsetY: event.clearOffsetY,
-            clearLandmarkSize: event.clearLandmarkSize,
-            clearFallbackOffsetY: event.clearFallbackOffsetY,
-            clearFallbackScaleFactor: event.clearFallbackScaleFactor,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onFallbackAnchorChanged(
-    EffectFallbackAnchorTypeChanged event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          placement: current.form.placement.copyWith(
-            fallbackAnchorType: event.anchorType == null ||
-                    event.anchorType!.isEmpty
-                ? null
-                : CameraEffectAnchorTypeApi.normalize(event.anchorType!),
-            clearFallbackAnchorType:
-                event.anchorType == null || event.anchorType!.isEmpty,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onApplyDefaults(
-    ApplyPlacementDefaultsEvent event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    final defaults = current.schema.defaultsForSlug(current.form.slug.trim());
-    if (defaults == null) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          placement: current.form.placement.mergeDefaults(defaults),
-        ),
-      ),
-    );
-  }
-
-  void _onResetPlacement(
-    ResetPlacementEvent event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          placement: current.baseline.placement,
-        ),
-      ),
-    );
-  }
-
   void _onResetEditor(
     ResetEffectEditorEvent event,
     Emitter<EffectEditorState> emit,
@@ -310,27 +200,18 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
     emit(current.copyWith(form: current.baseline, clearFieldErrors: true));
   }
 
-  void _onPlacementExpansionToggled(
-    EffectPlacementExpansionToggled event,
-    Emitter<EffectEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! EffectEditorReady) return;
-    emit(
-      current.copyWith(placementExpanded: !current.placementExpanded),
-    );
-  }
-
   Future<void> _onSubmit(
     SubmitEffectEditorEvent event,
     Emitter<EffectEditorState> emit,
   ) async {
     final current = state;
-    if (current is! EffectEditorReady || current.isSaving || current.isUploadingAsset) {
+    if (current is! EffectEditorReady ||
+        current.isSaving ||
+        current.isUploadingAsset) {
       return;
     }
 
-    final errors = _validate(current);
+    final errors = _validate(current.form);
     if (errors.isNotEmpty) {
       emit(current.copyWith(fieldErrors: errors));
       return;
@@ -345,12 +226,7 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
     );
     try {
       if (current.isEditing) {
-        final request = _buildUpdateRequest(current);
-        await _updateEffect(
-          current.effectId!,
-          request,
-          baselinePlacement: current.baseline.placement,
-        );
+        await _updateEffect(current.effectId!, _buildUpdateRequest(current));
       } else {
         await _createEffect(_buildCreateRequest(current));
       }
@@ -362,22 +238,12 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
         ),
       );
     } catch (e) {
-      final message = _formatError(e);
+      final message = formatFeApiError(e);
       final serverErrors = _serverFieldErrors(e);
       if (serverErrors.isNotEmpty) {
-        emit(
-          current.copyWith(
-            isSaving: false,
-            fieldErrors: serverErrors,
-          ),
-        );
+        emit(current.copyWith(isSaving: false, fieldErrors: serverErrors));
       } else {
-        emit(
-          current.copyWith(
-            isSaving: false,
-            submitError: message,
-          ),
-        );
+        emit(current.copyWith(isSaving: false, submitError: message));
       }
     }
   }
@@ -410,99 +276,95 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
 
     return EffectEditorFormData(
       slug: effect.slug,
-      effectType: effect.effectType,
-      emoji: emoji,
-      assetUrl: assetUrl,
-      previewColorHex: effect.previewColorHex,
+      renderType: CameraEffectRenderTypeApi.fromResponse(effect.renderType),
+      label: effect.label,
       labelKey: effect.labelKey,
-      requiresFaceDetection: effect.requiresFaceDetection,
-      isScreenEffect: effect.isScreenEffect,
+      emoji: emoji,
+      thumbnailUrl: effect.thumbnailUrl,
+      previewColorHex: effect.previewColorHex,
+      assetUrl: assetUrl,
+      assetAsset: effect.assetAsset,
+      anchor: EffectAnchorFormData.fromMap(effect.anchor),
+      stickers: effect.stickers,
+      distortionPreset: effect.distortionPreset,
       isActive: effect.isActive,
       sortOrder: effect.sortOrder,
-      placement: effect.placement,
     );
   }
 
-  EffectEditorFormData _syncFlagsForEffectType(
-    EffectEditorFormData form,
-    String effectType,
-  ) {
-    final normalized = CameraEffectTypeApi.normalize(effectType);
-    final flags = CameraEffectTypeApi.flagsForType(
-      normalized,
-      requiresFaceDetection: form.requiresFaceDetection,
-    );
-    var next = form.copyWith(
-      effectType: normalized,
-      requiresFaceDetection: flags.requiresFaceDetection,
-      isScreenEffect: flags.isScreenEffect,
-    );
-    if (flags.isScreenEffect) {
-      next = _applyScreenEffectPlacement(next);
-    }
-    return next;
-  }
-
-  EffectEditorFormData _applyScreenEffectPlacement(EffectEditorFormData form) {
-    return form.copyWith(
-      requiresFaceDetection: false,
-      isScreenEffect: true,
-      placement: form.placement.copyWith(
-        anchorType: CameraEffectAnchorTypeApi.screen,
-        clearAnchorLandmarks: true,
-        clearScaleFactor: true,
-        clearOffsetX: true,
-        clearOffsetY: true,
-        clearLandmarkSize: true,
-        clearFallbackAnchorType: true,
-        clearFallbackOffsetY: true,
-        clearFallbackScaleFactor: true,
-      ),
-    );
-  }
-
-  Map<String, String> _validate(EffectEditorReady current) {
+  Map<String, String> _validate(EffectEditorFormData form) {
     final errors = <String, String>{};
-    final form = current.form;
-    if (form.slug.trim().isEmpty) errors['slug'] = 'feRequired';
-    if (form.labelKey.trim().isEmpty) errors['labelKey'] = 'feRequired';
-    final hex = form.previewColorHex?.trim();
-    if (hex == null || hex.isEmpty) {
-      errors['previewColorHex'] = 'feRequired';
-    } else if (!isValidFePreviewHex(hex)) {
-      errors['previewColorHex'] = 'feInvalidHex';
+    final slug = form.slug.trim();
+    final label = form.label.trim();
+    if (slug.isEmpty) {
+      errors['slug'] = 'feRequired';
+    } else if (slug.length > 50) {
+      errors['slug'] = 'feSlugTooLong';
     }
-    final asset = form.assetUrl?.trim();
-    if (asset != null && asset.isNotEmpty) {
-      final uri = Uri.tryParse(asset);
-      if (uri == null || !uri.hasScheme) {
-        errors['assetUrl'] = 'feInvalidUrl';
-      }
+    if (label.isEmpty) {
+      errors['label'] = 'feRequired';
+    } else if (label.length > 80) {
+      errors['label'] = 'feLabelTooLong';
     }
-
+    final labelKey = form.labelKey?.trim();
+    if (labelKey != null && labelKey.length > 100) {
+      errors['labelKey'] = 'feLabelKeyTooLong';
+    }
     final emojiText = FeEffectEmojiDisplay.textEmoji(form.emoji);
     if (emojiText != null && emojiText.length > 16) {
       errors['emoji'] = 'feEmojiTooLong';
     }
-
-    if (EffectPlacementVisibility.placementEnabled(
-      requiresFaceDetection: form.requiresFaceDetection,
-      isScreenEffect: form.isScreenEffect,
-    )) {
-      final anchor = form.placement.anchorType;
-      if (anchor == null || anchor.isEmpty) {
-        errors['anchorType'] = 'feRequired';
-      }
-      if (EffectPlacementVisibility.showLandmarkMultiSelect(anchor) &&
-          form.placement.anchorLandmarks.isEmpty) {
-        errors['anchorLandmarks'] = 'feRequired';
-      }
-      if (EffectPlacementVisibility.showLandmarkSingleSelect(anchor) &&
-          form.placement.anchorLandmarks.isEmpty) {
-        errors['anchorLandmarks'] = 'feRequired';
+    final hex = form.previewColorHex?.trim();
+    if (hex != null && hex.isNotEmpty) {
+      if (hex.length > 7 || !isValidFePreviewHex(hex)) {
+        errors['previewColorHex'] = 'feInvalidHex';
       }
     }
 
+    if (CameraEffectRenderTypeApi.isSticker(form.renderType)) {
+      final hasAsset =
+          (form.assetUrl?.trim().isNotEmpty ?? false) ||
+          (form.assetAsset?.trim().isNotEmpty ?? false);
+      if (!hasAsset) errors['asset'] = 'feEffectAssetRequired';
+      errors.addAll(_anchorFieldErrors(form.anchor, prefix: 'anchor'));
+    } else if (CameraEffectRenderTypeApi.isComposite(form.renderType)) {
+      if (form.stickers.isEmpty) {
+        errors['stickers'] = 'feEffectStickersRequired';
+      } else {
+        for (var i = 0; i < form.stickers.length; i++) {
+          final layer = form.stickers[i];
+          if (!layer.hasAsset) {
+            errors['stickers'] = 'feEffectStickerLayerInvalid';
+            break;
+          }
+          if (layer.anchor.isEmpty) {
+            errors['stickers'] = 'feEffectStickerLayerInvalid';
+            break;
+          }
+          final layerAnchor = EffectAnchorFormData.fromMap(layer.anchor);
+          if (layerAnchor.hasInvalidNumbers) {
+            errors['stickers'] = 'feEffectAnchorNumbersInvalid';
+            break;
+          }
+        }
+      }
+    } else if (CameraEffectRenderTypeApi.isDistortion(form.renderType)) {
+      final preset = form.distortionPreset?.trim() ?? '';
+      if (preset.isEmpty ||
+          !CameraDistortionPresetApi.values.contains(
+            CameraDistortionPresetApi.fromResponse(preset),
+          )) {
+        errors['distortionPreset'] = 'feDistortionPresetRequired';
+      }
+    }
+
+    final assetUrl = form.assetUrl?.trim();
+    if (assetUrl != null && assetUrl.isNotEmpty) {
+      final uri = Uri.tryParse(assetUrl);
+      if (uri == null || !uri.hasScheme) {
+        errors['assetUrl'] = 'feInvalidUrl';
+      }
+    }
     return errors;
   }
 
@@ -510,54 +372,154 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
     final form = current.form;
     return CreateEffectRequest(
       slug: form.slug.trim(),
-      effectType: form.effectType,
+      renderType: form.renderType,
+      label: form.label.trim(),
+      labelKey: _nullableTrim(form.labelKey),
       emoji: _emojiForApi(form.emoji),
-      assetUrl: _nullableTrim(form.assetUrl),
-      previewColorHex: form.previewColorHex!.trim(),
-      labelKey: form.labelKey.trim(),
-      requiresFaceDetection: form.requiresFaceDetection,
-      isScreenEffect: form.isScreenEffect,
+      thumbnailUrl: _nullableTrim(form.thumbnailUrl),
+      previewColorHex: _nullableTrim(form.previewColorHex),
+      assetUrl: CameraEffectRenderTypeApi.isSticker(form.renderType)
+          ? _nullableTrim(form.assetUrl)
+          : null,
+      assetAsset: CameraEffectRenderTypeApi.isSticker(form.renderType)
+          ? _nullableTrim(form.assetAsset)
+          : null,
+      anchor: CameraEffectRenderTypeApi.isSticker(form.renderType)
+          ? form.anchor.toMap()
+          : const {},
+      stickers: CameraEffectRenderTypeApi.isComposite(form.renderType)
+          ? form.stickers
+          : const [],
+      distortionPreset: CameraEffectRenderTypeApi.isDistortion(form.renderType)
+          ? form.distortionPreset
+          : null,
       sortOrder: form.sortOrder,
       isActive: form.isActive,
-      placement: form.placement,
     );
   }
 
   UpdateEffectRequest _buildUpdateRequest(EffectEditorReady current) {
     final form = current.form;
     final baseline = current.baseline;
+    final isSticker = CameraEffectRenderTypeApi.isSticker(form.renderType);
+    final isComposite = CameraEffectRenderTypeApi.isComposite(form.renderType);
+    final isDistortion = CameraEffectRenderTypeApi.isDistortion(form.renderType);
+    final anchor = form.anchor.toMap();
+    final baselineAnchor = baseline.anchor.toMap();
+    final renderTypeChanged = !CameraEffectRenderTypeApi.matches(
+      form.renderType,
+      baseline.renderType,
+    );
+
     return UpdateEffectRequest(
       slug: form.slug.trim() != baseline.slug ? form.slug.trim() : null,
-      effectType:
-          form.effectType != baseline.effectType ? form.effectType : null,
+      renderType: renderTypeChanged ? form.renderType : null,
+      label: form.label.trim() != baseline.label ? form.label.trim() : null,
+      labelKey: form.labelKey != baseline.labelKey ? form.labelKey : null,
       emoji: form.emoji != baseline.emoji ? _emojiForApi(form.emoji) : null,
-      assetUrl: form.assetUrl != baseline.assetUrl
-          ? _nullableTrim(form.assetUrl)
+      thumbnailUrl: form.thumbnailUrl != baseline.thumbnailUrl
+          ? form.thumbnailUrl
           : null,
       previewColorHex: form.previewColorHex != baseline.previewColorHex
-          ? form.previewColorHex?.trim()
+          ? form.previewColorHex
           : null,
-      labelKey: form.labelKey.trim() != baseline.labelKey
-          ? form.labelKey.trim()
+      assetUrl: isSticker && form.assetUrl != baseline.assetUrl
+          ? _nullableTrim(form.assetUrl)
           : null,
-      requiresFaceDetection: form.requiresFaceDetection !=
-              baseline.requiresFaceDetection
-          ? form.requiresFaceDetection
+      assetAsset: isSticker && form.assetAsset != baseline.assetAsset
+          ? _nullableTrim(form.assetAsset)
           : null,
-      isScreenEffect: form.isScreenEffect != baseline.isScreenEffect
-          ? form.isScreenEffect
+      anchor: isSticker && !_mapEquals(anchor, baselineAnchor) ? anchor : null,
+      stickers: isComposite && form.stickers != baseline.stickers
+          ? form.stickers
           : null,
-      sortOrder:
-          form.sortOrder != baseline.sortOrder ? form.sortOrder : null,
+      distortionPreset:
+          isDistortion && form.distortionPreset != baseline.distortionPreset
+          ? form.distortionPreset
+          : null,
+      sortOrder: form.sortOrder != baseline.sortOrder ? form.sortOrder : null,
       isActive: form.isActive != baseline.isActive ? form.isActive : null,
-      placement: form.placement != baseline.placement ? form.placement : null,
-      clearEmoji: (form.emoji == null || form.emoji!.trim().isEmpty) &&
+      clearLabelKey:
+          (form.labelKey == null || form.labelKey!.isEmpty) &&
+          (baseline.labelKey?.isNotEmpty ?? false),
+      clearEmoji:
+          (form.emoji == null || form.emoji!.trim().isEmpty) &&
           (baseline.emoji?.trim().isNotEmpty ?? false),
-      clearAssetUrl: (form.assetUrl == null || form.assetUrl!.trim().isEmpty) &&
+      clearThumbnailUrl:
+          (form.thumbnailUrl == null || form.thumbnailUrl!.isEmpty) &&
+          (baseline.thumbnailUrl?.isNotEmpty ?? false),
+      clearPreviewColorHex:
+          (form.previewColorHex == null || form.previewColorHex!.isEmpty) &&
+          (baseline.previewColorHex?.isNotEmpty ?? false),
+      clearAssetUrl:
+          isSticker &&
+          (form.assetUrl == null || form.assetUrl!.trim().isEmpty) &&
           (baseline.assetUrl?.trim().isNotEmpty ?? false),
-      clearAnchorLandmarks: form.placement.anchorLandmarks.isEmpty &&
-          baseline.placement.anchorLandmarks.isNotEmpty,
+      clearAssetAsset:
+          isSticker &&
+          (form.assetAsset == null || form.assetAsset!.trim().isEmpty) &&
+          (baseline.assetAsset?.trim().isNotEmpty ?? false),
+      clearDistortionPreset:
+          isDistortion &&
+          (form.distortionPreset == null || form.distortionPreset!.isEmpty) &&
+          (baseline.distortionPreset?.isNotEmpty ?? false),
     );
+  }
+
+  EffectEditorFormData _normalizeFormForRenderType(EffectEditorFormData form) {
+    final type = form.renderType;
+    if (CameraEffectRenderTypeApi.isSticker(type)) {
+      return form.copyWith(
+        stickers: const [],
+        clearDistortionPreset: true,
+      );
+    }
+    if (CameraEffectRenderTypeApi.isComposite(type)) {
+      return form.copyWith(
+        anchor: EffectAnchorFormData.empty,
+        clearAssetUrl: true,
+        clearAssetAsset: true,
+        clearDistortionPreset: true,
+      );
+    }
+    if (CameraEffectRenderTypeApi.isDistortion(type)) {
+      return form.copyWith(
+        anchor: EffectAnchorFormData.empty,
+        stickers: const [],
+        clearAssetUrl: true,
+        clearAssetAsset: true,
+      );
+    }
+    return form.copyWith(
+      anchor: EffectAnchorFormData.empty,
+      stickers: const [],
+      clearAssetUrl: true,
+      clearAssetAsset: true,
+      clearDistortionPreset: true,
+    );
+  }
+
+  Map<String, String> _anchorFieldErrors(
+    EffectAnchorFormData anchor, {
+    required String prefix,
+  }) {
+    final errors = <String, String>{};
+    if (anchor.hasInvalidNumbers) {
+      errors[prefix] = 'feEffectAnchorNumbersInvalid';
+      return errors;
+    }
+    if (anchor.isEmpty) {
+      errors[prefix] = 'feEffectAnchorRequired';
+    }
+    return errors;
+  }
+
+  bool _mapEquals(Map<String, dynamic> a, Map<String, dynamic> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   String? _nullableTrim(String? value) {
@@ -588,27 +550,22 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
     if (data is! Map) return const {};
     final errors = <String, String>{};
     final message = data['message'];
+    void consider(String text) {
+      final lower = text.toLowerCase();
+      if (lower.contains('slug')) errors['slug'] = text;
+      if (lower.contains('label')) errors['label'] = text;
+      if (lower.contains('anchor')) errors['anchor'] = text;
+      if (lower.contains('sticker')) errors['stickers'] = text;
+      if (lower.contains('distortion')) errors['distortionPreset'] = text;
+    }
+
     if (message is String) {
-      if (message.toLowerCase().contains('slug')) errors['slug'] = message;
+      consider(message);
     } else if (message is List) {
       for (final item in message) {
-        final text = item.toString();
-        if (text.toLowerCase().contains('slug')) errors['slug'] = text;
+        consider(item.toString());
       }
     }
     return errors;
-  }
-
-  String _formatError(Object error) {
-    if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map && data['message'] != null) {
-        final message = data['message'];
-        if (message is String) return message;
-        if (message is List) return message.join('\n');
-      }
-      return error.message ?? 'Request failed';
-    }
-    return error.toString();
   }
 }

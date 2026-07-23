@@ -53,10 +53,7 @@ abstract final class FeEffectEmojiDisplay {
 
     final text = textEmoji(emoji);
     if (text != null) {
-      return Text(
-        text,
-        style: textStyle ?? TextStyle(fontSize: size * 0.75),
-      );
+      return Text(text, style: textStyle ?? TextStyle(fontSize: size * 0.75));
     }
 
     return Text(fallback, style: textStyle);

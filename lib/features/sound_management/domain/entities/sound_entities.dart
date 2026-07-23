@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../promotions/domain/entities/pagination_meta.dart';
 
 enum SoundSortMode {
@@ -135,19 +136,30 @@ class SoundUsageStatsEntity extends Equatable {
   List<Object?> get props => [totalUseCount, postsWithSoundLast24Hours];
 }
 
+class SoundSegmentStatsEntity extends Equatable {
+  const SoundSegmentStatsEntity({required this.total});
+
+  final int total;
+
+  @override
+  List<Object?> get props => [total];
+}
+
 class SoundOverviewEntity extends Equatable {
   const SoundOverviewEntity({
     required this.sounds,
     required this.usage,
+    required this.segments,
     required this.topSounds,
   });
 
   final SoundStatsEntity sounds;
   final SoundUsageStatsEntity usage;
+  final SoundSegmentStatsEntity segments;
   final List<SoundEntity> topSounds;
 
   @override
-  List<Object?> get props => [sounds, usage, topSounds];
+  List<Object?> get props => [sounds, usage, segments, topSounds];
 }
 
 class SoundsQuery extends Equatable {
@@ -230,6 +242,7 @@ class CreateSoundData extends Equatable {
     required this.audioUrl,
     required this.duration,
     this.coverUrl,
+    this.waveformPeaks,
     this.isActive = true,
   });
 
@@ -238,20 +251,28 @@ class CreateSoundData extends Equatable {
   final String audioUrl;
   final int duration;
   final String? coverUrl;
+  final List<double>? waveformPeaks;
   final bool isActive;
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        'author': author,
-        'audioUrl': audioUrl,
-        'duration': duration,
-        if (coverUrl != null && coverUrl!.isNotEmpty) 'coverUrl': coverUrl,
-        'isActive': isActive,
-      };
+  Map<String, dynamic> toJson() {
+    final absoluteAudio =
+        UpdateSoundData._absoluteHttpUrl(audioUrl) ?? audioUrl;
+    final absoluteCover = UpdateSoundData._absoluteHttpUrl(coverUrl);
+    return {
+      'name': name,
+      'author': author,
+      'audioUrl': absoluteAudio,
+      'duration': duration,
+      if (absoluteCover != null) 'coverUrl': absoluteCover,
+      if (waveformPeaks != null && waveformPeaks!.isNotEmpty)
+        'waveformPeaks': waveformPeaks,
+      'isActive': isActive,
+    };
+  }
 
   @override
   List<Object?> get props =>
-      [name, author, audioUrl, duration, coverUrl, isActive];
+      [name, author, audioUrl, duration, coverUrl, waveformPeaks, isActive];
 }
 
 class UploadSoundData extends Equatable {
@@ -282,26 +303,74 @@ class UpdateSoundData extends Equatable {
   const UpdateSoundData({
     this.name,
     this.author,
+    this.audioUrl,
+    this.coverUrl,
     this.duration,
+    this.waveformPeaks,
     this.isActive,
+    this.clearCoverUrl = false,
+    this.clearWaveformPeaks = false,
   });
 
   final String? name;
   final String? author;
+  final String? audioUrl;
+  final String? coverUrl;
   final int? duration;
+  final List<double>? waveformPeaks;
   final bool? isActive;
+  final bool clearCoverUrl;
+  final bool clearWaveformPeaks;
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (name != null) json['name'] = name;
     if (author != null) json['author'] = author;
+    final absoluteAudio = _absoluteHttpUrl(audioUrl);
+    if (absoluteAudio != null) json['audioUrl'] = absoluteAudio;
+    if (clearCoverUrl) {
+      // Omit coverUrl — Nest `@IsUrl()` rejects null/relative values.
+      // Callers that need to clear should upload a replacement or use a
+      // dedicated clear endpoint when available.
+    } else {
+      final absoluteCover = _absoluteHttpUrl(coverUrl);
+      if (absoluteCover != null) json['coverUrl'] = absoluteCover;
+    }
     if (duration != null) json['duration'] = duration;
+    if (clearWaveformPeaks) {
+      json['waveformPeaks'] = null;
+    } else if (waveformPeaks != null) {
+      json['waveformPeaks'] = waveformPeaks;
+    }
     if (isActive != null) json['isActive'] = isActive;
     return json;
   }
 
+  /// Backend validators require a full `http(s)` URL, not `/uploads/...`.
+  static String? _absoluteHttpUrl(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final resolved = resolveMediaUrl(trimmed) ?? trimmed;
+    final uri = Uri.tryParse(resolved);
+    if (uri == null) return null;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+    if (uri.host.isEmpty) return null;
+    return resolved;
+  }
+
   @override
-  List<Object?> get props => [name, author, duration, isActive];
+  List<Object?> get props => [
+        name,
+        author,
+        audioUrl,
+        coverUrl,
+        duration,
+        waveformPeaks,
+        isActive,
+        clearCoverUrl,
+        clearWaveformPeaks,
+      ];
 }
 
 class BulkSoundActionRequest extends Equatable {
@@ -329,6 +398,8 @@ class BulkSoundActionResultEntity extends Equatable {
     required this.notFoundCount,
     required this.soundIds,
     required this.notFoundIds,
+    this.skippedCount = 0,
+    this.skippedIds = const [],
   });
 
   final String action;
@@ -336,8 +407,17 @@ class BulkSoundActionResultEntity extends Equatable {
   final int notFoundCount;
   final List<String> soundIds;
   final List<String> notFoundIds;
+  final int skippedCount;
+  final List<String> skippedIds;
 
   @override
-  List<Object?> get props =>
-      [action, successCount, notFoundCount, soundIds, notFoundIds];
+  List<Object?> get props => [
+        action,
+        successCount,
+        notFoundCount,
+        soundIds,
+        notFoundIds,
+        skippedCount,
+        skippedIds,
+      ];
 }

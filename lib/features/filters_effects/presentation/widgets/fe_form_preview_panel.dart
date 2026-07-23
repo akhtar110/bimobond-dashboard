@@ -28,9 +28,9 @@ class FeFormColorPicker extends StatelessWidget {
       children: [
         Text(
           l10n.tOr('feSelectPreviewColor', 'Select preview color'),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -70,8 +70,8 @@ class FeFormColorPicker extends StatelessWidget {
                 Text(
                   l10n.tOr('fePreviewColorHexLabel', 'Stored hex'),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -81,9 +81,9 @@ class FeFormColorPicker extends StatelessWidget {
                         : l10n.tOr('fePreviewColorNone', 'None'),
                     textAlign: TextAlign.end,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'monospace',
-                        ),
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ),
               ],
@@ -183,10 +183,9 @@ class FeFormPreviewPane extends StatelessWidget {
     this.previewColorHex,
     this.emoji,
     this.thumbnailUrl,
-    this.engineKey,
-    this.effectType,
-    this.requiresFaceDetection = false,
-    this.isScreenEffect = false,
+    this.renderType,
+    this.distortionPreset,
+    this.stickersCount = 0,
   });
 
   final FeCatalogPreviewMode mode;
@@ -194,10 +193,9 @@ class FeFormPreviewPane extends StatelessWidget {
   final String? previewColorHex;
   final String? emoji;
   final String? thumbnailUrl;
-  final String? engineKey;
-  final String? effectType;
-  final bool requiresFaceDetection;
-  final bool isScreenEffect;
+  final String? renderType;
+  final String? distortionPreset;
+  final int stickersCount;
 
   @override
   Widget build(BuildContext context) {
@@ -220,10 +218,9 @@ class FeFormPreviewPane extends StatelessWidget {
               previewColorHex: previewColorHex,
               emoji: emoji,
               thumbnailUrl: thumbnailUrl,
-              engineKey: engineKey,
-              effectType: effectType,
-              requiresFaceDetection: requiresFaceDetection,
-              isScreenEffect: isScreenEffect,
+              renderType: renderType,
+              distortionPreset: distortionPreset,
+              stickersCount: stickersCount,
             ),
           ),
         ),

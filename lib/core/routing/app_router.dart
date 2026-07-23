@@ -45,6 +45,11 @@ import '../../features/promotions/presentation/pages/campaign_detail_page.dart';
 import '../../features/promotions/presentation/pages/promoted_post_analytics_page.dart';
 import '../../features/sound_management/presentation/pages/sound_management_page.dart';
 import '../../features/filters_effects/presentation/pages/filters_effects_page.dart';
+import '../../features/stories/presentation/pages/stories_management_page.dart';
+import '../../features/rbac/presentation/bloc/rbac_bloc.dart';
+import '../../features/rbac/presentation/bloc/rbac_event.dart';
+import '../../features/rbac/presentation/pages/rbac_dashboard_pages.dart';
+import '../../features/rbac/presentation/utils/permission_manager.dart';
 import '../../features/auction_reports/presentation/bloc/auction_report_detail_bloc.dart';
 import '../../features/auction_reports/presentation/pages/auction_report_detail_page.dart';
 import '../../features/user_reports/presentation/bloc/user_reports_bloc.dart';
@@ -77,12 +82,17 @@ class AppRoutes {
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+  static Widget _homeShell() => BlocProvider.value(
+    value: di.sl<RbacBloc>()..add(const LoadCurrentPermissions(force: true)),
+    child: const HomeShell(),
+  );
+
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case AppRoutes.login:
         return MaterialPageRoute(builder: (_) => const LoginPage());
       case AppRoutes.dashboard:
-        return MaterialPageRoute(builder: (_) => const HomeShell());
+        return MaterialPageRoute(builder: (_) => _homeShell());
       case AppRoutes.analytics:
         return MaterialPageRoute(builder: (_) => const AnalyticsPage());
       case AppRoutes.notifications:
@@ -92,36 +102,42 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) => UserDetailRouteScope(user: user),
         );
-      case AppRoutes.postManagementDetail: {
-        final deepLink = PostManagementRouteArgs.tryParseRouteName(
-          settings.name,
-        );
-        final args = deepLink ??
-            PostManagementRouteArgs.tryResolve(settings.arguments);
-        if (args == null) {
-          // Hot reload / route restore may replay this route without arguments.
-          return MaterialPageRoute(
-            settings: const RouteSettings(name: AppRoutes.root),
-            builder: (_) => const HomeShell(),
+      case AppRoutes.postManagementDetail:
+        {
+          final deepLink = PostManagementRouteArgs.tryParseRouteName(
+            settings.name,
+          );
+          final args =
+              deepLink ??
+              PostManagementRouteArgs.tryResolve(settings.arguments);
+          if (args == null) {
+            // Hot reload / route restore may replay this route without arguments.
+            return MaterialPageRoute(
+              settings: const RouteSettings(name: AppRoutes.root),
+              builder: (_) => _homeShell(),
+            );
+          }
+          return AdminDetailPageRoute(
+            settings: settings,
+            builder: (_) => PersistentBlocProvider<CategoriesBloc>(
+              debugLabel: 'PostManagementRoute',
+              create: () =>
+                  di.sl<CategoriesBloc>()
+                    ..add(LoadCategoriesEvent(forCatalog: true)),
+              child: PostManagementDetailScreen.fromArgs(args),
+            ),
           );
         }
-        return AdminDetailPageRoute(
-          settings: settings,
-          builder: (_) => PersistentBlocProvider<CategoriesBloc>(
-            debugLabel: 'PostManagementRoute',
-            create: () => di.sl<CategoriesBloc>()
-              ..add(LoadCategoriesEvent(forCatalog: true)),
-            child: PostManagementDetailScreen.fromArgs(args),
-          ),
-        );
-      }
       case AppRoutes.auctionDetail:
         final auction = settings.arguments as AuctionEntity;
         return MaterialPageRoute(
           builder: (_) => PersistentBlocProvider<AuctionDetailBloc>(
             debugLabel: 'AuctionDetailRoute',
             create: () => di.sl<AuctionDetailBloc>(),
-            child: AuctionDetailPage(auctionId: auction.id),
+            child: AuctionDetailPage(
+              auctionId: auction.id,
+              listPreview: auction,
+            ),
           ),
         );
       case AppRoutes.campaignDetail:
@@ -144,9 +160,7 @@ class AppRouter {
           builder: (_) => WalletDetailPage(userId: userId),
         );
       case AppRoutes.createPost:
-        return MaterialPageRoute(
-          builder: (_) => const CreatePostRouteScope(),
-        );
+        return MaterialPageRoute(builder: (_) => const CreatePostRouteScope());
       case AppRoutes.giftReportDetail:
         final giftId = settings.arguments as String;
         return MaterialPageRoute(
@@ -186,7 +200,7 @@ class AppRouter {
         );
       case AppRoutes.root:
       default:
-        return MaterialPageRoute(builder: (_) => const HomeShell());
+        return MaterialPageRoute(builder: (_) => _homeShell());
     }
   }
 }
@@ -199,7 +213,7 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const _tabCount = 17;
+  static const _tabCount = 19;
   int _index = 0;
 
   List<UserRole> _roles(BuildContext context) {
@@ -208,20 +222,77 @@ class _HomeShellState extends State<HomeShell> {
     return const [];
   }
 
-  bool _tabVisible(int tabIndex, List<UserRole> roles) =>
-      canAccessDashboardTab(tabIndex, roles);
+  bool _canAccessSecurity(List<UserRole> roles, Set<String> permissions) {
+    // Prefer fine-grained RBAC; keep legacy admin fallback so the Security
+    // menu still appears when /rbac/me has not loaded or is unavailable.
+    if (permissions.contains(RbacPermissionKeys.manageRoles)) return true;
+    return roles.contains(UserRole.admin);
+  }
 
-  int _firstAllowedTab(List<UserRole> roles) {
+  bool _canAccessCameraStudio(List<UserRole> roles, Set<String> permissions) {
+    if (permissions.contains(RbacPermissionKeys.manageCameraStudio)) {
+      return true;
+    }
+    return roles.contains(UserRole.admin);
+  }
+
+  bool _canAccessStories(List<UserRole> roles, Set<String> permissions) {
+    if (permissions.contains(RbacPermissionKeys.readStories)) return true;
+    return roles.contains(UserRole.admin);
+  }
+
+  bool _canAccessSounds(List<UserRole> roles, Set<String> permissions) {
+    if (permissions.contains(RbacPermissionKeys.manageSounds)) return true;
+    return roles.contains(UserRole.admin);
+  }
+
+  bool _tabVisible(
+    int tabIndex,
+    List<UserRole> roles,
+    Set<String> permissions,
+  ) {
+    if (tabIndex == 16) {
+      return _canAccessCameraStudio(roles, permissions);
+    }
+    if (tabIndex == 6) {
+      return _canAccessStories(roles, permissions);
+    }
+    if (tabIndex == 13) {
+      return _canAccessSounds(roles, permissions);
+    }
+    if (tabIndex == 18) {
+      return _canAccessSecurity(roles, permissions);
+    }
+    return canAccessDashboardTab(tabIndex, roles);
+  }
+
+  int _firstAllowedTab(List<UserRole> roles, Set<String> permissions) {
     for (var i = 0; i < _tabCount; i++) {
-      if (_tabVisible(i, roles)) return i;
+      if (_tabVisible(i, roles, permissions)) return i;
     }
     return 0;
   }
 
   void _onIndexChanged(BuildContext context, int index) {
     final roles = _roles(context);
-    if (!_tabVisible(index, roles)) return;
+    final permissions =
+        context.read<RbacBloc>().state.authContext?.permissionKeys ??
+        const <String>{};
+    if (!_tabVisible(index, roles, permissions)) return;
     setState(() => _index = index);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Shell may be created before login; refresh RBAC once auth is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final auth = context.read<AuthBloc>().state;
+      if (auth is Authenticated) {
+        context.read<RbacBloc>().add(const LoadCurrentPermissions(force: true));
+      }
+    });
   }
 
   @override
@@ -229,33 +300,47 @@ class _HomeShellState extends State<HomeShell> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
+          context.read<RbacBloc>().add(
+            const LoadCurrentPermissions(force: true),
+          );
           final roles = state.user.roles;
-          if (!_tabVisible(_index, roles)) {
-            setState(() => _index = _firstAllowedTab(roles));
+          final permissions =
+              context.read<RbacBloc>().state.authContext?.permissionKeys ??
+              const <String>{};
+          if (!_tabVisible(_index, roles, permissions)) {
+            setState(() => _index = _firstAllowedTab(roles, permissions));
           }
         }
       },
       child: PersistentBlocProvider<SidebarBloc>(
         debugLabel: 'Sidebar',
         create: () => di.sl<SidebarBloc>(),
-        child: BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, authState) {
-            final roles = authState is Authenticated
-                ? authState.user.roles
-                : const <UserRole>[];
-            final safeIndex =
-                _tabVisible(_index, roles) ? _index : _firstAllowedTab(roles);
-            if (safeIndex != _index) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() => _index = safeIndex);
-              });
-            }
-            return _HomeShellChrome(
-              index: safeIndex,
-              roles: roles,
-              onIndexChanged: (index) => _onIndexChanged(context, index),
-            );
-          },
+        child: BlocBuilder<RbacBloc, RbacState>(
+          buildWhen: (previous, current) =>
+              previous.authContext != current.authContext,
+          builder: (context, rbacState) => BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, authState) {
+              final roles = authState is Authenticated
+                  ? authState.user.roles
+                  : const <UserRole>[];
+              final permissions =
+                  rbacState.authContext?.permissionKeys ?? const <String>{};
+              final safeIndex = _tabVisible(_index, roles, permissions)
+                  ? _index
+                  : _firstAllowedTab(roles, permissions);
+              if (safeIndex != _index) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() => _index = safeIndex);
+                });
+              }
+              return _HomeShellChrome(
+                index: safeIndex,
+                roles: roles,
+                permissions: permissions,
+                onIndexChanged: (index) => _onIndexChanged(context, index),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -267,11 +352,13 @@ class _HomeShellChrome extends StatelessWidget {
   const _HomeShellChrome({
     required this.index,
     required this.roles,
+    required this.permissions,
     required this.onIndexChanged,
   });
 
   final int index;
   final List<UserRole> roles;
+  final Set<String> permissions;
   final ValueChanged<int> onIndexChanged;
 
   @override
@@ -279,7 +366,26 @@ class _HomeShellChrome extends StatelessWidget {
     // Rebuild sidebar labels when language changes.
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final l10n = context.l10n;
-    bool tabVisible(int tabIndex) => canAccessDashboardTab(tabIndex, roles);
+    bool tabVisible(int tabIndex) {
+      if (tabIndex == 16) {
+        return permissions.contains(RbacPermissionKeys.manageCameraStudio) ||
+            roles.contains(UserRole.admin);
+      }
+      if (tabIndex == 6) {
+        return permissions.contains(RbacPermissionKeys.readStories) ||
+            roles.contains(UserRole.admin);
+      }
+      if (tabIndex == 13) {
+        return permissions.contains(RbacPermissionKeys.manageSounds) ||
+            roles.contains(UserRole.admin);
+      }
+      if (tabIndex == 18) {
+        return permissions.contains(RbacPermissionKeys.manageRoles) ||
+            roles.contains(UserRole.admin);
+      }
+      return canAccessDashboardTab(tabIndex, roles);
+    }
+
     return WebDashboardLayout(
       currentIndex: index,
       tabVisible: tabVisible,
@@ -318,6 +424,11 @@ class _HomeShellChrome extends StatelessWidget {
           icon: Icons.grid_view_outlined,
           selectedIcon: Icons.grid_view,
           label: l10n.t('posts'),
+        ),
+        DashboardNavItem(
+          icon: Icons.auto_stories_outlined,
+          selectedIcon: Icons.auto_stories,
+          label: l10n.tOr('storiesManagement', 'Stories'),
         ),
         DashboardNavItem(
           icon: Icons.label_outlined,
@@ -374,6 +485,11 @@ class _HomeShellChrome extends StatelessWidget {
           selectedIcon: Icons.settings,
           label: l10n.t('settings'),
         ),
+        DashboardNavItem(
+          icon: Icons.admin_panel_settings_outlined,
+          selectedIcon: Icons.admin_panel_settings,
+          label: l10n.tOr('rbacRoles', 'Roles'),
+        ),
       ],
     );
   }
@@ -389,7 +505,7 @@ class _DashboardTabStack extends StatefulWidget {
 }
 
 class _DashboardTabStackState extends State<_DashboardTabStack> {
-  static const _tabCount = 17;
+  static const _tabCount = 19;
   final List<Widget?> _tabCache = List<Widget?>.filled(_tabCount, null);
   Locale? _cachedLocale;
   Brightness? _cachedBrightness;
@@ -397,8 +513,7 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
   void _invalidateTabCacheIfNeeded() {
     final locale = Localizations.localeOf(context);
     final brightness = Theme.of(context).brightness;
-    final localeChanged =
-        _cachedLocale != null && _cachedLocale != locale;
+    final localeChanged = _cachedLocale != null && _cachedLocale != locale;
     final themeChanged =
         _cachedBrightness != null && _cachedBrightness != brightness;
 
@@ -443,33 +558,39 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
     return switch (index) {
       0 => AnalyticsPage(key: ValueKey('dashboard_tab_analytics_$suffix')),
       1 => SearchManagementPage(
-          key: ValueKey('dashboard_tab_search_management_$suffix'),
-        ),
+        key: ValueKey('dashboard_tab_search_management_$suffix'),
+      ),
       2 => UsersPage(key: ValueKey('dashboard_tab_users_$suffix')),
       3 => UserLocationsPage(
-          key: ValueKey('dashboard_tab_user_locations_$suffix'),
-        ),
+        key: ValueKey('dashboard_tab_user_locations_$suffix'),
+      ),
       4 => SearchHistoryPage(
-          key: ValueKey('dashboard_tab_search_history_$suffix'),
-        ),
+        key: ValueKey('dashboard_tab_search_history_$suffix'),
+      ),
       5 => PostsPage(key: ValueKey('dashboard_tab_posts_$suffix')),
-      6 => CategoriesPage(key: ValueKey('dashboard_tab_categories_$suffix')),
-      7 => ChatManagementPage(key: ValueKey('dashboard_tab_chat_$suffix')),
-      8 => AuctionsPage(key: ValueKey('dashboard_tab_auctions_$suffix')),
-      9 => GiftsPage(key: ValueKey('dashboard_tab_gifts_$suffix')),
-      10 => WalletsShellPage(key: ValueKey('dashboard_tab_wallets_$suffix')),
-      11 => PromotionsShellPage(
-          key: ValueKey('dashboard_tab_promotions_$suffix'),
-        ),
-      12 => SoundManagementPage(key: ValueKey('dashboard_tab_sounds_$suffix')),
-      13 => ReportsPage(key: ValueKey('dashboard_tab_reports_$suffix')),
-      14 => NotificationsPage(
-          key: ValueKey('dashboard_tab_notifications_$suffix'),
-        ),
-      15 => FiltersEffectsPage(
-          key: ValueKey('dashboard_tab_filters_effects_$suffix'),
-        ),
-      16 => SettingsPage(key: ValueKey('dashboard_tab_settings_$suffix')),
+      6 => StoriesManagementPage(
+        key: ValueKey('dashboard_tab_stories_$suffix'),
+      ),
+      7 => CategoriesPage(key: ValueKey('dashboard_tab_categories_$suffix')),
+      8 => ChatManagementPage(key: ValueKey('dashboard_tab_chat_$suffix')),
+      9 => AuctionsPage(key: ValueKey('dashboard_tab_auctions_$suffix')),
+      10 => GiftsPage(key: ValueKey('dashboard_tab_gifts_$suffix')),
+      11 => WalletsShellPage(key: ValueKey('dashboard_tab_wallets_$suffix')),
+      12 => PromotionsShellPage(
+        key: ValueKey('dashboard_tab_promotions_$suffix'),
+      ),
+      13 => SoundManagementPage(key: ValueKey('dashboard_tab_sounds_$suffix')),
+      14 => ReportsPage(key: ValueKey('dashboard_tab_reports_$suffix')),
+      15 => NotificationsPage(
+        key: ValueKey('dashboard_tab_notifications_$suffix'),
+      ),
+      16 => FiltersEffectsPage(
+        key: ValueKey('dashboard_tab_filters_effects_$suffix'),
+      ),
+      17 => SettingsPage(key: ValueKey('dashboard_tab_settings_$suffix')),
+      18 => RbacRolesDashboardPage(
+        key: ValueKey('dashboard_tab_rbac_roles_$suffix'),
+      ),
       _ => SizedBox.shrink(key: ValueKey('dashboard_tab_empty_$suffix')),
     };
   }

@@ -5,7 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
+import '../../domain/entities/gift_group_entities.dart';
+import '../../domain/enums/gift_size.dart';
 import '../../domain/repositories/gifts_repository.dart';
+import '../../domain/usecases/gift_group_usecases.dart';
+import '../bloc/gift_groups_bloc.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
@@ -34,12 +38,42 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
   final _priceCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _imageError;
-  DateTime? _publishedAt;
+  DateTime? _publishedAt = DateTime.now();
   String? _animationUrl;
   String? _animationName;
   Uint8List? _animationBytes;
   bool _uploadingAnimation = false;
   String? _animationError;
+  GiftSize _selectedSize = GiftSize.medium;
+  String? _selectedGroupId;
+  bool _loadingGroups = false;
+  List<GiftGroupEntity> _groups = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    final blocState = widget.pageContext.read<GiftGroupsBloc>().state;
+    if (blocState is GiftGroupsLoaded) {
+      setState(() => _groups = blocState.groups);
+      return;
+    }
+    setState(() => _loadingGroups = true);
+    try {
+      final groups = await di.sl<GetGiftGroupsUseCase>()();
+      if (!mounted) return;
+      setState(() {
+        _groups = groups;
+        _loadingGroups = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingGroups = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -133,8 +167,10 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
               imageBytes: state.pendingImageBytes!,
               imageName: state.pendingImageName ?? 'gift.jpg',
               priceCoins: double.parse(_priceCtrl.text.trim()),
+              size: _selectedSize,
               publishedAt: _publishedAt,
               animationUrl: _animationUrl,
+              assignGroupId: _selectedGroupId,
             ),
           ),
         );
@@ -318,6 +354,65 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                           ? () => setState(() => _publishedAt = null)
                           : null,
                     ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<GiftSize>(
+                      value: _selectedSize,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('giftSizeLabel', 'Size'),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      items: GiftSize.values
+                          .map(
+                            (size) => DropdownMenuItem(
+                              value: size,
+                              child: Text(size.apiValue),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: state.isActioning
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setState(() => _selectedSize = value);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 14),
+                    if (_loadingGroups)
+                      const LinearProgressIndicator()
+                    else
+                      DropdownButtonFormField<String?>(
+                        value: _groups.any((g) => g.id == _selectedGroupId)
+                            ? _selectedGroupId
+                            : null,
+                        decoration: InputDecoration(
+                          labelText: l10n.tOr('giftGroupName', 'Tab name'),
+                          helperText: l10n.tOr(
+                            'giftGroupNameHint',
+                            'Optional — add to a gift panel tab',
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        items: [
+                          DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text(l10n.tOr('giftAddNoneGroup', 'None')),
+                          ),
+                          for (final group in _groups)
+                            DropdownMenuItem<String?>(
+                              value: group.id,
+                              child: Text(group.name),
+                            ),
+                        ],
+                        onChanged: state.isActioning
+                            ? null
+                            : (value) =>
+                                setState(() => _selectedGroupId = value),
+                      ),
                     const SizedBox(height: 14),
                     GiftPriceCoinsField(
                       controller: _priceCtrl,

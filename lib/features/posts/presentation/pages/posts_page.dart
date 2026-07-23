@@ -9,9 +9,6 @@ import '../../../../features/post_management/domain/entities/managed_post_author
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
 import '../../../../features/post_management/presentation/utils/post_management_navigation.dart';
 import '../../../../injection_container.dart' as di;
-import '../../../stories/presentation/bloc/stories_bloc.dart';
-import '../../../stories/presentation/bloc/stories_event.dart';
-import '../../../stories/presentation/widgets/active_stories_section.dart';
 import '../bloc/posts_bloc.dart';
 import '../utils/posts_page_refresh.dart';
 import '../utils/posts_responsive.dart';
@@ -39,12 +36,7 @@ class PostsPage extends StatelessWidget {
         debugLabel: 'PostsPage/Categories',
         create: () => di.sl<CategoriesBloc>()
           ..add(LoadCategoriesEvent(forCatalog: true)),
-        child: PersistentBlocProvider<StoriesBloc>(
-          debugLabel: 'PostsPage/Stories',
-          create: () =>
-              di.sl<StoriesBloc>()..add(const LoadActiveStoriesEvent()),
-          child: const _PostsPageView(),
-        ),
+        child: const _PostsPageView(),
       ),
     );
   }
@@ -197,8 +189,6 @@ class _PostsPageViewState extends State<_PostsPageView> {
                             PostsPageHeader(metrics: metrics),
                             SizedBox(height: metrics.sectionGap),
                             PostsCategoryFilter(metrics: metrics),
-                            SizedBox(height: metrics.filterGap),
-                            ActiveStoriesSection(metrics: metrics),
                             SizedBox(height: metrics.filterGap),
                             const BulkSelectionToolbar(),
                             SizedBox(height: metrics.sectionGap),

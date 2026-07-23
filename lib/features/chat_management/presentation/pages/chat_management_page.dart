@@ -324,6 +324,7 @@ class _MobileLayout extends StatelessWidget {
           ),
         ),
         Expanded(
+          flex: 3,
           child: ChatMessagesPanel(
             state: state,
             scrollController: messagesScroll,
@@ -332,7 +333,7 @@ class _MobileLayout extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 280,
+          height: (MediaQuery.sizeOf(context).height * 0.26).clamp(140.0, 220.0),
           child: ChatModerationSidebar(state: state),
         ),
         ChatBulkActionToolbar(state: state),

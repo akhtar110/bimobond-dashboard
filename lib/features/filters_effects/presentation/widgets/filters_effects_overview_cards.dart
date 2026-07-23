@@ -70,7 +70,9 @@ class FiltersEffectsOverviewCards extends StatelessWidget {
       ),
       _FeKpiItem(
         label: l10n.tOr('feCatalogVersion', 'Catalog version'),
-        value: overview.catalogVersion,
+        value: overview.catalogVersion?.trim().isNotEmpty == true
+            ? overview.catalogVersion!
+            : '—',
         icon: Icons.publish_rounded,
         tooltip: '${l10n.tOr('feCatalogPublished', 'Published')}: $published',
       ),
@@ -103,10 +105,7 @@ class FiltersEffectsOverviewCards extends StatelessWidget {
               children: [
                 for (var i = 0; i < items.length; i++) ...[
                   if (i > 0) SizedBox(width: gap),
-                  _CompactKpiTile(
-                    item: items[i],
-                    layout: _KpiTileLayout.strip,
-                  ),
+                  _CompactKpiTile(item: items[i], layout: _KpiTileLayout.strip),
                 ],
               ],
             ),
@@ -125,7 +124,17 @@ class FiltersEffectsOverviewSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const widths = [96.0, 112.0, 120.0, 132.0, 96.0, 112.0, 120.0, 128.0, 140.0];
+    const widths = [
+      96.0,
+      112.0,
+      120.0,
+      132.0,
+      96.0,
+      112.0,
+      120.0,
+      128.0,
+      140.0,
+    ];
 
     return SizedBox(
       height: FiltersEffectsOverviewCards.stripHeight,
@@ -172,10 +181,7 @@ class _FeKpiItem {
 }
 
 class _CompactKpiTile extends StatelessWidget {
-  const _CompactKpiTile({
-    required this.item,
-    required this.layout,
-  });
+  const _CompactKpiTile({required this.item, required this.layout});
 
   final _FeKpiItem item;
   final _KpiTileLayout layout;
@@ -187,14 +193,13 @@ class _CompactKpiTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final tooltip = item.tooltip ?? '${item.value} · ${item.label}';
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-          fontSize: 10,
-          height: 1.15,
-        );
-    final valueStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w800,
-          height: 1.05,
-        );
+      color: scheme.onSurfaceVariant,
+      fontSize: 10,
+      height: 1.15,
+    );
+    final valueStyle = Theme.of(
+      context,
+    ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, height: 1.05);
 
     final labelMaxLines = layout == _KpiTileLayout.wrap ? 3 : 1;
 
@@ -226,10 +231,7 @@ class _CompactKpiTile extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  item.value,
-                  style: valueStyle,
-                ),
+                Text(item.value, style: valueStyle),
                 Text(
                   item.label,
                   maxLines: labelMaxLines,

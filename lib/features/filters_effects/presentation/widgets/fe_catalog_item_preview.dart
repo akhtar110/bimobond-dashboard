@@ -1,18 +1,36 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
-import '../constants/fe_preview_assets.dart';
-import '../utils/fe_effect_emoji_display.dart';
-import '../utils/fe_engine_filter_preview.dart';
-import '../utils/fe_effect_placement_preview.dart';
-import '../utils/fe_filter_settings_preview.dart';
-import '../utils/fe_preview_color_utils.dart';
 import '../../domain/entities/filters_effects_entities.dart';
+import '../utils/fe_effect_emoji_display.dart';
+import '../utils/fe_preview_color_utils.dart';
+import 'fe_preview_scene_view.dart';
 
 enum FeCatalogPreviewMode { filter, effect }
 
-/// Live preview of how a filter/effect appears in the mobile picker strip.
+String feEffectRenderTypeLabel(BuildContext context, String? type) {
+  final l10n = context.l10n;
+  return switch (CameraEffectRenderTypeApi.fromResponse(type ?? '')) {
+    CameraEffectRenderTypeApi.sticker => l10n.tOr(
+      'feRenderTypeSticker',
+      'Sticker',
+    ),
+    CameraEffectRenderTypeApi.composite => l10n.tOr(
+      'feRenderTypeComposite',
+      'Composite',
+    ),
+    CameraEffectRenderTypeApi.distortion => l10n.tOr(
+      'feRenderTypeDistortion',
+      'Distortion',
+    ),
+    _ => l10n.tOr('feRenderTypeNone', 'None'),
+  };
+}
+
+/// Live preview of how a filter/effect appears on the bundled portrait scene.
 class FeCatalogItemPreview extends StatelessWidget {
   const FeCatalogItemPreview({
     super.key,
@@ -21,17 +39,17 @@ class FeCatalogItemPreview extends StatelessWidget {
     this.previewColorHex,
     this.emoji,
     this.thumbnailUrl,
-    this.engineKey,
-    this.effectType,
-    this.requiresFaceDetection = false,
-    this.isScreenEffect = false,
-    this.filterPreviewLook,
-    this.anchorType,
-    this.scaleFactor,
-    this.offsetX,
-    this.offsetY,
-    this.landmarkSize,
-    this.anchorLandmarks = const [],
+    this.renderType,
+    this.lutUrl,
+    this.lutPreviewBytes,
+    this.lutPreviewFilename,
+    this.colorMatrix = const [],
+    this.adjustments = const {},
+    this.effectAnchor = const {},
+    this.effectStickers = const [],
+    this.distortionPreset,
+    this.stickersCount = 0,
+    this.externalLoading = false,
   });
 
   final FeCatalogPreviewMode mode;
@@ -39,27 +57,33 @@ class FeCatalogItemPreview extends StatelessWidget {
   final String? previewColorHex;
   final String? emoji;
   final String? thumbnailUrl;
-  final String? engineKey;
-  final String? effectType;
-  final bool requiresFaceDetection;
-  final bool isScreenEffect;
-  final FilterSettingsPreviewLook? filterPreviewLook;
-  final String? anchorType;
-  final double? scaleFactor;
-  final double? offsetX;
-  final double? offsetY;
-  final double? landmarkSize;
-  final List<String> anchorLandmarks;
+
+  /// Filter: `matrix` | `lut`. Effect: `none` | `sticker` | `composite` | `distortion`.
+  final String? renderType;
+  final String? lutUrl;
+  final Uint8List? lutPreviewBytes;
+  final String? lutPreviewFilename;
+  final List<double> colorMatrix;
+  final Map<String, int> adjustments;
+  final Map<String, dynamic> effectAnchor;
+  final List<CameraEffectStickerLayer> effectStickers;
+  final String? distortionPreset;
+  final int stickersCount;
+  final bool externalLoading;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final gradient = previewGradientForHex(previewColorHex);
-    final hasColor = previewColorHex != null && previewColorHex!.trim().isNotEmpty;
+    final hasColor =
+        previewColorHex != null && previewColorHex!.trim().isNotEmpty;
     final isEffect = mode == FeCatalogPreviewMode.effect;
-    final isScreenOverlay = isEffect &&
-        CameraEffectTypeApi.isScreenOverlay(effectType ?? CameraEffectTypeApi.faceAr);
+    final isLutFilter =
+        !isEffect && CameraFilterRenderTypeApi.isLut(renderType ?? '');
+    final effectType = isEffect
+        ? CameraEffectRenderTypeApi.fromResponse(renderType ?? '')
+        : null;
     final trimmedEmoji = emoji?.trim();
     final emojiText = FeEffectEmojiDisplay.textEmoji(trimmedEmoji);
     final emojiImageUrl = FeEffectEmojiDisplay.resolvedImageUrl(trimmedEmoji);
@@ -67,39 +91,37 @@ class FeCatalogItemPreview extends StatelessWidget {
     final assetImageUrl = trimmedAsset != null && trimmedAsset.isNotEmpty
         ? resolveMediaUrl(trimmedAsset)
         : null;
-    final overlayImageUrl = emojiImageUrl ?? assetImageUrl;
-    final placementLayout = isEffect && !isScreenOverlay
-        ? EffectPlacementPreviewLayout.forPlacement(
-            anchorType: anchorType,
-            scaleFactor: scaleFactor,
-            offsetX: offsetX,
-            offsetY: offsetY,
-            landmarkSize: landmarkSize,
-            anchorLandmarks: anchorLandmarks,
-          )
-        : null;
+    final stripImageUrl = isEffect
+        ? emojiImageUrl
+        : isLutFilter
+        ? emojiImageUrl
+        : (emojiImageUrl ??
+              (assetImageUrl != null &&
+                      lutUrl != null &&
+                      assetImageUrl == resolveMediaUrl(lutUrl)
+                  ? null
+                  : assetImageUrl));
     final previewKey = isEffect
         ? ValueKey(
             '$previewColorHex|$trimmedEmoji|$trimmedAsset|$effectType|'
-            '$isScreenOverlay|$anchorType|$scaleFactor|$offsetX|$offsetY|'
-            '$landmarkSize|${anchorLandmarks.join(',')}',
+            '$distortionPreset|$effectAnchor|$effectStickers',
           )
         : ValueKey(
-            '$previewColorHex|$trimmedAsset|$engineKey|$label|'
-            '${filterPreviewLook?.blurSigma}|'
-            '${filterPreviewLook?.vignette}|'
-            '${filterPreviewLook?.colorMatrix?.join(',')}',
+            // Label/slug must NOT be in this key — text edits must not remount
+            // the scene or re-apply the LUT.
+            '$previewColorHex|$trimmedAsset|$lutUrl|'
+            '${lutPreviewBytes?.length}|$lutPreviewFilename|'
+            '$renderType|$colorMatrix|$adjustments',
           );
 
     return Column(
-      key: previewKey,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           l10n.tOr('feLivePreview', 'Live preview'),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         DecoratedBox(
@@ -119,10 +141,23 @@ class FeCatalogItemPreview extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        _PreviewSceneBackground(
-                          engineKey: engineKey,
-                          filterPreviewLook: filterPreviewLook,
+                        FePreviewSceneView(
+                          key: previewKey,
                           previewColorHex: isEffect ? null : previewColorHex,
+                          renderType: isEffect ? null : renderType,
+                          lutUrl: isEffect ? null : lutUrl,
+                          lutPreviewBytes: isEffect ? null : lutPreviewBytes,
+                          lutPreviewFilename:
+                              isEffect ? null : lutPreviewFilename,
+                          colorMatrix: isEffect ? const [] : colorMatrix,
+                          adjustments: isEffect ? const {} : adjustments,
+                          effectRenderType: isEffect ? renderType : null,
+                          effectAssetUrl: isEffect ? assetImageUrl : null,
+                          effectEmoji: isEffect ? emojiText : null,
+                          effectAnchor: isEffect ? effectAnchor : const {},
+                          effectStickers: isEffect ? effectStickers : const [],
+                          distortionPreset: isEffect ? distortionPreset : null,
+                          externalLoading: externalLoading,
                         ),
                         if (hasColor && isEffect)
                           DecoratedBox(
@@ -130,32 +165,12 @@ class FeCatalogItemPreview extends StatelessWidget {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: isScreenOverlay
-                                    ? [
-                                        gradient.first.withValues(alpha: 0.35),
-                                        gradient.last.withValues(alpha: 0.72),
-                                      ]
-                                    : [
-                                        gradient.first.withValues(alpha: 0.15),
-                                        gradient.last.withValues(alpha: 0.55),
-                                      ],
+                                colors: [
+                                  gradient.first.withValues(alpha: 0.15),
+                                  gradient.last.withValues(alpha: 0.55),
+                                ],
                               ),
                             ),
-                          ),
-                        if (isEffect && !isScreenOverlay)
-                          const _FaceArGuide(),
-                        if (isEffect)
-                          _EffectOverlayLayer(
-                            key: ValueKey(
-                              'overlay-$trimmedEmoji-$trimmedAsset-'
-                              '$isScreenOverlay-$anchorType-$scaleFactor-'
-                              '$offsetX-$offsetY',
-                            ),
-                            isScreenOverlay: isScreenOverlay,
-                            emoji: emojiText,
-                            assetUrl: overlayImageUrl,
-                            requiresFaceDetection: requiresFaceDetection,
-                            layout: placementLayout,
                           ),
                         Positioned(
                           left: 0,
@@ -166,16 +181,43 @@ class FeCatalogItemPreview extends StatelessWidget {
                             gradient: gradient,
                             hasColor: hasColor,
                             emoji: emojiText,
-                            emojiImageUrl: isEffect
-                                ? emojiImageUrl
-                                : (emojiImageUrl ?? assetImageUrl),
+                            emojiImageUrl: stripImageUrl,
                           ),
                         ),
-                        if (isEffect)
+                        if (isEffect &&
+                            CameraEffectRenderTypeApi.isComposite(
+                              effectType ?? '',
+                            ) &&
+                            stickersCount > 0)
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Text(
+                                  'x$stickersCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (isEffect && effectType != null)
                           Positioned(
                             top: 8,
                             left: 8,
-                            child: _EffectTypeBadge(isScreenOverlay: isScreenOverlay),
+                            child: _EffectTypeBadge(renderType: effectType),
                           ),
                       ],
                     ),
@@ -186,22 +228,14 @@ class FeCatalogItemPreview extends StatelessWidget {
                   mode == FeCatalogPreviewMode.filter
                       ? l10n.tOr(
                           'fePreviewFilterHint',
-                          'How this filter tile appears in the app camera strip.',
+                          'Scene preview with LUT or color matrix applied.',
                         )
-                      : isScreenOverlay
-                          ? l10n.tOr(
-                              'fePreviewEffectScreenOverlayHint',
-                              'Full-screen overlay covering the camera preview.',
-                            )
-                          : l10n.tOr(
-                              'fePreviewEffectFaceArHint',
-                              'Face AR effect anchored on the detected face.',
-                            ),
+                      : _effectHint(context, effectType!),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -210,71 +244,27 @@ class FeCatalogItemPreview extends StatelessWidget {
       ],
     );
   }
-}
 
-class _PreviewSceneBackground extends StatelessWidget {
-  const _PreviewSceneBackground({
-    this.engineKey,
-    this.filterPreviewLook,
-    this.previewColorHex,
-  });
-
-  final String? engineKey;
-  final FilterSettingsPreviewLook? filterPreviewLook;
-  final String? previewColorHex;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget scene = Image.asset(
-      FePreviewAssets.previewScene,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) {
-        return const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF94A3B8), Color(0xFF64748B)],
-            ),
-          ),
-          child: Center(
-            child: Icon(Icons.person_rounded, size: 72, color: Colors.white70),
-          ),
-        );
-      },
-    );
-
-    // Mobile pipeline: engine look → color/settings/beauty overlays.
-    scene = applyEnginePreviewLook(engineKey: engineKey, child: scene);
-    final look = filterPreviewLook;
-    if (look != null) {
-      scene = applyFilterSettingsPreviewLook(child: scene, look: look);
-    }
-
-    final hex = previewColorHex?.trim();
-    if (hex != null && hex.isNotEmpty) {
-      final gradient = previewGradientForHex(hex);
-      scene = Stack(
-        fit: StackFit.expand,
-        children: [
-          scene,
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  gradient.first.withValues(alpha: 0.22),
-                  gradient.last.withValues(alpha: 0.58),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return scene;
+  String _effectHint(BuildContext context, String effectType) {
+    final l10n = context.l10n;
+    return switch (effectType) {
+      CameraEffectRenderTypeApi.sticker => l10n.tOr(
+        'fePreviewEffectStickerHint',
+        'Sticker positioned using anchor landmarks and scale.',
+      ),
+      CameraEffectRenderTypeApi.composite => l10n.tOr(
+        'fePreviewEffectCompositeHint',
+        'Each sticker layer is anchored independently on the face.',
+      ),
+      CameraEffectRenderTypeApi.distortion => l10n.tOr(
+        'fePreviewEffectDistortionHint',
+        'Face distortion preset applied to the preview region.',
+      ),
+      _ => l10n.tOr(
+        'fePreviewEffectNoneHint',
+        'Visual-only entry with no render pipeline.',
+      ),
+    };
   }
 }
 
@@ -330,12 +320,12 @@ class _PickerStripHighlight extends StatelessWidget {
                     width: 36,
                     height: 36,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
                   ),
                 )
               : emoji != null && emoji!.trim().isNotEmpty
-                  ? Text(emoji!, style: const TextStyle(fontSize: 22))
-                  : null,
+              ? Text(emoji!, style: const TextStyle(fontSize: 22))
+              : null,
         ),
         const SizedBox(height: 4),
         Container(
@@ -360,176 +350,21 @@ class _PickerStripHighlight extends StatelessWidget {
   }
 }
 
-class _FaceArGuide extends StatelessWidget {
-  const _FaceArGuide();
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: const Alignment(0, -0.22),
-      child: Container(
-        width: 92,
-        height: 118,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.75),
-            width: 2,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EffectOverlayLayer extends StatelessWidget {
-  const _EffectOverlayLayer({
-    super.key,
-    required this.isScreenOverlay,
-    this.emoji,
-    this.assetUrl,
-    this.requiresFaceDetection = false,
-    this.layout,
-  });
-
-  final bool isScreenOverlay;
-  final String? emoji;
-  final String? assetUrl;
-  final bool requiresFaceDetection;
-  final EffectPlacementPreviewLayout? layout;
-
-  Widget _emojiWidget(double fontSize) {
-    return Text(
-      emoji!,
-      style: TextStyle(
-        fontSize: fontSize,
-        shadows: [
-          Shadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 12,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _assetWidget(double size, {BoxFit fit = BoxFit.contain}) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Image.network(
-        assetUrl!,
-        key: ValueKey(assetUrl),
-        fit: fit,
-        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-      ),
-    );
-  }
-
-  Widget _placedContent({
-    required Alignment alignment,
-    required double sizeFactor,
-    bool coverFace = false,
-  }) {
-    final hasEmoji = emoji != null && emoji!.isNotEmpty;
-    final hasAsset = assetUrl != null && assetUrl!.isNotEmpty;
-    if (!hasEmoji && !hasAsset) return const SizedBox.shrink();
-
-    final emojiSize = (coverFace ? 56.0 : 48.0) * sizeFactor;
-    final assetSize = (coverFace ? 110.0 : 72.0) * sizeFactor;
-
-    return Align(
-      alignment: alignment,
-      child: hasAsset
-          ? _assetWidget(assetSize, fit: coverFace ? BoxFit.cover : BoxFit.contain)
-          : _emojiWidget(emojiSize),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasEmoji = emoji != null && emoji!.isNotEmpty;
-    final hasAsset = assetUrl != null && assetUrl!.isNotEmpty;
-
-    if (isScreenOverlay) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(color: Colors.black.withValues(alpha: 0.12)),
-          if (hasAsset)
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.85,
-                child: Image.network(
-                  assetUrl!,
-                  key: ValueKey(assetUrl),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-          if (hasEmoji)
-            Center(
-              child: _emojiWidget(hasAsset ? 64 : 78),
-            ),
-          if (!hasEmoji && !hasAsset)
-            Center(
-              child: Icon(
-                Icons.fullscreen_rounded,
-                size: 56,
-                color: Colors.white.withValues(alpha: 0.85),
-              ),
-            ),
-        ],
-      );
-    }
-
-    final resolved = layout ??
-        const EffectPlacementPreviewLayout(
-          primaryAlignment: Alignment(0, -0.22),
-          sizeFactor: 0.85,
-        );
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        _placedContent(
-          alignment: resolved.primaryAlignment,
-          sizeFactor: resolved.sizeFactor,
-          coverFace: resolved.coverFace,
-        ),
-        if (resolved.secondaryAlignment != null)
-          _placedContent(
-            alignment: resolved.secondaryAlignment!,
-            sizeFactor: resolved.sizeFactor,
-            coverFace: resolved.coverFace,
-          ),
-        if (requiresFaceDetection)
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Icon(
-              Icons.face_retouching_natural_rounded,
-              size: 18,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 class _EffectTypeBadge extends StatelessWidget {
-  const _EffectTypeBadge({required this.isScreenOverlay});
+  const _EffectTypeBadge({required this.renderType});
 
-  final bool isScreenOverlay;
+  final String renderType;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final label = isScreenOverlay
-        ? l10n.tOr('feEffectTypeScreenOverlay', 'Screen overlay')
-        : l10n.tOr('feEffectTypeFaceAr', 'Face AR');
+    final label = feEffectRenderTypeLabel(context, renderType);
+    final icon = switch (renderType) {
+      CameraEffectRenderTypeApi.sticker => Icons.emoji_emotions_outlined,
+      CameraEffectRenderTypeApi.composite => Icons.layers_outlined,
+      CameraEffectRenderTypeApi.distortion =>
+        Icons.face_retouching_natural_outlined,
+      _ => Icons.blur_off_rounded,
+    };
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -541,13 +376,7 @@ class _EffectTypeBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isScreenOverlay
-                  ? Icons.fullscreen_rounded
-                  : Icons.face_retouching_natural_outlined,
-              size: 14,
-              color: Colors.white,
-            ),
+            Icon(icon, size: 14, color: Colors.white),
             const SizedBox(width: 4),
             Text(
               label,

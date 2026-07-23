@@ -22,10 +22,12 @@ class ChatImageMessage extends StatelessWidget {
     super.key,
     required this.imageUrl,
     this.embedded = false,
+    this.bubbleStyle = false,
   });
 
   final String imageUrl;
   final bool embedded;
+  final bool bubbleStyle;
 
   static const _maxWidth = 320.0;
   static const _maxHeight = 280.0;
@@ -65,32 +67,44 @@ class ChatImageMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final screenW = MediaQuery.sizeOf(context).width;
+    final maxW = bubbleStyle
+        ? math.min(_maxWidth, screenW * 0.72)
+        : _maxWidth;
+    final maxH = bubbleStyle ? 240.0 : _maxHeight;
+
     final image = ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: _maxWidth,
-        maxHeight: _maxHeight,
+      constraints: BoxConstraints(
+        maxWidth: maxW,
+        maxHeight: maxH,
+        minWidth: bubbleStyle ? math.min(180, maxW) : 0,
       ),
-      child: CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.contain,
-        placeholder: (_, __) => SizedBox(
-          width: embedded ? 200 : _maxWidth,
-          height: embedded ? 140 : 160,
-          child: Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: scheme.primary,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(bubbleStyle ? 14 : 0),
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          fit: bubbleStyle ? BoxFit.cover : BoxFit.contain,
+          width: bubbleStyle ? maxW : null,
+          height: bubbleStyle ? null : null,
+          placeholder: (_, __) => SizedBox(
+            width: embedded ? math.min(200, maxW) : maxW,
+            height: embedded ? 140 : 160,
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
             ),
           ),
-        ),
-        errorWidget: (_, __, ___) => _MediaError(
-          icon: Icons.broken_image_outlined,
-          label: context.l10n.t('chatMediaLoadFailed'),
+          errorWidget: (_, __, ___) => _MediaError(
+            icon: Icons.broken_image_outlined,
+            label: context.l10n.t('chatMediaLoadFailed'),
+          ),
         ),
       ),
     );
 
-    if (embedded) {
+    if (embedded || bubbleStyle) {
       return InkWell(onTap: () => _openLightbox(context), child: image);
     }
 
@@ -342,6 +356,43 @@ class _ChatVideoMessageState extends State<ChatVideoMessage> {
   }
 }
 
+/// Ensures only one chat audio bubble plays at a time (WhatsApp-style).
+class _ChatAudioPlaybackHub {
+  _ChatAudioPlaybackHub._();
+
+  static VideoPlayerController? _active;
+
+  static Future<void> play(VideoPlayerController controller) async {
+    final previous = _active;
+    if (previous != null &&
+        !identical(previous, controller) &&
+        previous.value.isInitialized) {
+      try {
+        await previous.pause();
+      } on Object {
+        // Previous controller may already be disposed.
+      }
+    }
+    _active = controller;
+    await controller.play();
+  }
+
+  static Future<void> pause(VideoPlayerController controller) async {
+    if (controller.value.isInitialized) {
+      await controller.pause();
+    }
+    if (identical(_active, controller)) {
+      _active = null;
+    }
+  }
+
+  static void detach(VideoPlayerController controller) {
+    if (identical(_active, controller)) {
+      _active = null;
+    }
+  }
+}
+
 /// Inline playable audio bubble with play/pause and scrubber (WhatsApp-style).
 class ChatAudioMessage extends StatefulWidget {
   const ChatAudioMessage({
@@ -396,12 +447,25 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
   }
 
   void _onTick() {
+    final controller = _controller;
+    if (controller != null &&
+        controller.value.isInitialized &&
+        !controller.value.isPlaying &&
+        identical(_ChatAudioPlaybackHub._active, controller) &&
+        controller.value.position >= controller.value.duration &&
+        controller.value.duration > Duration.zero) {
+      _ChatAudioPlaybackHub.detach(controller);
+    }
     if (mounted) setState(() {});
   }
 
   void _disposeController() {
-    _controller?.removeListener(_onTick);
-    _controller?.dispose();
+    final controller = _controller;
+    if (controller != null) {
+      _ChatAudioPlaybackHub.detach(controller);
+      controller.removeListener(_onTick);
+      controller.dispose();
+    }
     _controller = null;
     _initialized = false;
     _hasError = false;
@@ -413,15 +477,15 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
     super.dispose();
   }
 
-  void _togglePlayback() {
+  Future<void> _togglePlayback() async {
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) return;
     if (controller.value.isPlaying) {
-      controller.pause();
+      await _ChatAudioPlaybackHub.pause(controller);
     } else {
-      controller.play();
+      await _ChatAudioPlaybackHub.play(controller);
     }
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _seek(double value) {

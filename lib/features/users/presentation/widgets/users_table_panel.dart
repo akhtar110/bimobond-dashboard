@@ -48,8 +48,14 @@ class UsersTablePanel extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
         child: BlocBuilder<UsersBloc, UsersState>(
-          buildWhen: (previous, current) =>
-              previous.runtimeType != current.runtimeType,
+          buildWhen: (previous, current) {
+            if (current is ResetUserPasswordLoading ||
+                current is ResetUserPasswordSuccess ||
+                current is ResetUserPasswordFailure) {
+              return false;
+            }
+            return previous.runtimeType != current.runtimeType;
+          },
           builder: (context, state) {
             return AnimatedSwitcher(
               duration: const Duration(milliseconds: 280),
@@ -83,7 +89,11 @@ class UsersTablePanel extends StatelessWidget {
                         ),
                     isDestructive: false,
                   ),
-                UsersLoaded() => _LoadedUsersContent(
+                UsersLoaded() ||
+                ResetUserPasswordLoading() ||
+                ResetUserPasswordSuccess() ||
+                ResetUserPasswordFailure() =>
+                  _LoadedUsersContent(
                     key: const ValueKey('loaded'),
                     metrics: metrics,
                     listScrollController: listScrollController,

@@ -15,7 +15,7 @@ enum AuctionSortOption {
   oldestFirst,
   highestBid,
   lowestBid,
-  mostViewed,
+  targetPrice,
   endingSoon,
 }
 
@@ -126,6 +126,10 @@ class AuctionsLoaded extends AuctionsState {
   int get cancelledCount =>
       auctions.where((a) => a.status == 'CANCELLED').length;
   int get bannedCount => auctions.where((a) => a.status == 'BANNED').length;
+  int get disputedCount =>
+      auctions.where((a) => a.status == 'DISPUTED').length;
+  int get settledCount =>
+      auctions.where((a) => a.status == 'SETTLED').length;
 
   AuctionsLoaded copyWith({
     List<AuctionEntity>? auctions,
@@ -211,7 +215,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
         AuctionSortOption.oldestFirst => AdminAuctionsSortOrder.oldest,
         AuctionSortOption.highestBid => AdminAuctionsSortOrder.highestTotal,
         AuctionSortOption.lowestBid => AdminAuctionsSortOrder.lowestTotal,
-        AuctionSortOption.mostViewed => AdminAuctionsSortOrder.newest,
+        AuctionSortOption.targetPrice => AdminAuctionsSortOrder.targetPrice,
         AuctionSortOption.endingSoon => AdminAuctionsSortOrder.recentlyEnded,
       };
 

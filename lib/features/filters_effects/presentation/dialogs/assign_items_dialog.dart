@@ -26,6 +26,7 @@ void showAssignItemsDialog(
 
 class AssignItemsDialog extends StatefulWidget {
   const AssignItemsDialog({
+    super.key,
     required this.isEffectCategory,
     required this.category,
   });
@@ -40,6 +41,7 @@ class AssignItemsDialog extends StatefulWidget {
 class _AssignItemsDialogState extends State<AssignItemsDialog> {
   late final Set<String> _selectedIds;
   late List<String> _orderedIds;
+  String _search = '';
 
   @override
   void initState() {
@@ -53,6 +55,16 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
       _selectedIds = category.filters.map((f) => f.id).toSet();
       _orderedIds = category.filters.map((f) => f.id).toList();
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final bloc = context.read<FiltersEffectsBloc>();
+      if (widget.isEffectCategory) {
+        bloc.add(const LoadCameraEffects());
+      } else {
+        bloc.add(const LoadCameraFilters());
+      }
+    });
   }
 
   String _categoryId() {
@@ -64,11 +76,47 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
 
   String _labelForId(FiltersEffectsLoaded loaded, String id) {
     if (widget.isEffectCategory) {
-      final effect = loaded.effects.firstWhere((e) => e.id == id);
-      return effect.emoji != null ? '${effect.emoji} ${effect.labelKey}' : effect.labelKey;
+      final category = widget.category as CameraEffectCategoryEntity;
+      for (final source in [
+        loaded.allEffectsForPicker,
+        loaded.effects,
+        category.effects,
+      ]) {
+        for (final effect in source) {
+          if (effect.id != id) continue;
+          final emoji = effect.emoji?.trim();
+          if (emoji != null && emoji.isNotEmpty) {
+            return '$emoji ${effect.displayLabel}';
+          }
+          return effect.displayLabel;
+        }
+      }
+      return id;
     }
-    final filter = loaded.filters.firstWhere((f) => f.id == id);
-    return filter.displayLabel;
+
+    final category = widget.category as CameraFilterCategoryEntity;
+    for (final source in [
+      loaded.allFiltersForPicker,
+      loaded.filters,
+      category.filters,
+    ]) {
+      for (final filter in source) {
+        if (filter.id == id) return filter.displayLabel;
+      }
+    }
+    return id;
+  }
+
+  bool _matchesSearch({
+    required String slug,
+    required String displayLabel,
+    String? labelKey,
+  }) {
+    final q = _search.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return slug.toLowerCase().contains(q) ||
+        displayLabel.toLowerCase().contains(q) ||
+        (labelKey?.toLowerCase().contains(q) ?? false);
   }
 
   void _toggle(String id, bool selected) {
@@ -83,6 +131,13 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
     });
   }
 
+  void _clearAll() {
+    setState(() {
+      _selectedIds.clear();
+      _orderedIds.clear();
+    });
+  }
+
   void _submit(FiltersEffectsLoaded loaded) {
     final bloc = context.read<FiltersEffectsBloc>();
     final categoryId = _categoryId();
@@ -90,13 +145,17 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
     if (widget.isEffectCategory) {
       final payload = <EffectAssignmentItem>[];
       for (var i = 0; i < _orderedIds.length; i++) {
-        payload.add(EffectAssignmentItem(effectId: _orderedIds[i], sortOrder: i));
+        payload.add(
+          EffectAssignmentItem(effectId: _orderedIds[i], sortOrder: i),
+        );
       }
       bloc.add(AssignEffectsToCategoryEvent(categoryId, payload));
     } else {
       final payload = <FilterAssignmentItem>[];
       for (var i = 0; i < _orderedIds.length; i++) {
-        payload.add(FilterAssignmentItem(filterId: _orderedIds[i], sortOrder: i));
+        payload.add(
+          FilterAssignmentItem(filterId: _orderedIds[i], sortOrder: i),
+        );
       }
       bloc.add(AssignFiltersToCategoryEvent(categoryId, payload));
     }
@@ -106,45 +165,109 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final state = context.watch<FiltersEffectsBloc>().state;
-    if (state is! FiltersEffectsLoaded) {
-      return const SizedBox.shrink();
-    }
-
     final title = widget.isEffectCategory
         ? l10n.tOr('feAssignEffects', 'Assign effects')
         : l10n.tOr('feAssignFilters', 'Assign filters');
+
+    return BlocBuilder<FiltersEffectsBloc, FiltersEffectsState>(
+      builder: (context, state) {
+        if (state is! FiltersEffectsLoaded) {
+          return AlertDialog(
+            title: Text(title),
+            content: const SizedBox(
+              height: 120,
+              width: 320,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        return _buildDialog(context, l10n, state, title);
+      },
+    );
+  }
+
+  Widget _buildDialog(
+    BuildContext context,
+    AppLocalizations l10n,
+    FiltersEffectsLoaded state,
+    String title,
+  ) {
+
+    final visibleEffects = widget.isEffectCategory
+        ? state.allEffectsForPicker
+              .where(
+                (e) => _matchesSearch(
+                  slug: e.slug,
+                  displayLabel: e.displayLabel,
+                  labelKey: e.labelKey,
+                ),
+              )
+              .toList()
+        : const <CameraEffectEntity>[];
+    final visibleFilters = !widget.isEffectCategory
+        ? state.allFiltersForPicker
+              .where(
+                (f) => _matchesSearch(
+                  slug: f.slug,
+                  displayLabel: f.displayLabel,
+                  labelKey: f.labelKey,
+                ),
+              )
+              .toList()
+        : const <CameraFilterEntity>[];
 
     return AlertDialog(
       title: Text(title),
       content: SizedBox(
         width: 520,
-        height: 480,
+        height: 520,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              l10n.tOr('feAssignSelectHint', 'Select items, then drag to reorder.'),
+              l10n.tOr(
+                'feAssignSelectHint',
+                'Select items, then drag to reorder.',
+              ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 10),
+            TextField(
+              onChanged: (value) => setState(() => _search = value),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: l10n.tOr('feAssignSearchHint', 'Search items…'),
+                prefixIcon: const Icon(Icons.search_rounded, size: 18),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                onPressed: _selectedIds.isEmpty ? null : _clearAll,
+                icon: const Icon(Icons.clear_all_rounded, size: 18),
+                label: Text(l10n.tOr('feClearAll', 'Clear all')),
+              ),
+            ),
             Expanded(
               child: ListView(
                 children: [
                   if (widget.isEffectCategory)
-                    for (final effect in state.effects)
+                    for (final effect in visibleEffects)
                       CheckboxListTile(
                         value: _selectedIds.contains(effect.id),
                         onChanged: (v) => _toggle(effect.id, v ?? false),
                         title: Text(
-                          effect.emoji != null
-                              ? '${effect.emoji} ${effect.labelKey}'
-                              : effect.labelKey,
+                          effect.emoji != null &&
+                                  effect.emoji!.trim().isNotEmpty
+                              ? '${effect.emoji} ${effect.displayLabel}'
+                              : effect.displayLabel,
                         ),
                         subtitle: Text(effect.slug),
                       )
                   else
-                    for (final filter in state.filters)
+                    for (final filter in visibleFilters)
                       CheckboxListTile(
                         value: _selectedIds.contains(filter.id),
                         onChanged: (v) => _toggle(filter.id, v ?? false),

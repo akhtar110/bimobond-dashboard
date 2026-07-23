@@ -200,14 +200,6 @@ class SoundsTableRow extends StatefulWidget {
 class _SoundsTableRowState extends State<SoundsTableRow> {
   bool _hovered = false;
 
-  void _setHovered(bool hovered) {
-    if (_hovered == hovered || !mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _hovered == hovered) return;
-      setState(() => _hovered = hovered);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -225,8 +217,12 @@ class _SoundsTableRowState extends State<SoundsTableRow> {
             : scheme.surface;
 
     return MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
+      onEnter: (_) {
+        if (!_hovered) setState(() => _hovered = true);
+      },
+      onExit: (_) {
+        if (_hovered) setState(() => _hovered = false);
+      },
       child: Material(
         color: bg,
         child: Padding(

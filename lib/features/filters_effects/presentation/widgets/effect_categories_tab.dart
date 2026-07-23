@@ -6,10 +6,8 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/status_chip.dart';
 import '../../../../core/widgets/state_widgets.dart';
-import '../../../auth/domain/utils/dashboard_permissions.dart';
-import '../../../auth/presentation/bloc/auth_bloc.dart';
-import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../users/domain/entities/user_entity.dart';
+import '../../../rbac/presentation/bloc/rbac_bloc.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
@@ -38,18 +36,6 @@ class EffectCategoriesTab extends StatelessWidget {
     final dateFmt = DateFormat.yMMMd();
 
     return FeTabScaffold(
-      header: _EffectCategoryTabHeader(
-        canManage: canManage,
-        showReorder: categories.length > 1,
-        createLabel: l10n.tOr('feCreateEffectCategory', 'Create effect category'),
-        onCreate: () => showCategoryFormDialog(
-          context,
-          isEffectCategory: true,
-        ),
-        onReorder: categories.isEmpty
-            ? null
-            : () => _showReorderDialog(context, categories),
-      ),
       child: categories.isEmpty
           ? Center(
               child: EmptyView(
@@ -60,50 +46,62 @@ class EffectCategoriesTab extends StatelessWidget {
               ),
             )
           : ResponsiveDataTable(
-        mobileBreakpoint: 900,
-        columns: [
-          DataColumn(label: Text(l10n.tOr('feColSlug', 'Slug'))),
-          DataColumn(label: Text(l10n.tOr('feColLabelKey', 'Label key'))),
-          DataColumn(label: Text(l10n.tOr('feColEffectsCount', 'Effects'))),
-          DataColumn(label: Text(l10n.tOr('feColSortOrder', 'Order'))),
-          DataColumn(label: Text(l10n.tOr('feColStatus', 'Status'))),
-          DataColumn(label: Text(l10n.tOr('feColUpdated', 'Updated'))),
-          DataColumn(label: Text(l10n.tOr('feColActions', 'Actions'))),
-        ],
-        rows: [
-          for (final category in categories)
-            DataRow(
-              cells: [
-                DataCell(Text(category.slug)),
-                DataCell(Text(category.labelKey)),
-                DataCell(Text('${category.effectsCount}')),
-                DataCell(Text('${category.sortOrder}')),
-                DataCell(_statusChip(context, category.isActive)),
-                DataCell(Text(
-                  category.updatedAt != null
-                      ? dateFmt.format(category.updatedAt!.toLocal())
-                      : '—',
-                )),
-                DataCell(_actionsMenu(context, category, canManage)),
+              mobileBreakpoint: 900,
+              columns: [
+                DataColumn(label: Text(l10n.tOr('feColSlug', 'Slug'))),
+                DataColumn(label: Text(l10n.tOr('feColName', 'Name'))),
+                DataColumn(label: Text(l10n.tOr('feColLabelKey', 'Label key'))),
+                DataColumn(
+                  label: Text(l10n.tOr('feColEffectsCount', 'Effects')),
+                ),
+                DataColumn(label: Text(l10n.tOr('feColSortOrder', 'Order'))),
+                DataColumn(label: Text(l10n.tOr('feColStatus', 'Status'))),
+                DataColumn(label: Text(l10n.tOr('feColUpdated', 'Updated'))),
+                DataColumn(label: Text(l10n.tOr('feColActions', 'Actions'))),
+              ],
+              rows: [
+                for (final category in categories)
+                  DataRow(
+                    cells: [
+                      DataCell(Text(category.slug)),
+                      DataCell(Text(category.displayLabel)),
+                      DataCell(
+                        Text(
+                          category.labelKey?.trim().isNotEmpty == true
+                              ? category.labelKey!
+                              : '—',
+                        ),
+                      ),
+                      DataCell(Text('${category.effectsCount}')),
+                      DataCell(Text('${category.sortOrder}')),
+                      DataCell(_statusChip(context, category.isActive)),
+                      DataCell(
+                        Text(
+                          category.updatedAt != null
+                              ? dateFmt.format(category.updatedAt!.toLocal())
+                              : '—',
+                        ),
+                      ),
+                      DataCell(_actionsMenu(context, category, canManage)),
+                    ],
+                  ),
+              ],
+              mobileCards: [
+                for (final category in categories)
+                  _CategoryMobileCard(
+                    title: category.displayLabel,
+                    subtitle: category.slug,
+                    countLabel: l10n.tOr('feColEffectsCount', 'Effects'),
+                    count: category.effectsCount,
+                    canManage: canManage,
+                    onEdit: () => showCategoryFormDialog(
+                      context,
+                      isEffectCategory: true,
+                      editing: category,
+                    ),
+                  ),
               ],
             ),
-        ],
-        mobileCards: [
-          for (final category in categories)
-            _CategoryMobileCard(
-              title: category.labelKey,
-              subtitle: category.slug,
-              countLabel: l10n.tOr('feColEffectsCount', 'Effects'),
-              count: category.effectsCount,
-              canManage: canManage,
-              onEdit: () => showCategoryFormDialog(
-                context,
-                isEffectCategory: true,
-                editing: category,
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -117,7 +115,8 @@ class EffectCategoriesTab extends StatelessWidget {
           .where(
             (c) =>
                 c.slug.toLowerCase().contains(search) ||
-                c.labelKey.toLowerCase().contains(search),
+                c.displayLabel.toLowerCase().contains(search) ||
+                (c.labelKey?.toLowerCase().contains(search) ?? false),
           )
           .toList();
     }
@@ -125,12 +124,10 @@ class EffectCategoriesTab extends StatelessWidget {
   }
 
   bool _canManage(BuildContext context) {
-    final roles = context.select<AuthBloc, List<UserRole>>((b) {
-      final state = b.state;
-      if (state is Authenticated) return state.user.roles;
-      return const <UserRole>[];
-    });
-    return canManageFiltersEffects(roles);
+    context.select<RbacBloc, Set<String>?>(
+      (b) => b.state.authContext?.permissionKeys,
+    );
+    return PermissionManager.canManageCameraStudio(context);
   }
 
   Widget _statusChip(BuildContext context, bool isActive) {
@@ -139,33 +136,9 @@ class EffectCategoriesTab extends StatelessWidget {
       label: isActive
           ? l10n.tOr('feActive', 'Active')
           : l10n.tOr('feInactive', 'Inactive'),
-      tone: isActive ? DashboardStatusTone.success : DashboardStatusTone.neutral,
-    );
-  }
-
-  Future<void> _showReorderDialog(
-    BuildContext context,
-    List<CameraEffectCategoryEntity> categories,
-  ) async {
-    final l10n = context.l10n;
-    final sorted = [...categories]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    final items = sorted.map((c) => c.labelKey).toList();
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => _ReorderCategoriesDialog(
-        title: l10n.tOr('feReorderEffectCategories', 'Reorder effect categories'),
-        items: items,
-        onSave: (reordered) {
-          final bloc = context.read<FiltersEffectsBloc>();
-          final payload = <CategoryReorderItem>[];
-          for (var i = 0; i < reordered.length; i++) {
-            final category = sorted.firstWhere((c) => c.labelKey == reordered[i]);
-            payload.add(CategoryReorderItem(id: category.id, sortOrder: i));
-          }
-          bloc.add(ReorderCameraEffectCategoriesEvent(payload));
-        },
-      ),
+      tone: isActive
+          ? DashboardStatusTone.success
+          : DashboardStatusTone.neutral,
     );
   }
 
@@ -207,10 +180,7 @@ class EffectCategoriesTab extends StatelessWidget {
         }
       },
       itemBuilder: (ctx) => [
-        PopupMenuItem(
-          value: 'edit',
-          child: Text(l10n.tOr('feEdit', 'Edit')),
-        ),
+        PopupMenuItem(value: 'edit', child: Text(l10n.tOr('feEdit', 'Edit'))),
         PopupMenuItem(
           value: 'assign',
           child: Text(l10n.tOr('feAssignEffects', 'Assign effects')),
@@ -218,47 +188,6 @@ class EffectCategoriesTab extends StatelessWidget {
         PopupMenuItem(
           value: 'delete',
           child: Text(l10n.tOr('feDelete', 'Delete')),
-        ),
-      ],
-    );
-  }
-}
-
-class _EffectCategoryTabHeader extends StatelessWidget {
-  const _EffectCategoryTabHeader({
-    required this.canManage,
-    required this.showReorder,
-    required this.createLabel,
-    required this.onCreate,
-    this.onReorder,
-  });
-
-  final bool canManage;
-  final bool showReorder;
-  final String createLabel;
-  final VoidCallback onCreate;
-  final VoidCallback? onReorder;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!canManage) return const SizedBox.shrink();
-    final l10n = context.l10n;
-
-    return Row(
-      children: [
-        const Spacer(),
-        if (showReorder && onReorder != null) ...[
-          OutlinedButton.icon(
-            onPressed: onReorder,
-            icon: const Icon(Icons.swap_vert_rounded, size: 18),
-            label: Text(l10n.tOr('feReorderCategories', 'Reorder')),
-          ),
-          const SizedBox(width: 8),
-        ],
-        FilledButton.icon(
-          onPressed: onCreate,
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text(createLabel),
         ),
       ],
     );
@@ -301,75 +230,6 @@ class _CategoryMobileCard extends StatelessWidget {
               )
             : null,
       ),
-    );
-  }
-}
-
-class _ReorderCategoriesDialog extends StatefulWidget {
-  const _ReorderCategoriesDialog({
-    required this.title,
-    required this.items,
-    required this.onSave,
-  });
-
-  final String title;
-  final List<String> items;
-  final void Function(List<String> reordered) onSave;
-
-  @override
-  State<_ReorderCategoriesDialog> createState() =>
-      _ReorderCategoriesDialogState();
-}
-
-class _ReorderCategoriesDialogState extends State<_ReorderCategoriesDialog> {
-  late List<String> _items;
-
-  @override
-  void initState() {
-    super.initState();
-    _items = [...widget.items];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SizedBox(
-        width: 360,
-        child: ReorderableListView(
-          shrinkWrap: true,
-          onReorder: (oldIndex, newIndex) {
-            setState(() {
-              if (newIndex > oldIndex) newIndex -= 1;
-              final item = _items.removeAt(oldIndex);
-              _items.insert(newIndex, item);
-            });
-          },
-          children: [
-            for (var i = 0; i < _items.length; i++)
-              ListTile(
-                key: ValueKey(_items[i]),
-                leading: const Icon(Icons.drag_handle_rounded),
-                title: Text(_items[i]),
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.t('cancel')),
-        ),
-        FilledButton(
-          onPressed: () {
-            widget.onSave(_items);
-            Navigator.of(context).pop();
-          },
-          child: Text(l10n.tOr('feSaveOrder', 'Save order')),
-        ),
-      ],
     );
   }
 }

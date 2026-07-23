@@ -1,49 +1,64 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/datasources/filters_effects_remote_datasource.dart';
 import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../../domain/usecases/filters_effects_usecases.dart';
+import '../utils/fe_api_errors.dart';
 import '../utils/fe_preview_color_utils.dart';
+import '../utils/filter_lut_picker.dart';
 import 'filter_editor_event.dart';
 import 'filter_editor_state.dart';
 
 class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
   FilterEditorBloc({
-    required GetFilterSettingsSchemaUseCase getSchema,
     required GetCameraFilterUseCase getFilter,
     required CreateCameraFilterUseCase createFilter,
     required UpdateCameraFilterUseCase updateFilter,
+    required GetFilterSettingsSchemaUseCase getFilterSettingsSchema,
     required UploadEffectAssetUseCase uploadFilterThumbnail,
-  })  : _getSchema = getSchema,
-        _getFilter = getFilter,
-        _createFilter = createFilter,
-        _updateFilter = updateFilter,
-        _uploadFilterThumbnail = uploadFilterThumbnail,
-        super(const FilterEditorInitial()) {
+    required UploadFilterLutUseCase uploadFilterLut,
+  }) : _getFilter = getFilter,
+       _createFilter = createFilter,
+       _updateFilter = updateFilter,
+       _getFilterSettingsSchema = getFilterSettingsSchema,
+       _uploadFilterThumbnail = uploadFilterThumbnail,
+       _uploadFilterLut = uploadFilterLut,
+       super(const FilterEditorInitial()) {
     on<LoadFilterEditorEvent>(_onLoad);
-    on<LoadFilterSchemaEvent>(_onLoadSchema);
-    on<LoadFilterDetailEvent>(_onLoadDetail);
     on<FilterBasicFieldChanged>(_onBasicChanged);
-    on<FilterSliderChanged>(_onSliderChanged);
     on<FilterPreviewColorChanged>(_onPreviewColorChanged);
-    on<FilterSettingsSearchChanged>(_onSearchChanged);
-    on<FilterGroupExpansionToggled>(_onGroupToggled);
-    on<FilterToggleAllGroupsEvent>(_onToggleAllGroups);
-    on<ResetFilterSettingsEvent>(_onResetSettings);
+    on<FilterAdjustmentChanged>(_onAdjustmentChanged);
     on<ResetFilterEditorEvent>(_onResetEditor);
     on<UploadFilterThumbnailEvent>(_onUploadThumbnail);
+    on<UploadFilterLutEvent>(_onUploadLut);
     on<SubmitFilterEditorEvent>(_onSubmit);
     on<ClearFilterEditorSaveFlagEvent>(_onClearSaveFlag);
     on<ClearFilterEditorSubmitErrorEvent>(_onClearSubmitError);
   }
 
-  final GetFilterSettingsSchemaUseCase _getSchema;
   final GetCameraFilterUseCase _getFilter;
   final CreateCameraFilterUseCase _createFilter;
   final UpdateCameraFilterUseCase _updateFilter;
+  final GetFilterSettingsSchemaUseCase _getFilterSettingsSchema;
   final UploadEffectAssetUseCase _uploadFilterThumbnail;
+  final UploadFilterLutUseCase _uploadFilterLut;
+
+  Future<FilterSettingsSchemaEntity?> _loadSettingsSchema() async {
+    try {
+      return await _getFilterSettingsSchema();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, int> _adjustmentsFromEntity(CameraFilterEntity filter) {
+    return filter.effectiveAdjustments.values.map(
+      (key, value) => MapEntry(key, value.round()),
+    );
+  }
 
   Future<void> _onLoad(
     LoadFilterEditorEvent event,
@@ -51,78 +66,31 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
   ) async {
     emit(const FilterEditorLoading());
     try {
-      final schema = await _getSchema();
       if (event.filterId != null) {
-        final filter = await _getFilter(event.filterId!);
-        final form = _formFromEntity(filter, schema);
+        final results = await Future.wait([
+          _loadSettingsSchema(),
+          _getFilter(event.filterId!),
+        ]);
+        final schema = results[0] as FilterSettingsSchemaEntity?;
+        final filter = results[1] as CameraFilterEntity;
+        final form = _formFromEntity(filter);
         emit(
           FilterEditorReady(
             filterId: filter.id,
             form: form,
             baseline: form,
-            schema: schema,
-            colorMatrix: filter.colorMatrix,
-            expandedGroups: schema.groups.map((g) => g.key).toSet(),
+            settingsSchema: schema,
+            lutFileName: _lutFileNameFromFilter(filter),
           ),
         );
         return;
       }
 
-      final form = FilterEditorFormData(
-        slug: '',
-        engineKey: kCameraAwesomeEngineKeys.first,
-        engineType: CameraFilterEngineTypeApi.camerawesome,
-        filterSettings: FilterSettingsEntity(schema.defaultValues()),
-      );
-      emit(
-        FilterEditorReady(
-          form: form,
-          baseline: form,
-          schema: schema,
-          expandedGroups: schema.groups.map((g) => g.key).toSet(),
-        ),
-      );
+      final schema = await _loadSettingsSchema();
+      const form = FilterEditorFormData(slug: '', label: '');
+      emit(FilterEditorReady(form: form, baseline: form, settingsSchema: schema));
     } catch (e) {
-      emit(FilterEditorError(_formatError(e)));
-    }
-  }
-
-  Future<void> _onLoadSchema(
-    LoadFilterSchemaEvent event,
-    Emitter<FilterEditorState> emit,
-  ) async {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    try {
-      final schema = await _getSchema();
-      emit(current.copyWith(schema: schema));
-    } catch (e) {
-      emit(FilterEditorError(_formatError(e)));
-    }
-  }
-
-  Future<void> _onLoadDetail(
-    LoadFilterDetailEvent event,
-    Emitter<FilterEditorState> emit,
-  ) async {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    emit(const FilterEditorLoading());
-    try {
-      final filter = await _getFilter(event.filterId);
-      final form = _formFromEntity(filter, current.schema);
-      emit(
-        FilterEditorReady(
-          filterId: filter.id,
-          form: form,
-          baseline: form,
-          schema: current.schema,
-          colorMatrix: filter.colorMatrix,
-          expandedGroups: current.schema.groups.map((g) => g.key).toSet(),
-        ),
-      );
-    } catch (e) {
-      emit(FilterEditorError(_formatError(e)));
+      emit(FilterEditorError(formatFeApiError(e)));
     }
   }
 
@@ -132,29 +100,120 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
   ) {
     final current = state;
     if (current is! FilterEditorReady) return;
+
+    var nextForm = current.form.copyWith(
+      slug: event.slug,
+      label: event.label,
+      labelKey: event.labelKey,
+      emoji: event.emoji,
+      thumbnailUrl: event.thumbnailUrl,
+      previewColorHex: event.previewColorHex,
+      lutUrl: event.lutUrl,
+      lutAsset: event.lutAsset,
+      isActive: event.isActive,
+      sortOrder: event.sortOrder,
+      clearLabelKey: event.clearLabelKey,
+      clearEmoji: event.clearEmoji,
+      clearThumbnailUrl: event.clearThumbnailUrl,
+      clearPreviewColorHex: event.clearPreviewColorHex,
+      clearLutUrl: event.clearLutUrl,
+      clearLutAsset: event.clearLutAsset,
+    );
+
+    if (event.renderType != null) {
+      final normalized = CameraFilterRenderTypeApi.fromResponse(
+        event.renderType!,
+      );
+      if (normalized != current.form.renderType) {
+        nextForm = nextForm.copyWith(
+          renderType: normalized,
+          clearLutUrl: normalized == CameraFilterRenderTypeApi.matrix,
+          clearLutAsset: normalized == CameraFilterRenderTypeApi.matrix,
+          clearAdjustments: normalized == CameraFilterRenderTypeApi.lut,
+        );
+      }
+    }
+
     emit(
       current.copyWith(
-        form: current.form.copyWith(
-          slug: event.slug,
-          engineKey: event.engineKey,
-          engineType: event.engineType,
-          labelKey: event.labelKey,
-          customLabel: event.customLabel,
-          thumbnailUrl: event.thumbnailUrl,
-          previewColorHex: event.previewColorHex,
-          isOriginal: event.isOriginal,
-          isBeautyDefault: event.isBeautyDefault,
-          isActive: event.isActive,
-          sortOrder: event.sortOrder,
-          clearLabelKey: event.clearLabelKey,
-          clearCustomLabel: event.clearCustomLabel,
-          clearThumbnailUrl: event.clearThumbnailUrl,
-          clearPreviewColorHex: event.clearPreviewColorHex,
-        ),
+        form: nextForm,
         clearFieldErrors: true,
-        clearThumbnailFileName: event.clearThumbnailUrl,
+        clearLutFileName: event.clearLutUrl,
+        clearLutPreviewBytes: event.clearLutUrl,
       ),
     );
+  }
+
+  void _onAdjustmentChanged(
+    FilterAdjustmentChanged event,
+    Emitter<FilterEditorState> emit,
+  ) {
+    final current = state;
+    if (current is! FilterEditorReady) return;
+    final next = Map<String, int>.from(current.form.adjustments)
+      ..[event.key] = event.value;
+    emit(
+      current.copyWith(
+        form: current.form.copyWith(adjustments: next),
+        clearFieldErrors: true,
+      ),
+    );
+  }
+
+  Future<void> _onUploadLut(
+    UploadFilterLutEvent event,
+    Emitter<FilterEditorState> emit,
+  ) async {
+    final current = state;
+    if (current is! FilterEditorReady || current.isUploadingLut) return;
+
+    if (!isAllowedFilterLutFilename(event.filename)) {
+      emit(
+        current.copyWith(
+          fieldErrors: {'lutUrl': 'feInvalidLutFileType'},
+        ),
+      );
+      return;
+    }
+
+    emit(
+      current.copyWith(
+        isUploadingLut: true,
+        lutFileName: event.filename,
+        lutPreviewBytes: Uint8List.fromList(event.bytes),
+        clearFieldErrors: true,
+        clearSubmitError: true,
+      ),
+    );
+
+    try {
+      final result = await _uploadFilterLut(event.bytes, event.filename);
+      final latest = state;
+      if (latest is! FilterEditorReady) return;
+
+      emit(
+        latest.copyWith(
+          isUploadingLut: false,
+          lutFileName: event.filename,
+          lutPreviewBytes: Uint8List.fromList(event.bytes),
+          form: latest.form.copyWith(
+            lutUrl: result.lutUrl,
+            lutAsset: result.lutAsset?.trim().isNotEmpty == true
+                ? result.lutAsset
+                : latest.form.lutAsset,
+          ),
+        ),
+      );
+    } catch (e) {
+      final latest = state;
+      if (latest is! FilterEditorReady) return;
+      emit(
+        latest.copyWith(
+          isUploadingLut: false,
+          fieldErrors: {'lutUrl': formatFeApiError(e)},
+        ),
+      );
+    }
   }
 
   Future<void> _onUploadThumbnail(
@@ -189,26 +248,10 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
       emit(
         latest.copyWith(
           isUploadingThumbnail: false,
-          fieldErrors: {'thumbnailUrl': _formatError(e)},
+          fieldErrors: {'thumbnailUrl': formatFeApiError(e)},
         ),
       );
     }
-  }
-
-  void _onSliderChanged(
-    FilterSliderChanged event,
-    Emitter<FilterEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          filterSettings:
-              current.form.filterSettings.withValue(event.key, event.value),
-        ),
-      ),
-    );
   }
 
   void _onPreviewColorChanged(
@@ -223,67 +266,6 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
         form: current.form.copyWith(
           previewColorHex: hex == null || hex.isEmpty ? null : hex,
           clearPreviewColorHex: hex == null || hex.isEmpty,
-        ),
-      ),
-    );
-  }
-
-  void _onSearchChanged(
-    FilterSettingsSearchChanged event,
-    Emitter<FilterEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    emit(current.copyWith(settingsSearchQuery: event.query.trim()));
-  }
-
-  void _onGroupToggled(
-    FilterGroupExpansionToggled event,
-    Emitter<FilterEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    final next = Set<String>.from(current.expandedGroups);
-    if (next.contains(event.groupKey)) {
-      next.remove(event.groupKey);
-    } else {
-      next.add(event.groupKey);
-    }
-    emit(
-      current.copyWith(
-        expandedGroups: next,
-        allGroupsExpanded: false,
-      ),
-    );
-  }
-
-  void _onToggleAllGroups(
-    FilterToggleAllGroupsEvent event,
-    Emitter<FilterEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    emit(
-      current.copyWith(
-        allGroupsExpanded: event.expand,
-        expandedGroups: event.expand
-            ? current.schema.groups.map((g) => g.key).toSet()
-            : const {},
-      ),
-    );
-  }
-
-  void _onResetSettings(
-    ResetFilterSettingsEvent event,
-    Emitter<FilterEditorState> emit,
-  ) {
-    final current = state;
-    if (current is! FilterEditorReady) return;
-    emit(
-      current.copyWith(
-        form: current.form.copyWith(
-          filterSettings:
-              current.form.filterSettings.resetToDefaults(current.schema),
         ),
       ),
     );
@@ -305,28 +287,29 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     final current = state;
     if (current is! FilterEditorReady ||
         current.isSaving ||
-        current.isUploadingThumbnail) {
+        current.isUploadingThumbnail ||
+        current.isUploadingLut) {
       return;
     }
 
-    final errors = _validate(current);
+    final errors = _validate(current.form);
     if (errors.isNotEmpty) {
       emit(current.copyWith(fieldErrors: errors));
       return;
     }
 
-    emit(current.copyWith(isSaving: true, clearFieldErrors: true, clearSubmitError: true));
+    emit(
+      current.copyWith(
+        isSaving: true,
+        clearFieldErrors: true,
+        clearSubmitError: true,
+      ),
+    );
     try {
       if (current.isEditing) {
-        final request = _buildUpdateRequest(current);
-        await _updateFilter(
-          current.filterId!,
-          request,
-          schema: current.schema,
-        );
+        await _updateFilter(current.filterId!, _buildUpdateRequest(current));
       } else {
-        final request = _buildCreateRequest(current);
-        await _createFilter(request, schema: current.schema);
+        await _createFilter(_buildCreateRequest(current));
       }
       emit(
         current.copyWith(
@@ -336,22 +319,12 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
         ),
       );
     } catch (e) {
-      final message = _formatError(e);
+      final message = formatFeApiError(e);
       final serverErrors = _serverFieldErrors(e);
       if (serverErrors.isNotEmpty) {
-        emit(
-          current.copyWith(
-            isSaving: false,
-            fieldErrors: serverErrors,
-          ),
-        );
+        emit(current.copyWith(isSaving: false, fieldErrors: serverErrors));
       } else {
-        emit(
-          current.copyWith(
-            isSaving: false,
-            submitError: message,
-          ),
-        );
+        emit(current.copyWith(isSaving: false, submitError: message));
       }
     }
   }
@@ -374,41 +347,71 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     emit(current.copyWith(clearSubmitError: true));
   }
 
-  FilterEditorFormData _formFromEntity(
-    CameraFilterEntity filter,
-    FilterSettingsSchemaEntity schema,
-  ) {
-    final defaults = schema.defaultValues();
-    final merged = Map<String, int>.from(defaults);
-    merged.addAll(filter.filterSettings.values);
+  FilterEditorFormData _formFromEntity(CameraFilterEntity filter) {
     return FilterEditorFormData(
       slug: filter.slug,
-      engineKey: filter.engineKey,
-      engineType: filter.engineType,
+      label: filter.label,
+      renderType: CameraFilterRenderTypeApi.fromResponse(filter.renderType),
       labelKey: filter.labelKey,
-      customLabel: filter.customLabel,
+      emoji: filter.emoji,
       thumbnailUrl: filter.thumbnailUrl,
       previewColorHex: filter.previewColorHex,
-      isOriginal: filter.isOriginal,
-      isBeautyDefault: filter.isBeautyDefault,
+      lutUrl: filter.lutUrl,
+      lutAsset: filter.lutAsset,
+      adjustments: _adjustmentsFromEntity(filter),
+      colorMatrix: List<double>.from(filter.colorMatrix),
       isActive: filter.isActive,
       sortOrder: filter.sortOrder,
-      filterSettings: FilterSettingsEntity(merged),
     );
   }
 
-  Map<String, String> _validate(FilterEditorReady current) {
+  Map<String, String> _validate(FilterEditorFormData form) {
     final errors = <String, String>{};
-    final form = current.form;
-    if (form.slug.trim().isEmpty) {
+    final slug = form.slug.trim();
+    final label = form.label.trim();
+    if (slug.isEmpty) {
       errors['slug'] = 'feRequired';
+    } else if (slug.length > 80) {
+      errors['slug'] = 'feSlugTooLong';
     }
-    if (form.engineKey.trim().isEmpty) {
-      errors['engineKey'] = 'feRequired';
+    if (label.isEmpty) {
+      errors['label'] = 'feRequired';
+    } else if (label.length > 80) {
+      errors['label'] = 'feLabelTooLong';
+    }
+    final labelKey = form.labelKey?.trim();
+    if (labelKey != null && labelKey.length > 100) {
+      errors['labelKey'] = 'feLabelKeyTooLong';
+    }
+    final emoji = form.emoji?.trim();
+    if (emoji != null && emoji.length > 16) {
+      errors['emoji'] = 'feEmojiTooLong';
     }
     final hex = form.previewColorHex?.trim();
-    if (hex != null && hex.isNotEmpty && !isValidFePreviewHex(hex)) {
-      errors['previewColorHex'] = 'feInvalidHex';
+    if (hex != null && hex.isNotEmpty) {
+      if (hex.length > 7 || !isValidFePreviewHex(hex)) {
+        errors['previewColorHex'] = 'feInvalidHex';
+      }
+    }
+    final hasLut =
+        (form.lutUrl?.trim().isNotEmpty ?? false) ||
+        (form.lutAsset?.trim().isNotEmpty ?? false);
+    if (form.isLut && !hasLut) {
+      errors['lut'] = 'feLutRequired';
+    }
+    final thumb = form.thumbnailUrl?.trim();
+    if (thumb != null && thumb.isNotEmpty) {
+      final uri = Uri.tryParse(thumb);
+      if (uri == null || !uri.hasScheme) {
+        errors['thumbnailUrl'] = 'feInvalidUrl';
+      }
+    }
+    final lutUrl = form.lutUrl?.trim();
+    if (form.isLut && lutUrl != null && lutUrl.isNotEmpty) {
+      final uri = Uri.tryParse(lutUrl);
+      if (uri == null || !uri.hasScheme) {
+        errors['lutUrl'] = 'feInvalidUrl';
+      }
     }
     return errors;
   }
@@ -417,61 +420,103 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     final form = current.form;
     return CreateFilterRequest(
       slug: form.slug.trim(),
-      engineKey: form.engineKey.trim(),
-      engineType: form.engineType,
+      renderType: form.renderType,
+      label: form.label.trim(),
       labelKey: _nullableTrim(form.labelKey),
-      customLabel: _nullableTrim(form.customLabel),
+      emoji: _nullableTrim(form.emoji),
       thumbnailUrl: _nullableTrim(form.thumbnailUrl),
       previewColorHex: _nullableTrim(form.previewColorHex),
-      isOriginal: form.isOriginal,
-      isBeautyDefault: form.isBeautyDefault,
+      lutUrl: form.isLut ? _nullableTrim(form.lutUrl) : null,
+      lutAsset: form.isLut ? _nullableTrim(form.lutAsset) : null,
+      colorMatrix: form.isMatrix ? List<double>.from(form.colorMatrix) : const [],
+      adjustments: form.isMatrix ? form.adjustmentsPayload : const CameraFilterAdjustments(),
       sortOrder: form.sortOrder,
       isActive: form.isActive,
-      filterSettings: form.filterSettings,
     );
   }
 
   UpdateFilterRequest _buildUpdateRequest(FilterEditorReady current) {
     final form = current.form;
     final baseline = current.baseline;
-    final settingsChanged = form.filterSettings != baseline.filterSettings;
-    final settingsAreDefaults = form.filterSettings.equalsDefaults(current.schema);
-    final request = UpdateFilterRequest(
+    final adjustmentsChanged = form.isMatrix &&
+        !_mapsEqual(form.adjustments, baseline.adjustments);
+    final colorMatrixChanged = form.isMatrix &&
+        form.colorMatrix.length == 20 &&
+        !_listsEqual(form.colorMatrix, baseline.colorMatrix);
+    return UpdateFilterRequest(
       slug: form.slug.trim() != baseline.slug ? form.slug.trim() : null,
-      engineKey:
-          form.engineKey.trim() != baseline.engineKey ? form.engineKey.trim() : null,
-      engineType: form.engineType != baseline.engineType ? form.engineType : null,
+      renderType: form.renderType != baseline.renderType ? form.renderType : null,
+      label: form.label.trim() != baseline.label ? form.label.trim() : null,
       labelKey: form.labelKey != baseline.labelKey ? form.labelKey : null,
-      customLabel:
-          form.customLabel != baseline.customLabel ? form.customLabel : null,
-      thumbnailUrl:
-          form.thumbnailUrl != baseline.thumbnailUrl ? form.thumbnailUrl : null,
+      emoji: form.emoji != baseline.emoji ? form.emoji : null,
+      thumbnailUrl: form.thumbnailUrl != baseline.thumbnailUrl
+          ? form.thumbnailUrl
+          : null,
       previewColorHex: form.previewColorHex != baseline.previewColorHex
           ? form.previewColorHex
           : null,
-      isOriginal:
-          form.isOriginal != baseline.isOriginal ? form.isOriginal : null,
-      isBeautyDefault: form.isBeautyDefault != baseline.isBeautyDefault
-          ? form.isBeautyDefault
+      lutUrl: form.isLut && form.lutUrl != baseline.lutUrl ? form.lutUrl : null,
+      lutAsset: form.isLut && form.lutAsset != baseline.lutAsset
+          ? form.lutAsset
           : null,
-      sortOrder:
-          form.sortOrder != baseline.sortOrder ? form.sortOrder : null,
+      adjustments: adjustmentsChanged ? form.adjustmentsPayload : null,
+      colorMatrix: colorMatrixChanged ? List<double>.from(form.colorMatrix) : null,
+      sortOrder: form.sortOrder != baseline.sortOrder ? form.sortOrder : null,
       isActive: form.isActive != baseline.isActive ? form.isActive : null,
-      filterSettings:
-          settingsChanged && !settingsAreDefaults ? form.filterSettings : null,
-      clearFilterSettings: settingsChanged && settingsAreDefaults,
-      clearLabelKey: (form.labelKey == null || form.labelKey!.isEmpty) &&
+      clearLabelKey:
+          (form.labelKey == null || form.labelKey!.isEmpty) &&
           (baseline.labelKey?.isNotEmpty ?? false),
-      clearCustomLabel: (form.customLabel == null || form.customLabel!.isEmpty) &&
-          (baseline.customLabel?.isNotEmpty ?? false),
+      clearEmoji:
+          (form.emoji == null || form.emoji!.isEmpty) &&
+          (baseline.emoji?.isNotEmpty ?? false),
       clearThumbnailUrl:
           (form.thumbnailUrl == null || form.thumbnailUrl!.isEmpty) &&
-              (baseline.thumbnailUrl?.isNotEmpty ?? false),
+          (baseline.thumbnailUrl?.isNotEmpty ?? false),
       clearPreviewColorHex:
           (form.previewColorHex == null || form.previewColorHex!.isEmpty) &&
-              (baseline.previewColorHex?.isNotEmpty ?? false),
+          (baseline.previewColorHex?.isNotEmpty ?? false),
+      clearLutUrl:
+          form.isLut &&
+          (form.lutUrl == null || form.lutUrl!.isEmpty) &&
+          (baseline.lutUrl?.isNotEmpty ?? false),
+      clearLutAsset:
+          form.isLut &&
+          (form.lutAsset == null || form.lutAsset!.isEmpty) &&
+          (baseline.lutAsset?.isNotEmpty ?? false),
+      clearAdjustments:
+          form.isMatrix &&
+          form.adjustments.isEmpty &&
+          baseline.adjustments.isNotEmpty,
     );
-    return request;
+  }
+
+  bool _mapsEqual(Map<String, int> a, Map<String, int> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  bool _listsEqual(List<double> a, List<double> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  String? _lutFileNameFromFilter(CameraFilterEntity filter) {
+    final asset = filter.lutAsset?.trim();
+    if (asset != null && asset.isNotEmpty) return asset;
+    final url = filter.lutUrl?.trim();
+    if (url == null || url.isEmpty) return null;
+    final uri = Uri.tryParse(url);
+    if (uri != null && uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.last;
+    }
+    final parts = url.split('/');
+    return parts.isNotEmpty ? parts.last : null;
   }
 
   String? _nullableTrim(String? value) {
@@ -486,29 +531,20 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     if (data is! Map) return const {};
     final errors = <String, String>{};
     final message = data['message'];
-    if (message is String && message.toLowerCase().contains('slug')) {
-      errors['slug'] = message;
+    void consider(String text) {
+      final lower = text.toLowerCase();
+      if (lower.contains('slug')) errors['slug'] = text;
+      if (lower.contains('label')) errors['label'] = text;
+      if (lower.contains('lut')) errors['lut'] = text;
+    }
+
+    if (message is String) {
+      consider(message);
     } else if (message is List) {
       for (final item in message) {
-        final text = item.toString();
-        if (text.toLowerCase().contains('slug')) {
-          errors['slug'] = text;
-        }
+        consider(item.toString());
       }
     }
     return errors;
-  }
-
-  String _formatError(Object error) {
-    if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map && data['message'] != null) {
-        final message = data['message'];
-        if (message is String) return message;
-        if (message is List) return message.join('\n');
-      }
-      return error.message ?? 'Request failed';
-    }
-    return error.toString();
   }
 }

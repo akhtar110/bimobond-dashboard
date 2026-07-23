@@ -1,4 +1,5 @@
 import '../entities/sound_entities.dart';
+import '../entities/sound_group_entities.dart';
 import '../repositories/sound_management_repository.dart';
 
 class GetSoundOverviewUseCase {
@@ -14,6 +15,13 @@ class GetSoundsUseCase {
 
   Future<PaginatedSoundsEntity> call(SoundsQuery query) =>
       _repository.getSounds(query);
+}
+
+class GetSoundByIdUseCase {
+  const GetSoundByIdUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<SoundEntity> call(String soundId) => _repository.getSoundById(soundId);
 }
 
 class CreateSoundUseCase {
@@ -66,4 +74,53 @@ class BulkSoundActionUseCase {
 
   Future<BulkSoundActionResultEntity> call(BulkSoundActionRequest request) =>
       _repository.bulkAction(request);
+}
+
+class GetSoundGroupsUseCase {
+  const GetSoundGroupsUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<List<SoundGroupEntity>> call() => _repository.getSoundGroups();
+}
+
+class CreateSoundGroupUseCase {
+  const CreateSoundGroupUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<SoundGroupEntity> call(CreateSoundGroupData data) =>
+      _repository.createSoundGroup(data);
+}
+
+class ReorderSoundGroupsUseCase {
+  const ReorderSoundGroupsUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<List<SoundGroupEntity>> call(List<SoundGroupReorderItem> items) =>
+      _repository.reorderSoundGroups(items);
+}
+
+class UpdateSoundGroupUseCase {
+  const UpdateSoundGroupUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<SoundGroupEntity> call(String groupId, UpdateSoundGroupData data) =>
+      _repository.updateSoundGroup(groupId, data);
+}
+
+class DeleteSoundGroupUseCase {
+  const DeleteSoundGroupUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<void> call(String groupId) => _repository.deleteSoundGroup(groupId);
+}
+
+class ReplaceGroupSoundsUseCase {
+  const ReplaceGroupSoundsUseCase(this._repository);
+  final SoundManagementRepository _repository;
+
+  Future<SoundGroupEntity> call(
+    String groupId,
+    List<SoundGroupMembershipItem> sounds,
+  ) =>
+      _repository.replaceGroupSounds(groupId, sounds);
 }

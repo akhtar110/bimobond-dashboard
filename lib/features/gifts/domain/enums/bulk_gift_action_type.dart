@@ -1,5 +1,8 @@
 enum BulkGiftActionType {
-  delete,
-  activate,
-  deactivate,
+  delete('DELETE'),
+  activate('ACTIVATE'),
+  deactivate('DEACTIVATE');
+
+  const BulkGiftActionType(this.apiValue);
+  final String apiValue;
 }

@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../../domain/entities/auction_update_body.dart';
 import '../../domain/entities/auction_update_entity.dart';
+import '../../domain/usecases/admin_refund_fulfillment_usecase.dart';
+import '../../domain/usecases/admin_release_fulfillment_usecase.dart';
 import '../../domain/usecases/ban_auction_usecase.dart';
 import '../../domain/usecases/cancel_auction_usecase.dart';
 import '../../domain/usecases/get_auction_details_usecase.dart';
@@ -17,8 +19,10 @@ import '../../data/datasources/auction_socket_service.dart';
 abstract class AuctionDetailEvent {}
 
 class LoadAuctionDetailsEvent extends AuctionDetailEvent {
-  LoadAuctionDetailsEvent(this.auctionId);
+  LoadAuctionDetailsEvent(this.auctionId, {this.listPreview});
+
   final String auctionId;
+  final AuctionEntity? listPreview;
 }
 
 class JoinAuctionRoomEvent extends AuctionDetailEvent {
@@ -46,6 +50,10 @@ class AdminResolveAuctionEvent extends AuctionDetailEvent {
   AdminResolveAuctionEvent(this.winnerId);
   final String winnerId;
 }
+
+class AdminRefundFulfillmentEvent extends AuctionDetailEvent {}
+
+class AdminReleaseFulfillmentEvent extends AuctionDetailEvent {}
 
 // ─── States ──────────────────────────────────────────────────────────────────
 
@@ -110,6 +118,8 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     required AdminBanAuction banAuction,
     required AdminUpdateAuction updateAuction,
     required AdminResolveAuction resolveAuction,
+    required AdminRefundFulfillment refundFulfillment,
+    required AdminReleaseFulfillment releaseFulfillment,
     required PreviewAuctionPricing previewPricing,
     required AuctionSocketService socketService,
   })  : _getAuctionDetails = getAuctionDetails,
@@ -117,6 +127,8 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
         _banAuction = banAuction,
         _updateAuction = updateAuction,
         _resolveAuction = resolveAuction,
+        _refundFulfillment = refundFulfillment,
+        _releaseFulfillment = releaseFulfillment,
         _previewPricing = previewPricing,
         _socketService = socketService,
         super(AuctionDetailInitial()) {
@@ -128,6 +140,8 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     on<AdminBanDetailAuctionEvent>(_onBan);
     on<AdminUpdateAuctionEvent>(_onUpdate);
     on<AdminResolveAuctionEvent>(_onResolve);
+    on<AdminRefundFulfillmentEvent>(_onRefundFulfillment);
+    on<AdminReleaseFulfillmentEvent>(_onReleaseFulfillment);
   }
 
   final GetAuctionDetails _getAuctionDetails;
@@ -135,6 +149,8 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
   final AdminBanAuction _banAuction;
   final AdminUpdateAuction _updateAuction;
   final AdminResolveAuction _resolveAuction;
+  final AdminRefundFulfillment _refundFulfillment;
+  final AdminReleaseFulfillment _releaseFulfillment;
   final PreviewAuctionPricing _previewPricing;
   final AuctionSocketService _socketService;
   StreamSubscription<AuctionUpdateEntity>? _socketSub;
@@ -144,7 +160,10 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
       LoadAuctionDetailsEvent event, Emitter<AuctionDetailState> emit) async {
     emit(AuctionDetailLoading());
     try {
-      final auction = await _getAuctionDetails(event.auctionId);
+      var auction = await _getAuctionDetails(event.auctionId);
+      if (event.listPreview != null) {
+        auction = auction.mergeAdminListPreview(event.listPreview!);
+      }
       emit(AuctionDetailLoaded(auction: auction, isLive: false));
       if (auction.isActive) {
         add(JoinAuctionRoomEvent(auction.id));
@@ -286,6 +305,67 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     } catch (e) {
       emit(current.copyWith(
           isActioning: false, errorMessage: e.toString()));
+    }
+  }
+
+  Future<void> _onRefundFulfillment(
+    AdminRefundFulfillmentEvent event,
+    Emitter<AuctionDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is! AuctionDetailLoaded) return;
+    emit(current.copyWith(isActioning: true, clearMessages: true));
+    try {
+      final result = await _refundFulfillment(current.auction.id);
+      final auctionId = result.auction.id.isNotEmpty
+          ? result.auction.id
+          : current.auction.id;
+      final refreshed = await _getAuctionDetails(auctionId);
+      final count = result.refundedCount;
+      emit(current.copyWith(
+        auction: refreshed,
+        isActioning: false,
+        isLive: false,
+        successMessage: count != null
+            ? 'auction_fulfillment_refund:$count'
+            : 'auction_fulfillment_refund',
+      ));
+      add(LeaveAuctionRoomEvent());
+    } catch (e) {
+      emit(current.copyWith(
+        isActioning: false,
+        errorMessage: e.toString(),
+      ));
+    }
+  }
+
+  Future<void> _onReleaseFulfillment(
+    AdminReleaseFulfillmentEvent event,
+    Emitter<AuctionDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is! AuctionDetailLoaded) return;
+    emit(current.copyWith(isActioning: true, clearMessages: true));
+    try {
+      final result = await _releaseFulfillment(current.auction.id);
+      final auctionId = result.auction.id.isNotEmpty
+          ? result.auction.id
+          : current.auction.id;
+      final refreshed = await _getAuctionDetails(auctionId);
+      emit(current.copyWith(
+        auction: refreshed,
+        isActioning: false,
+        isLive: false,
+        successMessage: result.alreadySettled
+            ? 'auction_fulfillment_already_settled'
+            : 'auction_fulfillment_release',
+      ));
+      add(LeaveAuctionRoomEvent());
+    } catch (e) {
+      emit(current.copyWith(
+        isActioning: false,
+        errorMessage: e.toString(),
+      ));
     }
   }
 

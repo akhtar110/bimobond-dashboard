@@ -1,32 +1,10 @@
 import 'package:flutter/material.dart';
 
-class StoriesSkeleton extends StatefulWidget {
-  const StoriesSkeleton({super.key});
+import '../../../posts/presentation/utils/posts_page_layout.dart';
+import '../../../posts/presentation/widgets/post_card.dart';
 
-  @override
-  State<StoriesSkeleton> createState() => _StoriesSkeletonState();
-}
-
-class _StoriesSkeletonState extends State<StoriesSkeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _anim;
-  late final Animation<double> _shimmer;
-
-  @override
-  void initState() {
-    super.initState();
-    _anim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-    _shimmer = CurvedAnimation(parent: _anim, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _anim.dispose();
-    super.dispose();
-  }
+class StoriesSkeletonGrid extends StatelessWidget {
+  const StoriesSkeletonGrid({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -34,56 +12,58 @@ class _StoriesSkeletonState extends State<StoriesSkeleton>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 520;
-        final bubbleSize = compact ? 68.0 : 84.0;
-        final count = compact ? 4 : 6;
+        final gap = constraints.maxWidth < 520 ? 8.0 : 12.0;
+        final columns = postsGridColumnCount(constraints.maxWidth);
 
-        return AnimatedBuilder(
-          animation: _shimmer,
-          builder: (context, _) {
-            final base = scheme.surfaceContainerLow;
-            final highlight = Color.lerp(
-              base,
-              scheme.surfaceContainerHighest,
-              _shimmer.value,
-            )!;
-
-            return SizedBox(
-              height: bubbleSize + 26,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: count,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (_, index) {
-                  return Column(
-                    children: [
-                      Container(
-                        width: bubbleSize,
-                        height: bubbleSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: highlight,
-                          border: Border.all(color: scheme.outlineVariant),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: bubbleSize * 0.65,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: highlight,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+        return Column(
+          children: [
+            for (var row = 0; row < 2; row++) ...[
+              if (row > 0) SizedBox(height: gap),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var col = 0; col < columns; col++) ...[
+                    if (col > 0) SizedBox(width: gap),
+                    Expanded(
+                      child: _StorySkeletonCard(color: scheme.surfaceContainerHighest),
+                    ),
+                  ],
+                ],
               ),
-            );
-          },
+            ],
+          ],
         );
       },
+    );
+  }
+}
+
+class _StorySkeletonCard extends StatelessWidget {
+  const _StorySkeletonCard({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AspectRatio(
+          aspectRatio: kPostCardThumbnailAspect,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(height: 12, width: 120, color: color),
+        const SizedBox(height: 6),
+        Container(height: 10, color: color),
+        const SizedBox(height: 6),
+        Container(height: 10, width: 180, color: color),
+      ],
     );
   }
 }

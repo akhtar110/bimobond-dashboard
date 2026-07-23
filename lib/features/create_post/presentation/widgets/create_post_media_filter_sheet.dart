@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../../core/utils/camera_engine_filter_look.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../filters_effects/domain/entities/filters_effects_entities.dart';
 import '../../../filters_effects/domain/usecases/filters_effects_usecases.dart';
@@ -103,7 +102,7 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
         ? CreatePostMediaFilterEntity(
             catalogFilterId: existing.catalogFilterId,
             catalogFilterLabel: existing.catalogFilterLabel,
-            catalogEngineKey: existing.catalogEngineKey,
+            catalogColorMatrix: existing.catalogColorMatrix,
           )
         : CreatePostMediaFilterEntity.neutral;
     _customFilter = existing.hasCustomAdjustments
@@ -125,12 +124,16 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
 
   Future<void> _loadCatalogFilters() async {
     try {
-      final filters = await di.sl<GetCameraFiltersUseCase>()();
+      final page = await di.sl<GetCameraFiltersUseCase>()(
+        const FiltersEffectsListQuery(
+          page: 1,
+          pageSize: 100,
+          status: FiltersEffectsStatusFilter.active,
+        ),
+      );
       if (!mounted) return;
       setState(() {
-        _catalogFilters = filters
-            .where((f) => f.isActive)
-            .toList()
+        _catalogFilters = page.data
           ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
         _catalogLoading = false;
         _catalogError = null;
@@ -173,7 +176,10 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
         _libraryFilter = CreatePostMediaFilterEntity.neutral.withCatalogFilter(
           id: filter.id,
           label: filter.displayLabel,
-          engineKey: filter.engineKey,
+          colorMatrix: CameraFilterRenderTypeApi.forAdminApi(filter.renderType) ==
+                  CameraFilterRenderTypeApi.matrix
+              ? filter.colorMatrix
+              : null,
         );
       }
     });
@@ -379,7 +385,11 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
                 label: filter.displayLabel,
                 selected: _libraryFilter.catalogFilterId == filter.id,
                 previewBytes: bytes,
-                engineKey: filter.engineKey,
+                colorMatrix:
+                    CameraFilterRenderTypeApi.forAdminApi(filter.renderType) ==
+                            CameraFilterRenderTypeApi.matrix
+                        ? filter.colorMatrix
+                        : null,
                 previewColorHex: filter.previewColorHex,
                 onTap: () => _selectCatalogFilter(filter),
               ),
@@ -573,7 +583,7 @@ class _CatalogFilterChip extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.previewBytes,
-    this.engineKey,
+    this.colorMatrix,
     this.previewColorHex,
   });
 
@@ -581,7 +591,7 @@ class _CatalogFilterChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final Uint8List? previewBytes;
-  final String? engineKey;
+  final List<double>? colorMatrix;
   final String? previewColorHex;
 
   @override
@@ -591,10 +601,13 @@ class _CatalogFilterChip extends StatelessWidget {
 
     Widget thumb;
     if (previewBytes != null) {
-      thumb = applyCameraEngineFilterLook(
-        child: Image.memory(previewBytes!, fit: BoxFit.cover),
-        engineKey: engineKey,
-      );
+      thumb = Image.memory(previewBytes!, fit: BoxFit.cover);
+      if (colorMatrix != null && colorMatrix!.length >= 20) {
+        thumb = ColorFiltered(
+          colorFilter: ColorFilter.matrix(colorMatrix!.take(20).toList()),
+          child: thumb,
+        );
+      }
     } else {
       final gradient = previewGradientForHex(previewColorHex);
       thumb = DecoratedBox(
@@ -605,13 +618,14 @@ class _CatalogFilterChip extends StatelessWidget {
             colors: gradient,
           ),
         ),
-        child: engineKey != null
-            ? applyCameraEngineFilterLook(
-                child: const SizedBox.expand(),
-                engineKey: engineKey,
-              )
-            : const SizedBox.expand(),
+        child: const SizedBox.expand(),
       );
+      if (colorMatrix != null && colorMatrix!.length >= 20) {
+        thumb = ColorFiltered(
+          colorFilter: ColorFilter.matrix(colorMatrix!.take(20).toList()),
+          child: thumb,
+        );
+      }
     }
 
     return InkWell(

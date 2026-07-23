@@ -111,7 +111,6 @@ class _InvestigationBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final highlightId = state.activityContext?.highlightCommentId;
-    final l10n = context.l10n;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget moderationSidebar() {
@@ -223,8 +222,12 @@ class _InvestigationBody extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final isDesktop = width >= InvestigationTheme.desktop;
+        final isWide = width >= InvestigationTheme.wide;
         final isTablet =
             width >= InvestigationTheme.tablet && width < InvestigationTheme.desktop;
+        // Two side-by-side text columns need ~900px to stay readable.
+        final tabletSideBySide = width >= 900;
+        final pagePadding = width < InvestigationTheme.tablet ? 12.0 : 20.0;
 
         Widget columns;
         Widget centeredMedia({double? maxWidth}) {
@@ -239,23 +242,25 @@ class _InvestigationBody extends StatelessWidget {
         }
 
         if (isDesktop) {
+          // On narrower desktops give the text columns a bit more room;
+          // the media panel caps its own width anyway.
           columns = Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 30,
+                flex: isWide ? 30 : 32,
                 child: SingleChildScrollView(child: moderationSidebar()),
               ),
               const SizedBox(width: InvestigationTheme.s16),
               Expanded(
-                flex: 40,
+                flex: isWide ? 40 : 36,
                 child: centeredMedia(),
               ),
               const SizedBox(width: InvestigationTheme.s16),
-              Expanded(flex: 30, child: centerContent()),
+              Expanded(flex: isWide ? 30 : 32, child: centerContent()),
             ],
           );
-        } else if (isTablet) {
+        } else if (isTablet && tabletSideBySide) {
           columns = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -288,7 +293,7 @@ class _InvestigationBody extends StatelessWidget {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 20),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1920),

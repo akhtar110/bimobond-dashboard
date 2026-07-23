@@ -7,11 +7,7 @@ import '../bloc/filters_effects_state.dart';
 import '../utils/filters_effects_responsive.dart';
 
 class CatalogTab extends StatelessWidget {
-  const CatalogTab({
-    super.key,
-    required this.loaded,
-    required this.metrics,
-  });
+  const CatalogTab({super.key, required this.loaded, required this.metrics});
 
   final FiltersEffectsLoaded loaded;
   final FiltersEffectsLayoutMetrics metrics;
@@ -49,11 +45,14 @@ class CatalogTab extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      l10n.tOr('feCatalogVersionLabel', 'Version: ${catalog.version}'),
+                      l10n.tOr(
+                        'feCatalogVersionLabel',
+                        'Version: ${catalog.version?.trim().isNotEmpty == true ? catalog.version : '—'}',
+                      ),
                       textAlign: TextAlign.start,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -64,17 +63,19 @@ class CatalogTab extends StatelessWidget {
           Text(
             l10n.tOr('feFilterCategories', 'Filter categories'),
             textAlign: TextAlign.start,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           SizedBox(height: metrics.filterGap),
           if (catalog.filterCategories.isEmpty)
-            Text(l10n.tOr('feNoFilterCategories', 'No filter categories found.'))
+            Text(
+              l10n.tOr('feNoFilterCategories', 'No filter categories found.'),
+            )
           else
             ...catalog.filterCategories.map(
               (category) => _CatalogCategoryTile(
-                title: category.labelKey,
+                title: category.displayLabel,
                 subtitle: category.slug,
                 isActive: category.isActive,
                 children: category.filters
@@ -87,21 +88,27 @@ class CatalogTab extends StatelessWidget {
           Text(
             l10n.tOr('feEffectCategories', 'Effect categories'),
             textAlign: TextAlign.start,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           SizedBox(height: metrics.filterGap),
           if (catalog.effectCategories.isEmpty)
-            Text(l10n.tOr('feNoEffectCategories', 'No effect categories found.'))
+            Text(
+              l10n.tOr('feNoEffectCategories', 'No effect categories found.'),
+            )
           else
             ...catalog.effectCategories.map(
               (category) => _CatalogCategoryTile(
-                title: category.labelKey,
+                title: category.displayLabel,
                 subtitle: category.slug,
                 isActive: category.isActive,
                 children: category.effects
-                    .map((e) => e.emoji != null ? '${e.emoji} ${e.labelKey}' : e.labelKey)
+                    .map(
+                      (e) => e.emoji != null && e.emoji!.trim().isNotEmpty
+                          ? '${e.emoji} ${e.displayLabel}'
+                          : e.displayLabel,
+                    )
                     .toList(growable: false),
                 emptyLabel: l10n.tOr('feNoEffectsInCategory', 'No effects'),
               ),
@@ -149,7 +156,9 @@ class _CatalogCategoryTile extends StatelessWidget {
             label: isActive
                 ? l10n.tOr('feActive', 'Active')
                 : l10n.tOr('feInactive', 'Inactive'),
-            tone: isActive ? DashboardStatusTone.success : DashboardStatusTone.neutral,
+            tone: isActive
+                ? DashboardStatusTone.success
+                : DashboardStatusTone.neutral,
           ),
           children: [
             if (children.isEmpty)

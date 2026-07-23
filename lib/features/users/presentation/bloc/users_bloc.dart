@@ -1,5 +1,7 @@
 import 'package:bimo_bond_dashboard/features/users/domain/entities/user_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/utils/api_error_messages.dart';
 import '../../domain/entities/admin_bulk_users_result_entity.dart';
 import '../../domain/usecases/bulk_activate_users.dart';
 import '../../domain/usecases/bulk_delete_users.dart';
@@ -11,6 +13,7 @@ import '../../domain/usecases/delete_user.dart';
 import '../../domain/usecases/demote_user.dart';
 import '../../domain/usecases/get_users.dart';
 import '../../domain/usecases/promote_to_admin.dart';
+import '../../domain/usecases/reset_user_password_usecase.dart';
 import '../../domain/usecases/updte_role.dart';
 import '../../domain/usecases/unban_user.dart';
 import '../users_ui_filter.dart';
@@ -89,6 +92,16 @@ class BulkPromoteUsersEvent extends UsersEvent {}
 class BulkDemoteUsersEvent extends UsersEvent {}
 
 class ClearUsersBulkFeedbackEvent extends UsersEvent {}
+
+class ResetUserPasswordEvent extends UsersEvent {
+  ResetUserPasswordEvent({
+    required this.userId,
+    required this.newPassword,
+  });
+
+  final String userId;
+  final String newPassword;
+}
 
 //
 // STATES
@@ -177,6 +190,15 @@ class UsersLoaded extends UsersState {
   }
 }
 
+class ResetUserPasswordLoading extends UsersState {}
+
+class ResetUserPasswordSuccess extends UsersState {}
+
+class ResetUserPasswordFailure extends UsersState {
+  ResetUserPasswordFailure(this.message);
+  final String message;
+}
+
 //
 // BLOC
 //
@@ -194,6 +216,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     required this.bulkDeleteUsers,
     required this.bulkPromoteUsers,
     required this.bulkDemoteUsers,
+    required this.resetUserPassword,
   }) : super(UsersLoading()) {
     on<LoadUsersEvent>(_onLoad);
     on<LoadMoreUsersEvent>(_onLoadMore);
@@ -214,6 +237,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<BulkPromoteUsersEvent>(_onBulkPromote);
     on<BulkDemoteUsersEvent>(_onBulkDemote);
     on<ClearUsersBulkFeedbackEvent>(_onClearBulkFeedback);
+    on<ResetUserPasswordEvent>(_onResetUserPassword);
   }
 
   final GetUsers getUsers;
@@ -228,6 +252,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   final BulkDeleteUsers bulkDeleteUsers;
   final BulkPromoteUsers bulkPromoteUsers;
   final BulkDemoteUsers bulkDemoteUsers;
+  final ResetUserPasswordUseCase resetUserPassword;
 
   static const int pageLimit = 20;
   static const int _limit = pageLimit;
@@ -237,6 +262,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   int _total = 0;
   bool _busy = false;
   bool _loadMoreBusy = false;
+  bool _resetPasswordBusy = false;
+  UsersState? _stateBeforeResetPassword;
 
   String _query = '';
   UsersUiFilter _filter = UsersUiFilter.all;
@@ -596,6 +623,52 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
       } else {
         emit(UsersError(e.toString()));
       }
+    }
+  }
+
+  Future<void> _onResetUserPassword(
+    ResetUserPasswordEvent event,
+    Emitter<UsersState> emit,
+  ) async {
+    if (_resetPasswordBusy) return;
+
+    _resetPasswordBusy = true;
+    final previous = state;
+    if (previous is UsersLoaded) {
+      _stateBeforeResetPassword = previous;
+    }
+
+    emit(ResetUserPasswordLoading());
+
+    try {
+      await resetUserPassword(
+        ResetUserPasswordParams(
+          userId: event.userId,
+          newPassword: event.newPassword,
+        ),
+      );
+      emit(ResetUserPasswordSuccess());
+    } catch (e) {
+      emit(ResetUserPasswordFailure(ApiErrorMessages.from(e)));
+    } finally {
+      _resetPasswordBusy = false;
+      _restoreStateAfterResetPassword(emit);
+    }
+  }
+
+  void _restoreStateAfterResetPassword(Emitter<UsersState> emit) {
+    final previous = _stateBeforeResetPassword;
+    _stateBeforeResetPassword = null;
+
+    if (previous is UsersLoaded) {
+      _emitLoaded(emit);
+      return;
+    }
+
+    if (_users.isNotEmpty) {
+      _emitLoaded(emit);
+    } else if (_users.isEmpty && previous is UsersEmpty) {
+      emit(UsersEmpty());
     }
   }
 }

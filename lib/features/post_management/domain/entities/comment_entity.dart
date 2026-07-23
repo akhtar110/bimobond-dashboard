@@ -9,6 +9,7 @@ class CommentEntity {
     required this.replyCount,
     required this.createdAt,
     this.username,
+    this.fullName,
     this.avatarUrl,
   });
 
@@ -21,9 +22,15 @@ class CommentEntity {
   final int replyCount;
   final DateTime createdAt;
   final String? username;
+  final String? fullName;
   final String? avatarUrl;
 
-  String get displayName => username ?? userId;
+  /// Prefers the user's full name, then username, then id.
+  String get displayName {
+    final full = fullName?.trim();
+    if (full != null && full.isNotEmpty) return full;
+    return username ?? userId;
+  }
 }
 
 class PostCommentsPageEntity {

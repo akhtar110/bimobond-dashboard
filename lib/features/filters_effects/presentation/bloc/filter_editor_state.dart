@@ -1,99 +1,119 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/filter_settings_entities.dart';
+import '../../domain/entities/filters_effects_entities.dart';
 
 /// Immutable snapshot of the filter editor form for dirty-checking.
 class FilterEditorFormData extends Equatable {
   const FilterEditorFormData({
     required this.slug,
-    required this.engineKey,
-    required this.engineType,
+    required this.label,
+    this.renderType = CameraFilterRenderTypeApi.lut,
     this.labelKey,
-    this.customLabel,
+    this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
-    this.isOriginal = false,
-    this.isBeautyDefault = false,
+    this.lutUrl,
+    this.lutAsset,
+    this.adjustments = const {},
+    this.colorMatrix = const [],
     this.isActive = true,
     this.sortOrder = 0,
-    this.filterSettings = FilterSettingsEntity.empty,
   });
 
   final String slug;
-  final String engineKey;
-  final String engineType;
+  final String label;
+  final String renderType;
   final String? labelKey;
-  final String? customLabel;
+  final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
-  final bool isOriginal;
-  final bool isBeautyDefault;
+  final String? lutUrl;
+  final String? lutAsset;
+  final Map<String, int> adjustments;
+  final List<double> colorMatrix;
   final bool isActive;
   final int sortOrder;
-  final FilterSettingsEntity filterSettings;
+
+  bool get isLut => CameraFilterRenderTypeApi.isLut(renderType);
+
+  bool get isMatrix => CameraFilterRenderTypeApi.isMatrix(renderType);
 
   String get displayLabel {
-    final custom = customLabel?.trim();
-    if (custom != null && custom.isNotEmpty) return custom;
-    final key = labelKey?.trim();
-    if (key != null && key.isNotEmpty) return key;
+    final primary = label.trim();
+    if (primary.isNotEmpty) return primary;
     final s = slug.trim();
     return s.isNotEmpty ? s : '—';
   }
 
+  CameraFilterAdjustments get adjustmentsPayload =>
+      CameraFilterAdjustments(
+        adjustments.map((key, value) => MapEntry(key, value)),
+      );
+
   FilterEditorFormData copyWith({
     String? slug,
-    String? engineKey,
-    String? engineType,
+    String? label,
+    String? renderType,
     String? labelKey,
-    String? customLabel,
+    String? emoji,
     String? thumbnailUrl,
     String? previewColorHex,
-    bool? isOriginal,
-    bool? isBeautyDefault,
+    String? lutUrl,
+    String? lutAsset,
+    Map<String, int>? adjustments,
+    List<double>? colorMatrix,
     bool? isActive,
     int? sortOrder,
-    FilterSettingsEntity? filterSettings,
     bool clearLabelKey = false,
-    bool clearCustomLabel = false,
+    bool clearEmoji = false,
     bool clearThumbnailUrl = false,
     bool clearPreviewColorHex = false,
+    bool clearLutUrl = false,
+    bool clearLutAsset = false,
+    bool clearAdjustments = false,
   }) {
     return FilterEditorFormData(
       slug: slug ?? this.slug,
-      engineKey: engineKey ?? this.engineKey,
-      engineType: engineType ?? this.engineType,
+      label: label ?? this.label,
+      renderType: renderType ?? this.renderType,
       labelKey: clearLabelKey ? null : (labelKey ?? this.labelKey),
-      customLabel:
-          clearCustomLabel ? null : (customLabel ?? this.customLabel),
-      thumbnailUrl:
-          clearThumbnailUrl ? null : (thumbnailUrl ?? this.thumbnailUrl),
+      emoji: clearEmoji ? null : (emoji ?? this.emoji),
+      thumbnailUrl: clearThumbnailUrl
+          ? null
+          : (thumbnailUrl ?? this.thumbnailUrl),
       previewColorHex: clearPreviewColorHex
           ? null
           : (previewColorHex ?? this.previewColorHex),
-      isOriginal: isOriginal ?? this.isOriginal,
-      isBeautyDefault: isBeautyDefault ?? this.isBeautyDefault,
+      lutUrl: clearLutUrl ? null : (lutUrl ?? this.lutUrl),
+      lutAsset: clearLutAsset ? null : (lutAsset ?? this.lutAsset),
+      adjustments: clearAdjustments
+          ? const {}
+          : (adjustments ?? this.adjustments),
+      colorMatrix: colorMatrix ?? this.colorMatrix,
       isActive: isActive ?? this.isActive,
       sortOrder: sortOrder ?? this.sortOrder,
-      filterSettings: filterSettings ?? this.filterSettings,
     );
   }
 
   @override
   List<Object?> get props => [
-        slug,
-        engineKey,
-        engineType,
-        labelKey,
-        customLabel,
-        thumbnailUrl,
-        previewColorHex,
-        isOriginal,
-        isBeautyDefault,
-        isActive,
-        sortOrder,
-        filterSettings,
-      ];
+    slug,
+    label,
+    renderType,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    lutUrl,
+    lutAsset,
+    adjustments,
+    colorMatrix,
+    isActive,
+    sortOrder,
+  ];
 }
 
 abstract class FilterEditorState extends Equatable {
@@ -115,16 +135,15 @@ class FilterEditorReady extends FilterEditorState {
   const FilterEditorReady({
     required this.form,
     required this.baseline,
-    required this.schema,
     this.filterId,
-    this.colorMatrix = const [],
-    this.expandedGroups = const {},
-    this.allGroupsExpanded = true,
-    this.settingsSearchQuery = '',
+    this.settingsSchema,
     this.fieldErrors = const {},
     this.isSaving = false,
     this.isUploadingThumbnail = false,
     this.thumbnailFileName,
+    this.isUploadingLut = false,
+    this.lutFileName,
+    this.lutPreviewBytes,
     this.saveSucceeded = false,
     this.submitError,
   });
@@ -132,15 +151,14 @@ class FilterEditorReady extends FilterEditorState {
   final String? filterId;
   final FilterEditorFormData form;
   final FilterEditorFormData baseline;
-  final FilterSettingsSchemaEntity schema;
-  final List<double> colorMatrix;
-  final Set<String> expandedGroups;
-  final bool allGroupsExpanded;
-  final String settingsSearchQuery;
+  final FilterSettingsSchemaEntity? settingsSchema;
   final Map<String, String> fieldErrors;
   final bool isSaving;
   final bool isUploadingThumbnail;
   final String? thumbnailFileName;
+  final bool isUploadingLut;
+  final String? lutFileName;
+  final Uint8List? lutPreviewBytes;
   final bool saveSucceeded;
   final String? submitError;
 
@@ -148,69 +166,65 @@ class FilterEditorReady extends FilterEditorState {
 
   bool get hasUnsavedChanges => form != baseline;
 
-  bool isGroupExpanded(String groupKey) =>
-      allGroupsExpanded || expandedGroups.contains(groupKey);
-
   FilterEditorReady copyWith({
     FilterEditorFormData? form,
     FilterEditorFormData? baseline,
-    FilterSettingsSchemaEntity? schema,
     String? filterId,
-    List<double>? colorMatrix,
-    Set<String>? expandedGroups,
-    bool? allGroupsExpanded,
-    String? settingsSearchQuery,
+    FilterSettingsSchemaEntity? settingsSchema,
     Map<String, String>? fieldErrors,
     bool? isSaving,
     bool? isUploadingThumbnail,
     String? thumbnailFileName,
+    bool? isUploadingLut,
+    String? lutFileName,
+    Uint8List? lutPreviewBytes,
     bool? saveSucceeded,
     String? submitError,
     bool clearFieldErrors = false,
     bool clearSubmitError = false,
     bool clearThumbnailFileName = false,
+    bool clearLutFileName = false,
+    bool clearLutPreviewBytes = false,
   }) {
     return FilterEditorReady(
       filterId: filterId ?? this.filterId,
       form: form ?? this.form,
       baseline: baseline ?? this.baseline,
-      schema: schema ?? this.schema,
-      colorMatrix: colorMatrix ?? this.colorMatrix,
-      expandedGroups: expandedGroups ?? this.expandedGroups,
-      allGroupsExpanded: allGroupsExpanded ?? this.allGroupsExpanded,
-      settingsSearchQuery: settingsSearchQuery ?? this.settingsSearchQuery,
+      settingsSchema: settingsSchema ?? this.settingsSchema,
       fieldErrors: clearFieldErrors
           ? const {}
           : (fieldErrors ?? this.fieldErrors),
       isSaving: isSaving ?? this.isSaving,
-      isUploadingThumbnail:
-          isUploadingThumbnail ?? this.isUploadingThumbnail,
+      isUploadingThumbnail: isUploadingThumbnail ?? this.isUploadingThumbnail,
       thumbnailFileName: clearThumbnailFileName
           ? null
           : (thumbnailFileName ?? this.thumbnailFileName),
+      isUploadingLut: isUploadingLut ?? this.isUploadingLut,
+      lutFileName: clearLutFileName ? null : (lutFileName ?? this.lutFileName),
+      lutPreviewBytes: clearLutPreviewBytes
+          ? null
+          : (lutPreviewBytes ?? this.lutPreviewBytes),
       saveSucceeded: saveSucceeded ?? this.saveSucceeded,
-      submitError:
-          clearSubmitError ? null : (submitError ?? this.submitError),
+      submitError: clearSubmitError ? null : (submitError ?? this.submitError),
     );
   }
 
   @override
   List<Object?> get props => [
-        filterId,
-        form,
-        baseline,
-        schema,
-        colorMatrix,
-        expandedGroups,
-        allGroupsExpanded,
-        settingsSearchQuery,
-        fieldErrors,
-        isSaving,
-        isUploadingThumbnail,
-        thumbnailFileName,
-        saveSucceeded,
-        submitError,
-      ];
+    filterId,
+    form,
+    baseline,
+    settingsSchema,
+    fieldErrors,
+    isSaving,
+    isUploadingThumbnail,
+    thumbnailFileName,
+    isUploadingLut,
+    lutFileName,
+    lutPreviewBytes,
+    saveSucceeded,
+    submitError,
+  ];
 }
 
 class FilterEditorError extends FilterEditorState {

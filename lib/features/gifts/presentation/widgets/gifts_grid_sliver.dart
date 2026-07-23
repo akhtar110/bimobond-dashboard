@@ -13,7 +13,7 @@ import 'gifts_table_view.dart';
 import 'selectable_gift_card_wrapper.dart';
 
 class GiftsContentSliver extends StatelessWidget {
-  const GiftsContentSliver();
+  const GiftsContentSliver({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -64,9 +64,20 @@ class GiftsContentSliver extends StatelessWidget {
 }
 
 class GiftsGridSliver extends GiftsContentSliver {
-  const GiftsGridSliver({this.onPreviewGift});
+  const GiftsGridSliver({
+    super.key,
+    this.onPreviewGift,
+    this.giftIdFilter,
+    this.preferGiftIdOrder,
+  });
 
   final void Function(BuildContext context, GiftEntity gift)? onPreviewGift;
+
+  /// When set, only gifts whose ids are in this set are shown (group tab).
+  final Set<String>? giftIdFilter;
+
+  /// Optional preferred order for [giftIdFilter] (e.g. group sort order).
+  final List<String>? preferGiftIdOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +102,9 @@ class GiftsGridSliver extends GiftsContentSliver {
       builder: (context, state) {
         if (state is! GiftsLoaded) return const SliverToBoxAdapter();
 
+        final filterKey = giftIdFilter == null
+            ? 'all'
+            : giftIdFilter!.join(',');
         final contentKey =
             'gifts-${state.viewType.name}-${state.selectedTab.name}-'
             '${state.searchQuery}-'
@@ -100,22 +114,69 @@ class GiftsGridSliver extends GiftsContentSliver {
             '${state.maxPriceFilter}-'
             '${state.selectedSort.name}-'
             '${state.currentPage}-'
-            '${state.displayed.length}';
+            '${state.displayed.length}-'
+            '$filterKey';
 
         return state.viewType == GiftsViewType.grid
             ? GiftsSliverGrid(
                 key: ValueKey('grid-$contentKey'),
                 loaded: state,
                 onPreviewGift: onPreviewGift,
+                giftIdFilter: giftIdFilter,
+                preferGiftIdOrder: preferGiftIdOrder,
               )
             : GiftsSliverList(
                 key: ValueKey('list-$contentKey'),
                 loaded: state,
                 onPreviewGift: onPreviewGift,
+                giftIdFilter: giftIdFilter,
+                preferGiftIdOrder: preferGiftIdOrder,
               );
       },
     );
   }
+}
+
+/// Filters [GiftsLoaded.displayed] by optional group membership, then pages.
+List<GiftEntity> giftsPagedForView(
+  GiftsLoaded loaded, {
+  required bool infiniteScroll,
+  Set<String>? giftIdFilter,
+  List<String>? preferGiftIdOrder,
+}) {
+  var items = loaded.displayed;
+  if (giftIdFilter != null) {
+    if (preferGiftIdOrder != null && preferGiftIdOrder.isNotEmpty) {
+      final byId = {for (final g in items) g.id: g};
+      items = [
+        for (final id in preferGiftIdOrder)
+          if (giftIdFilter.contains(id) && byId.containsKey(id)) byId[id]!,
+      ];
+    } else {
+      items = items.where((g) => giftIdFilter.contains(g.id)).toList();
+    }
+  }
+
+  if (items.isEmpty) return const [];
+
+  final pageSize = GiftsBloc.pageLimit;
+  if (infiniteScroll) {
+    final end = (loaded.currentPage * pageSize).clamp(0, items.length);
+    return items.sublist(0, end);
+  }
+
+  final start = (loaded.currentPage - 1) * pageSize;
+  if (start >= items.length) return const [];
+  final end = (start + pageSize).clamp(0, items.length);
+  return items.sublist(start, end);
+}
+
+int giftsFilteredTotalCount(
+  GiftsLoaded loaded, {
+  Set<String>? giftIdFilter,
+}) {
+  if (giftIdFilter == null) return loaded.giftsTotalCount;
+  return loaded.displayed.where((g) => giftIdFilter.contains(g.id)).length;
 }
 
 class GiftsSliverGrid extends StatelessWidget {
@@ -123,17 +184,24 @@ class GiftsSliverGrid extends StatelessWidget {
     super.key,
     required this.loaded,
     this.onPreviewGift,
+    this.giftIdFilter,
+    this.preferGiftIdOrder,
   });
   final GiftsLoaded loaded;
   final void Function(BuildContext context, GiftEntity gift)? onPreviewGift;
+  final Set<String>? giftIdFilter;
+  final List<String>? preferGiftIdOrder;
 
   @override
   Widget build(BuildContext context) {
     final metrics = GiftsLayoutMetrics(
       getGiftsDeviceType(MediaQuery.sizeOf(context).width),
     );
-    final gifts = loaded.pagedDisplayed(
+    final gifts = giftsPagedForView(
+      loaded,
       infiniteScroll: metrics.useInfiniteScroll,
+      giftIdFilter: giftIdFilter,
+      preferGiftIdOrder: preferGiftIdOrder,
     );
 
     if (gifts.isEmpty) {
@@ -215,17 +283,24 @@ class GiftsSliverList extends StatelessWidget {
     super.key,
     required this.loaded,
     this.onPreviewGift,
+    this.giftIdFilter,
+    this.preferGiftIdOrder,
   });
   final GiftsLoaded loaded;
   final void Function(BuildContext context, GiftEntity gift)? onPreviewGift;
+  final Set<String>? giftIdFilter;
+  final List<String>? preferGiftIdOrder;
 
   @override
   Widget build(BuildContext context) {
     final metrics = GiftsLayoutMetrics(
       getGiftsDeviceType(MediaQuery.sizeOf(context).width),
     );
-    final gifts = loaded.pagedDisplayed(
+    final gifts = giftsPagedForView(
+      loaded,
       infiniteScroll: metrics.useInfiniteScroll,
+      giftIdFilter: giftIdFilter,
+      preferGiftIdOrder: preferGiftIdOrder,
     );
 
     if (gifts.isEmpty) {

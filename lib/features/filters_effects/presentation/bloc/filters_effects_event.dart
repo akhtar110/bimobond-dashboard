@@ -63,18 +63,18 @@ class FiltersEffectsSearchChanged extends FiltersEffectsEvent {
 class FiltersEffectsFilterChanged extends FiltersEffectsEvent {
   const FiltersEffectsFilterChanged({
     this.status,
-    this.engineKey,
-    this.clearEngineKey = false,
+    this.renderType,
+    this.clearRenderType = false,
     this.page,
   });
 
   final FiltersEffectsStatusFilter? status;
-  final String? engineKey;
-  final bool clearEngineKey;
+  final String? renderType;
+  final bool clearRenderType;
   final int? page;
 
   @override
-  List<Object?> get props => [status, engineKey, clearEngineKey, page];
+  List<Object?> get props => [status, renderType, clearRenderType, page];
 }
 
 class CreateCameraFilterEvent extends FiltersEffectsEvent {
@@ -278,4 +278,46 @@ class SeedFiltersEffectsCatalogEvent extends FiltersEffectsEvent {
 
 class ClearFiltersEffectsMessage extends FiltersEffectsEvent {
   const ClearFiltersEffectsMessage();
+}
+
+class ToggleFilterSelectionEvent extends FiltersEffectsEvent {
+  const ToggleFilterSelectionEvent(this.filterId);
+
+  final String filterId;
+
+  @override
+  List<Object?> get props => [filterId];
+}
+
+class ToggleEffectSelectionEvent extends FiltersEffectsEvent {
+  const ToggleEffectSelectionEvent(this.effectId);
+
+  final String effectId;
+
+  @override
+  List<Object?> get props => [effectId];
+}
+
+class SelectAllVisibleFiltersEvent extends FiltersEffectsEvent {
+  const SelectAllVisibleFiltersEvent();
+}
+
+class SelectAllVisibleEffectsEvent extends FiltersEffectsEvent {
+  const SelectAllVisibleEffectsEvent();
+}
+
+class ClearFilterSelectionEvent extends FiltersEffectsEvent {
+  const ClearFilterSelectionEvent();
+}
+
+class ClearEffectSelectionEvent extends FiltersEffectsEvent {
+  const ClearEffectSelectionEvent();
+}
+
+class BulkDeleteSelectedFiltersEvent extends FiltersEffectsEvent {
+  const BulkDeleteSelectedFiltersEvent();
+}
+
+class BulkDeleteSelectedEffectsEvent extends FiltersEffectsEvent {
+  const BulkDeleteSelectedEffectsEvent();
 }

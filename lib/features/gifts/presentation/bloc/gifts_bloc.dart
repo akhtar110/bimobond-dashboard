@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/bulk_gift_action_request.dart';
+import '../../domain/entities/bulk_gift_action_result.dart';
+import '../../domain/entities/gift_group_entities.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/bulk_gift_action_type.dart';
 import '../../domain/enums/gifts_view_type.dart';
@@ -11,6 +13,7 @@ import '../../domain/usecases/bulk_gift_action_usecase.dart';
 import '../../domain/usecases/create_gift_usecase.dart';
 import '../../domain/usecases/delete_gift_usecase.dart';
 import '../../domain/usecases/get_admin_gifts_usecase.dart';
+import '../../domain/usecases/gift_group_usecases.dart';
 import '../../domain/usecases/update_gift_usecase.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -405,11 +408,15 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     required UpdateGift updateGift,
     required DeleteGift deleteGift,
     required BulkGiftActionUseCase bulkGiftAction,
+    required GetGiftGroupsUseCase getGiftGroups,
+    required ReplaceGroupGiftsUseCase replaceGroupGifts,
   })  : _getAdminGifts = getAdminGifts,
         _createGift = createGift,
         _updateGift = updateGift,
         _deleteGift = deleteGift,
         _bulkGiftAction = bulkGiftAction,
+        _getGiftGroups = getGiftGroups,
+        _replaceGroupGifts = replaceGroupGifts,
         super(GiftsInitial()) {
     on<LoadAdminGiftsEvent>(_onLoad);
     on<ChangeGiftTabFilterEvent>(_onChangeTab);
@@ -441,6 +448,8 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   final UpdateGift _updateGift;
   final DeleteGift _deleteGift;
   final BulkGiftActionUseCase _bulkGiftAction;
+  final GetGiftGroupsUseCase _getGiftGroups;
+  final ReplaceGroupGiftsUseCase _replaceGroupGifts;
 
   static const pageLimit = 20;
 
@@ -543,12 +552,16 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         BulkGiftActionRequest(giftIds: ids, action: action),
       );
 
-      final succeededIds = result.succeededGiftIds.toSet();
       final removedIds = result.removedGiftIds.toSet();
+      final deactivatedIds = result.deactivatedIds.toSet();
+      final succeededIds = result.giftIds.toSet();
 
       var gifts = current.gifts
           .where((g) => !removedIds.contains(g.id))
           .map((g) {
+            if (deactivatedIds.contains(g.id)) {
+              return g.copyWith(isActive: false);
+            }
             if (!succeededIds.contains(g.id)) return g;
             return switch (action) {
               BulkGiftActionType.activate => g.copyWith(isActive: true),
@@ -560,12 +573,10 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
 
       _selectedGiftIds = _selectedGiftIds
           .difference(removedIds)
-          .difference(result.failedGiftIds.toSet());
+          .difference(result.notFoundIds.toSet());
 
-      final message = result.isFullSuccess
-          ? _successMessageFor(action, result.successCount)
-          : result.errorMessage ??
-              '${result.failedGiftIds.length} gift(s) failed';
+      final message = result.errorMessage ??
+          _successMessageFor(action, result);
 
       emit(
         _withUiState(
@@ -597,13 +608,20 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         _ => null,
       };
 
-  String _successMessageFor(BulkGiftActionType action, int count) {
-    final label = switch (action) {
-      BulkGiftActionType.delete => 'deleted',
-      BulkGiftActionType.activate => 'activated',
-      BulkGiftActionType.deactivate => 'deactivated',
+  String _successMessageFor(
+    BulkGiftActionType action,
+    BulkGiftActionResult result,
+  ) {
+    return switch (action) {
+      BulkGiftActionType.delete => result.deactivatedCount > 0
+          ? 'Deleted ${result.successCount} gift(s); '
+              '${result.deactivatedCount} deactivated (in use)'
+          : '${result.successCount} gift(s) deleted',
+      BulkGiftActionType.activate =>
+        '${result.successCount} gift(s) activated',
+      BulkGiftActionType.deactivate =>
+        '${result.successCount} gift(s) deactivated',
     };
-    return '$count gift(s) $label';
   }
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -757,6 +775,9 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     emit(c.copyWith(isActioning: true, clearMessages: true));
     try {
       final gift = await _createGift(event.data);
+      if (event.data.assignGroupId != null) {
+        await _assignGiftToGroup(event.data.assignGroupId!, gift.id);
+      }
       emit(c.copyWith(
         gifts: [...c.gifts, gift],
         isActioning: false,
@@ -825,5 +846,30 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     } catch (e) {
       emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
     }
+  }
+
+  Future<void> _assignGiftToGroup(String groupId, String giftId) async {
+    final groups = await _getGiftGroups();
+    GiftGroupEntity? group;
+    for (final candidate in groups) {
+      if (candidate.id == groupId) {
+        group = candidate;
+        break;
+      }
+    }
+    if (group == null) return;
+
+    final members = [
+      for (final member in group.gifts)
+        GiftGroupMembershipItem(
+          giftId: member.gift.id,
+          sortOrder: member.sortOrder,
+        ),
+      GiftGroupMembershipItem(
+        giftId: giftId,
+        sortOrder: group.gifts.length,
+      ),
+    ];
+    await _replaceGroupGifts(groupId, members);
   }
 }

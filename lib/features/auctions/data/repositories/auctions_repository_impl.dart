@@ -1,3 +1,4 @@
+import '../../domain/entities/auction_fulfillment_result.dart';
 import '../../domain/entities/admin_auctions_query.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../../domain/entities/auction_pricing_preview_entity.dart';
@@ -74,4 +75,16 @@ class AuctionsRepositoryImpl implements AuctionsRepository {
     String winnerId,
   ) =>
       _dataSource.adminResolveAuction(auctionId, winnerId);
+
+  @override
+  Future<AuctionFulfillmentActionResult> adminRefundFulfillment(
+    String auctionId,
+  ) =>
+      _dataSource.adminRefundFulfillment(auctionId);
+
+  @override
+  Future<AuctionFulfillmentActionResult> adminReleaseFulfillment(
+    String auctionId,
+  ) =>
+      _dataSource.adminReleaseFulfillment(auctionId);
 }
