@@ -100,11 +100,15 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
               children: [
                 Icon(Icons.forum_outlined, size: 20, color: scheme.primary),
                 const SizedBox(width: 8),
-                Text(
-                  l10n.t('commentsInvestigation'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                Expanded(
+                  child: Text(
+                    l10n.t('commentsInvestigation'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
                 ),
               ],
             ),

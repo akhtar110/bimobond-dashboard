@@ -79,6 +79,8 @@ class AuctionEntity {
     this.currencyCode,
     required this.currentTotalCoins,
     required this.status,
+    this.escrowEnabled = false,
+    this.fulfillmentStatus,
     this.winnerId,
     required this.startedAt,
     this.endedAt,
@@ -101,7 +103,9 @@ class AuctionEntity {
   final double? targetPrice;
   final String? currencyCode;
   final double currentTotalCoins;
-  final String status; // ACTIVE | COMPLETED | CANCELLED | BANNED
+  final String status;
+  final bool escrowEnabled;
+  final String? fulfillmentStatus;
   final String? winnerId;
   final DateTime startedAt;
   final DateTime? endedAt;
@@ -160,8 +164,47 @@ class AuctionEntity {
 
   bool get isActive => status == AuctionStatus.active.apiValue;
   bool get isCompleted => status == AuctionStatus.completed.apiValue;
+  bool get isSettled => status == AuctionStatus.settled.apiValue;
   bool get isCancelled => status == AuctionStatus.cancelled.apiValue;
   bool get isBanned => status == AuctionStatus.banned.apiValue;
+  bool get isDisputed => status == AuctionStatus.disputed.apiValue;
+
+  /// Admin PATCH is rejected for SETTLED, CANCELLED, and BANNED.
+  bool get isAdminEditable =>
+      !isSettled && !isCancelled && !isBanned;
+
+  /// Cancel / ban allowed for ACTIVE, COMPLETED, and DISPUTED.
+  bool get canAdminCancelOrBan =>
+      isActive || isCompleted || isDisputed;
+
+  /// Force resolve is ACTIVE-only.
+  bool get canAdminForceResolve => isActive;
+
+  bool get showEscrowFulfillmentTools =>
+      canAdminRefundEscrow || canAdminReleaseEscrow;
+
+  /// True when the API marks escrow on, or fulfillment/coins imply escrow flow.
+  bool get effectiveEscrowEnabled =>
+      escrowEnabled ||
+      hasFulfillmentLifecycle ||
+      ((isCompleted || isDisputed) && currentTotalCoins > 0);
+
+  bool get hasFulfillmentLifecycle {
+    final value = fulfillmentStatus?.trim().toUpperCase();
+    return value != null && value.isNotEmpty && value != 'NONE';
+  }
+
+  /// Escrow refund (`PATCH .../fulfillment/refund`).
+  /// Backend validates escrow; UI gates on post-completion statuses only.
+  bool get canAdminRefundEscrow =>
+      (isCompleted || isDisputed) &&
+      !isCancelled &&
+      !isBanned &&
+      !isSettled;
+
+  /// Escrow release (`PATCH .../fulfillment/release`).
+  bool get canAdminReleaseEscrow =>
+      canAdminRefundEscrow && currentTotalCoins > 0;
 
   /// Whether a host may edit auction details (ACTIVE only).
   bool get isHostEditable => isActive;
@@ -178,6 +221,8 @@ class AuctionEntity {
     String? currencyCode,
     double? currentTotalCoins,
     String? status,
+    bool? escrowEnabled,
+    String? fulfillmentStatus,
     String? winnerId,
     DateTime? startedAt,
     DateTime? endedAt,
@@ -199,6 +244,8 @@ class AuctionEntity {
       currencyCode: currencyCode ?? this.currencyCode,
       currentTotalCoins: currentTotalCoins ?? this.currentTotalCoins,
       status: status ?? this.status,
+      escrowEnabled: escrowEnabled ?? this.escrowEnabled,
+      fulfillmentStatus: fulfillmentStatus ?? this.fulfillmentStatus,
       winnerId: winnerId ?? this.winnerId,
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
@@ -207,6 +254,18 @@ class AuctionEntity {
       giftTransactions: giftTransactions ?? this.giftTransactions,
       post: post,
       pricing: pricing ?? this.pricing,
+    );
+  }
+
+  /// Admin list rows include escrow fields that public detail may omit.
+  AuctionEntity mergeAdminListPreview(AuctionEntity preview) {
+    if (preview.id != id) return this;
+    return copyWith(
+      escrowEnabled: escrowEnabled || preview.escrowEnabled,
+      fulfillmentStatus: fulfillmentStatus ?? preview.fulfillmentStatus,
+      currentTotalCoins: currentTotalCoins > 0
+          ? currentTotalCoins
+          : preview.currentTotalCoins,
     );
   }
 }

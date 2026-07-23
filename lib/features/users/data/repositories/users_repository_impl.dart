@@ -151,8 +151,14 @@ class UsersRepositoryImpl implements UsersRepository {
   }
 
   @override
-  Future<void> resetUserPassword(String userId) {
-    return remoteDataSource.resetUserPassword(userId);
+  Future<void> resetUserPassword({
+    required String userId,
+    required String newPassword,
+  }) {
+    return remoteDataSource.resetUserPassword(
+      userId: userId,
+      newPassword: newPassword,
+    );
   }
 
   @override

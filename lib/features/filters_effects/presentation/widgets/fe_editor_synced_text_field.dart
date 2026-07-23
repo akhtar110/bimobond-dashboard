@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Text field that keeps local editing state and only syncs [value] from the
 /// parent when the field is not focused (e.g. color picker, load, reset).
@@ -10,6 +11,9 @@ class FeEditorSyncedTextField extends StatefulWidget {
     required this.decoration,
     this.keyboardType,
     this.readOnly = false,
+    this.maxLines = 1,
+    this.minLines,
+    this.inputFormatters,
   });
 
   final String value;
@@ -17,6 +21,9 @@ class FeEditorSyncedTextField extends StatefulWidget {
   final InputDecoration decoration;
   final TextInputType? keyboardType;
   final bool readOnly;
+  final int? maxLines;
+  final int? minLines;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<FeEditorSyncedTextField> createState() =>
@@ -60,6 +67,9 @@ class _FeEditorSyncedTextFieldState extends State<FeEditorSyncedTextField> {
       readOnly: widget.readOnly,
       decoration: widget.decoration,
       keyboardType: widget.keyboardType,
+      inputFormatters: widget.inputFormatters,
+      maxLines: widget.maxLines,
+      minLines: widget.minLines,
       onChanged: widget.onChanged,
     );
   }

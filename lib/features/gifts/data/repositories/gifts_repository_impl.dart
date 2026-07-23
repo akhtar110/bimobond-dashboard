@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../../domain/entities/bulk_gift_action_request.dart';
 import '../../domain/entities/bulk_gift_action_result.dart';
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/entities/gift_group_entities.dart';
 import '../../domain/enums/bulk_gift_action_type.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../datasources/gifts_remote_datasource.dart';
@@ -16,7 +17,6 @@ class GiftsRepositoryImpl implements GiftsRepository {
   @override
   Future<List<GiftEntity>> getAdminGifts() => _dataSource.getAdminGifts();
 
-  /// Upload the selected image first, then create the gift with the returned URL.
   @override
   Future<GiftEntity> createGift(CreateGiftData data) async {
     final thumbnailUrl = await _dataSource.uploadGiftImage(
@@ -34,22 +34,20 @@ class GiftsRepositoryImpl implements GiftsRepository {
       );
     }
 
-    return _dataSource.createGiftWithUrl(
+    final created = await _dataSource.createGiftWithUrl(
       name: data.name,
       thumbnailUrl: thumbnailUrl,
       animationUrl: animationUrl,
       priceCoins: data.priceCoins,
+      size: data.size,
       isActive: data.isActive,
-      publishedAt: data.publishedAt,
+      // Match create UI "defaults to now" when the admin leaves date empty.
+      publishedAt: data.publishedAt ?? DateTime.now(),
     );
+    if (created.publishedAt != null) return created;
+    return created.copyWith(publishedAt: data.publishedAt ?? DateTime.now());
   }
 
-  /// Update an existing gift.
-  /// If [data.imageBytes] is provided the image is uploaded first and the
-  /// resulting URL is used as [thumbnailUrl]; any explicit [data.thumbnailUrl]
-  /// value is ignored in that case.
-  /// Same for [data.animationBytes] → [animationUrl] when [data.animationUrl]
-  /// is not already set from a prior UI upload.
   @override
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data) async {
     String? resolvedThumbnailUrl = data.thumbnailUrl;
@@ -76,8 +74,11 @@ class GiftsRepositoryImpl implements GiftsRepository {
       thumbnailUrl: resolvedThumbnailUrl,
       animationUrl: resolvedAnimationUrl,
       priceCoins: data.priceCoins,
+      size: data.size,
       isActive: data.isActive,
       publishedAt: data.publishedAt,
+      clearPublishedAt: data.clearPublishedAt,
+      clearAnimationUrl: data.clearAnimationUrl,
     );
 
     return _dataSource.updateGift(giftId, patchedData);
@@ -96,8 +97,11 @@ class GiftsRepositoryImpl implements GiftsRepository {
   ) async {
     if (request.giftIds.isEmpty) {
       return const BulkGiftActionResult(
-        removedGiftIds: [],
-        failedGiftIds: [],
+        action: '',
+        successCount: 0,
+        notFoundCount: 0,
+        giftIds: [],
+        notFoundIds: [],
       );
     }
 
@@ -109,22 +113,59 @@ class GiftsRepositoryImpl implements GiftsRepository {
       final result = await _dataSource.executeAdminBulkAction(dto);
 
       return BulkGiftActionResult(
-        succeededGiftIds: result.affectedGiftIds,
-        removedGiftIds:
-            result.isDelete ? result.affectedGiftIds : const [],
-        failedGiftIds: result.failedGiftIds,
+        action: result.action,
+        successCount: result.successCount,
+        notFoundCount: result.notFoundCount,
+        giftIds: result.giftIds,
+        notFoundIds: result.notFoundIds,
+        deactivatedCount: result.deactivatedCount,
+        deactivatedIds: result.deactivatedIds,
         errorMessage: result.isFullSuccess
             ? null
-            : '${result.failedGiftIds.length} gift(s) could not be updated',
+            : '${result.notFoundIds.length} gift(s) could not be updated',
       );
     } catch (e) {
       return BulkGiftActionResult(
-        removedGiftIds: const [],
-        failedGiftIds: request.giftIds,
+        action: request.action.apiValue,
+        successCount: 0,
+        notFoundCount: request.giftIds.length,
+        giftIds: const [],
+        notFoundIds: request.giftIds,
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
     }
   }
+
+  @override
+  Future<List<GiftGroupEntity>> getGiftGroups() => _dataSource.getGiftGroups();
+
+  @override
+  Future<GiftGroupEntity> createGiftGroup(CreateGiftGroupData data) =>
+      _dataSource.createGiftGroup(data);
+
+  @override
+  Future<List<GiftGroupEntity>> reorderGiftGroups(
+    List<GiftGroupReorderItem> items,
+  ) =>
+      _dataSource.reorderGiftGroups(items);
+
+  @override
+  Future<GiftGroupEntity> updateGiftGroup(
+    String groupId,
+    UpdateGiftGroupData data,
+  ) =>
+      _dataSource.updateGiftGroup(groupId, data);
+
+  @override
+  Future<void> deleteGiftGroup(String groupId) =>
+      _dataSource.deleteGiftGroup(groupId);
+
+  @override
+  Future<GiftGroupEntity> replaceGroupGifts(
+    String groupId,
+    List<GiftGroupMembershipItem> gifts,
+  ) =>
+      _dataSource.replaceGroupGifts(groupId, gifts);
 
   AdminBulkGiftAction _toAdminAction(BulkGiftActionType action) =>
       switch (action) {

@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../bloc/bulk_sound_action_bloc.dart';
-import '../bloc/sound_crud_bloc.dart';
-import '../bloc/sound_overview_bloc.dart';
-import '../bloc/sounds_bloc.dart';
 import '../../../../core/localization/localization.dart';
-import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../../../core/widgets/web_dashboard_layout.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../promotions/presentation/widgets/promotions_dashboard_widgets.dart';
-import '../../../promotions/presentation/widgets/promotions_shared_widgets.dart';
 import '../../domain/entities/sound_entities.dart';
-import '../services/sound_preview_service.dart';
+import '../../domain/entities/sound_group_entities.dart';
+import '../bloc/bulk_sound_action_bloc.dart';
+import '../bloc/sound_crud_bloc.dart';
+import '../bloc/sound_groups_bloc.dart';
+import '../bloc/sound_overview_bloc.dart';
+import '../bloc/sounds_bloc.dart';
 import '../utils/sound_audio_duration_parser.dart';
 import '../utils/sound_audio_duration_web.dart';
 import '../widgets/sound_compact_overview.dart';
 import '../widgets/sound_confirm_dialogs.dart';
+import '../widgets/sound_filters_panel.dart';
 import '../widgets/sound_form_dialog.dart';
+import '../widgets/sound_groups_tabs_bar.dart';
+import '../widgets/sound_library_body.dart';
+import '../widgets/sound_management_header.dart';
 import '../widgets/sound_preview_scope.dart';
-import '../widgets/sound_skeleton.dart';
-import '../widgets/sounds_table.dart';
 
 class SoundManagementPage extends StatelessWidget {
   const SoundManagementPage({super.key});
@@ -39,9 +40,13 @@ class SoundManagementPage extends StatelessWidget {
         ),
         BlocProvider(create: (_) => di.sl<SoundCrudBloc>()),
         BlocProvider(create: (_) => di.sl<BulkSoundActionBloc>()),
+        BlocProvider(
+          create: (_) =>
+              di.sl<SoundGroupsBloc>()..add(const LoadSoundGroupsEvent()),
+        ),
       ],
-      child: SoundPreviewHost(
-        child: const _SoundManagementView(),
+      child: const SoundPreviewHost(
+        child: _SoundManagementView(),
       ),
     );
   }
@@ -55,13 +60,15 @@ class _SoundManagementView extends StatefulWidget {
 }
 
 class _SoundManagementViewState extends State<_SoundManagementView> {
-  /// Match [WebDashboardLayout.desktopBreakpoint] so the bar appears whenever
-  /// the permanent desktop sidebar is shown.
   static const _desktopPaginationBreakpoint =
       WebDashboardLayout.desktopBreakpoint;
+  static const _maxContentWidth = 1680.0;
+  static const int maxAudioSizeBytes = 1024 * 1024;
 
   final _scrollController = ScrollController();
   String? _pendingSoundId;
+  String? _pendingAssignGroupId;
+  String? _selectedGroupId;
 
   @override
   void initState() {
@@ -82,6 +89,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   void _onScroll() {
     if (!mounted || !_scrollController.hasClients) return;
     if (_useDesktopPagination) return;
+    if (_selectedGroupId != null) return;
 
     final position = _scrollController.position;
     if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
@@ -90,6 +98,24 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
     if (position.pixels >= position.maxScrollExtent - 300) {
       context.read<SoundsBloc>().add(const LoadMoreSoundsEvent());
     }
+  }
+
+  double _horizontalPadding(double width) {
+    if (width < 400) return 10;
+    if (width < 600) return 14;
+    return 20;
+  }
+
+  double _verticalPadding(double width) {
+    if (width < 400) return 10;
+    if (width < 720) return 12;
+    return 16;
+  }
+
+  double _sectionSpacing(double width) {
+    if (width < 400) return 8;
+    if (width < 720) return 10;
+    return 12;
   }
 
   void _refreshOverview() {
@@ -101,6 +127,9 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   void _refreshAll() {
     _refreshOverview();
     context.read<SoundsBloc>().add(const LoadSoundsEvent(refresh: true));
+    context
+        .read<SoundGroupsBloc>()
+        .add(const LoadSoundGroupsEvent(refresh: true));
   }
 
   void _applyCrudSuccess(SoundCrudSuccess state) {
@@ -125,6 +154,44 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
         );
     _pendingSoundId = null;
     _refreshOverview();
+
+    final groupId = _pendingAssignGroupId;
+    _pendingAssignGroupId = null;
+    if (mutation == SoundLibraryMutation.created &&
+        groupId != null &&
+        state.sound != null) {
+      _assignCreatedSoundToGroup(groupId, state.sound!);
+    }
+  }
+
+  void _assignCreatedSoundToGroup(String groupId, SoundEntity sound) {
+    final groupsState = context.read<SoundGroupsBloc>().state;
+    if (groupsState is! SoundGroupsLoaded) return;
+
+    SoundGroupEntity? group;
+    for (final candidate in groupsState.groups) {
+      if (candidate.id == groupId) {
+        group = candidate;
+        break;
+      }
+    }
+    if (group == null) return;
+
+    final members = [
+      for (final member in group.sounds)
+        SoundGroupMembershipItem(
+          soundId: member.sound.id,
+          sortOrder: member.sortOrder,
+        ),
+      SoundGroupMembershipItem(
+        soundId: sound.id,
+        sortOrder: group.sounds.length,
+      ),
+    ];
+
+    context.read<SoundGroupsBloc>().add(
+          ReplaceGroupSoundsEvent(groupId: groupId, sounds: members),
+        );
   }
 
   void _applyBulkSuccess(BulkSoundActionSuccess state) {
@@ -178,7 +245,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   }
 
   String _bulkSuccessMessage(BulkSoundActionResultEntity result) {
-    return switch (result.action) {
+    final base = switch (result.action) {
       'ACTIVATE' => context.tr('soundBulkActivatedSuccess', {
           'count': '${result.successCount}',
         }),
@@ -192,15 +259,31 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
           'count': '${result.successCount}',
         }),
     };
+    if (result.action == 'DELETE' && result.skippedCount > 0) {
+      return context.tr('soundBulkDeletedWithSkipped', {
+        'count': '${result.successCount}',
+        'skipped': '${result.skippedCount}',
+      });
+    }
+    return base;
   }
 
   Future<void> _openAddDialog() async {
     final l10n = context.l10n;
-    final result = await SoundFormDialog.show(context);
+    final groupsState = context.read<SoundGroupsBloc>().state;
+    final groups = groupsState is SoundGroupsLoaded ? groupsState.groups : null;
+    final result = await SoundFormDialog.show(context, groups: groups);
     if (!mounted || result == null) return;
+
+    _pendingAssignGroupId = result.assignGroupId;
 
     if (result.uploadData != null) {
       final upload = result.uploadData!;
+      if (upload.bytes.length > maxAudioSizeBytes) {
+        _showSnack(l10n.t('soundAudioMaxSizeExceeded'), isError: true);
+        if (mounted) await _openAddDialog();
+        return;
+      }
       final duration = await _resolveAudioDuration(
         existingDuration: upload.duration,
         bytes: upload.bytes,
@@ -308,6 +391,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -328,6 +412,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
               context.read<SoundsBloc>().add(const ClearSoundSelectionEvent());
             } else if (state is SoundCrudError) {
               _pendingSoundId = null;
+              _pendingAssignGroupId = null;
               _showSnack(state.message, isError: true);
               context.read<SoundCrudBloc>().add(const ResetSoundCrudEvent());
             }
@@ -344,310 +429,101 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
             }
           },
         ),
+        BlocListener<SoundGroupsBloc, SoundGroupsState>(
+          listenWhen: (previous, current) =>
+              current is SoundGroupsLoaded && current.feedbackMessage != null,
+          listener: (context, state) {
+            if (state is! SoundGroupsLoaded || state.feedbackMessage == null) {
+              return;
+            }
+            final l10n = context.l10n;
+            _showSnack(
+              l10n.tOr(state.feedbackMessage!, state.feedbackMessage!),
+              isError: state.feedbackIsError,
+            );
+            context
+                .read<SoundGroupsBloc>()
+                .add(const ClearSoundGroupsFeedbackEvent());
+          },
+        ),
       ],
-      child: PromotionsDashboardShell(
-        scrollController: _scrollController,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _PageHeader(
-              onAdd: _openAddDialog,
-              onRefresh: _refreshAll,
-            ),
-            const SizedBox(height: PromotionsSpace.sm),
-            _OverviewSection(),
-            const SizedBox(height: PromotionsSpace.sm),
-            DashboardCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      PromotionsSpace.md,
-                      PromotionsSpace.md,
-                      PromotionsSpace.md,
-                      PromotionsSpace.sm,
-                    ),
-                    child: _CompactLibraryFilters(onRefresh: _refreshAll),
+      child: ColoredBox(
+        color: scheme.surfaceContainerLowest,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final hPad = _horizontalPadding(width);
+            final vPad = _verticalPadding(width);
+            final sectionGap = _sectionSpacing(width);
+            final compactHeader = width < 720;
+
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    hPad,
+                    vPad,
+                    hPad,
+                    vPad,
                   ),
-                  Divider(
-                    height: 1,
-                    color: scheme.outlineVariant.withValues(alpha: 0.35),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SoundManagementHeader(
+                        isLoading: false,
+                        compact: compactHeader,
+                        onAdd: _openAddDialog,
+                        onRefresh: _refreshAll,
+                      ),
+                      SizedBox(height: sectionGap),
+                      const _OverviewSection(),
+                      SizedBox(height: sectionGap),
+                      BlocSelector<SoundsBloc, SoundsState, SoundsQuery>(
+                        selector: (state) => switch (state) {
+                          SoundsLoaded(:final query) => query,
+                          SoundsEmpty(:final query) => query,
+                          _ => const SoundsQuery(),
+                        },
+                        builder: (context, query) {
+                          return SoundFiltersPanel(query: query);
+                        },
+                      ),
+                      SizedBox(height: sectionGap),
+                      SoundGroupsTabsBar(
+                        selectedGroupId: _selectedGroupId,
+                        onGroupSelected: (group) {
+                          setState(() => _selectedGroupId = group?.id);
+                        },
+                      ),
+                      SizedBox(height: width < 520 ? 8 : 10),
+                      SoundLibraryBody(
+                        preview: preview,
+                        useDesktopPagination: _useDesktopPagination,
+                        selectedGroupId: _selectedGroupId,
+                        onEdit: _openEditDialog,
+                        onToggleActive: _toggleActive,
+                        onDelete: _deleteSound,
+                        onBulkAction: _bulkAction,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
-                  _LibraryContent(
-                    preview: preview,
-                    useDesktopPagination: _useDesktopPagination,
-                    onEdit: _openEditDialog,
-                    onToggleActive: _toggleActive,
-                    onDelete: _deleteSound,
-                    onBulkAction: _bulkAction,
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: PromotionsSpace.xxl),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _LibraryContent extends StatelessWidget {
-  const _LibraryContent({
-    required this.preview,
-    required this.useDesktopPagination,
-    required this.onEdit,
-    required this.onToggleActive,
-    required this.onDelete,
-    required this.onBulkAction,
-  });
-
-  final SoundPreviewService preview;
-  final bool useDesktopPagination;
-  final ValueChanged<SoundEntity> onEdit;
-  final ValueChanged<SoundEntity> onToggleActive;
-  final ValueChanged<SoundEntity> onDelete;
-  final ValueChanged<BulkSoundActionType> onBulkAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
-    return BlocBuilder<BulkSoundActionBloc, BulkSoundActionState>(
-      builder: (context, bulkState) {
-        final running = bulkState is BulkSoundActionRunning;
-        return BlocBuilder<SoundsBloc, SoundsState>(
-          builder: (context, state) {
-            if (state is SoundsLoading) {
-              return const Padding(
-                padding: EdgeInsets.all(PromotionsSpace.lg),
-                child: SoundTableSkeleton(),
-              );
-            }
-            if (state is SoundsError) {
-              return Padding(
-                padding: const EdgeInsets.all(PromotionsSpace.xl),
-                child: ErrorView(
-                  message: state.message,
-                  retryLabel: l10n.t('retry'),
-                  onRetry: () =>
-                      context.read<SoundsBloc>().add(const LoadSoundsEvent()),
-                ),
-              );
-            }
-            if (state is SoundsEmpty) {
-              if (state.isLoading) {
-                return const Padding(
-                  padding: EdgeInsets.all(PromotionsSpace.lg),
-                  child: SoundTableSkeleton(),
-                );
-              }
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 56),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.library_music_outlined,
-                      size: 44,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      l10n.t('soundNoResults'),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ],
-                ),
-              );
-            }
-            if (state is! SoundsLoaded) {
-              return const Padding(
-                padding: EdgeInsets.all(PromotionsSpace.lg),
-                child: SoundTableSkeleton(),
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (state.selectedCount > 0)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      PromotionsSpace.md,
-                      PromotionsSpace.md,
-                      PromotionsSpace.md,
-                      0,
-                    ),
-                    child: BulkActionToolbar(
-                      selectedCount: state.selectedCount,
-                      allVisibleSelected: state.allVisibleSelected,
-                      someVisibleSelected: state.someVisibleSelected,
-                      onSelectAll: () => context
-                          .read<SoundsBloc>()
-                          .add(const SelectAllSoundsEvent()),
-                      onClear: () => context
-                          .read<SoundsBloc>()
-                          .add(const ClearSoundSelectionEvent()),
-                      actions: [
-                        FilledButton.tonal(
-                          onPressed: running
-                              ? null
-                              : () =>
-                                  onBulkAction(BulkSoundActionType.activate),
-                          child: Text(l10n.t('soundBulkActivate')),
-                        ),
-                        FilledButton.tonal(
-                          onPressed: running
-                              ? null
-                              : () =>
-                                  onBulkAction(BulkSoundActionType.deactivate),
-                          child: Text(l10n.t('soundBulkDeactivate')),
-                        ),
-                        FilledButton(
-                          onPressed: running
-                              ? null
-                              : () => onBulkAction(BulkSoundActionType.delete),
-                          child: Text(l10n.t('soundBulkDelete')),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (state.isRefreshing || running)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      PromotionsSpace.md,
-                      PromotionsSpace.sm,
-                      PromotionsSpace.md,
-                      0,
-                    ),
-                    child: LinearProgressIndicator(),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    PromotionsSpace.md,
-                    PromotionsSpace.sm,
-                    PromotionsSpace.md,
-                    PromotionsSpace.md,
-                  ),
-                  child: SoundsTable(
-                    sounds: state.sounds,
-                    selectedIds: state.selectedIds,
-                    preview: preview,
-                    onToggleSelection: (id) => context
-                        .read<SoundsBloc>()
-                        .add(ToggleSoundSelectionEvent(id)),
-                    onSelectAll: () => context
-                        .read<SoundsBloc>()
-                        .add(const SelectAllSoundsEvent()),
-                    onEdit: onEdit,
-                    onToggleActive: onToggleActive,
-                    onDelete: onDelete,
-                  ),
-                ),
-                if (useDesktopPagination &&
-                    (state.meta.total > 0 || state.sounds.isNotEmpty))
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      PromotionsSpace.md,
-                      0,
-                      PromotionsSpace.md,
-                      PromotionsSpace.md,
-                    ),
-                    child: AppPaginationBar(
-                      currentPage: state.meta.page < 1 ? 1 : state.meta.page,
-                      lastPage: state.meta.totalPages < 1
-                          ? 1
-                          : state.meta.totalPages,
-                      total: state.meta.total > 0
-                          ? state.meta.total
-                          : state.sounds.length,
-                      pageSize: state.meta.limit > 0
-                          ? state.meta.limit
-                          : state.query.limit,
-                      itemCount: state.sounds.length,
-                      hideWhenSinglePage: false,
-                      borderRadius: BorderRadius.circular(12),
-                      onPageChanged: (page) => context
-                          .read<SoundsBloc>()
-                          .add(LoadSoundsEvent(page: page)),
-                    ),
-                  ),
-                if (!useDesktopPagination && state.isLoadingMore)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: PromotionsSpace.md),
-                    child: Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _PageHeader extends StatelessWidget {
-  const _PageHeader({
-    required this.onAdd,
-    required this.onRefresh,
-  });
-
-  final VoidCallback onAdd;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            l10n.t('soundManagementTitle'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
-          ),
-        ),
-        IconButton(
-          tooltip: l10n.t('refresh'),
-          onPressed: onRefresh,
-          visualDensity: VisualDensity.compact,
-          icon: Icon(Icons.refresh_rounded, color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(width: 4),
-        FilledButton.icon(
-          onPressed: onAdd,
-          style: FilledButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text(l10n.t('soundAddTitle')),
-        ),
-      ],
-    );
-  }
-}
-
 class _OverviewSection extends StatelessWidget {
+  const _OverviewSection();
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -676,317 +552,9 @@ class _OverviewSection extends StatelessWidget {
         return SoundCompactOverview(
           sounds: state.overview.sounds,
           usage: state.overview.usage,
+          segments: state.overview.segments,
         );
       },
-    );
-  }
-}
-
-class _CompactLibraryFilters extends StatelessWidget {
-  const _CompactLibraryFilters({required this.onRefresh});
-
-  final VoidCallback onRefresh;
-
-  static const _controlHeight = 36.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-
-    return BlocSelector<SoundsBloc, SoundsState, SoundsQuery>(
-      selector: (state) => switch (state) {
-        SoundsLoaded(:final query) => query,
-        SoundsEmpty(:final query) => query,
-        _ => const SoundsQuery(),
-      },
-      builder: (context, query) {
-        final hasFilters = (query.search != null && query.search!.isNotEmpty) ||
-            query.isActive != null;
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final narrow = constraints.maxWidth < 720;
-
-            final search = _CompactSearchField(
-              hint: l10n.t('soundSearchHint'),
-              initialValue: query.search ?? '',
-              onChanged: (q) =>
-                  context.read<SoundsBloc>().add(SearchSoundsEvent(q)),
-            );
-
-            final sort = _CompactFilterDropdown(
-              hint: l10n.t('sortBy'),
-              value: query.sort.apiValue,
-              items: SoundSortMode.values.map((s) => s.apiValue).toList(),
-              itemLabel: (v) => switch (SoundSortMode.values.firstWhere(
-                    (s) => s.apiValue == v,
-                    orElse: () => SoundSortMode.trending,
-                  )) {
-                SoundSortMode.trending => l10n.t('soundSortTrending'),
-                SoundSortMode.recent => l10n.t('soundSortRecent'),
-                SoundSortMode.alphabetical => l10n.t('soundSortName'),
-              },
-              onChanged: (v) {
-                if (v == null) return;
-                final sort = SoundSortMode.values.firstWhere(
-                  (s) => s.apiValue == v,
-                  orElse: () => SoundSortMode.trending,
-                );
-                context.read<SoundsBloc>().add(SortSoundsEvent(sort));
-              },
-            );
-
-            final status = _CompactFilterDropdown(
-              hint: l10n.t('status'),
-              value: query.isActive == null
-                  ? null
-                  : (query.isActive! ? 'active' : 'inactive'),
-              items: const [null, 'active', 'inactive'],
-              itemLabel: (v) => switch (v) {
-                'active' => l10n.t('soundStatusActive'),
-                'inactive' => l10n.t('soundStatusHidden'),
-                _ => l10n.t('all'),
-              },
-              onChanged: (v) => context.read<SoundsBloc>().add(
-                    FilterSoundsActiveEvent(
-                      v == null ? null : v == 'active',
-                    ),
-                  ),
-            );
-
-            if (narrow) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  search,
-                  const SizedBox(height: PromotionsSpace.sm),
-                  Row(
-                    children: [
-                      Expanded(child: sort),
-                      const SizedBox(width: PromotionsSpace.sm),
-                      Expanded(child: status),
-                      if (hasFilters) ...[
-                        const SizedBox(width: 4),
-                        IconButton(
-                          tooltip: l10n.t('clearFilters'),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => context
-                              .read<SoundsBloc>()
-                              .add(const ClearSoundsFiltersEvent()),
-                          icon: Icon(
-                            Icons.filter_alt_off_outlined,
-                            size: 18,
-                            color: scheme.error,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(flex: 3, child: search),
-                const SizedBox(width: PromotionsSpace.sm),
-                SizedBox(width: 148, child: sort),
-                const SizedBox(width: PromotionsSpace.sm),
-                SizedBox(width: 120, child: status),
-                if (hasFilters) ...[
-                  IconButton(
-                    tooltip: l10n.t('clearFilters'),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => context
-                        .read<SoundsBloc>()
-                        .add(const ClearSoundsFiltersEvent()),
-                    icon: Icon(
-                      Icons.filter_alt_off_outlined,
-                      size: 18,
-                      color: scheme.error,
-                    ),
-                  ),
-                ] else
-                  IconButton(
-                    tooltip: l10n.t('refresh'),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: onRefresh,
-                    icon: Icon(
-                      Icons.refresh_rounded,
-                      size: 18,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _CompactSearchField extends StatefulWidget {
-  const _CompactSearchField({
-    required this.hint,
-    required this.onChanged,
-    this.initialValue = '',
-  });
-
-  final String hint;
-  final ValueChanged<String> onChanged;
-  final String initialValue;
-
-  @override
-  State<_CompactSearchField> createState() => _CompactSearchFieldState();
-}
-
-class _CompactSearchFieldState extends State<_CompactSearchField> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void didUpdateWidget(_CompactSearchField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != oldWidget.initialValue &&
-        widget.initialValue != _controller.text) {
-      _controller.text = widget.initialValue;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: _CompactLibraryFilters._controlHeight,
-      child: TextField(
-        controller: _controller,
-        onChanged: (value) {
-          setState(() {});
-          widget.onChanged(value);
-        },
-        style: Theme.of(context).textTheme.bodySmall,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: widget.hint,
-          hintStyle: TextStyle(
-            color: scheme.onSurfaceVariant,
-            fontSize: 13,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            size: 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    _controller.clear();
-                    widget.onChanged('');
-                    setState(() {});
-                  },
-                  icon: Icon(Icons.close_rounded, size: 16, color: scheme.onSurfaceVariant),
-                )
-              : null,
-          isDense: true,
-          filled: true,
-          fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: scheme.primary, width: 1.2),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CompactFilterDropdown extends StatelessWidget {
-  const _CompactFilterDropdown({
-    required this.hint,
-    required this.value,
-    required this.items,
-    required this.itemLabel,
-    required this.onChanged,
-  });
-
-  final String hint;
-  final String? value;
-  final List<String?> items;
-  final String Function(String?) itemLabel;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final safeValue = items.contains(value) ? value : null;
-
-    return Container(
-      height: _CompactLibraryFilters._controlHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: safeValue,
-          isExpanded: true,
-          isDense: true,
-          hint: Text(
-            hint,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          icon: Icon(
-            Icons.expand_more_rounded,
-            size: 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          items: items
-              .map(
-                (v) => DropdownMenuItem(
-                  value: v,
-                  child: Text(
-                    itemLabel(v),
-                    style: Theme.of(context).textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
     );
   }
 }

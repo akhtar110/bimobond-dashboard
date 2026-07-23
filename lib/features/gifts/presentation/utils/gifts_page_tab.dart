@@ -1,0 +1,1 @@
+enum GiftsPageTab { catalog, groups }

@@ -63,7 +63,7 @@ class SoundTopTrendingSection extends StatelessWidget {
                 DataColumn(label: Text(l10n.t('soundName'))),
                 DataColumn(label: Text(l10n.t('soundAuthor'))),
                 DataColumn(label: Text(l10n.t('soundUsageCount'))),
-                DataColumn(label: Text(l10n.t('soundColVisible'))),
+                DataColumn(label: Text(l10n.t('soundStatusActive'))),
                 DataColumn(label: Text(l10n.t('soundPreview'))),
               ],
               rows: [

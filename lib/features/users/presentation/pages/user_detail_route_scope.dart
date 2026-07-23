@@ -10,6 +10,7 @@ import '../../../user_activity/presentation/bloc/user_comments_bloc.dart';
 import '../../../user_activity/presentation/bloc/user_likes_bloc.dart';
 import '../../../user_activity/presentation/bloc/user_unified_activity_bloc.dart';
 import '../../../promotions/presentation/bloc/location_intelligence_bloc.dart';
+import '../../../rbac/presentation/bloc/rbac_bloc.dart';
 import '../../../search_history/presentation/bloc/search_history_bloc.dart';
 import '../../../user_interests/presentation/bloc/user_interests_bloc.dart';
 import '../../domain/entities/user_entity.dart';
@@ -106,6 +107,7 @@ class _UserDetailRouteScopeState extends State<UserDetailRouteScope> {
     if (kDebugMode) debugPrint('UserDetailRouteScope rebuilt');
     return MultiBlocProvider(
       providers: [
+        BlocProvider<RbacBloc>.value(value: di.sl<RbacBloc>()),
         BlocProvider<UserDetailBloc>.value(value: _detailBloc),
         BlocProvider<UserActivityBloc>.value(value: _activityBloc),
         BlocProvider<UserCommentsBloc>.value(value: _commentsBloc),

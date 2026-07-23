@@ -2,8 +2,10 @@
 enum AuctionStatus {
   active('ACTIVE'),
   completed('COMPLETED'),
+  settled('SETTLED'),
   cancelled('CANCELLED'),
-  banned('BANNED');
+  banned('BANNED'),
+  disputed('DISPUTED');
 
   const AuctionStatus(this.apiValue);
   final String apiValue;

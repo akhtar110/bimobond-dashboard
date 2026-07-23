@@ -124,6 +124,7 @@ class ChatMessagesQuery {
         ChatMessageTypeFilter.video => 'VIDEO',
         ChatMessageTypeFilter.audio => 'AUDIO',
         ChatMessageTypeFilter.postShare => 'POST_SHARE',
+        ChatMessageTypeFilter.location => 'LOCATION',
         ChatMessageTypeFilter.all => 'TEXT',
       };
     }

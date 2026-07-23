@@ -40,7 +40,10 @@ class ChatModerationSidebar extends StatelessWidget {
           _InfoCard(
             title: l10n.t('chatInfo'),
             children: [
-              _InfoRow(l10n.t('chatId'), chat.id),
+              _InfoRow(
+                l10n.tOr('type', 'Type'),
+                chat.isGroup ? l10n.t('groupChat') : l10n.t('directChat'),
+              ),
               _InfoRow(l10n.t('createdAt'), formatChatTime(chat.createdAt)),
               _InfoRow(l10n.t('lastActivity'), formatChatTime(chat.updatedAt)),
               _InfoRow(l10n.t('totalMessages'), '${chat.messageCount}'),

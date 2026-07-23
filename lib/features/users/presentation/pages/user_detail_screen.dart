@@ -103,12 +103,42 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         ),
         body: BlocBuilder<UserDetailBloc, UserDetailState>(
           builder: (context, state) {
-            if (state is UserDetailLoading) {
+            if (state is UserDetailInitial || state is UserDetailLoading) {
               return const Center(child: CircularProgressIndicator());
             }
 
             if (state is UserDetailError) {
-              return Center(child: Text(state.message));
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: 48,
+                        color: scheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        state.message,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                        onPressed: () => context.read<UserDetailBloc>().add(
+                              LoadUserDetailEvent(widget.user),
+                            ),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(l10n.t('retry')),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
 
             if (state is UserDetailLoaded) {

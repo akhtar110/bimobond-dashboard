@@ -5,19 +5,20 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/sound_entities.dart';
 import '../../../promotions/presentation/widgets/promotions_dashboard_widgets.dart';
 
-/// Low-height KPI strip — single row, scrolls horizontally when space is tight.
+/// Compact KPI chips — width follows label/value content.
 class SoundCompactOverview extends StatelessWidget {
   const SoundCompactOverview({
     super.key,
     required this.sounds,
     required this.usage,
+    required this.segments,
   });
 
   final SoundStatsEntity sounds;
   final SoundUsageStatsEntity usage;
+  final SoundSegmentStatsEntity segments;
 
-  static const _stripHeight = 40.0;
-  static const _minTileWidth = 96.0;
+  static const _stripHeight = 44.0;
 
   @override
   Widget build(BuildContext context) {
@@ -29,53 +30,48 @@ class SoundCompactOverview extends StatelessWidget {
       (l10n.t('soundKpiActive'), number.format(sounds.active), Icons.check_circle_outline),
       (l10n.t('soundKpiHidden'), number.format(sounds.inactive), Icons.visibility_off_outlined),
       (l10n.t('soundKpiOriginalUploads'), number.format(sounds.originalUploads), Icons.upload_outlined),
+      (l10n.tOr('soundKpiSegments', 'Segments'), number.format(segments.total), Icons.graphic_eq_outlined),
       (l10n.t('soundKpiTotalUsage'), number.format(usage.totalUseCount), Icons.equalizer_rounded),
       (l10n.t('soundKpiPosts24h'), number.format(usage.postsWithSoundLast24Hours), Icons.trending_up_rounded),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final fitsInRow = width >= _minTileWidth * items.length + 8 * (items.length - 1);
+        final gap = PromotionsSpace.sm;
+        final useWrap = constraints.maxWidth < 720;
 
-        if (fitsInRow) {
-          return SizedBox(
-            height: _stripHeight,
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  if (i > 0) const SizedBox(width: PromotionsSpace.sm),
-                  Expanded(
-                    child: _CompactKpiTile(
-                      label: items[i].$1,
-                      value: items[i].$2,
-                      icon: items[i].$3,
-                    ),
-                  ),
-                ],
-              ],
+        final tiles = [
+          for (final item in items)
+            _CompactKpiTile(
+              label: item.$1,
+              value: item.$2,
+              icon: item.$3,
             ),
+        ];
+
+        if (useWrap) {
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: tiles,
           );
         }
 
         return SizedBox(
           height: _stripHeight,
-          child: ListView.separated(
+          child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.hardEdge,
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: PromotionsSpace.sm),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return SizedBox(
-                width: _minTileWidth,
-                child: _CompactKpiTile(
-                  label: item.$1,
-                  value: item.$2,
-                  icon: item.$3,
-                ),
-              );
-            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < tiles.length; i++) ...[
+                  if (i > 0) SizedBox(width: gap),
+                  tiles[i],
+                ],
+              ],
+            ),
           ),
         );
       },
@@ -89,21 +85,30 @@ class SoundCompactOverviewSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    const widths = [72.0, 68.0, 78.0, 84.0, 76.0, 72.0, 64.0];
 
     return SizedBox(
       height: SoundCompactOverview._stripHeight,
-      child: ListView.separated(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: 6,
-        separatorBuilder: (_, __) => const SizedBox(width: PromotionsSpace.sm),
-        itemBuilder: (_, __) => Container(
-          width: SoundCompactOverview._minTileWidth,
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
-          ),
+        child: Row(
+          children: [
+            for (var i = 0; i < widths.length; i++) ...[
+              if (i > 0) const SizedBox(width: PromotionsSpace.sm),
+              Container(
+                width: widths[i],
+                height: SoundCompactOverview._stripHeight,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -126,9 +131,12 @@ class _CompactKpiTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Tooltip(
-      message: label,
+      message: '$value · $label',
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        constraints: const BoxConstraints(
+          minHeight: SoundCompactOverview._stripHeight,
+        ),
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 5, 12, 5),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(10),
@@ -137,35 +145,32 @@ class _CompactKpiTile extends StatelessWidget {
           ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(icon, size: 14, color: scheme.primary),
             const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          height: 1.0,
-                        ),
-                  ),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 10,
-                          height: 1.1,
-                        ),
-                  ),
-                ],
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                      ),
+                ),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 10,
+                        height: 1.15,
+                      ),
+                ),
+              ],
             ),
           ],
         ),

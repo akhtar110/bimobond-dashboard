@@ -72,14 +72,6 @@ class DeleteUserUseCase {
   Future<void> call(String userId) => _repository.deleteUser(userId);
 }
 
-class ResetPasswordUseCase {
-  const ResetPasswordUseCase(this._repository);
-
-  final UsersRepository _repository;
-
-  Future<void> call(String userId) => _repository.resetUserPassword(userId);
-}
-
 class SetUserPostingAllowedUseCase {
   const SetUserPostingAllowedUseCase(this._repository);
 

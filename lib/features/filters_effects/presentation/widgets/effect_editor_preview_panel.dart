@@ -5,9 +5,11 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/effect_editor_bloc.dart';
 import '../bloc/effect_editor_state.dart';
-import '../utils/effect_placement_visibility.dart';
+import '../utils/effect_anchor_form_data.dart';
 import '../utils/fe_effect_emoji_display.dart';
+import 'effect_anchor_fields_form.dart';
 import 'fe_catalog_item_preview.dart';
+import 'fe_effect_form_fields.dart';
 
 class EffectEditorPreviewPanel extends StatelessWidget {
   const EffectEditorPreviewPanel({
@@ -23,20 +25,18 @@ class EffectEditorPreviewPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state != null) {
-      return _EffectEditorPreviewContent(
-        state: state!,
-        embedded: embedded,
-      );
+      return _EffectEditorPreviewContent(state: state!, embedded: embedded);
     }
 
-    return BlocSelector<EffectEditorBloc, EffectEditorState, EffectEditorReady?>(
+    return BlocSelector<
+      EffectEditorBloc,
+      EffectEditorState,
+      EffectEditorReady?
+    >(
       selector: (current) => current is EffectEditorReady ? current : null,
       builder: (context, ready) {
         if (ready == null) return const SizedBox.shrink();
-        return _EffectEditorPreviewContent(
-          state: ready,
-          embedded: embedded,
-        );
+        return _EffectEditorPreviewContent(state: ready, embedded: embedded);
       },
     );
   }
@@ -51,47 +51,15 @@ class _EffectEditorPreviewContent extends StatelessWidget {
   final EffectEditorReady state;
   final bool embedded;
 
-  String _anchorLabel(String? key) {
-    if (key == null || key.isEmpty) return '—';
-    final fromSchema = state.schema.anchorTypeFor(key);
-    if (fromSchema != null && fromSchema.label.trim().isNotEmpty) {
-      return fromSchema.label;
-    }
-    return key;
-  }
-
-  String _landmarkLabels(List<String> keys) {
-    if (keys.isEmpty) return '—';
-    return keys.map((key) {
-      for (final landmark in state.schema.landmarks) {
-        if (landmark.key == key) {
-          return landmark.label.trim().isNotEmpty ? landmark.label : key;
-        }
-      }
-      return key;
-    }).join(', ');
-  }
-
-  String _effectTypeLabel(BuildContext context, String type) {
-    final l10n = context.l10n;
-    return switch (CameraEffectTypeApi.normalize(type)) {
-      CameraEffectTypeApi.screenOverlay =>
-        l10n.tOr('feEffectTypeScreenOverlay', 'Screen overlay'),
-      _ => l10n.tOr('feEffectTypeFaceAr', 'Face AR'),
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final form = state.form;
-    final placement = form.placement;
-    final anchorType = placement.anchorType;
-    final showPlacement = EffectPlacementVisibility.placementEnabled(
-      requiresFaceDetection: form.requiresFaceDetection,
-      isScreenEffect: form.isScreenEffect,
-    );
+    final isComposite = CameraEffectRenderTypeApi.isComposite(form.renderType);
+    final isSticker = CameraEffectRenderTypeApi.isSticker(form.renderType);
+    final isDistortion = CameraEffectRenderTypeApi.isDistortion(form.renderType);
+    final assetImageUrl = FeEffectEmojiDisplay.resolvedImageUrl(form.assetUrl);
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -99,9 +67,9 @@ class _EffectEditorPreviewContent extends StatelessWidget {
         if (!embedded)
           Text(
             l10n.tOr('feEffectSectionPreview', 'Live preview'),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         if (!embedded) const SizedBox(height: 12),
         Center(
@@ -113,98 +81,65 @@ class _EffectEditorPreviewContent extends StatelessWidget {
               previewColorHex: form.previewColorHex,
               emoji: form.emoji,
               thumbnailUrl: form.assetUrl,
-              effectType: form.effectType,
-              requiresFaceDetection: form.requiresFaceDetection,
-              isScreenEffect: form.isScreenEffect,
-              anchorType: placement.anchorType,
-              scaleFactor: placement.scaleFactor,
-              offsetX: placement.offsetX,
-              offsetY: placement.offsetY,
-              landmarkSize: placement.landmarkSize,
-              anchorLandmarks: placement.anchorLandmarks,
+              renderType: form.renderType,
+              effectAnchor: form.anchor.toMap(),
+              effectStickers: form.stickers,
+              distortionPreset: form.distortionPreset,
+              stickersCount: form.stickers.length,
             ),
           ),
         ),
         const SizedBox(height: 12),
         Text(
-          l10n.tOr('feEffectPlacementSummary', 'Placement summary'),
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          l10n.tOr('feEffectSummary', 'Summary'),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         _SummaryCard(
           children: [
             _SummaryRow(
-              label: l10n.tOr('feFieldEffectType', 'Effect type'),
-              value: _effectTypeLabel(context, form.effectType),
+              label: l10n.tOr('feFieldRenderType', 'Render type'),
+              value: feEffectRenderTypeLabel(context, form.renderType),
             ),
             _SummaryRow(
-              label: l10n.tOr('feFieldAnchorType', 'Anchor type'),
-              value: showPlacement
-                  ? _anchorLabel(anchorType)
-                  : l10n.tOr('fePlacementNotApplicable', 'N/A'),
+              label: l10n.tOr('feFieldSlug', 'Slug'),
+              value: form.slug.trim().isEmpty ? '—' : form.slug.trim(),
             ),
-            _SummaryRow(
-              label: l10n.tOr('feFlagFaceDetection', 'Face detection'),
-              value: form.requiresFaceDetection
-                  ? l10n.t('yes')
-                  : l10n.t('no'),
-            ),
-            _SummaryRow(
-              label: l10n.tOr('feFlagScreenEffect', 'Screen effect'),
-              value: form.isScreenEffect
-                  ? l10n.t('yes')
-                  : l10n.t('no'),
-            ),
-            if (showPlacement &&
-                (EffectPlacementVisibility.showLandmarkMultiSelect(
-                      anchorType,
-                    ) ||
-                    EffectPlacementVisibility.showLandmarkSingleSelect(
-                      anchorType,
-                    )))
+            if (isDistortion)
               _SummaryRow(
-                label: l10n.tOr('feFieldAnchorLandmarks', 'Anchor landmarks'),
-                value: _landmarkLabels(placement.anchorLandmarks),
+                label: l10n.tOr('feFieldDistortionPreset', 'Distortion preset'),
+                value: (form.distortionPreset?.trim().isNotEmpty ?? false)
+                    ? feDistortionPresetLabel(context, form.distortionPreset!)
+                    : '—',
               ),
-            if (showPlacement &&
-                EffectPlacementVisibility.showScaleFactor(anchorType) &&
-                placement.scaleFactor != null)
+            if (isComposite)
               _SummaryRow(
-                label: l10n.tOr('feFieldScaleFactor', 'Scale factor'),
-                value: placement.scaleFactor!.toStringAsFixed(2),
+                label: l10n.tOr('feStickerLayers', 'Sticker layers'),
+                value: '${form.stickers.length}',
               ),
-            if (showPlacement &&
-                EffectPlacementVisibility.showOffsetX(anchorType) &&
-                placement.offsetX != null)
+            if (isSticker)
               _SummaryRow(
-                label: l10n.tOr('feFieldOffsetX', 'Offset X'),
-                value: placement.offsetX!.toStringAsFixed(2),
+                label: l10n.tOr('feFieldAnchor', 'Anchor'),
+                value: form.anchor.isEmpty
+                    ? l10n.t('no')
+                    : _formatAnchorSummary(context, form.anchor),
               ),
-            if (showPlacement &&
-                EffectPlacementVisibility.showOffsetY(anchorType) &&
-                placement.offsetY != null)
+            if (state.isEditing && state.hasUnsavedChanges)
               _SummaryRow(
-                label: l10n.tOr('feFieldOffsetY', 'Offset Y'),
-                value: placement.offsetY!.toStringAsFixed(2),
-              ),
-            if (showPlacement &&
-                EffectPlacementVisibility.showLandmarkSize(anchorType) &&
-                placement.landmarkSize != null)
-              _SummaryRow(
-                label: l10n.tOr('feFieldLandmarkSize', 'Landmark size'),
-                value: placement.landmarkSize!.toStringAsFixed(2),
+                label: l10n.tOr('feFilterCurrent', 'Modified'),
+                value: l10n.t('yes'),
               ),
           ],
         ),
-        if (FeEffectEmojiDisplay.resolvedImageUrl(form.assetUrl) != null) ...[
+        if (assetImageUrl != null) ...[
           const SizedBox(height: 12),
           Text(
             l10n.tOr('feAssetPreview', 'Asset preview'),
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           DecoratedBox(
@@ -217,15 +152,15 @@ class _EffectEditorPreviewContent extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Center(
                 child: Image.network(
-                  FeEffectEmojiDisplay.resolvedImageUrl(form.assetUrl)!,
+                  assetImageUrl,
                   key: ValueKey(form.assetUrl!.trim()),
                   height: 96,
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) => Text(
                     l10n.tOr('feAssetLoadFailed', 'Could not load asset'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.error,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: scheme.error),
                   ),
                 ),
               ),
@@ -243,12 +178,28 @@ class _EffectEditorPreviewContent extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: scheme.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: content,
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: content),
     );
   }
+}
+
+String _formatAnchorSummary(BuildContext context, EffectAnchorFormData anchor) {
+  final l10n = context.l10n;
+  final parts = <String>[];
+  final pinSummary = effectAnchorPinSummary(context, anchor);
+  if (pinSummary.isNotEmpty) parts.add(pinSummary);
+
+  if (anchor.parsedLeftLandmark != null ||
+      anchor.parsedRightLandmark != null ||
+      anchor.parsedAnchorLandmark != null) {
+    parts.add(effectAnchorLandmarkSummary(context, anchor));
+  }
+
+  if (anchor.parsedWidthScreenMult != null) {
+    parts.add('×${anchor.parsedWidthScreenMult!.toStringAsFixed(1)}');
+  }
+
+  return parts.isEmpty ? l10n.t('yes') : parts.join(' · ');
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -295,9 +246,9 @@ class _SummaryRow extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           Expanded(
@@ -305,9 +256,9 @@ class _SummaryRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],

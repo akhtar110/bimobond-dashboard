@@ -36,8 +36,7 @@ class EffectPlacementSchemaModel extends EffectPlacementSchemaEntity {
         )
         .toList();
 
-    final defaultsRaw =
-        json['defaultsBySlug'] as Map<String, dynamic>? ?? {};
+    final defaultsRaw = json['defaultsBySlug'] as Map<String, dynamic>? ?? {};
     final defaults = <String, SlugPlacementDefaultsEntity>{};
     for (final entry in defaultsRaw.entries) {
       defaults[entry.key] = _defaultsFromJson(
@@ -58,9 +57,7 @@ class EffectPlacementSchemaModel extends EffectPlacementSchemaEntity {
         landmarks: faceLandmarks,
       ),
       anchorTypes: anchorTypes,
-      landmarks: schemaLandmarks.isNotEmpty
-          ? schemaLandmarks
-          : faceLandmarks,
+      landmarks: schemaLandmarks.isNotEmpty ? schemaLandmarks : faceLandmarks,
       defaultsBySlug: defaults,
     );
   }

@@ -73,12 +73,14 @@ class SoundOverviewModel extends SoundOverviewEntity {
   const SoundOverviewModel({
     required super.sounds,
     required super.usage,
+    required super.segments,
     required super.topSounds,
   });
 
   factory SoundOverviewModel.fromJson(Map<String, dynamic> json) {
     final soundsJson = json['sounds'];
     final usageJson = json['usage'];
+    final segmentsJson = json['segments'];
     final topJson = json['topSounds'];
 
     return SoundOverviewModel(
@@ -96,6 +98,9 @@ class SoundOverviewModel extends SoundOverviewEntity {
               totalUseCount: 0,
               postsWithSoundLast24Hours: 0,
             ),
+      segments: segmentsJson is Map<String, dynamic>
+          ? SoundSegmentStatsModel.fromJson(segmentsJson)
+          : const SoundSegmentStatsModel(total: 0),
       topSounds: topJson is List
           ? topJson
               .whereType<Map<String, dynamic>>()
@@ -139,6 +144,16 @@ class SoundUsageStatsModel extends SoundUsageStatsEntity {
   }
 }
 
+class SoundSegmentStatsModel extends SoundSegmentStatsEntity {
+  const SoundSegmentStatsModel({required super.total});
+
+  factory SoundSegmentStatsModel.fromJson(Map<String, dynamic> json) {
+    return SoundSegmentStatsModel(
+      total: SoundModel._asInt(json['total']),
+    );
+  }
+}
+
 class PaginatedSoundsModel extends PaginatedSoundsEntity {
   const PaginatedSoundsModel({
     required super.data,
@@ -174,6 +189,8 @@ class BulkSoundActionResultModel extends BulkSoundActionResultEntity {
     required super.notFoundCount,
     required super.soundIds,
     required super.notFoundIds,
+    super.skippedCount,
+    super.skippedIds,
   });
 
   factory BulkSoundActionResultModel.fromJson(Map<String, dynamic> json) {
@@ -181,11 +198,16 @@ class BulkSoundActionResultModel extends BulkSoundActionResultEntity {
       action: json['action']?.toString() ?? '',
       successCount: SoundModel._asInt(json['successCount']),
       notFoundCount: SoundModel._asInt(json['notFoundCount']),
+      skippedCount: SoundModel._asInt(json['skippedCount']),
       soundIds: (json['soundIds'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
       notFoundIds: (json['notFoundIds'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      skippedIds: (json['skippedIds'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],

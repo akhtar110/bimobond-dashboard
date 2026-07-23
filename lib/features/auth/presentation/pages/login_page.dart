@@ -47,6 +47,7 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
+  LoginBloc? _loginBloc;
 
   static _LoginLayoutMetrics _metrics(BuildContext context) =>
       _LoginLayoutMetrics.of(context);
@@ -77,9 +78,29 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
     listenWindowFocus(_onWindowFocus);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Cache for window-focus callbacks: looking up InheritedWidgets after
+    // deactivate (route covered/popped) is unsafe even when mounted is true.
+    _loginBloc = context.read<LoginBloc>();
+  }
+
+  @override
+  void deactivate() {
+    cancelWindowFocusListener();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    listenWindowFocus(_onWindowFocus);
+  }
+
   void _onWindowFocus() {
     if (!mounted) return;
-    context.read<LoginBloc>().add(LoginGoogleSignInAborted());
+    _loginBloc?.add(LoginGoogleSignInAborted());
   }
 
   @override
@@ -617,7 +638,7 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
             keyboardType: TextInputType.url,
             decoration: const InputDecoration(
               labelText: 'API base URL',
-              hintText: 'http://134.209.2.225 or https://api.example.com',
+              hintText: 'http://192.168.1.123:3000 or https://api.example.com',
               prefixIcon: Icon(Icons.link),
             ),
           ),

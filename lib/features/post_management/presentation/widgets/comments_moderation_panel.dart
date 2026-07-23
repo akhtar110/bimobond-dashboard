@@ -331,6 +331,7 @@ class _CommentsModerationPanelState extends State<CommentsModerationPanel> {
     final user = UserEntity(
       id: comment.userId,
       username: comment.username ?? comment.userId,
+      fullName: comment.fullName,
       isVerified: false,
       isPrivate: false,
       allowComments: true,
@@ -469,20 +470,33 @@ class _CommentCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
-    final borderColor = highlighted ? scheme.tertiary : scheme.outlineVariant;
+    final borderColor = highlighted
+        ? scheme.tertiary.withValues(alpha: 0.65)
+        : scheme.outlineVariant.withValues(alpha: 0.4);
+    final username = comment.username?.trim();
+    final showUsername = username != null &&
+        username.isNotEmpty &&
+        username != comment.displayName;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: InvestigationTheme.animMs),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       decoration: BoxDecoration(
         color: highlighted
             ? scheme.tertiaryContainer.withValues(alpha: 0.45)
             : scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: borderColor,
           width: highlighted ? 1.5 : 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -509,22 +523,30 @@ class _CommentCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: scheme.primaryContainer,
-                foregroundColor: scheme.onPrimaryContainer,
-                backgroundImage: comment.avatarUrl != null &&
-                        comment.avatarUrl!.isNotEmpty
-                    ? CachedNetworkImageProvider(comment.avatarUrl!)
-                    : null,
-                child: comment.avatarUrl == null || comment.avatarUrl!.isEmpty
-                    ? Text(
-                        comment.displayName.isNotEmpty
-                            ? comment.displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(fontSize: 13),
-                      )
-                    : null,
+              InkWell(
+                onTap: disabled ? null : onViewProfile,
+                borderRadius: BorderRadius.circular(20),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: scheme.primaryContainer,
+                  foregroundColor: scheme.onPrimaryContainer,
+                  backgroundImage: comment.avatarUrl != null &&
+                          comment.avatarUrl!.isNotEmpty
+                      ? CachedNetworkImageProvider(comment.avatarUrl!)
+                      : null,
+                  child: comment.avatarUrl == null ||
+                          comment.avatarUrl!.isEmpty
+                      ? Text(
+                          comment.displayName.isNotEmpty
+                              ? comment.displayName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      : null,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -532,78 +554,126 @@ class _CommentCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                comment.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                  height: 1.2,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                              if (showUsername)
+                                Text(
+                                  '@$username',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style:
+                                      theme.textTheme.labelSmall?.copyWith(
+                                    color: InvestigationTheme.mutedText(
+                                        context),
+                                    fontSize: 11,
+                                    height: 1.2,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
                           child: Text(
-                            comment.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: scheme.onSurface,
+                            dateFormat.format(comment.createdAt),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: InvestigationTheme.mutedText(context),
+                              fontSize: 10,
                             ),
                           ),
                         ),
-                        Text(
-                          dateFormat.format(comment.createdAt),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: InvestigationTheme.mutedText(context),
-                            fontSize: 10,
-                          ),
-                        ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      comment.content,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        height: 1.45,
-                        color: scheme.onSurface,
-                      ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _MetaChip(
-                          icon: Icons.favorite_border,
-                          label: '${comment.likeCount}',
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
                         ),
-                        const SizedBox(width: 12),
-                        _MetaChip(
-                          icon: Icons.reply_rounded,
-                          label: '${comment.replyCount} ${l10n.t('replies')}',
+                        decoration: BoxDecoration(
+                          color: highlighted
+                              ? scheme.surface.withValues(alpha: 0.55)
+                              : scheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.4),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
+                            bottomRight: Radius.circular(12),
+                          ),
+                          border: Border.all(
+                            color: scheme.outlineVariant
+                                .withValues(alpha: 0.25),
+                          ),
                         ),
-                      ],
+                        child: Text(
+                          comment.content,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12.5,
+                            height: 1.45,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           if (isDeleting)
             const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
             )
           else
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
+            Row(
               children: [
+                _MetaChip(
+                  icon: Icons.favorite_border,
+                  label: '${comment.likeCount}',
+                ),
+                const SizedBox(width: 12),
+                _MetaChip(
+                  icon: Icons.reply_rounded,
+                  label: '${comment.replyCount} ${l10n.t('replies')}',
+                ),
+                const Spacer(),
+                _ActionBtn(
+                  icon: Icons.person_outline,
+                  label: l10n.t('viewProfile'),
+                  onPressed: disabled ? null : onViewProfile,
+                ),
+                const SizedBox(width: 4),
                 _ActionBtn(
                   icon: Icons.delete_outline,
                   label: l10n.t('delete'),
                   onPressed: disabled ? null : onDelete,
                   danger: true,
-                ),
-                _ActionBtn(
-                  icon: Icons.person_outline,
-                  label: l10n.t('viewProfile'),
-                  onPressed: disabled ? null : onViewProfile,
                 ),
               ],
             ),

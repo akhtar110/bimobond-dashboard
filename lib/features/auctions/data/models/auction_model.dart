@@ -18,6 +18,8 @@ class AuctionModel extends AuctionEntity {
     super.currencyCode,
     required super.currentTotalCoins,
     required super.status,
+    super.escrowEnabled,
+    super.fulfillmentStatus,
     super.winnerId,
     required super.startedAt,
     super.endedAt,
@@ -44,7 +46,7 @@ class AuctionModel extends AuctionEntity {
 
     final pricingJson = map['pricing'];
     return AuctionModel(
-      id: map['id']?.toString() ?? '',
+      id: map['id']?.toString() ?? map['auctionId']?.toString() ?? '',
       postId: map['postId']?.toString(),
       liveId: map['liveId']?.toString(),
       hostId: map['hostId']?.toString() ?? '',
@@ -57,6 +59,14 @@ class AuctionModel extends AuctionEntity {
       currencyCode: map['currencyCode']?.toString(),
       currentTotalCoins: _d(map['currentTotalCoins'] ?? map['currentTotalUsd']),
       status: map['status']?.toString() ?? 'ACTIVE',
+      escrowEnabled: _parseBool(map['escrowEnabled']) ||
+          _parseBool(map['escrow'] is Map
+              ? (map['escrow'] as Map)['enabled']
+              : null),
+      fulfillmentStatus: map['fulfillmentStatus']?.toString() ??
+          (map['fulfillment'] is Map
+              ? (map['fulfillment'] as Map)['status']?.toString()
+              : null),
       winnerId: map['winnerId']?.toString(),
       startedAt: _date(map['startedAt']),
       endedAt: map['endedAt'] != null ? _date(map['endedAt']) : null,
@@ -98,6 +108,16 @@ class AuctionModel extends AuctionEntity {
       remainingPrice: _optionalD(json['remainingPrice'] ?? json['remainingFiatUsd']),
       progressPercent: _optionalD(json['progressPercent']),
     );
+  }
+
+  static bool _parseBool(dynamic value) {
+    if (value == true) return true;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final lower = value.trim().toLowerCase();
+      return lower == 'true' || lower == '1' || lower == 'yes';
+    }
+    return false;
   }
 
   static String? _resolveItemImageUrl(Map<String, dynamic> json) {

@@ -13,7 +13,8 @@ class FiltersEffectsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return PersistentBlocProvider<FiltersEffectsBloc>(
       debugLabel: 'FiltersEffectsPage',
-      create: () => di.sl<FiltersEffectsBloc>()..add(const LoadFiltersEffects()),
+      create: () =>
+          di.sl<FiltersEffectsBloc>()..add(const LoadFiltersEffects()),
       child: const FiltersEffectsManagementPage(),
     );
   }

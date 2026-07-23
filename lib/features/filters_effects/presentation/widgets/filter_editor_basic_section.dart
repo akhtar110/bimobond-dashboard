@@ -3,11 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
-import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/filter_editor_bloc.dart';
 import '../bloc/filter_editor_event.dart';
 import '../bloc/filter_editor_state.dart';
 import '../utils/effect_asset_picker.dart';
+import '../utils/filter_lut_picker.dart';
+import 'filter_editor_matrix_section.dart';
 import 'fe_editor_synced_text_field.dart';
 import 'fe_filter_form_fields.dart';
 import 'fe_form_preview_panel.dart';
@@ -45,11 +46,17 @@ class FilterEditorBasicSection extends StatelessWidget {
           if (!embedded)
             Text(
               l10n.tOr('feFilterSectionBasic', 'Basic information'),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           if (!embedded) const SizedBox(height: 12),
+          FeFilterRenderTypeField(
+            value: form.renderType,
+            onChanged: (value) =>
+                bloc.add(FilterBasicFieldChanged(renderType: value)),
+          ),
+          const SizedBox(height: 10),
           FeFormColorPicker(
             selectedHex: form.previewColorHex,
             allowClear: true,
@@ -64,9 +71,7 @@ class FilterEditorBasicSection extends StatelessWidget {
               errorText: _fieldError(context, 'previewColorHex'),
             ),
             onChanged: (value) => bloc.add(
-              FilterPreviewColorChanged(
-                value.trim().isEmpty ? null : value,
-              ),
+              FilterPreviewColorChanged(value.trim().isEmpty ? null : value),
             ),
           ),
           const SizedBox(height: 14),
@@ -80,34 +85,21 @@ class FilterEditorBasicSection extends StatelessWidget {
                 bloc.add(FilterBasicFieldChanged(slug: value)),
           ),
           const SizedBox(height: 10),
-          FeFilterEngineKeyField(
-            value: form.engineKey,
-            onChanged: (value) =>
-                bloc.add(FilterBasicFieldChanged(engineKey: value)),
-          ),
-          if (_fieldError(context, 'engineKey') != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              _fieldError(context, 'engineKey')!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.error,
-                  ),
-            ),
-          ],
-          const SizedBox(height: 10),
           FeEditorSyncedTextField(
-            readOnly: true,
-            value: CameraFilterEngineTypeApi.camerawesome,
+            value: form.label,
             decoration: InputDecoration(
-              labelText: l10n.tOr('feFieldEngineType', 'Engine type'),
+              labelText: l10n.tOr('feFieldLabel', 'Label'),
+              errorText: _fieldError(context, 'label'),
             ),
-            onChanged: (_) {},
+            onChanged: (value) =>
+                bloc.add(FilterBasicFieldChanged(label: value)),
           ),
           const SizedBox(height: 10),
           FeEditorSyncedTextField(
             value: form.labelKey ?? '',
             decoration: InputDecoration(
               labelText: l10n.tOr('feFieldLabelKey', 'Label key'),
+              errorText: _fieldError(context, 'labelKey'),
             ),
             onChanged: (value) => bloc.add(
               FilterBasicFieldChanged(
@@ -118,18 +110,57 @@ class FilterEditorBasicSection extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           FeEditorSyncedTextField(
-            value: form.customLabel ?? '',
+            value: form.emoji ?? '',
             decoration: InputDecoration(
-              labelText: l10n.tOr('feFieldCustomLabel', 'Custom label'),
+              labelText: l10n.tOr('feFieldEmoji', 'Emoji'),
+              hintText: l10n.tOr(
+                'feFieldEmojiHint',
+                'Unicode icon (max 16 chars)',
+              ),
+              errorText: _fieldError(context, 'emoji'),
             ),
             onChanged: (value) => bloc.add(
               FilterBasicFieldChanged(
-                customLabel: value,
-                clearCustomLabel: value.trim().isEmpty,
+                emoji: value,
+                clearEmoji: value.trim().isEmpty,
               ),
             ),
           ),
           const SizedBox(height: 10),
+          if (form.isLut) ...[
+            _FilterLutUploadField(state: state),
+            const SizedBox(height: 10),
+            FeEditorSyncedTextField(
+              value: form.lutAsset ?? '',
+              decoration: InputDecoration(
+                labelText: l10n.tOr('feFieldLutAsset', 'LUT asset'),
+                hintText: l10n.tOr(
+                  'feFieldLutAssetHint',
+                  'Bundled asset path on the mobile client',
+                ),
+                errorText:
+                    _fieldError(context, 'lutAsset') ??
+                    _fieldError(context, 'lut'),
+              ),
+              onChanged: (value) => bloc.add(
+                FilterBasicFieldChanged(
+                  lutAsset: value,
+                  clearLutAsset: value.trim().isEmpty,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (form.isMatrix && state.settingsSchema != null) ...[
+            FilterEditorMatrixSection(
+              schema: state.settingsSchema!,
+              adjustments: form.adjustments,
+              colorMatrix: form.colorMatrix,
+              onAdjustmentChanged: (key, value) =>
+                  bloc.add(FilterAdjustmentChanged(key, value)),
+            ),
+            const SizedBox(height: 10),
+          ],
           _FilterThumbnailUploadField(state: state),
           const SizedBox(height: 10),
           FeEditorSyncedTextField(
@@ -145,20 +176,6 @@ class FilterEditorBasicSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          SwitchListTile(
-            contentPadding: EdgeInsetsDirectional.zero,
-            title: Text(l10n.tOr('feFlagOriginal', 'Original')),
-            value: form.isOriginal,
-            onChanged: (value) =>
-                bloc.add(FilterBasicFieldChanged(isOriginal: value)),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsetsDirectional.zero,
-            title: Text(l10n.tOr('feFlagBeautyDefault', 'Beauty default')),
-            value: form.isBeautyDefault,
-            onChanged: (value) =>
-                bloc.add(FilterBasicFieldChanged(isBeautyDefault: value)),
-          ),
           SwitchListTile(
             contentPadding: EdgeInsetsDirectional.zero,
             title: Text(l10n.tOr('feActive', 'Active')),
@@ -178,10 +195,157 @@ class FilterEditorBasicSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: scheme.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: fields,
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: fields),
+    );
+  }
+}
+
+class _FilterLutUploadField extends StatelessWidget {
+  const _FilterLutUploadField({required this.state});
+
+  final FilterEditorReady state;
+
+  Future<void> _pickAndUpload(BuildContext context) async {
+    final picked = await pickFilterLutFile();
+    if (!context.mounted || picked == null) return;
+    context.read<FilterEditorBloc>().add(
+      UploadFilterLutEvent(bytes: picked.bytes, filename: picked.name),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final bloc = context.read<FilterEditorBloc>();
+    final form = state.form;
+    final trimmed = form.lutUrl?.trim();
+    final previewUrl = trimmed != null && trimmed.isNotEmpty
+        ? resolveMediaUrl(trimmed)
+        : null;
+    final hasLut = previewUrl != null && previewUrl.isNotEmpty;
+    final isBusy =
+        state.isUploadingLut || state.isUploadingThumbnail || state.isSaving;
+    final error = state.fieldErrors['lutUrl'] ?? state.fieldErrors['lut'];
+    final errorText = error == null
+        ? null
+        : (error.startsWith('fe') ? l10n.tOr(error, error) : error);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.tOr('feFieldLutUrl', 'LUT file'),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          l10n.tOr(
+            'feFieldLutUploadHint',
+            'Upload a Lightroom/Photoshop .cube file or a 512×512 PNG LUT. '
+            'The server converts .cube files and fills lutUrl automatically.',
+          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: isBusy ? null : () => _pickAndUpload(context),
+          icon: state.isUploadingLut
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.upload_file_outlined, size: 18),
+          label: Text(
+            state.isUploadingLut
+                ? l10n.t('uploadingMedia')
+                : hasLut
+                ? l10n.tOr('feChangeLut', 'Change LUT file')
+                : l10n.tOr('feUploadLut', 'Upload LUT (.cube or PNG)'),
+          ),
+        ),
+        if (hasLut) ...[
+          const SizedBox(height: 8),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: scheme.outlineVariant),
+                      ),
+                      child: Icon(
+                        Icons.gradient_outlined,
+                        color: scheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (state.lutFileName != null)
+                          Text(
+                            state.lutFileName!,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        Text(
+                          form.lutUrl!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontFamily: 'monospace',
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: isBusy
+                        ? null
+                        : () => bloc.add(
+                            const FilterBasicFieldChanged(
+                              clearLutUrl: true,
+                              clearLutAsset: true,
+                            ),
+                          ),
+                    child: Text(l10n.t('remove')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        if (errorText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            errorText,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.error),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -195,11 +359,8 @@ class _FilterThumbnailUploadField extends StatelessWidget {
     final picked = await pickEffectAsset();
     if (!context.mounted || picked == null) return;
     context.read<FilterEditorBloc>().add(
-          UploadFilterThumbnailEvent(
-            bytes: picked.bytes,
-            filename: picked.name,
-          ),
-        );
+      UploadFilterThumbnailEvent(bytes: picked.bytes, filename: picked.name),
+    );
   }
 
   @override
@@ -224,9 +385,9 @@ class _FilterThumbnailUploadField extends StatelessWidget {
       children: [
         Text(
           l10n.tOr('feFieldThumbnailUrl', 'Thumbnail'),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -242,8 +403,8 @@ class _FilterThumbnailUploadField extends StatelessWidget {
             state.isUploadingThumbnail
                 ? l10n.t('uploadingMedia')
                 : hasThumbnail
-                    ? l10n.t('changeImage')
-                    : l10n.t('uploadImage'),
+                ? l10n.t('changeImage')
+                : l10n.t('uploadImage'),
           ),
         ),
         if (hasThumbnail) ...[
@@ -265,7 +426,7 @@ class _FilterThumbnailUploadField extends StatelessWidget {
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => SizedBox(
+                      errorBuilder: (_, _, _) => SizedBox(
                         width: 56,
                         height: 56,
                         child: Icon(
@@ -283,20 +444,18 @@ class _FilterThumbnailUploadField extends StatelessWidget {
                         if (state.thumbnailFileName != null)
                           Text(
                             state.thumbnailFileName!,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         Text(
                           form.thumbnailUrl!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                    fontFamily: 'monospace',
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontFamily: 'monospace',
+                              ),
                         ),
                       ],
                     ),
@@ -305,10 +464,10 @@ class _FilterThumbnailUploadField extends StatelessWidget {
                     onPressed: isBusy
                         ? null
                         : () => bloc.add(
-                              const FilterBasicFieldChanged(
-                                clearThumbnailUrl: true,
-                              ),
+                            const FilterBasicFieldChanged(
+                              clearThumbnailUrl: true,
                             ),
+                          ),
                     child: Text(l10n.t('remove')),
                   ),
                 ],
@@ -320,9 +479,9 @@ class _FilterThumbnailUploadField extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             errorText,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.error,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.error),
           ),
         ],
       ],

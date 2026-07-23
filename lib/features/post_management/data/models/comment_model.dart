@@ -12,6 +12,7 @@ class CommentModel extends CommentEntity {
     required super.replyCount,
     required super.createdAt,
     super.username,
+    super.fullName,
     super.avatarUrl,
   });
 
@@ -29,6 +30,9 @@ class CommentModel extends CommentEntity {
       username: user?['username'] as String? ??
           user?['name'] as String? ??
           json['username']?.toString(),
+      fullName: user?['fullName'] as String? ??
+          user?['full_name'] as String? ??
+          json['fullName']?.toString(),
       avatarUrl: resolveMediaUrl(
         user?['avatarUrl'] as String? ??
             user?['avatar'] as String? ??

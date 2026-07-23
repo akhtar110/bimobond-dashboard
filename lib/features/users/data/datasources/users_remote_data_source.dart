@@ -10,6 +10,7 @@ import '../models/admin_bulk_users_result_model.dart';
 import '../models/user_detail_model.dart';
 import '../models/user_follow_model.dart';
 import '../models/user_model.dart';
+import '../models/reset_user_password_request_model.dart';
 import '../models/user_post_model.dart';
 
 abstract class UsersRemoteDataSource {
@@ -55,7 +56,10 @@ abstract class UsersRemoteDataSource {
   Future<void> unbanUser(String userId);
   Future<void> activateUser(String userId);
   Future<void> deactivateUser(String userId);
-  Future<void> resetUserPassword(String userId);
+  Future<void> resetUserPassword({
+    required String userId,
+    required String newPassword,
+  });
   Future<void> setUserCanPost(String userId, {required bool canPost});
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
   Future<void> setUserIsPrivate(String userId, {required bool isPrivate});
@@ -395,8 +399,14 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   }
 
   @override
-  Future<void> resetUserPassword(String userId) async {
-    await _dio.post('/users/$userId/reset-password');
+  Future<void> resetUserPassword({
+    required String userId,
+    required String newPassword,
+  }) async {
+    await _dio.patch(
+      '/users/admin/$userId/password',
+      data: ResetUserPasswordRequestModel(newPassword: newPassword).toJson(),
+    );
   }
 
   @override

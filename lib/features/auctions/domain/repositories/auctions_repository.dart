@@ -1,5 +1,6 @@
 import '../entities/admin_auctions_query.dart';
 import '../entities/auction_entity.dart';
+import '../entities/auction_fulfillment_result.dart';
 import '../entities/auction_pricing_preview_entity.dart';
 import '../entities/auction_update_body.dart';
 import '../entities/auctions_page_entity.dart';
@@ -40,4 +41,8 @@ abstract class AuctionsRepository {
   );
 
   Future<AuctionEntity> adminResolveAuction(String auctionId, String winnerId);
+
+  Future<AuctionFulfillmentActionResult> adminRefundFulfillment(String auctionId);
+
+  Future<AuctionFulfillmentActionResult> adminReleaseFulfillment(String auctionId);
 }

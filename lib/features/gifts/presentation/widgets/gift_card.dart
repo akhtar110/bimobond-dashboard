@@ -87,11 +87,9 @@ class GiftCard extends StatelessWidget {
                     SizedBox(height: gap),
                     Row(
                       children: [
-                        Flexible(
-                          child: _PriceChip(
-                            priceCoins: gift.priceCoins,
-                            compact: true,
-                          ),
+                        _PriceChip(
+                          priceCoins: gift.priceCoins,
+                          compact: compact,
                         ),
                         if (gift.animationUrl != null &&
                             gift.animationUrl!.isNotEmpty) ...[
@@ -102,8 +100,16 @@ class GiftCard extends StatelessWidget {
                             color: scheme.onSurfaceVariant,
                           ),
                         ],
-                        const Spacer(),
-                        _PublishedDate(gift: gift, compact: true),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: _PublishedDate(
+                              gift: gift,
+                              compact: true,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     SizedBox(height: dense ? 6 : 8),
@@ -217,7 +223,7 @@ class _PublishedDate extends StatelessWidget {
   final GiftEntity gift;
   final bool compact;
 
-  static final _fmt = DateFormat('MMM d');
+  static final _fmt = DateFormat('MMM d, yyyy');
 
   @override
   Widget build(BuildContext context) {
@@ -226,7 +232,6 @@ class _PublishedDate extends StatelessWidget {
     if (date == null) return const SizedBox.shrink();
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           Icons.calendar_today_outlined,
@@ -234,13 +239,18 @@ class _PublishedDate extends StatelessWidget {
           color: scheme.onSurfaceVariant,
         ),
         SizedBox(width: compact ? 3 : 4),
-        Text(
-          _fmt.format(date.toLocal()),
-          style: TextStyle(
-            fontSize: compact ? 9.5 : 10.5,
-            color: scheme.onSurfaceVariant,
-            height: 1.1,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            _fmt.format(date.toLocal()),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: compact ? 9.5 : 10.5,
+              color: scheme.onSurfaceVariant,
+              height: 1.1,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -270,7 +280,7 @@ class _PriceChip extends StatelessWidget {
       child: Text(
         '🪙 ${CoinFormat.coinsAmount(priceCoins)}',
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        softWrap: false,
         style: TextStyle(
           fontSize: compact ? 11 : 12,
           fontWeight: FontWeight.w700,

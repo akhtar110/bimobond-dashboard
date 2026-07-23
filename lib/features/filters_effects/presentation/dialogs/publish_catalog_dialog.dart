@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
@@ -61,13 +62,13 @@ class _PublishCatalogDialogState extends State<PublishCatalogDialog> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     context.read<FiltersEffectsBloc>().add(
-          PublishFiltersEffectsCatalogEvent(
-            PublishCatalogRequest(
-              version: _versionCtrl.text.trim(),
-              notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-            ),
-          ),
-        );
+      PublishFiltersEffectsCatalogEvent(
+        PublishCatalogRequest(
+          version: _versionCtrl.text.trim(),
+          notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        ),
+      ),
+    );
     Navigator.of(context).pop();
   }
 
@@ -94,11 +95,24 @@ class _PublishCatalogDialogState extends State<PublishCatalogDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _versionCtrl,
+                maxLength: 40,
+                inputFormatters: [LengthLimitingTextInputFormatter(40)],
                 decoration: InputDecoration(
                   labelText: l10n.tOr('feFieldVersion', 'Version'),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? l10n.tOr('feRequired', 'Required') : null,
+                validator: (v) {
+                  final value = v?.trim() ?? '';
+                  if (value.isEmpty) {
+                    return l10n.tOr('feRequired', 'Required');
+                  }
+                  if (value.length > 40) {
+                    return l10n.tOr(
+                      'feVersionTooLong',
+                      'Version must be 40 characters or fewer',
+                    );
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 10),
               TextFormField(

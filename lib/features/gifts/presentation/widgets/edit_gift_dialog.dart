@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/enums/gift_size.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
@@ -62,6 +63,7 @@ class EditGiftDialogState extends State<EditGiftDialog> {
   bool _uploadingAnimation = false;
   String? _animationError;
   DateTime? _publishedAt;
+  late GiftSize _selectedSize;
 
   @override
   void initState() {
@@ -70,6 +72,7 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     _priceCtrl = TextEditingController(
         text: widget.gift.priceCoins.toStringAsFixed(2));
     _publishedAt = widget.gift.publishedAt;
+    _selectedSize = widget.gift.size;
     _animationUrl = widget.gift.animationUrl;
     _animationName = widget.gift.animationUrl;
   }
@@ -152,16 +155,15 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
     final originalUrl = widget.gift.animationUrl;
     String? animationUrl;
+    var clearAnimationUrl = false;
     if (_clearAnimation) {
-      animationUrl = '';
+      clearAnimationUrl = true;
     } else if (_animationUrl != null &&
         _animationUrl!.trim().isNotEmpty &&
         _animationUrl != originalUrl) {
       animationUrl = _animationUrl;
     }
 
-    // Keep dialog open until bloc finishes (listener pops). Closing early
-    // disposed the PAG player while WASM was still running.
     widget.pageContext.read<GiftsBloc>().add(UpdateGiftEvent(
           widget.gift.id,
           UpdateGiftData(
@@ -169,10 +171,14 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                 ? null
                 : _nameCtrl.text.trim(),
             priceCoins: double.tryParse(_priceCtrl.text.trim()),
+            size: _selectedSize,
             publishedAt: _publishedAt,
+            clearPublishedAt:
+                widget.gift.publishedAt != null && _publishedAt == null,
             imageBytes: _newImageBytes,
             imageName: _newImageName,
             animationUrl: animationUrl,
+            clearAnimationUrl: clearAnimationUrl,
           ),
         ));
   }
@@ -185,8 +191,10 @@ class EditGiftDialogState extends State<EditGiftDialog> {
 
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final screenW = MediaQuery.sizeOf(context).width;
+    final screenSize = MediaQuery.sizeOf(context);
+    final screenW = screenSize.width;
     final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
+    final maxContentH = screenSize.height * 0.7;
     final hasNewImage = _newImageBytes != null;
     final showAnimation = !_clearAnimation &&
         ((_animationBytes != null && _animationBytes!.isNotEmpty) ||
@@ -223,11 +231,18 @@ class EditGiftDialogState extends State<EditGiftDialog> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16)),
             title: Text(l10n.t('editGift')),
-            content: SizedBox(
-              width: dialogW,
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: maxContentH,
+                minWidth: dialogW,
+                maxWidth: dialogW,
+              ),
               child: Form(
                 key: _formKey,
                 child: SingleChildScrollView(
+                  // Top padding keeps the floating label of the first field
+                  // (gift name) from being clipped by the scroll view.
+                  padding: const EdgeInsets.only(top: 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -360,6 +375,32 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                         ),
                       ],
 
+                      const SizedBox(height: 14),
+
+                      DropdownButtonFormField<GiftSize>(
+                        value: _selectedSize,
+                        decoration: InputDecoration(
+                          labelText: l10n.tOr('giftSizeLabel', 'Size'),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        items: GiftSize.values
+                            .map(
+                              (size) => DropdownMenuItem(
+                                value: size,
+                                child: Text(size.apiValue),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: isActioning
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setState(() => _selectedSize = value);
+                                }
+                              },
+                      ),
                       const SizedBox(height: 14),
 
                       GiftPriceCoinsField(

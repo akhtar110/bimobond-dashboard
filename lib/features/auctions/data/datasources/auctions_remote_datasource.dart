@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../domain/entities/auction_fulfillment_result.dart';
 import '../../domain/entities/admin_auctions_query.dart';
 import '../../domain/entities/auction_update_body.dart';
 import '../models/auction_model.dart';
@@ -42,6 +43,10 @@ abstract class AuctionsRemoteDataSource {
   );
 
   Future<AuctionModel> adminResolveAuction(String auctionId, String winnerId);
+
+  Future<AuctionFulfillmentActionResult> adminRefundFulfillment(String auctionId);
+
+  Future<AuctionFulfillmentActionResult> adminReleaseFulfillment(String auctionId);
 }
 
 class AuctionsRemoteDataSourceImpl implements AuctionsRemoteDataSource {
@@ -187,6 +192,51 @@ class AuctionsRemoteDataSourceImpl implements AuctionsRemoteDataSource {
       data: {'winnerId': winnerId},
     );
     return _parse(response.data);
+  }
+
+  @override
+  Future<AuctionFulfillmentActionResult> adminRefundFulfillment(
+    String auctionId,
+  ) async {
+    final response = await _dio.patch(
+      '/auctions/admin/$auctionId/fulfillment/refund',
+    );
+    return _parseFulfillment(response.data);
+  }
+
+  @override
+  Future<AuctionFulfillmentActionResult> adminReleaseFulfillment(
+    String auctionId,
+  ) async {
+    final response = await _dio.patch(
+      '/auctions/admin/$auctionId/fulfillment/release',
+    );
+    return _parseFulfillment(response.data);
+  }
+
+  AuctionFulfillmentActionResult _parseFulfillment(dynamic raw) {
+    final data = _unwrapPayload(raw);
+    final auctionPayload = data['auction'];
+    if (auctionPayload is! Map<String, dynamic>) {
+      throw Exception('Invalid fulfillment auction payload');
+    }
+    final refundedCount = data['refundedCount'];
+    return AuctionFulfillmentActionResult(
+      auction: AuctionModel.fromJson(
+        Map<String, dynamic>.from(auctionPayload),
+      ),
+      refundedCount: refundedCount is num ? refundedCount.toInt() : null,
+      alreadySettled: data['alreadySettled'] == true,
+    );
+  }
+
+  Map<String, dynamic> _unwrapPayload(dynamic raw) {
+    if (raw is! Map<String, dynamic>) {
+      throw Exception('Invalid fulfillment response format');
+    }
+    final nested = raw['data'];
+    if (nested is Map<String, dynamic>) return nested;
+    return raw;
   }
 
   AuctionModel _parse(dynamic data) {

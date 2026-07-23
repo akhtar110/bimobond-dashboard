@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,59 +50,80 @@ class ChatMessagesPanel extends StatelessWidget {
         const MessagesSelectionHeader(),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              SizedBox(
-                width: 220,
-                child: TextField(
-                  key: ValueKey(
-                    'msg-search-${chat.id}-${state.messagesFilterRevision}',
-                  ),
-                  decoration: InputDecoration(
-                    hintText: l10n.t('searchMessages'),
-                    isDense: true,
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onChanged: (v) => context
-                      .read<ChatManagementBloc>()
-                      .add(MessagesSearchChanged(v)),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 560;
+              final search = TextField(
+                key: ValueKey(
+                  'msg-search-${chat.id}-${state.messagesFilterRevision}',
                 ),
-              ),
-              for (final filter in ChatMessageTypeFilter.values)
+                decoration: InputDecoration(
+                  hintText: l10n.t('searchMessages'),
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onChanged: (v) => context
+                    .read<ChatManagementBloc>()
+                    .add(MessagesSearchChanged(v)),
+              );
+
+              final chips = [
+                for (final filter in ChatMessageTypeFilter.values)
+                  FilterChip(
+                    label: Text(_msgTypeLabel(l10n, filter)),
+                    selected: state.messagesQuery.typeFilter == filter,
+                    onSelected: (selected) {
+                      final bloc = context.read<ChatManagementBloc>();
+                      if (filter == ChatMessageTypeFilter.all || selected) {
+                        bloc.add(MessagesTypeFilterChanged(filter));
+                      } else {
+                        bloc.add(
+                          const MessagesTypeFilterChanged(
+                            ChatMessageTypeFilter.all,
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 FilterChip(
-                  label: Text(_msgTypeLabel(l10n, filter)),
-                  selected: state.messagesQuery.typeFilter == filter,
-                  onSelected: (selected) {
-                    final bloc = context.read<ChatManagementBloc>();
-                    if (filter == ChatMessageTypeFilter.all || selected) {
-                      bloc.add(MessagesTypeFilterChanged(filter));
-                    } else {
-                      bloc.add(
-                        const MessagesTypeFilterChanged(
-                          ChatMessageTypeFilter.all,
-                        ),
-                      );
-                    }
-                  },
+                  label: Text(l10n.t('deletedMessagesOnly')),
+                  selected: state.messagesQuery.deletedFilter ==
+                      ChatDeletedFilter.deletedOnly,
+                  onSelected: (selected) =>
+                      context.read<ChatManagementBloc>().add(
+                            MessagesDeletedFilterChanged(
+                              selected
+                                  ? ChatDeletedFilter.deletedOnly
+                                  : ChatDeletedFilter.all,
+                            ),
+                          ),
                 ),
-              FilterChip(
-                label: Text(l10n.t('deletedMessagesOnly')),
-                selected: state.messagesQuery.deletedFilter ==
-                    ChatDeletedFilter.deletedOnly,
-                onSelected: (selected) => context.read<ChatManagementBloc>().add(
-                      MessagesDeletedFilterChanged(
-                        selected
-                            ? ChatDeletedFilter.deletedOnly
-                            : ChatDeletedFilter.all,
-                      ),
-                    ),
-              ),
-            ],
+              ];
+
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    search,
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 6, runSpacing: 6, children: chips),
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(width: 220, child: search),
+                  ...chips,
+                ],
+              );
+            },
           ),
         ),
         if (state.typingUserId != null)
@@ -246,6 +269,7 @@ class ChatMessagesPanel extends StatelessWidget {
       ChatMessageTypeFilter.video => l10n.t('chatMessageVideo'),
       ChatMessageTypeFilter.audio => l10n.t('chatMessageAudio'),
       ChatMessageTypeFilter.postShare => l10n.t('chatMessagePostShare'),
+      ChatMessageTypeFilter.location => l10n.t('chatMessageLocation'),
     };
   }
 }
@@ -265,30 +289,117 @@ class ChatDetailsHeader extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final bloc = context.read<ChatManagementBloc>();
+    final narrow = MediaQuery.sizeOf(context).width < 720;
+
+    final actions = [
+      if (state.isSocketConnected)
+        Tooltip(
+          message: l10n.t('liveConnected'),
+          child: Icon(Icons.circle, size: 10, color: scheme.tertiary),
+        ),
+      if (chat.isGroup)
+        IconButton(
+          tooltip: l10n.t('editChat'),
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => _showEditDialog(context, chat, bloc),
+        ),
+      IconButton(
+        tooltip: l10n.t('exportLogs'),
+        icon: const Icon(Icons.download_outlined),
+        onPressed: () {
+          final buffer =
+              StringBuffer('chatId,messageId,sender,type,content,createdAt\n');
+          for (final m in state.messages) {
+            buffer.writeln(
+              '"${m.chatId}","${m.id}","${m.senderId}","${m.type.name}","${(m.content ?? '').replaceAll('"', '""')}","${m.createdAt.toIso8601String()}"',
+            );
+          }
+          Clipboard.setData(ClipboardData(text: buffer.toString()));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.t('chatExportCopied'))),
+          );
+        },
+      ),
+      if (narrow)
+        IconButton(
+          tooltip: l10n.t('delete'),
+          style: IconButton.styleFrom(
+            backgroundColor: scheme.errorContainer,
+            foregroundColor: scheme.onErrorContainer,
+          ),
+          onPressed: state.isSubmitting
+              ? null
+              : () async {
+                  final ok = await confirmChatModerationAction(
+                    context,
+                    title: l10n.t('deleteChatTitle'),
+                    message: l10n.t('deleteChatConfirm'),
+                    destructive: true,
+                  );
+                  if (ok && context.mounted) {
+                    bloc.add(ChatDeleteRequested(chat.id));
+                  }
+                },
+          icon: const Icon(Icons.delete_outline_rounded),
+        )
+      else
+        FilledButton.tonalIcon(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.errorContainer,
+            foregroundColor: scheme.onErrorContainer,
+          ),
+          onPressed: state.isSubmitting
+              ? null
+              : () async {
+                  final ok = await confirmChatModerationAction(
+                    context,
+                    title: l10n.t('deleteChatTitle'),
+                    message: l10n.t('deleteChatConfirm'),
+                    destructive: true,
+                  );
+                  if (ok && context.mounted) {
+                    bloc.add(ChatDeleteRequested(chat.id));
+                  }
+                },
+          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+          label: Text(l10n.t('delete')),
+        ),
+    ];
 
     return Material(
       color: scheme.surfaceContainerLow,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: narrow ? 10 : 14,
+          vertical: narrow ? 8 : 12,
+        ),
         child: Row(
           children: [
             CircleAvatar(
-              radius: 20,
+              radius: narrow ? 16 : 20,
               child: Icon(
                 chat.isGroup ? Icons.groups_rounded : Icons.person_rounded,
+                size: narrow ? 18 : 24,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: narrow ? 8 : 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     chat.displayTitle(directFallback: l10n.t('directChat')),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: narrow ? 14 : null,
+                    ),
                   ),
                   Text(
                     '${chat.isGroup ? l10n.t('groupChat') : l10n.t('directChat')} · ${chat.participantCount} · ${formatChatTime(chat.createdAt)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -296,55 +407,12 @@ class ChatDetailsHeader extends StatelessWidget {
                 ],
               ),
             ),
-            if (state.isSocketConnected)
-              Tooltip(
-                message: l10n.t('liveConnected'),
-                child: Icon(Icons.circle, size: 10, color: scheme.tertiary),
-              ),
-            const SizedBox(width: 8),
-            if (chat.isGroup)
-              IconButton(
-                tooltip: l10n.t('editChat'),
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () => _showEditDialog(context, chat, bloc),
-              ),
-            IconButton(
-              tooltip: l10n.t('exportLogs'),
-              icon: const Icon(Icons.download_outlined),
-              onPressed: () {
-                final buffer = StringBuffer('chatId,messageId,sender,type,content,createdAt\n');
-                for (final m in state.messages) {
-                  buffer.writeln(
-                    '"${m.chatId}","${m.id}","${m.senderId}","${m.type.name}","${(m.content ?? '').replaceAll('"', '""')}","${m.createdAt.toIso8601String()}"',
-                  );
-                }
-                Clipboard.setData(ClipboardData(text: buffer.toString()));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.t('chatExportCopied'))),
-                );
-              },
-            ),
-            FilledButton.tonalIcon(
-              style: FilledButton.styleFrom(
-                backgroundColor: scheme.errorContainer,
-                foregroundColor: scheme.onErrorContainer,
-              ),
-              onPressed: state.isSubmitting
-                  ? null
-                  : () async {
-                      final ok = await confirmChatModerationAction(
-                        context,
-                        title: l10n.t('deleteChatTitle'),
-                        message: l10n.t('deleteChatConfirm'),
-                        destructive: true,
-                      );
-                      if (ok && context.mounted) {
-                        bloc.add(ChatDeleteRequested(chat.id));
-                      }
-                    },
-              icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              label: Text(l10n.t('delete')),
-            ),
+            ...[
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) SizedBox(width: narrow ? 2 : 4),
+                actions[i],
+              ],
+            ],
           ],
         ),
       ),
@@ -419,7 +487,21 @@ class MessageBubble extends StatefulWidget {
 class _MessageBubbleState extends State<MessageBubble> {
   bool _hovered = false;
 
-  bool get _isMediaMessage {
+  bool get _isRichBubble {
+    return switch (widget.message.type) {
+      ChatMessageType.image ||
+      ChatMessageType.video ||
+      ChatMessageType.postShare ||
+      ChatMessageType.location =>
+        true,
+      ChatMessageType.text || ChatMessageType.unknown
+          when widget.message.locationPayload != null =>
+        true,
+      _ => false,
+    };
+  }
+
+  bool get _isMediaPadding {
     return switch (widget.message.type) {
       ChatMessageType.image ||
       ChatMessageType.video ||
@@ -436,50 +518,69 @@ class _MessageBubbleState extends State<MessageBubble> {
     final message = widget.message;
     final sender = message.sender;
     final deleted = message.isDeleted;
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 600;
+    final bubbleMaxWidth = math.min(
+      _isRichBubble ? 300.0 : 420.0,
+      width * (compact ? 0.78 : (_isRichBubble ? 0.42 : 0.55)),
+    );
+
     final bubbleColor = deleted
         ? scheme.surfaceContainerHighest
-        : scheme.surfaceContainerLow;
+        : Color.alphaBlend(
+            scheme.primary.withValues(alpha: 0.10),
+            scheme.surfaceContainerLow,
+          );
+
+    final radius = BorderRadius.only(
+      topLeft: const Radius.circular(18),
+      topRight: const Radius.circular(18),
+      bottomLeft: const Radius.circular(4),
+      bottomRight: const Radius.circular(18),
+    );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: compact ? 8 : 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Checkbox(
-              value: widget.isChecked,
-              onChanged: (_) => widget.onToggleSelect(),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
+          Checkbox(
+            value: widget.isChecked,
+            onChanged: (_) => widget.onToggleSelect(),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+          if (!compact) ...[
+            CircleAvatar(
+              radius: 15,
+              backgroundImage: () {
+                final resolved = sender?.avatarUrl != null
+                    ? MediaUrlResolver.resolve(sender!.avatarUrl!)
+                    : null;
+                return resolved != null
+                    ? CachedNetworkImageProvider(resolved)
+                    : null;
+              }(),
+              child: sender?.avatarUrl == null
+                  ? const Icon(Icons.person, size: 15)
+                  : null,
             ),
-          ),
-          CircleAvatar(
-            radius: 16,
-            backgroundImage: () {
-              final resolved = sender?.avatarUrl != null
-                  ? MediaUrlResolver.resolve(sender!.avatarUrl!)
-                  : null;
-              return resolved != null
-                  ? CachedNetworkImageProvider(resolved)
-                  : null;
-            }(),
-            child: sender?.avatarUrl == null
-                ? const Icon(Icons.person, size: 16)
-                : null,
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 4),
+                  padding: const EdgeInsetsDirectional.only(start: 4, bottom: 3),
                   child: Text(
                     sender?.displayName ?? message.senderId,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: scheme.primary,
+                          fontSize: compact ? 11 : null,
                         ),
                   ),
                 ),
@@ -487,34 +588,21 @@ class _MessageBubbleState extends State<MessageBubble> {
                   onEnter: (_) => setState(() => _hovered = true),
                   onExit: (_) => setState(() => _hovered = false),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
+                    constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: bubbleColor,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(4),
-                          bottomRight: Radius.circular(16),
-                        ),
-                        border: Border.all(
-                          color: scheme.outlineVariant.withValues(alpha: 0.45),
-                        ),
+                        borderRadius: radius,
                         boxShadow: [
                           BoxShadow(
-                            color: scheme.shadow.withValues(alpha: 0.04),
-                            blurRadius: 6,
+                            color: scheme.shadow.withValues(alpha: 0.06),
+                            blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(4),
-                          bottomRight: Radius.circular(16),
-                        ),
+                        borderRadius: radius,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -525,12 +613,14 @@ class _MessageBubbleState extends State<MessageBubble> {
                                 scheme: scheme,
                               ),
                             Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                _isMediaMessage && !deleted ? 4 : 12,
-                                _isMediaMessage && !deleted ? 4 : 10,
-                                8,
-                                6,
-                              ),
+                              padding: deleted
+                                  ? const EdgeInsets.fromLTRB(12, 10, 10, 4)
+                                  : _isRichBubble
+                                      ? const EdgeInsets.fromLTRB(3, 3, 3, 0)
+                                      : _isMediaPadding
+                                          ? const EdgeInsets.fromLTRB(4, 4, 4, 0)
+                                          : const EdgeInsets.fromLTRB(
+                                              12, 10, 10, 4),
                               child: deleted
                                   ? Text(
                                       l10n.t('messageDeletedPreview'),
@@ -542,10 +632,16 @@ class _MessageBubbleState extends State<MessageBubble> {
                                   : _MessageBody(
                                       message: message,
                                       embedded: true,
+                                      bubbleStyle: true,
                                     ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(10, 0, 6, 6),
+                              padding: EdgeInsets.fromLTRB(
+                                _isRichBubble && !deleted ? 8 : 10,
+                                _isRichBubble && !deleted ? 4 : 0,
+                                6,
+                                6,
+                              ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
@@ -570,7 +666,9 @@ class _MessageBubbleState extends State<MessageBubble> {
                                   ),
                                   AnimatedOpacity(
                                     duration: const Duration(milliseconds: 150),
-                                    opacity: _hovered && !deleted ? 1 : 0,
+                                    opacity: (_hovered || compact) && !deleted
+                                        ? 1
+                                        : 0,
                                     child: IconButton(
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
@@ -599,7 +697,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 if (message.reactions.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Padding(
-                    padding: const EdgeInsets.only(left: 4),
+                    padding: const EdgeInsetsDirectional.only(start: 4),
                     child: Wrap(
                       spacing: 4,
                       runSpacing: 4,
@@ -675,10 +773,12 @@ class _MessageBody extends StatelessWidget {
   const _MessageBody({
     required this.message,
     this.embedded = false,
+    this.bubbleStyle = false,
   });
 
   final ChatMessageEntity message;
   final bool embedded;
+  final bool bubbleStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -688,7 +788,11 @@ class _MessageBody extends StatelessWidget {
             ? MediaUrlResolver.resolve(message.mediaUrl!)
             : null;
         if (url == null) return Text(message.content ?? '');
-        return ChatImageMessage(imageUrl: url, embedded: embedded);
+        return ChatImageMessage(
+          imageUrl: url,
+          embedded: embedded,
+          bubbleStyle: bubbleStyle,
+        );
       case ChatMessageType.video:
         final url = message.mediaUrl != null
             ? MediaUrlResolver.resolve(message.mediaUrl!)
@@ -702,17 +806,26 @@ class _MessageBody extends StatelessWidget {
         if (url == null) return Text(message.content ?? '');
         return ChatAudioMessage(audioUrl: url, embedded: embedded);
       case ChatMessageType.postShare:
-        return ChatPostSharePreview(message: message);
+        return ChatPostSharePreview(
+          message: message,
+          bubbleStyle: bubbleStyle,
+        );
       case ChatMessageType.location:
         final payload = message.locationPayload;
         if (payload != null) {
-          return ChatLocationSharePreview(payload: payload);
+          return ChatLocationSharePreview(
+            payload: payload,
+            bubbleStyle: bubbleStyle,
+          );
         }
         return Text(message.content ?? '');
       case ChatMessageType.text:
       case ChatMessageType.unknown:
         if (message.locationPayload != null) {
-          return ChatLocationSharePreview(payload: message.locationPayload!);
+          return ChatLocationSharePreview(
+            payload: message.locationPayload!,
+            bubbleStyle: bubbleStyle,
+          );
         }
         return Text(
           message.content ?? '',

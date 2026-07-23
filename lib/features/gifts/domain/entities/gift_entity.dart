@@ -1,3 +1,5 @@
+import '../enums/gift_size.dart';
+
 class GiftEntity {
   const GiftEntity({
     required this.id,
@@ -5,6 +7,7 @@ class GiftEntity {
     required this.thumbnailUrl,
     this.animationUrl,
     required this.priceCoins,
+    required this.size,
     required this.isActive,
     this.publishedAt,
   });
@@ -14,9 +17,8 @@ class GiftEntity {
   final String thumbnailUrl;
   final String? animationUrl;
   final double priceCoins;
+  final GiftSize size;
   final bool isActive;
-
-  /// When the gift was published (maps to `publishedAt` on the server).
   final DateTime? publishedAt;
 
   GiftEntity copyWith({
@@ -24,8 +26,10 @@ class GiftEntity {
     String? thumbnailUrl,
     String? animationUrl,
     double? priceCoins,
+    GiftSize? size,
     bool? isActive,
     DateTime? publishedAt,
+    bool clearPublishedAt = false,
   }) {
     return GiftEntity(
       id: id,
@@ -33,8 +37,9 @@ class GiftEntity {
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       animationUrl: animationUrl ?? this.animationUrl,
       priceCoins: priceCoins ?? this.priceCoins,
+      size: size ?? this.size,
       isActive: isActive ?? this.isActive,
-      publishedAt: publishedAt ?? this.publishedAt,
+      publishedAt: clearPublishedAt ? null : (publishedAt ?? this.publishedAt),
     );
   }
 }

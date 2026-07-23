@@ -15,10 +15,7 @@ void showCategoryFiltersDialog(
 }
 
 class CategoryFiltersDialog extends StatelessWidget {
-  const CategoryFiltersDialog({
-    super.key,
-    required this.category,
-  });
+  const CategoryFiltersDialog({super.key, required this.category});
 
   final CameraFilterCategoryEntity category;
 
@@ -29,9 +26,7 @@ class CategoryFiltersDialog extends StatelessWidget {
     final filters = category.filters;
 
     return AlertDialog(
-      title: Text(
-        l10n.tOr('feCategoryFiltersTitle', 'Filters in category'),
-      ),
+      title: Text(l10n.tOr('feCategoryFiltersTitle', 'Filters in category')),
       content: SizedBox(
         width: 480,
         child: Column(
@@ -39,17 +34,17 @@ class CategoryFiltersDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              category.labelKey,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              category.displayLabel,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
               category.slug,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             if (filters.isEmpty)
@@ -61,8 +56,8 @@ class CategoryFiltersDialog extends StatelessWidget {
                     'No filters assigned to this category.',
                   ),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               )
             else

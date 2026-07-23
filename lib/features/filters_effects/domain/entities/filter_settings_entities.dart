@@ -62,18 +62,18 @@ class FilterSettingDefinitionEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        key,
-        label,
-        group,
-        type,
-        min,
-        max,
-        defaultValue,
-        step,
-        colorMatrix,
-        clientOnly,
-        description,
-      ];
+    key,
+    label,
+    group,
+    type,
+    min,
+    max,
+    defaultValue,
+    step,
+    colorMatrix,
+    clientOnly,
+    description,
+  ];
 }
 
 class FilterSettingsSchemaEntity extends Equatable {
@@ -104,12 +104,12 @@ class FilterSettingsSchemaEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        version,
-        bipolarRange,
-        unipolarRange,
-        groups,
-        settings,
-      ];
+    version,
+    bipolarRange,
+    unipolarRange,
+    groups,
+    settings,
+  ];
 }
 
 /// Strongly typed filter slider values keyed by schema setting key.
@@ -183,9 +183,8 @@ class FilterSettingsEntity extends Equatable {
     return true;
   }
 
-  List<({FilterSettingDefinitionEntity definition, int value})> nonDefaultEntries(
-    FilterSettingsSchemaEntity schema,
-  ) {
+  List<({FilterSettingDefinitionEntity definition, int value})>
+  nonDefaultEntries(FilterSettingsSchemaEntity schema) {
     final entries = <({FilterSettingDefinitionEntity definition, int value})>[];
     for (final definition in schema.settings) {
       final value = valueFor(definition);

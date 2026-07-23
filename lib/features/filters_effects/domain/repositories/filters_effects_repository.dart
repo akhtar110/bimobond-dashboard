@@ -7,28 +7,28 @@ abstract class FiltersEffectsRepository {
 
   Future<CameraStudioCatalogEntity> getCatalog();
 
-  Future<List<CameraFilterEntity>> getFilters();
+  Future<PaginatedCameraFiltersEntity> getFilters(
+    FiltersEffectsListQuery query,
+  );
 
   Future<CameraFilterEntity> getFilter(String id);
 
   Future<FilterSettingsSchemaEntity> getFilterSettingsSchema();
 
-  Future<CameraFilterEntity> createFilter(
-    CreateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  });
+  Future<CameraFilterEntity> createFilter(CreateFilterRequest request);
 
   Future<CameraFilterEntity> updateFilter(
     String id,
-    UpdateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  });
+    UpdateFilterRequest request,
+  );
 
   Future<CameraFilterEntity> activateFilter(String id);
 
   Future<CameraFilterEntity> deactivateFilter(String id);
 
   Future<void> deleteFilter(String id);
+
+  Future<BulkCameraFiltersResult> bulkFilters(BulkCameraFiltersRequest request);
 
   Future<List<CameraFilterCategoryEntity>> getFilterCategories();
 
@@ -52,7 +52,9 @@ abstract class FiltersEffectsRepository {
 
   Future<void> deleteFilterCategory(String id);
 
-  Future<List<CameraEffectEntity>> getEffects();
+  Future<PaginatedCameraEffectsEntity> getEffects(
+    FiltersEffectsListQuery query,
+  );
 
   Future<CameraEffectEntity> getEffect(String id);
 
@@ -62,15 +64,16 @@ abstract class FiltersEffectsRepository {
 
   Future<CameraEffectEntity> updateEffect(
     String id,
-    UpdateEffectRequest request, {
-    EffectPlacementSettingsEntity? baselinePlacement,
-  });
+    UpdateEffectRequest request,
+  );
 
   Future<CameraEffectEntity> activateEffect(String id);
 
   Future<CameraEffectEntity> deactivateEffect(String id);
 
   Future<void> deleteEffect(String id);
+
+  Future<BulkCameraEffectsResult> bulkEffects(BulkCameraEffectsRequest request);
 
   Future<List<CameraEffectCategoryEntity>> getEffectCategories();
 
@@ -98,7 +101,9 @@ abstract class FiltersEffectsRepository {
     PublishCatalogRequest request,
   );
 
-  Future<CameraStudioCatalogEntity> seedCatalog();
+  Future<CatalogSeedResultEntity> seedCatalog();
 
   Future<String> uploadEffectAsset(List<int> bytes, String filename);
+
+  Future<FilterLutUploadResult> uploadFilterLut(List<int> bytes, String filename);
 }

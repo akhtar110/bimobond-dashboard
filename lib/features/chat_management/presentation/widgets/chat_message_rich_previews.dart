@@ -12,9 +12,14 @@ import '../../../post_management/presentation/utils/post_management_navigation.d
 import '../../domain/entities/chat_entities.dart';
 
 class ChatPostSharePreview extends StatefulWidget {
-  const ChatPostSharePreview({super.key, required this.message});
+  const ChatPostSharePreview({
+    super.key,
+    required this.message,
+    this.bubbleStyle = false,
+  });
 
   final ChatMessageEntity message;
+  final bool bubbleStyle;
 
   @override
   State<ChatPostSharePreview> createState() => _ChatPostSharePreviewState();
@@ -143,6 +148,106 @@ class _ChatPostSharePreviewState extends State<ChatPostSharePreview> {
       return Text(widget.message.content ?? l10n.t('chatMessagePostShare'));
     }
 
+    if (widget.bubbleStyle) {
+      final screenW = MediaQuery.sizeOf(context).width;
+      final mediaHeight = (screenW * 0.16).clamp(64.0, 96.0);
+
+      return Material(
+        color: scheme.surface.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _openPost(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: mediaHeight,
+                child: _PostThumbnail(
+                  thumbnailUrl: thumbnail,
+                  expand: true,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.share_rounded,
+                            size: 13, color: scheme.primary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            l10n.t('chatMessagePostShare'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                        if (_loading)
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.primary,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _title(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                    ),
+                    if (author != null)
+                      Text(
+                        author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                      ),
+                    Text(
+                      l10n.t('chatViewPost'),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                    ),
+                    if (_error != null)
+                      Text(
+                        l10n.t('chatPostLoadFailed'),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.error,
+                              fontSize: 11,
+                            ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Material(
       color: scheme.surface.withValues(alpha: 0.65),
       borderRadius: BorderRadius.circular(10),
@@ -236,49 +341,66 @@ class _ChatPostSharePreviewState extends State<ChatPostSharePreview> {
 }
 
 class _PostThumbnail extends StatelessWidget {
-  const _PostThumbnail({this.thumbnailUrl});
+  const _PostThumbnail({this.thumbnailUrl, this.expand = false});
 
   final String? thumbnailUrl;
+  final bool expand;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     const size = 56.0;
 
-    if (thumbnailUrl == null) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
+    Widget placeholder({double? w, double? h}) => Container(
+          width: w,
+          height: h,
           color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.play_circle_outline_rounded,
+            color: scheme.primary,
+            size: expand ? 36 : 24,
+          ),
+        );
+
+    if (thumbnailUrl == null) {
+      if (expand) return placeholder();
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: placeholder(w: size, h: size),
         ),
-        child: Icon(Icons.play_circle_outline_rounded, color: scheme.primary),
       );
     }
 
+    final image = CachedNetworkImage(
+      imageUrl: thumbnailUrl!,
+      width: expand ? null : size,
+      height: expand ? null : size,
+      fit: BoxFit.cover,
+      errorWidget: (_, e, st) => placeholder(w: expand ? null : size, h: expand ? null : size),
+    );
+
+    if (expand) return image;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: CachedNetworkImage(
-        imageUrl: thumbnailUrl!,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorWidget: (_, e, st) => Container(
-          width: size,
-          height: size,
-          color: scheme.surfaceContainerHighest,
-          child: Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
-        ),
-      ),
+      child: image,
     );
   }
 }
 
 class ChatLocationSharePreview extends StatelessWidget {
-  const ChatLocationSharePreview({super.key, required this.payload});
+  const ChatLocationSharePreview({
+    super.key,
+    required this.payload,
+    this.bubbleStyle = false,
+  });
 
   final ChatMessageLocationPayload payload;
+  final bool bubbleStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -287,6 +409,109 @@ class ChatLocationSharePreview extends StatelessWidget {
     final subtitle = payload.displaySubtitle;
     final coords =
         '${payload.latitude.toStringAsFixed(5)}, ${payload.longitude.toStringAsFixed(5)}';
+    final showCoords = payload.displayTitle != coords;
+
+    if (bubbleStyle) {
+      final screenW = MediaQuery.sizeOf(context).width;
+      final mediaHeight = (screenW * 0.14).clamp(52.0, 72.0);
+
+      return Material(
+        color: scheme.surface.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => openExternalUrl(payload.mapsQueryUrl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: mediaHeight,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      scheme.primaryContainer.withValues(alpha: 0.85),
+                      scheme.secondaryContainer.withValues(alpha: 0.65),
+                    ],
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.map_rounded,
+                      size: mediaHeight * 0.55,
+                      color: scheme.primary.withValues(alpha: 0.18),
+                    ),
+                    Icon(
+                      Icons.location_on_rounded,
+                      size: mediaHeight * 0.38,
+                      color: scheme.error,
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.t('chatMessageLocation'),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      payload.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                      ),
+                    if (showCoords)
+                      Text(
+                        coords,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 10.5,
+                            ),
+                      ),
+                    Text(
+                      l10n.t('chatOpenInMaps'),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Material(
       color: scheme.surface.withValues(alpha: 0.65),
@@ -344,13 +569,15 @@ class ChatLocationSharePreview extends StatelessWidget {
                             ),
                       ),
                     ],
-                    const SizedBox(height: 4),
-                    Text(
-                      coords,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                    ),
+                    if (showCoords) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        coords,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       l10n.t('chatOpenInMaps'),

@@ -37,7 +37,10 @@ abstract class UsersRepository {
   Future<void> unbanUser(String userId);
   Future<void> activateUser(String userId);
   Future<void> deactivateUser(String userId);
-  Future<void> resetUserPassword(String userId);
+  Future<void> resetUserPassword({
+    required String userId,
+    required String newPassword,
+  });
   Future<void> setUserCanPost(String userId, {required bool canPost});
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
   Future<void> setUserIsPrivate(String userId, {required bool isPrivate});

@@ -187,7 +187,7 @@ class GiftsFilterBarDelegate extends SliverPersistentHeaderDelegate {
                     ),
                   ],
                   SizedBox(height: metrics.filterGap),
-                  _GiftsModernToolbar(
+                  GiftsModernToolbar(
                     width: screenWidth,
                     metrics: metrics,
                     searchQuery: searchQuery,
@@ -217,8 +217,10 @@ class GiftsFilterBarDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-class _GiftsModernToolbar extends StatelessWidget {
-  const _GiftsModernToolbar({
+/// Shared search / price-date / sort toolbar used by the pinned bar and page panel.
+class GiftsModernToolbar extends StatelessWidget {
+  const GiftsModernToolbar({
+    super.key,
     required this.width,
     required this.metrics,
     required this.searchQuery,
@@ -233,6 +235,8 @@ class _GiftsModernToolbar extends StatelessWidget {
     required this.onPriceRangeChanged,
     required this.onDateRangeChanged,
     required this.sortLabel,
+    this.leading,
+    this.forceSingleLine = false,
   });
 
   final double width;
@@ -250,7 +254,13 @@ class _GiftsModernToolbar extends StatelessWidget {
   final void Function(DateTime? fromDate, DateTime? toDate) onDateRangeChanged;
   final String Function(GiftSortType) sortLabel;
 
-  bool get _isInlineToolbar => width >= 760;
+  /// Optional widgets placed before search (e.g. Active / Inactive chips).
+  final Widget? leading;
+
+  /// Keep status + search + price + sort on one horizontal line.
+  final bool forceSingleLine;
+
+  bool get _isInlineToolbar => forceSingleLine || width >= 760;
 
   @override
   Widget build(BuildContext context) {
@@ -264,15 +274,17 @@ class _GiftsModernToolbar extends StatelessWidget {
     final search = GiftsSearchField(
       searchQuery: searchQuery,
       height: controlHeight,
-      compact: metrics.isMobile,
+      compact: metrics.isMobile || forceSingleLine,
       onChanged: onSearchChanged,
     );
 
     final filtersBtn = _ToolbarButton(
-      label: metrics.isMobile ? 'Filters' : 'Price & Date Filters',
+      label: metrics.isMobile || forceSingleLine
+          ? 'Filters'
+          : 'Price & Date Filters',
       icon: Icons.tune_rounded,
       isActive: hasPriceDate,
-      compact: metrics.isMobile,
+      compact: metrics.isMobile || forceSingleLine,
       controlHeight: controlHeight,
       borderRadius: metrics.toolbarControlRadius,
       onTap: () => _openPriceDateFilters(context),
@@ -281,30 +293,49 @@ class _GiftsModernToolbar extends StatelessWidget {
     final sortBtn = _SortToolbarButton(
       selectedSort: selectedSort,
       sortLabel: sortLabel,
-      compact: metrics.isMobile,
+      compact: metrics.isMobile || forceSingleLine,
       controlHeight: controlHeight,
       borderRadius: metrics.toolbarControlRadius,
       onChanged: onSortChanged,
     );
 
     if (_isInlineToolbar) {
-      return SizedBox(
+      final row = SizedBox(
         height: controlHeight,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (leading != null) ...[
+              leading!,
+              SizedBox(width: metrics.isMobile ? 8 : 12),
+            ],
             Expanded(child: search),
             SizedBox(width: metrics.isMobile ? 8 : 12),
             SizedBox(
-              width: metrics.isMobile ? 180 : 220,
+              width: forceSingleLine
+                  ? (metrics.isMobile ? 110 : 160)
+                  : (metrics.isMobile ? 180 : 220),
               child: filtersBtn,
             ),
             SizedBox(width: gap),
             SizedBox(
-              width: metrics.isMobile ? 120 : 140,
+              width: forceSingleLine
+                  ? (metrics.isMobile ? 100 : 130)
+                  : (metrics.isMobile ? 120 : 140),
               child: sortBtn,
             ),
           ],
+        ),
+      );
+
+      if (!forceSingleLine || width >= 900) return row;
+
+      // Narrow: keep one line via horizontal scroll.
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: width < 520 ? 720 : 860,
+          child: row,
         ),
       );
     }

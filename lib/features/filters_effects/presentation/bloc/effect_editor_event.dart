@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../domain/entities/filters_effects_entities.dart';
+import '../utils/effect_anchor_form_data.dart';
+
 abstract class EffectEditorEvent extends Equatable {
   const EffectEditorEvent();
 
@@ -19,51 +22,90 @@ class LoadEffectEditorEvent extends EffectEditorEvent {
 class EffectBasicFieldChanged extends EffectEditorEvent {
   const EffectBasicFieldChanged({
     this.slug,
-    this.effectType,
-    this.emoji,
-    this.assetUrl,
+    this.renderType,
+    this.label,
     this.labelKey,
-    this.requiresFaceDetection,
-    this.isScreenEffect,
+    this.emoji,
+    this.thumbnailUrl,
+    this.previewColorHex,
+    this.assetUrl,
+    this.assetAsset,
+    this.distortionPreset,
     this.isActive,
     this.sortOrder,
+    this.clearLabelKey = false,
     this.clearEmoji = false,
+    this.clearThumbnailUrl = false,
+    this.clearPreviewColorHex = false,
     this.clearAssetUrl = false,
+    this.clearAssetAsset = false,
+    this.clearDistortionPreset = false,
   });
 
   final String? slug;
-  final String? effectType;
-  final String? emoji;
-  final String? assetUrl;
+  final String? renderType;
+  final String? label;
   final String? labelKey;
-  final bool? requiresFaceDetection;
-  final bool? isScreenEffect;
+  final String? emoji;
+  final String? thumbnailUrl;
+  final String? previewColorHex;
+  final String? assetUrl;
+  final String? assetAsset;
+  final String? distortionPreset;
   final bool? isActive;
   final int? sortOrder;
+  final bool clearLabelKey;
   final bool clearEmoji;
+  final bool clearThumbnailUrl;
+  final bool clearPreviewColorHex;
   final bool clearAssetUrl;
+  final bool clearAssetAsset;
+  final bool clearDistortionPreset;
 
   @override
   List<Object?> get props => [
-        slug,
-        effectType,
-        emoji,
-        assetUrl,
-        labelKey,
-        requiresFaceDetection,
-        isScreenEffect,
-        isActive,
-        sortOrder,
-        clearEmoji,
-        clearAssetUrl,
-      ];
+    slug,
+    renderType,
+    label,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    assetUrl,
+    assetAsset,
+    distortionPreset,
+    isActive,
+    sortOrder,
+    clearLabelKey,
+    clearEmoji,
+    clearThumbnailUrl,
+    clearPreviewColorHex,
+    clearAssetUrl,
+    clearAssetAsset,
+    clearDistortionPreset,
+  ];
+}
+
+class EffectAnchorChanged extends EffectEditorEvent {
+  const EffectAnchorChanged(this.anchor);
+
+  final EffectAnchorFormData anchor;
+
+  @override
+  List<Object?> get props => [anchor];
+}
+
+class EffectStickersChanged extends EffectEditorEvent {
+  const EffectStickersChanged(this.stickers);
+
+  final List<CameraEffectStickerLayer> stickers;
+
+  @override
+  List<Object?> get props => [stickers];
 }
 
 class UploadEffectAssetEvent extends EffectEditorEvent {
-  const UploadEffectAssetEvent({
-    required this.bytes,
-    required this.filename,
-  });
+  const UploadEffectAssetEvent({required this.bytes, required this.filename});
 
   final List<int> bytes;
   final String filename;
@@ -81,93 +123,8 @@ class EffectPreviewColorChanged extends EffectEditorEvent {
   List<Object?> get props => [hex];
 }
 
-class EffectAnchorTypeChanged extends EffectEditorEvent {
-  const EffectAnchorTypeChanged(this.anchorType);
-
-  final String? anchorType;
-
-  @override
-  List<Object?> get props => [anchorType];
-}
-
-class EffectLandmarksChanged extends EffectEditorEvent {
-  const EffectLandmarksChanged(this.landmarks);
-
-  final List<String> landmarks;
-
-  @override
-  List<Object?> get props => [landmarks];
-}
-
-class EffectPlacementNumericChanged extends EffectEditorEvent {
-  const EffectPlacementNumericChanged({
-    this.scaleFactor,
-    this.offsetX,
-    this.offsetY,
-    this.landmarkSize,
-    this.fallbackOffsetY,
-    this.fallbackScaleFactor,
-    this.clearScaleFactor = false,
-    this.clearOffsetX = false,
-    this.clearOffsetY = false,
-    this.clearLandmarkSize = false,
-    this.clearFallbackOffsetY = false,
-    this.clearFallbackScaleFactor = false,
-  });
-
-  final double? scaleFactor;
-  final double? offsetX;
-  final double? offsetY;
-  final double? landmarkSize;
-  final double? fallbackOffsetY;
-  final double? fallbackScaleFactor;
-  final bool clearScaleFactor;
-  final bool clearOffsetX;
-  final bool clearOffsetY;
-  final bool clearLandmarkSize;
-  final bool clearFallbackOffsetY;
-  final bool clearFallbackScaleFactor;
-
-  @override
-  List<Object?> get props => [
-        scaleFactor,
-        offsetX,
-        offsetY,
-        landmarkSize,
-        fallbackOffsetY,
-        fallbackScaleFactor,
-        clearScaleFactor,
-        clearOffsetX,
-        clearOffsetY,
-        clearLandmarkSize,
-        clearFallbackOffsetY,
-        clearFallbackScaleFactor,
-      ];
-}
-
-class EffectFallbackAnchorTypeChanged extends EffectEditorEvent {
-  const EffectFallbackAnchorTypeChanged(this.anchorType);
-
-  final String? anchorType;
-
-  @override
-  List<Object?> get props => [anchorType];
-}
-
-class ApplyPlacementDefaultsEvent extends EffectEditorEvent {
-  const ApplyPlacementDefaultsEvent();
-}
-
-class ResetPlacementEvent extends EffectEditorEvent {
-  const ResetPlacementEvent();
-}
-
 class ResetEffectEditorEvent extends EffectEditorEvent {
   const ResetEffectEditorEvent();
-}
-
-class EffectPlacementExpansionToggled extends EffectEditorEvent {
-  const EffectPlacementExpansionToggled();
 }
 
 class SubmitEffectEditorEvent extends EffectEditorEvent {

@@ -14,7 +14,7 @@ enum ChatBulkAction { deleteChats, deleteMessages }
 
 enum ChatTypeFilter { all, group, direct }
 
-enum ChatMessageTypeFilter { all, text, image, video, audio, postShare }
+enum ChatMessageTypeFilter { all, text, image, video, audio, postShare, location }
 
 enum ChatDeletedFilter { all, deletedOnly, activeOnly }
 

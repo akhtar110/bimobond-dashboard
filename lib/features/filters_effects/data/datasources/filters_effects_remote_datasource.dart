@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../../../core/utils/media_url_resolver.dart';
-
 import '../../domain/entities/effect_placement_entities.dart';
 import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
@@ -13,21 +12,21 @@ import '../models/filter_settings_schema_model.dart';
 abstract class FiltersEffectsRemoteDataSource {
   Future<FiltersEffectsOverviewEntity> getOverview();
   Future<CameraStudioCatalogEntity> getCatalog();
-  Future<List<CameraFilterEntity>> getFilters();
+  Future<PaginatedCameraFiltersEntity> getFilters(
+    FiltersEffectsListQuery query,
+  );
   Future<CameraFilterEntity> getFilter(String id);
   Future<FilterSettingsSchemaEntity> getFilterSettingsSchema();
-  Future<CameraFilterEntity> createFilter(
-    CreateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  });
+  Future<CameraFilterEntity> createFilter(CreateFilterRequest request);
   Future<CameraFilterEntity> updateFilter(
     String id,
-    UpdateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  });
+    UpdateFilterRequest request,
+  );
   Future<CameraFilterEntity> activateFilter(String id);
   Future<CameraFilterEntity> deactivateFilter(String id);
   Future<void> deleteFilter(String id);
+
+  Future<BulkCameraFiltersResult> bulkFilters(BulkCameraFiltersRequest request);
   Future<List<CameraFilterCategoryEntity>> getFilterCategories();
   Future<CameraFilterCategoryEntity> createFilterCategory(
     CreateCategoryRequest request,
@@ -44,18 +43,21 @@ abstract class FiltersEffectsRemoteDataSource {
     List<FilterAssignmentItem> filters,
   );
   Future<void> deleteFilterCategory(String id);
-  Future<List<CameraEffectEntity>> getEffects();
+  Future<PaginatedCameraEffectsEntity> getEffects(
+    FiltersEffectsListQuery query,
+  );
   Future<CameraEffectEntity> getEffect(String id);
   Future<EffectPlacementSchemaEntity> getEffectPlacementSchema();
   Future<CameraEffectEntity> createEffect(CreateEffectRequest request);
   Future<CameraEffectEntity> updateEffect(
     String id,
-    UpdateEffectRequest request, {
-    EffectPlacementSettingsEntity? baselinePlacement,
-  });
+    UpdateEffectRequest request,
+  );
   Future<CameraEffectEntity> activateEffect(String id);
   Future<CameraEffectEntity> deactivateEffect(String id);
   Future<void> deleteEffect(String id);
+
+  Future<BulkCameraEffectsResult> bulkEffects(BulkCameraEffectsRequest request);
   Future<List<CameraEffectCategoryEntity>> getEffectCategories();
   Future<CameraEffectCategoryEntity> createEffectCategory(
     CreateCategoryRequest request,
@@ -75,13 +77,20 @@ abstract class FiltersEffectsRemoteDataSource {
   Future<CatalogPublishResultEntity> publishCatalog(
     PublishCatalogRequest request,
   );
-  Future<CameraStudioCatalogEntity> seedCatalog();
+  Future<CatalogSeedResultEntity> seedCatalog();
 
   /// Uploads a PNG/sticker via `POST /posts/upload` and returns an absolute URL.
   Future<String> uploadEffectAsset(Uint8List bytes, String filename);
+
+  /// Uploads a LUT file via `POST /camera-studio/admin/filters/lut/upload`.
+  Future<FilterLutUploadResult> uploadFilterLut(
+    Uint8List bytes,
+    String filename,
+  );
 }
 
-class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSource {
+class FiltersEffectsRemoteDataSourceImpl
+    implements FiltersEffectsRemoteDataSource {
   FiltersEffectsRemoteDataSourceImpl(this._dio);
 
   final Dio _dio;
@@ -100,11 +109,14 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
-  Future<List<CameraFilterEntity>> getFilters() async {
-    final response = await _dio.get('$_base/filters');
-    return _list(response.data)
-        .map((e) => CameraFilterModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+  Future<PaginatedCameraFiltersEntity> getFilters(
+    FiltersEffectsListQuery query,
+  ) async {
+    final response = await _dio.get(
+      '$_base/filters',
+      queryParameters: query.toQueryParameters(),
+    );
+    return _parsePaginatedFilters(response.data);
   }
 
   @override
@@ -120,26 +132,19 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
-  Future<CameraFilterEntity> createFilter(
-    CreateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  }) async {
-    final response = await _dio.post(
-      '$_base/filters',
-      data: request.toJson(schema: schema),
-    );
+  Future<CameraFilterEntity> createFilter(CreateFilterRequest request) async {
+    final response = await _dio.post('$_base/filters', data: request.toJson());
     return CameraFilterModel.fromJson(_map(response.data));
   }
 
   @override
   Future<CameraFilterEntity> updateFilter(
     String id,
-    UpdateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  }) async {
+    UpdateFilterRequest request,
+  ) async {
     final response = await _dio.patch(
       '$_base/filters/$id',
-      data: request.toJson(schema: schema),
+      data: request.toJson(),
     );
     return CameraFilterModel.fromJson(_map(response.data));
   }
@@ -162,6 +167,17 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
+  Future<BulkCameraFiltersResult> bulkFilters(
+    BulkCameraFiltersRequest request,
+  ) async {
+    final response = await _dio.post(
+      '$_base/filters/bulk',
+      data: request.toJson(),
+    );
+    return BulkCameraFiltersResultModel.fromJson(_map(response.data));
+  }
+
+  @override
   Future<List<CameraFilterCategoryEntity>> getFilterCategories() async {
     final response = await _dio.get('$_base/filter-categories');
     return _list(response.data)
@@ -175,8 +191,10 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   Future<CameraFilterCategoryEntity> createFilterCategory(
     CreateCategoryRequest request,
   ) async {
-    final response =
-        await _dio.post('$_base/filter-categories', data: request.toJson());
+    final response = await _dio.post(
+      '$_base/filter-categories',
+      data: request.toJson(),
+    );
     return CameraFilterCategoryModel.fromJson(_map(response.data));
   }
 
@@ -225,11 +243,14 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
-  Future<List<CameraEffectEntity>> getEffects() async {
-    final response = await _dio.get('$_base/effects');
-    return _list(response.data)
-        .map((e) => CameraEffectModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+  Future<PaginatedCameraEffectsEntity> getEffects(
+    FiltersEffectsListQuery query,
+  ) async {
+    final response = await _dio.get(
+      '$_base/effects',
+      queryParameters: query.toEffectQueryParameters(),
+    );
+    return _parsePaginatedEffects(response.data);
   }
 
   @override
@@ -253,12 +274,11 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   @override
   Future<CameraEffectEntity> updateEffect(
     String id,
-    UpdateEffectRequest request, {
-    EffectPlacementSettingsEntity? baselinePlacement,
-  }) async {
+    UpdateEffectRequest request,
+  ) async {
     final response = await _dio.patch(
       '$_base/effects/$id',
-      data: request.toJson(baselinePlacement: baselinePlacement),
+      data: request.toJson(),
     );
     return CameraEffectModel.fromJson(_map(response.data));
   }
@@ -281,6 +301,17 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   }
 
   @override
+  Future<BulkCameraEffectsResult> bulkEffects(
+    BulkCameraEffectsRequest request,
+  ) async {
+    final response = await _dio.post(
+      '$_base/effects/bulk',
+      data: request.toJson(),
+    );
+    return BulkCameraEffectsResultModel.fromJson(_map(response.data));
+  }
+
+  @override
   Future<List<CameraEffectCategoryEntity>> getEffectCategories() async {
     final response = await _dio.get('$_base/effect-categories');
     return _list(response.data)
@@ -294,8 +325,10 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   Future<CameraEffectCategoryEntity> createEffectCategory(
     CreateCategoryRequest request,
   ) async {
-    final response =
-        await _dio.post('$_base/effect-categories', data: request.toJson());
+    final response = await _dio.post(
+      '$_base/effect-categories',
+      data: request.toJson(),
+    );
     return CameraEffectCategoryModel.fromJson(_map(response.data));
   }
 
@@ -347,25 +380,24 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
   Future<CatalogPublishResultEntity> publishCatalog(
     PublishCatalogRequest request,
   ) async {
-    final response =
-        await _dio.post('$_base/catalog/publish', data: request.toJson());
+    final response = await _dio.post(
+      '$_base/catalog/publish',
+      data: request.toJson(),
+    );
     return CatalogPublishResultModel.fromJson(_map(response.data));
   }
 
   @override
-  Future<CameraStudioCatalogEntity> seedCatalog() async {
+  Future<CatalogSeedResultEntity> seedCatalog() async {
     final response = await _dio.post('$_base/seed');
-    return CameraStudioCatalogModel.fromJson(_map(response.data));
+    return CatalogSeedResultModel.fromJson(_map(response.data));
   }
 
   @override
   Future<String> uploadEffectAsset(Uint8List bytes, String filename) async {
     final formData = FormData();
     formData.files.add(
-      MapEntry(
-        'files',
-        MultipartFile.fromBytes(bytes, filename: filename),
-      ),
+      MapEntry('files', MultipartFile.fromBytes(bytes, filename: filename)),
     );
 
     final response = await _dio.post(
@@ -382,7 +414,8 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
 
     if (data is Map<String, dynamic>) {
       final nested = data['data'];
-      final urls = data['urls'] ??
+      final urls =
+          data['urls'] ??
           (nested is Map<String, dynamic> ? nested['urls'] : null);
       if (urls is List && urls.isNotEmpty) {
         url = _parseUploadUrl(urls.first);
@@ -398,6 +431,122 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
     return resolveMediaUrl(url) ?? url;
   }
 
+  @override
+  Future<FilterLutUploadResult> uploadFilterLut(
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final normalized = filename.trim().toLowerCase();
+    if (!normalized.endsWith('.cube') &&
+        !normalized.endsWith('.png') &&
+        !normalized.endsWith('.3dl')) {
+      throw Exception('Unsupported LUT file type. Use .cube, .3dl, or .png');
+    }
+    return _uploadAdminLut(bytes, filename);
+  }
+
+  Future<FilterLutUploadResult> _uploadAdminLut(
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final formData = FormData();
+    formData.files.add(
+      MapEntry('file', MultipartFile.fromBytes(bytes, filename: filename)),
+    );
+
+    final response = await _dio.post(
+      '$_base/filters/lut/upload',
+      data: formData,
+      options: Options(
+        sendTimeout: const Duration(minutes: 5),
+        receiveTimeout: const Duration(minutes: 5),
+      ),
+    );
+
+    return _parseLutUploadResult(_map(response.data), filename);
+  }
+
+  FilterLutUploadResult _parseLutUploadResult(
+    Map<String, dynamic> map,
+    String fallbackFilename,
+  ) {
+    final lutUrl = _readLutUrl(map);
+    if (lutUrl == null || lutUrl.isEmpty) {
+      throw Exception('LUT upload failed: no lutUrl returned');
+    }
+
+    final lutAsset = _readLutAsset(map, fallbackFilename);
+
+    return FilterLutUploadResult(
+      lutUrl: resolveMediaUrl(lutUrl) ?? lutUrl,
+      lutAsset: lutAsset,
+      sourceFilename: map['originalName']?.toString().trim().isNotEmpty == true
+          ? map['originalName'].toString().trim()
+          : fallbackFilename,
+    );
+  }
+
+  String _readLutAsset(Map<String, dynamic> map, String fallbackFilename) {
+    for (final key in ['lutAsset', 'filename']) {
+      final value = map[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return fallbackFilename.split(RegExp(r'[/\\]')).last;
+  }
+
+  String? _readLutUrl(Map<String, dynamic> map) {
+    final direct = map['lutUrl']?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final url = map['url']?.toString().trim();
+    if (url != null && url.isNotEmpty) return url;
+
+    final urls = map['urls'];
+    if (urls is List && urls.isNotEmpty) {
+      return _parseUploadUrl(urls.first);
+    }
+
+    final nested = map['data'];
+    if (nested is Map<String, dynamic>) {
+      return _readLutUrl(nested);
+    }
+    return null;
+  }
+
+  PaginatedCameraFiltersEntity _parsePaginatedFilters(dynamic data) {
+    final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    final items = _list(data)
+        .map((e) => CameraFilterModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final metaMap = map['meta'];
+    final meta = metaMap is Map<String, dynamic>
+        ? FiltersEffectsPaginationMetaModel.fromJson(metaMap)
+        : FiltersEffectsPaginationMeta(
+            total: items.length,
+            page: 1,
+            limit: items.length,
+            totalPages: 1,
+          );
+    return PaginatedCameraFiltersEntity(data: items, meta: meta);
+  }
+
+  PaginatedCameraEffectsEntity _parsePaginatedEffects(dynamic data) {
+    final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    final items = _list(data)
+        .map((e) => CameraEffectModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final metaMap = map['meta'];
+    final meta = metaMap is Map<String, dynamic>
+        ? FiltersEffectsPaginationMetaModel.fromJson(metaMap)
+        : FiltersEffectsPaginationMeta(
+            total: items.length,
+            page: 1,
+            limit: items.length,
+            totalPages: 1,
+          );
+    return PaginatedCameraEffectsEntity(data: items, meta: meta);
+  }
+
   String _parseUploadUrl(dynamic entry) {
     if (entry is String) return entry;
     if (entry is Map<String, dynamic>) {
@@ -408,7 +557,14 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
 
   Map<String, dynamic> _map(dynamic data) {
     if (data is Map<String, dynamic>) {
-      if (data['data'] is Map<String, dynamic>) {
+      // Prefer unwrapped admin responses. Only peel a nested `data` map when
+      // the outer map looks like an envelope (has success/message and no id).
+      if (data['data'] is Map<String, dynamic> &&
+          !data.containsKey('id') &&
+          !data.containsKey('slug') &&
+          !data.containsKey('version') &&
+          !data.containsKey('filterCategories') &&
+          !data.containsKey('colorFilterCategories')) {
         return data['data'] as Map<String, dynamic>;
       }
       return data;
@@ -425,7 +581,7 @@ class FiltersEffectsRemoteDataSourceImpl implements FiltersEffectsRemoteDataSour
         return nested['data'] as List;
       }
     }
-    return const [];
+    throw Exception('Invalid camera studio list response');
   }
 }
 
@@ -435,17 +591,19 @@ class FiltersEffectsOverviewModel extends FiltersEffectsOverviewEntity {
     required super.filterCategories,
     required super.effects,
     required super.effectCategories,
-    required super.catalogVersion,
+    super.catalogVersion,
     super.catalogPublishedAt,
   });
 
   factory FiltersEffectsOverviewModel.fromJson(Map<String, dynamic> json) {
+    final categoryCounts =
+        json['filterCategories'] ?? json['colorFilterCategories'];
     return FiltersEffectsOverviewModel(
       filters: _countSummary(json['filters']),
-      filterCategories: _countSummary(json['filterCategories']),
+      filterCategories: _countSummary(categoryCounts),
       effects: _countSummary(json['effects']),
       effectCategories: _countSummary(json['effectCategories']),
-      catalogVersion: json['catalogVersion']?.toString() ?? '',
+      catalogVersion: json['catalogVersion']?.toString(),
       catalogPublishedAt: _date(json['catalogPublishedAt']),
     );
   }
@@ -464,40 +622,59 @@ class CameraFilterModel extends CameraFilterEntity {
   const CameraFilterModel({
     required super.id,
     required super.slug,
-    required super.engineType,
-    required super.engineKey,
-    super.labelKey,
+    required super.renderType,
+    required super.label,
     super.customLabel,
+    super.labelKey,
+    super.emoji,
     super.thumbnailUrl,
     super.previewColorHex,
+    super.colorMatrix,
+    super.lutUrl,
+    super.lutAsset,
+    super.adjustments,
+    super.filterSettings,
     super.isOriginal,
     super.isBeautyDefault,
     super.isActive,
     super.sortOrder,
-    super.filterSettings,
-    super.colorMatrix,
     super.createdAt,
     super.updatedAt,
   });
 
   factory CameraFilterModel.fromJson(Map<String, dynamic> json) {
+    final adjustments = _parseAdjustments(json['adjustments']);
+    final filterSettings = _parseAdjustments(json['filterSettings']);
+    final label =
+        json['label']?.toString() ??
+        json['customLabel']?.toString() ??
+        json['slug']?.toString() ??
+        '';
     return CameraFilterModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      engineType: CameraFilterEngineTypeApi.forAdminApi(
-        json['engineType']?.toString() ?? '',
+      renderType: CameraFilterRenderTypeApi.fromResponse(
+        json['renderType']?.toString() ?? '',
       ),
-      engineKey: json['engineKey']?.toString() ?? '',
-      labelKey: json['labelKey']?.toString(),
+      label: label,
       customLabel: json['customLabel']?.toString(),
-      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      labelKey: json['labelKey']?.toString(),
+      emoji: json['emoji']?.toString(),
+      thumbnailUrl:
+          resolveMediaUrl(json['thumbnailUrl']?.toString()) ??
+          json['thumbnailUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
+      colorMatrix: _parseColorMatrix(json['colorMatrix']),
+      lutUrl:
+          resolveMediaUrl(json['lutUrl']?.toString()) ??
+          json['lutUrl']?.toString(),
+      lutAsset: json['lutAsset']?.toString(),
+      adjustments: adjustments,
+      filterSettings: filterSettings,
       isOriginal: json['isOriginal'] == true,
       isBeautyDefault: json['isBeautyDefault'] == true,
       isActive: json['isActive'] != false,
       sortOrder: _int(json['sortOrder']),
-      filterSettings: parseFilterSettings(json['filterSettings']),
-      colorMatrix: parseColorMatrix(json['colorMatrix']),
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
     );
@@ -508,7 +685,8 @@ class CameraFilterCategoryModel extends CameraFilterCategoryEntity {
   const CameraFilterCategoryModel({
     required super.id,
     required super.slug,
-    required super.labelKey,
+    required super.label,
+    super.labelKey,
     required super.sortOrder,
     required super.isActive,
     super.filters,
@@ -520,10 +698,16 @@ class CameraFilterCategoryModel extends CameraFilterCategoryEntity {
     final filters = (json['filters'] as List? ?? [])
         .map((e) => CameraFilterModel.fromJson(e as Map<String, dynamic>))
         .toList();
+    final label =
+        json['label']?.toString() ??
+        json['labelKey']?.toString() ??
+        json['slug']?.toString() ??
+        '';
     return CameraFilterCategoryModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      labelKey: json['labelKey']?.toString() ?? '',
+      label: label,
+      labelKey: json['labelKey']?.toString(),
       sortOrder: _int(json['sortOrder']),
       isActive: json['isActive'] != false,
       filters: filters,
@@ -537,59 +721,67 @@ class CameraEffectModel extends CameraEffectEntity {
   const CameraEffectModel({
     required super.id,
     required super.slug,
-    required super.effectType,
+    required super.renderType,
+    required super.label,
+    super.labelKey,
     super.emoji,
-    super.assetUrl,
+    super.thumbnailUrl,
     super.previewColorHex,
-    required super.labelKey,
-    super.requiresFaceDetection,
-    super.isScreenEffect,
+    super.assetUrl,
+    super.assetAsset,
+    super.anchor,
+    super.stickers,
+    super.distortionPreset,
     super.isActive,
     super.sortOrder,
-    super.anchorType,
-    super.anchorLandmarks,
-    super.scaleFactor,
-    super.offsetX,
-    super.offsetY,
-    super.landmarkSize,
-    super.fallbackAnchorType,
-    super.fallbackOffsetY,
-    super.fallbackScaleFactor,
     super.createdAt,
     super.updatedAt,
   });
 
   factory CameraEffectModel.fromJson(Map<String, dynamic> json) {
+    final rawAnchor = json['anchor'];
+    final rawStickers = json['stickers'];
+    final label =
+        json['label']?.toString() ??
+        json['labelKey']?.toString() ??
+        json['slug']?.toString() ??
+        '';
+    final distortion = json['distortionPreset']?.toString();
     return CameraEffectModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      effectType: CameraEffectTypeApi.normalize(
-        json['effectType']?.toString() ?? '',
+      renderType: CameraEffectRenderTypeApi.fromResponse(
+        json['renderType']?.toString() ?? '',
       ),
+      label: label,
+      labelKey: json['labelKey']?.toString(),
       emoji: json['emoji']?.toString(),
-      assetUrl: resolveMediaUrl(json['assetUrl']?.toString()) ??
-          json['assetUrl']?.toString(),
+      thumbnailUrl:
+          resolveMediaUrl(json['thumbnailUrl']?.toString()) ??
+          json['thumbnailUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
-      labelKey: json['labelKey']?.toString() ?? '',
-      requiresFaceDetection: json['requiresFaceDetection'] == true,
-      isScreenEffect: json['isScreenEffect'] == true,
+      assetUrl:
+          resolveMediaUrl(json['assetUrl']?.toString()) ??
+          json['assetUrl']?.toString(),
+      assetAsset: json['assetAsset']?.toString(),
+      anchor: rawAnchor is Map<String, dynamic>
+          ? Map<String, dynamic>.from(rawAnchor)
+          : const {},
+      stickers: rawStickers is List
+          ? rawStickers
+                .whereType<Map>()
+                .map(
+                  (e) => CameraEffectStickerLayer.fromJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .toList()
+          : const [],
+      distortionPreset: distortion == null || distortion.isEmpty
+          ? null
+          : CameraDistortionPresetApi.fromResponse(distortion),
       isActive: json['isActive'] != false,
       sortOrder: _int(json['sortOrder']),
-      anchorType: json['anchorType'] == null
-          ? null
-          : CameraEffectAnchorTypeApi.normalize(json['anchorType'].toString()),
-      anchorLandmarks: parseEffectAnchorLandmarks(json['anchorLandmarks']),
-      scaleFactor: _double(json['scaleFactor']),
-      offsetX: _double(json['offsetX']),
-      offsetY: _double(json['offsetY']),
-      landmarkSize: _double(json['landmarkSize']),
-      fallbackAnchorType: json['fallbackAnchorType'] == null
-          ? null
-          : CameraEffectAnchorTypeApi.normalize(
-              json['fallbackAnchorType'].toString(),
-            ),
-      fallbackOffsetY: _double(json['fallbackOffsetY']),
-      fallbackScaleFactor: _double(json['fallbackScaleFactor']),
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
     );
@@ -600,7 +792,8 @@ class CameraEffectCategoryModel extends CameraEffectCategoryEntity {
   const CameraEffectCategoryModel({
     required super.id,
     required super.slug,
-    required super.labelKey,
+    required super.label,
+    super.labelKey,
     required super.sortOrder,
     required super.isActive,
     super.effects,
@@ -612,10 +805,16 @@ class CameraEffectCategoryModel extends CameraEffectCategoryEntity {
     final effects = (json['effects'] as List? ?? [])
         .map((e) => CameraEffectModel.fromJson(e as Map<String, dynamic>))
         .toList();
+    final label =
+        json['label']?.toString() ??
+        json['labelKey']?.toString() ??
+        json['slug']?.toString() ??
+        '';
     return CameraEffectCategoryModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      labelKey: json['labelKey']?.toString() ?? '',
+      label: label,
+      labelKey: json['labelKey']?.toString(),
       sortOrder: _int(json['sortOrder']),
       isActive: json['isActive'] != false,
       effects: effects,
@@ -627,13 +826,15 @@ class CameraEffectCategoryModel extends CameraEffectCategoryEntity {
 
 class CameraStudioCatalogModel extends CameraStudioCatalogEntity {
   const CameraStudioCatalogModel({
-    required super.version,
+    super.version,
     required super.filterCategories,
     required super.effectCategories,
   });
 
   factory CameraStudioCatalogModel.fromJson(Map<String, dynamic> json) {
-    final filterCategories = (json['filterCategories'] as List? ?? [])
+    final rawFilterCategories =
+        json['colorFilterCategories'] ?? json['filterCategories'];
+    final filterCategories = (rawFilterCategories as List? ?? [])
         .map(
           (e) => CameraFilterCategoryModel.fromJson(e as Map<String, dynamic>),
         )
@@ -643,8 +844,9 @@ class CameraStudioCatalogModel extends CameraStudioCatalogEntity {
           (e) => CameraEffectCategoryModel.fromJson(e as Map<String, dynamic>),
         )
         .toList();
+    final version = json['version']?.toString();
     return CameraStudioCatalogModel(
-      version: json['version']?.toString() ?? '',
+      version: version == null || version.isEmpty ? null : version,
       filterCategories: filterCategories,
       effectCategories: effectCategories,
     );
@@ -670,10 +872,102 @@ class CatalogPublishResultModel extends CatalogPublishResultEntity {
   }
 }
 
-double? _double(dynamic value) {
-  if (value == null) return null;
-  if (value is num) return value.toDouble();
-  return double.tryParse(value.toString());
+class CatalogSeedResultModel extends CatalogSeedResultEntity {
+  const CatalogSeedResultModel({required super.success, super.message});
+
+  factory CatalogSeedResultModel.fromJson(Map<String, dynamic> json) {
+    return CatalogSeedResultModel(
+      success: json['success'] == true,
+      message: json['message']?.toString(),
+    );
+  }
+}
+
+class FiltersEffectsPaginationMetaModel extends FiltersEffectsPaginationMeta {
+  const FiltersEffectsPaginationMetaModel({
+    required super.total,
+    required super.page,
+    required super.limit,
+    required super.totalPages,
+  });
+
+  factory FiltersEffectsPaginationMetaModel.fromJson(Map<String, dynamic> json) {
+    return FiltersEffectsPaginationMetaModel(
+      total: _int(json['total']),
+      page: _int(json['page']).clamp(1, 999999),
+      limit: _int(json['limit']).clamp(1, 100),
+      totalPages: _int(json['totalPages']).clamp(1, 999999),
+    );
+  }
+}
+
+class BulkCameraFiltersResultModel extends BulkCameraFiltersResult {
+  const BulkCameraFiltersResultModel({
+    required super.action,
+    required super.successCount,
+    required super.notFoundCount,
+    required super.filterIds,
+    required super.notFoundIds,
+  });
+
+  factory BulkCameraFiltersResultModel.fromJson(Map<String, dynamic> json) {
+    return BulkCameraFiltersResultModel(
+      action: json['action']?.toString() ?? '',
+      successCount: _int(json['successCount']),
+      notFoundCount: _int(json['notFoundCount']),
+      filterIds: _stringList(json['filterIds']),
+      notFoundIds: _stringList(json['notFoundIds']),
+    );
+  }
+}
+
+class BulkCameraEffectsResultModel extends BulkCameraEffectsResult {
+  const BulkCameraEffectsResultModel({
+    required super.action,
+    required super.successCount,
+    required super.notFoundCount,
+    required super.effectIds,
+    required super.notFoundIds,
+  });
+
+  factory BulkCameraEffectsResultModel.fromJson(Map<String, dynamic> json) {
+    return BulkCameraEffectsResultModel(
+      action: json['action']?.toString() ?? '',
+      successCount: _int(json['successCount']),
+      notFoundCount: _int(json['notFoundCount']),
+      effectIds: _stringList(json['effectIds']),
+      notFoundIds: _stringList(json['notFoundIds']),
+    );
+  }
+}
+
+List<String> _stringList(dynamic value) {
+  if (value is! List) return const [];
+  return value.map((e) => e.toString()).toList(growable: false);
+}
+
+CameraFilterAdjustments _parseAdjustments(dynamic value) {
+  if (value is! Map) return const CameraFilterAdjustments();
+  final values = <String, num>{};
+  value.forEach((key, entry) {
+    if (entry is num) {
+      values[key.toString()] = entry;
+    } else {
+      final parsed = num.tryParse(entry.toString());
+      if (parsed != null) values[key.toString()] = parsed;
+    }
+  });
+  return CameraFilterAdjustments(values);
+}
+
+List<double> _parseColorMatrix(dynamic value) {
+  if (value is! List) return const [];
+  return value
+      .map((e) {
+        if (e is num) return e.toDouble();
+        return double.tryParse(e.toString()) ?? 0;
+      })
+      .toList(growable: false);
 }
 
 int _int(dynamic value) {
@@ -686,37 +980,3 @@ DateTime? _date(dynamic value) {
   if (value == null) return null;
   return DateTime.tryParse(value.toString());
 }
-
-/// Known CamerAwesome engine keys for filter dropdowns.
-const kCameraAwesomeEngineKeys = [
-  'Original',
-  'Amaro',
-  'Juno',
-  'Lark',
-  'Addictive Red',
-  'Addictive Blue',
-  'Clarendon',
-  'Reyes',
-  'Aden',
-  'Perpetua',
-  'Walden',
-  'Ginza',
-  'Sierra',
-  'Hefe',
-  'Inkwell',
-  'Moon',
-  'Willow',
-  'Brannan',
-  'Stinson',
-  'Sutro',
-  'Hudson',
-  'LoFi',
-  'Slumber',
-  'Dogpatch',
-  'Brooklyn',
-  'Gingham',
-  'XProII',
-  'Ludwig',
-  'Crema',
-  'Ashby',
-];

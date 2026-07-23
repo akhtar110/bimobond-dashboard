@@ -1,10 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 class BoundingBoxInfoEntity extends Equatable {
-  const BoundingBoxInfoEntity({
-    required this.fields,
-    this.description,
-  });
+  const BoundingBoxInfoEntity({required this.fields, this.description});
 
   final List<String> fields;
   final String? description;
@@ -60,12 +57,12 @@ class AnchorTypeEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        key,
-        label,
-        description,
-        requiresLandmarks,
-        usesFaceBox,
-      ];
+    key,
+    label,
+    description,
+    requiresLandmarks,
+    usesFaceBox,
+  ];
 }
 
 class SlugPlacementDefaultsEntity extends Equatable {
@@ -93,16 +90,16 @@ class SlugPlacementDefaultsEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        anchorType,
-        anchorLandmarks,
-        scaleFactor,
-        offsetX,
-        offsetY,
-        landmarkSize,
-        fallbackAnchorType,
-        fallbackOffsetY,
-        fallbackScaleFactor,
-      ];
+    anchorType,
+    anchorLandmarks,
+    scaleFactor,
+    offsetX,
+    offsetY,
+    landmarkSize,
+    fallbackAnchorType,
+    fallbackOffsetY,
+    fallbackScaleFactor,
+  ];
 }
 
 class EffectPlacementSchemaEntity extends Equatable {
@@ -135,12 +132,12 @@ class EffectPlacementSchemaEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        version,
-        faceDetection,
-        anchorTypes,
-        landmarks,
-        defaultsBySlug,
-      ];
+    version,
+    faceDetection,
+    anchorTypes,
+    landmarks,
+    defaultsBySlug,
+  ];
 }
 
 /// Strongly typed placement fields for effect create/update payloads.
@@ -196,17 +193,18 @@ class EffectPlacementSettingsEntity extends Equatable {
       anchorLandmarks: clearAnchorLandmarks
           ? const []
           : (anchorLandmarks ?? this.anchorLandmarks),
-      scaleFactor:
-          clearScaleFactor ? null : (scaleFactor ?? this.scaleFactor),
+      scaleFactor: clearScaleFactor ? null : (scaleFactor ?? this.scaleFactor),
       offsetX: clearOffsetX ? null : (offsetX ?? this.offsetX),
       offsetY: clearOffsetY ? null : (offsetY ?? this.offsetY),
-      landmarkSize:
-          clearLandmarkSize ? null : (landmarkSize ?? this.landmarkSize),
+      landmarkSize: clearLandmarkSize
+          ? null
+          : (landmarkSize ?? this.landmarkSize),
       fallbackAnchorType: clearFallbackAnchorType
           ? null
           : (fallbackAnchorType ?? this.fallbackAnchorType),
-      fallbackOffsetY:
-          clearFallbackOffsetY ? null : (fallbackOffsetY ?? this.fallbackOffsetY),
+      fallbackOffsetY: clearFallbackOffsetY
+          ? null
+          : (fallbackOffsetY ?? this.fallbackOffsetY),
       fallbackScaleFactor: clearFallbackScaleFactor
           ? null
           : (fallbackScaleFactor ?? this.fallbackScaleFactor),
@@ -245,8 +243,9 @@ class EffectPlacementSettingsEntity extends Equatable {
     if (offsetY != null) json['offsetY'] = offsetY;
     if (landmarkSize != null) json['landmarkSize'] = landmarkSize;
     if (fallbackAnchorType != null && fallbackAnchorType!.isNotEmpty) {
-      json['fallbackAnchorType'] =
-          CameraEffectAnchorTypeApi.forApi(fallbackAnchorType!);
+      json['fallbackAnchorType'] = CameraEffectAnchorTypeApi.forApi(
+        fallbackAnchorType!,
+      );
     }
     if (fallbackOffsetY != null) json['fallbackOffsetY'] = fallbackOffsetY;
     if (fallbackScaleFactor != null) {
@@ -263,8 +262,9 @@ class EffectPlacementSettingsEntity extends Equatable {
     if (clearAnchorLandmarks) {
       json['anchorLandmarks'] = null;
     } else if (anchorLandmarks != baseline?.anchorLandmarks) {
-      json['anchorLandmarks'] =
-          anchorLandmarks.isEmpty ? null : anchorLandmarks;
+      json['anchorLandmarks'] = anchorLandmarks.isEmpty
+          ? null
+          : anchorLandmarks;
     }
     if (anchorType != baseline?.anchorType) {
       json['anchorType'] = anchorType == null || anchorType!.isEmpty
@@ -280,8 +280,8 @@ class EffectPlacementSettingsEntity extends Equatable {
     if (fallbackAnchorType != baseline?.fallbackAnchorType) {
       json['fallbackAnchorType'] =
           fallbackAnchorType == null || fallbackAnchorType!.isEmpty
-              ? null
-              : CameraEffectAnchorTypeApi.forApi(fallbackAnchorType!);
+          ? null
+          : CameraEffectAnchorTypeApi.forApi(fallbackAnchorType!);
     }
     if (fallbackOffsetY != baseline?.fallbackOffsetY) {
       json['fallbackOffsetY'] = fallbackOffsetY;
@@ -294,16 +294,16 @@ class EffectPlacementSettingsEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        anchorType,
-        anchorLandmarks,
-        scaleFactor,
-        offsetX,
-        offsetY,
-        landmarkSize,
-        fallbackAnchorType,
-        fallbackOffsetY,
-        fallbackScaleFactor,
-      ];
+    anchorType,
+    anchorLandmarks,
+    scaleFactor,
+    offsetX,
+    offsetY,
+    landmarkSize,
+    fallbackAnchorType,
+    fallbackOffsetY,
+    fallbackScaleFactor,
+  ];
 }
 
 /// Normalizes anchor type keys between admin request and API response.

@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../auth/domain/utils/dashboard_permissions.dart';
+import '../../../../injection_container.dart' as di;
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
-import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
+import '../bloc/admin_settings_bloc.dart';
+import '../utils/settings_responsive.dart';
 import '../widgets/language_selector_card.dart';
 import '../widgets/logout_section.dart';
 import '../widgets/profile_card.dart';
+import '../widgets/settings_header.dart';
+import '../widgets/settings_overview_cards.dart';
 import '../widgets/settings_platform_tabs.dart';
+import '../widgets/settings_search_bar.dart';
 import '../widgets/theme_selector_card.dart';
 
-/// Settings screen with narrow rebuild scopes for theme and locale changes.
+/// Settings screen with admin module, profile, appearance, and logout.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -21,16 +26,54 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  /// Stable callback reference — avoids rebuilding [LogoutSection] on unrelated frames.
   void _handleLogout() => _confirmLogout(context);
 
   @override
   Widget build(BuildContext context) {
-    // Intentionally no Theme.of / l10n here so this node is not marked dirty
-    // when only theme or locale changes.
-    return _SettingsBackground(
-      child: _SettingsScrollBody(onLogout: _handleLogout),
+    return BlocProvider(
+      create: (_) => di.sl<AdminSettingsBloc>()..add(const LoadAdminSettingsEvent()),
+      child: BlocListener<AdminSettingsBloc, AdminSettingsState>(
+        listenWhen: (prev, next) =>
+            next.message != null && next.message != prev.message,
+        listener: (context, state) {
+          if (state.message == null) return;
+          final l10n = context.l10n;
+          final scheme = Theme.of(context).colorScheme;
+          final text = _resolveAdminMessage(l10n, state.message!);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(text),
+              backgroundColor: state.messageIsError ? scheme.error : null,
+            ),
+          );
+          context
+              .read<AdminSettingsBloc>()
+              .add(const ClearAdminSettingsFeedbackEvent());
+        },
+        child: _SettingsBackground(
+          child: _SettingsScrollBody(onLogout: _handleLogout),
+        ),
+      ),
     );
+  }
+
+  static String _resolveAdminMessage(AppLocalizations l10n, String message) {
+    if (message.startsWith('settingsSeedSuccess:')) {
+      final count = message.split(':').last;
+      return l10n
+          .tOr('settingsSeedSuccess', 'Seeded {count} settings')
+          .replaceAll('{count}', count);
+    }
+    return switch (message) {
+      'settingCreated' => l10n.tOr('settingCreated', 'Setting created'),
+      'settingUpdated' => l10n.tOr('settingUpdated', 'Setting updated'),
+      'settingDeleted' => l10n.tOr('settingDeleted', 'Setting deleted'),
+      'brandingUpdated' => l10n.tOr('brandingUpdated', 'Branding updated'),
+      'currencyCreated' => l10n.tOr('currencyCreated', 'Currency created'),
+      'currencyUpdated' => l10n.tOr('currencyUpdated', 'Currency updated'),
+      'currencyDeleted' => l10n.tOr('currencyDeleted', 'Currency deleted'),
+      _ => message,
+    };
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -40,7 +83,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final danger =
         isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
 
-    // Resolve strings and styles once before opening the dialog route.
     final dialogContent = (
       title: l10n.t('logout'),
       message: l10n.t('logoutConfirmMessage'),
@@ -72,7 +114,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-/// Self-contained dialog — no inherited lookups inside [build].
 class _LogoutConfirmDialog extends StatelessWidget {
   const _LogoutConfirmDialog({
     required this.danger,
@@ -127,7 +168,6 @@ class _LogoutConfirmDialog extends StatelessWidget {
   }
 }
 
-/// Only rebuilds when theme/brightness changes (page background).
 class _SettingsBackground extends StatelessWidget {
   const _SettingsBackground({required this.child});
 
@@ -145,53 +185,55 @@ class _SettingsBackground extends StatelessWidget {
   }
 }
 
-/// Scroll shell — uses [MediaQuery] for padding (not [LayoutBuilder]).
-/// Does not depend on theme or locale, so it skips those rebuilds.
 class _SettingsScrollBody extends StatelessWidget {
   const _SettingsScrollBody({required this.onLogout});
 
   final VoidCallback onLogout;
 
-  static double _horizontalPaddingFor(double width) {
-    if (width >= 1200) return 32;
-    if (width >= 768) return 24;
-    return 16;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final horizontalPadding =
-        _horizontalPaddingFor(MediaQuery.sizeOf(context).width);
+    final width = MediaQuery.sizeOf(context).width;
+    final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
+    final sectionGap = metrics.sectionGap;
+    final canReadAdmin = PermissionManager.canReadSettings(context);
+    final canManage = PermissionManager.canWriteSettings(context);
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960),
+        constraints: const BoxConstraints(
+          maxWidth: SettingsLayoutMetrics.maxContentWidth,
+        ),
         child: SingleChildScrollView(
           padding: EdgeInsetsDirectional.fromSTEB(
-            horizontalPadding,
-            28,
-            horizontalPadding,
+            metrics.pageHorizontalPadding,
+            metrics.pageTopPadding + 12,
+            metrics.pageHorizontalPadding,
             40,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const RepaintBoundary(child: _SettingsHeader()),
-              const SizedBox(height: 28),
-              const RepaintBoundary(child: ProfileCard()),
-              const SizedBox(height: 28),
-              const RepaintBoundary(child: _AppearanceSection()),
-              const SizedBox(height: 28),
               RepaintBoundary(
-                child: BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, authState) {
-                    final canManage = authState is Authenticated &&
-                        canManageSettings(authState.user.roles);
-                    return SettingsPlatformTabs(canManage: canManage);
-                  },
-                ),
+                child: SettingsHeader(compact: metrics.isCompact),
               ),
-              const SizedBox(height: 28),
+              SizedBox(height: sectionGap + 8),
+              const RepaintBoundary(child: ProfileCard()),
+              SizedBox(height: sectionGap + 8),
+              const RepaintBoundary(child: _AppearanceSection()),
+              if (canReadAdmin) ...[
+                SizedBox(height: sectionGap + 8),
+                const RepaintBoundary(child: SettingsOverviewCards()),
+                SizedBox(height: sectionGap),
+                const RepaintBoundary(child: SettingsSearchBar()),
+                SizedBox(height: sectionGap),
+                RepaintBoundary(
+                  child: SettingsPlatformTabs(
+                    canManage: canManage,
+                    canReadAdmin: canReadAdmin,
+                  ),
+                ),
+              ],
+              SizedBox(height: sectionGap + 8),
               RepaintBoundary(
                 child: LogoutSection(onLogout: onLogout),
               ),
@@ -203,57 +245,21 @@ class _SettingsScrollBody extends StatelessWidget {
   }
 }
 
-/// Title block — rebuilds on locale and theme only.
-class _SettingsHeader extends StatelessWidget {
-  const _SettingsHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : const Color(0xFF111827);
-    final subtitleColor =
-        isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          l10n.t('settings'),
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-            color: titleColor,
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          l10n.t('settingsSubtitle'),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: subtitleColor,
-            fontSize: 14,
-            height: 1.4,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-
 class _AppearanceSection extends StatelessWidget {
   const _AppearanceSection();
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final gap = SettingsLayoutMetrics(
+      getSettingsDeviceType(MediaQuery.sizeOf(context).width),
+    ).sectionGap;
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ThemeSelectorCard(),
-        SizedBox(height: 28),
-        LanguageSelectorCard(),
+        const ThemeSelectorCard(),
+        SizedBox(height: gap + 8),
+        const LanguageSelectorCard(),
       ],
     );
   }

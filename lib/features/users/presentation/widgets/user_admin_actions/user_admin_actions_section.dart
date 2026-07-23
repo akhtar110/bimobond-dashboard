@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/localization/localization.dart';
+import '../../../../rbac/presentation/bloc/rbac_bloc.dart';
+import '../../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../domain/entities/user_admin_action_type.dart';
 import '../../../domain/entities/user_entity.dart';
 import '../../bloc/user_detail_bloc.dart';
 import '../../bloc/user_detail_event.dart';
 import '../../utils/user_admin_action_presentation.dart';
+import '../reset_password_dialog.dart';
 import 'admin_action_confirmation_dialog.dart';
 
 class UserAdminActionsSection extends StatelessWidget {
@@ -28,7 +31,16 @@ class UserAdminActionsSection extends StatelessWidget {
     final actions = visibleUserAdminActions(user);
     final isLoading = executingAction != null;
 
-    return MenuAnchor(
+    return BlocBuilder<RbacBloc, RbacState>(
+      buildWhen: (previous, current) =>
+          previous.authContext != current.authContext,
+      builder: (context, rbacState) {
+        final canResetPassword = PermissionManager.hasPermission(
+          context,
+          RbacPermissionKeys.resetUserPassword,
+        );
+
+        return MenuAnchor(
       style: MenuStyle(
         visualDensity: VisualDensity.compact,
         padding: WidgetStateProperty.all(
@@ -94,7 +106,38 @@ class UserAdminActionsSection extends StatelessWidget {
             isDisabled: isBusy && executingAction != action,
             onSelected: () => _onActionTap(context, action),
           ),
+        if (canResetPassword)
+          MenuItemButton(
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              ),
+            ),
+            onPressed: isBusy
+                ? null
+                : () => ResetPasswordDialog.show(
+                      context,
+                      userId: user.id,
+                      displayName: user.fullName ?? user.username,
+                    ),
+            leadingIcon: Icon(
+              Icons.lock_reset_rounded,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+            child: Text(
+              l10n.t('resetPassword'),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isBusy ? scheme.onSurfaceVariant : scheme.onSurface,
+              ),
+            ),
+          ),
       ],
+    );
+      },
     );
   }
 

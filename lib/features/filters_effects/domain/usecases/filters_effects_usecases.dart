@@ -24,7 +24,8 @@ class GetCameraFiltersUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<List<CameraFilterEntity>> call() => _repository.getFilters();
+  Future<PaginatedCameraFiltersEntity> call(FiltersEffectsListQuery query) =>
+      _repository.getFilters(query);
 }
 
 class GetCameraFilterUseCase {
@@ -49,11 +50,8 @@ class CreateCameraFilterUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraFilterEntity> call(
-    CreateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  }) =>
-      _repository.createFilter(request, schema: schema);
+  Future<CameraFilterEntity> call(CreateFilterRequest request) =>
+      _repository.createFilter(request);
 }
 
 class UpdateCameraFilterUseCase {
@@ -61,12 +59,8 @@ class UpdateCameraFilterUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraFilterEntity> call(
-    String id,
-    UpdateFilterRequest request, {
-    FilterSettingsSchemaEntity? schema,
-  }) =>
-      _repository.updateFilter(id, request, schema: schema);
+  Future<CameraFilterEntity> call(String id, UpdateFilterRequest request) =>
+      _repository.updateFilter(id, request);
 }
 
 class ActivateCameraFilterUseCase {
@@ -92,6 +86,15 @@ class DeleteCameraFilterUseCase {
   final FiltersEffectsRepository _repository;
 
   Future<void> call(String id) => _repository.deleteFilter(id);
+}
+
+class BulkCameraFiltersUseCase {
+  const BulkCameraFiltersUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<BulkCameraFiltersResult> call(BulkCameraFiltersRequest request) =>
+      _repository.bulkFilters(request);
 }
 
 class GetCameraFilterCategoriesUseCase {
@@ -120,8 +123,7 @@ class UpdateCameraFilterCategoryUseCase {
   Future<CameraFilterCategoryEntity> call(
     String id,
     UpdateCategoryRequest request,
-  ) =>
-      _repository.updateFilterCategory(id, request);
+  ) => _repository.updateFilterCategory(id, request);
 }
 
 class ReorderCameraFilterCategoriesUseCase {
@@ -131,8 +133,7 @@ class ReorderCameraFilterCategoriesUseCase {
 
   Future<List<CameraFilterCategoryEntity>> call(
     List<CategoryReorderItem> items,
-  ) =>
-      _repository.reorderFilterCategories(items);
+  ) => _repository.reorderFilterCategories(items);
 }
 
 class AssignFiltersToCategoryUseCase {
@@ -143,8 +144,7 @@ class AssignFiltersToCategoryUseCase {
   Future<CameraFilterCategoryEntity> call(
     String categoryId,
     List<FilterAssignmentItem> filters,
-  ) =>
-      _repository.assignFiltersToCategory(categoryId, filters);
+  ) => _repository.assignFiltersToCategory(categoryId, filters);
 }
 
 class DeleteCameraFilterCategoryUseCase {
@@ -160,7 +160,8 @@ class GetCameraEffectsUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<List<CameraEffectEntity>> call() => _repository.getEffects();
+  Future<PaginatedCameraEffectsEntity> call(FiltersEffectsListQuery query) =>
+      _repository.getEffects(query);
 }
 
 class GetCameraEffectUseCase {
@@ -189,6 +190,15 @@ class UploadEffectAssetUseCase {
       _repository.uploadEffectAsset(bytes, filename);
 }
 
+class UploadFilterLutUseCase {
+  const UploadFilterLutUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<FilterLutUploadResult> call(List<int> bytes, String filename) =>
+      _repository.uploadFilterLut(bytes, filename);
+}
+
 class CreateCameraEffectUseCase {
   const CreateCameraEffectUseCase(this._repository);
 
@@ -203,16 +213,8 @@ class UpdateCameraEffectUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraEffectEntity> call(
-    String id,
-    UpdateEffectRequest request, {
-    EffectPlacementSettingsEntity? baselinePlacement,
-  }) =>
-      _repository.updateEffect(
-        id,
-        request,
-        baselinePlacement: baselinePlacement,
-      );
+  Future<CameraEffectEntity> call(String id, UpdateEffectRequest request) =>
+      _repository.updateEffect(id, request);
 }
 
 class ActivateCameraEffectUseCase {
@@ -238,6 +240,15 @@ class DeleteCameraEffectUseCase {
   final FiltersEffectsRepository _repository;
 
   Future<void> call(String id) => _repository.deleteEffect(id);
+}
+
+class BulkCameraEffectsUseCase {
+  const BulkCameraEffectsUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<BulkCameraEffectsResult> call(BulkCameraEffectsRequest request) =>
+      _repository.bulkEffects(request);
 }
 
 class GetCameraEffectCategoriesUseCase {
@@ -266,8 +277,7 @@ class UpdateCameraEffectCategoryUseCase {
   Future<CameraEffectCategoryEntity> call(
     String id,
     UpdateCategoryRequest request,
-  ) =>
-      _repository.updateEffectCategory(id, request);
+  ) => _repository.updateEffectCategory(id, request);
 }
 
 class ReorderCameraEffectCategoriesUseCase {
@@ -277,8 +287,7 @@ class ReorderCameraEffectCategoriesUseCase {
 
   Future<List<CameraEffectCategoryEntity>> call(
     List<CategoryReorderItem> items,
-  ) =>
-      _repository.reorderEffectCategories(items);
+  ) => _repository.reorderEffectCategories(items);
 }
 
 class AssignEffectsToCategoryUseCase {
@@ -289,8 +298,7 @@ class AssignEffectsToCategoryUseCase {
   Future<CameraEffectCategoryEntity> call(
     String categoryId,
     List<EffectAssignmentItem> effects,
-  ) =>
-      _repository.assignEffectsToCategory(categoryId, effects);
+  ) => _repository.assignEffectsToCategory(categoryId, effects);
 }
 
 class DeleteCameraEffectCategoryUseCase {
@@ -315,5 +323,5 @@ class SeedFiltersEffectsCatalogUseCase {
 
   final FiltersEffectsRepository _repository;
 
-  Future<CameraStudioCatalogEntity> call() => _repository.seedCatalog();
+  Future<CatalogSeedResultEntity> call() => _repository.seedCatalog();
 }

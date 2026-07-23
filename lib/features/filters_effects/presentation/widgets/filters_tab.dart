@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/status_chip.dart';
 import '../../../../core/widgets/state_widgets.dart';
-import '../../../auth/domain/utils/dashboard_permissions.dart';
-import '../../../auth/presentation/bloc/auth_bloc.dart';
-import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../users/domain/entities/user_entity.dart';
+import '../../../rbac/presentation/bloc/rbac_bloc.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
@@ -18,7 +16,10 @@ import '../bloc/filters_effects_state.dart';
 import '../dialogs/fe_item_preview_dialog.dart';
 import '../dialogs/fe_confirm_dialog.dart';
 import '../dialogs/filter_form_dialog.dart';
+import '../utils/fe_display_filters.dart';
 import '../utils/filters_effects_responsive.dart';
+import 'fe_filter_form_fields.dart';
+import 'fe_selected_category_banner.dart';
 import 'fe_tab_scaffold.dart';
 
 Future<void> _openEditor(BuildContext context, {String? filterId}) async {
@@ -49,82 +50,164 @@ class FiltersTab extends StatelessWidget {
     super.key,
     required this.loaded,
     required this.metrics,
+    this.selectedCategoryId,
+    this.onClearCategory,
   });
 
   final FiltersEffectsLoaded loaded;
   final FiltersEffectsLayoutMetrics metrics;
+  final String? selectedCategoryId;
+  final VoidCallback? onClearCategory;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final canManage = _canManage(context);
-    final items = loaded.pagedFilters;
-    final dateFmt = DateFormat.yMMMd();
+    final items = filtersForDisplay(
+      pagedFilters: loaded.pagedFilters,
+      filterCategories: loaded.filterCategories,
+      query: loaded.query,
+      selectedCategoryId: selectedCategoryId,
+    );
+    final selectionEnabled = canManage && !loaded.isBulkDeleting;
+    final categorySelected = selectedCategoryId != null;
 
-    if (loaded.filteredFilters.isEmpty) {
-      return Center(
-        child: EmptyView(
-          message: l10n.tOr('feNoFilters', 'No filters match your filters.'),
-        ),
+    CameraFilterCategoryEntity? selectedCategory;
+    if (categorySelected) {
+      for (final c in loaded.filterCategories) {
+        if (c.id == selectedCategoryId) {
+          selectedCategory = c;
+          break;
+        }
+      }
+    }
+
+    final allVisibleSelected = items.isNotEmpty &&
+        items.every((f) => loaded.selectedFilterIds.contains(f.id));
+    final someVisibleSelected = items.any(
+          (f) => loaded.selectedFilterIds.contains(f.id),
+        ) &&
+        !allVisibleSelected;
+
+    if (items.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (selectedCategory != null) ...[
+            FeSelectedCategoryBanner(
+              label: selectedCategory.displayLabel,
+              itemCount: 0,
+              isEffectCategory: false,
+              onClear: onClearCategory ?? () {},
+            ),
+            const SizedBox(height: 12),
+          ],
+          Expanded(
+            child: Center(
+              child: EmptyView(
+                message: l10n.tOr(
+                  'feNoFilters',
+                  'No filters match your filters.',
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     return FeTabScaffold(
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (canManage)
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: FilledButton.icon(
-                onPressed: () => _openEditor(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(l10n.tOr('feCreateFilter', 'Create filter')),
+      header: selectedCategory == null
+          ? null
+          : FeSelectedCategoryBanner(
+              label: selectedCategory.displayLabel,
+              itemCount: items.length,
+              isEffectCategory: false,
+              onClear: onClearCategory ?? () {},
+            ),
+      footer: categorySelected
+          ? null
+          : AppPaginationBar(
+              currentPage: loaded.query.page,
+              lastPage: loaded.filtersTotalPages,
+              total: loaded.filtersTotalCount,
+              pageSize: loaded.query.pageSize,
+              itemCount: items.length,
+              hideWhenSinglePage: false,
+              borderRadius: BorderRadius.circular(12),
+              onPageChanged: (page) => context.read<FiltersEffectsBloc>().add(
+                FiltersEffectsFilterChanged(page: page),
               ),
             ),
-          if (canManage) SizedBox(height: metrics.filterGap),
-        ],
-      ),
-      footer: AppPaginationBar(
-        currentPage: loaded.query.page,
-        lastPage: loaded.filtersTotalPages,
-        total: loaded.filteredFilters.length,
-        pageSize: loaded.query.pageSize,
-        itemCount: items.length,
-        hideWhenSinglePage: false,
-        borderRadius: BorderRadius.circular(12),
-        onPageChanged: (page) => context.read<FiltersEffectsBloc>().add(
-              FiltersEffectsFilterChanged(page: page),
-            ),
-      ),
       child: ResponsiveDataTable(
         mobileBreakpoint: 900,
         columns: [
+          if (selectionEnabled)
+            DataColumn(
+              label: Checkbox(
+                tristate: true,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                value: allVisibleSelected
+                    ? true
+                    : someVisibleSelected
+                        ? null
+                        : false,
+                onChanged: (_) {
+                  if (!categorySelected) {
+                    context.read<FiltersEffectsBloc>().add(
+                      const SelectAllVisibleFiltersEvent(),
+                    );
+                    return;
+                  }
+                  final bloc = context.read<FiltersEffectsBloc>();
+                  for (final filter in items) {
+                    final selected =
+                        loaded.selectedFilterIds.contains(filter.id);
+                    if (allVisibleSelected == selected) {
+                      bloc.add(ToggleFilterSelectionEvent(filter.id));
+                    }
+                  }
+                },
+              ),
+            ),
+          DataColumn(label: Text(l10n.tOr('feColThumbnail', 'Thumb'))),
+          DataColumn(label: Text(l10n.tOr('feColName', 'Name'))),
           DataColumn(label: Text(l10n.tOr('feColSlug', 'Slug'))),
-          DataColumn(label: Text(l10n.tOr('feColEngineKey', 'Engine key'))),
-          DataColumn(label: Text(l10n.tOr('feColLabel', 'Label'))),
+          DataColumn(label: Text(l10n.tOr('feColRenderType', 'Render type'))),
           DataColumn(label: Text(l10n.tOr('feColStatus', 'Status'))),
-          DataColumn(label: Text(l10n.tOr('feColFlags', 'Flags'))),
+          DataColumn(label: Text(l10n.tOr('feColDefaults', 'Defaults'))),
           DataColumn(label: Text(l10n.tOr('feColSortOrder', 'Order'))),
-          DataColumn(label: Text(l10n.tOr('feColUpdated', 'Updated'))),
           DataColumn(label: Text(l10n.tOr('feColActions', 'Actions'))),
         ],
         rows: [
           for (final filter in items)
             DataRow(
+              selected: loaded.selectedFilterIds.contains(filter.id),
               cells: [
-                DataCell(Text(filter.slug)),
-                DataCell(Text(filter.engineKey)),
+                if (selectionEnabled)
+                  DataCell(
+                    Checkbox(
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      value: loaded.selectedFilterIds.contains(filter.id),
+                      onChanged: (_) => context.read<FiltersEffectsBloc>().add(
+                        ToggleFilterSelectionEvent(filter.id),
+                      ),
+                    ),
+                  ),
+                DataCell(_FilterThumb(filter: filter)),
                 DataCell(Text(filter.displayLabel)),
+                DataCell(Text(filter.slug)),
+                DataCell(
+                  Text(feFilterRenderTypeLabel(context, filter.renderType)),
+                ),
                 DataCell(_statusChip(context, filter.isActive)),
-                DataCell(Text(_flagsLabel(context, filter))),
+                DataCell(Text(_defaultsLabel(context, filter))),
                 DataCell(Text('${filter.sortOrder}')),
-                DataCell(Text(
-                  filter.updatedAt != null
-                      ? dateFmt.format(filter.updatedAt!.toLocal())
-                      : '—',
-                )),
-                DataCell(_actionsMenu(context, filter, canManage)),
+                DataCell(
+                  _FilterActionsMenu(filter: filter, canManage: canManage),
+                ),
               ],
             ),
         ],
@@ -133,7 +216,8 @@ class FiltersTab extends StatelessWidget {
             _FilterMobileCard(
               filter: filter,
               canManage: canManage,
-              dateFmt: dateFmt,
+              selectionEnabled: selectionEnabled,
+              isSelected: loaded.selectedFilterIds.contains(filter.id),
             ),
         ],
       ),
@@ -141,12 +225,10 @@ class FiltersTab extends StatelessWidget {
   }
 
   bool _canManage(BuildContext context) {
-    final roles = context.select<AuthBloc, List<UserRole>>((b) {
-      final state = b.state;
-      if (state is Authenticated) return state.user.roles;
-      return const <UserRole>[];
-    });
-    return canManageFiltersEffects(roles);
+    context.select<RbacBloc, Set<String>?>(
+      (b) => b.state.authContext?.permissionKeys,
+    );
+    return PermissionManager.canManageCameraStudio(context);
   }
 
   Widget _statusChip(BuildContext context, bool isActive) {
@@ -155,11 +237,13 @@ class FiltersTab extends StatelessWidget {
       label: isActive
           ? l10n.tOr('feActive', 'Active')
           : l10n.tOr('feInactive', 'Inactive'),
-      tone: isActive ? DashboardStatusTone.success : DashboardStatusTone.neutral,
+      tone: isActive
+          ? DashboardStatusTone.success
+          : DashboardStatusTone.neutral,
     );
   }
 
-  String _flagsLabel(BuildContext context, CameraFilterEntity filter) {
+  String _defaultsLabel(BuildContext context, CameraFilterEntity filter) {
     final l10n = context.l10n;
     final flags = <String>[];
     if (filter.isOriginal) {
@@ -170,12 +254,62 @@ class FiltersTab extends StatelessWidget {
     }
     return flags.isEmpty ? '—' : flags.join(', ');
   }
+}
 
-  Widget _actionsMenu(
-    BuildContext context,
-    CameraFilterEntity filter,
-    bool canManage,
-  ) {
+class _FilterThumb extends StatelessWidget {
+  const _FilterThumb({required this.filter});
+
+  final CameraFilterEntity filter;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = filter.thumbnailUrl?.trim();
+    final resolved = url != null && url.isNotEmpty
+        ? resolveMediaUrl(url)
+        : null;
+    final emoji = filter.emoji?.trim();
+
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: resolved != null
+            ? Image.network(
+                resolved,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => ColoredBox(
+                  color: scheme.surfaceContainerHighest,
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : ColoredBox(
+                color: scheme.surfaceContainerHighest,
+                child: Center(
+                  child: Text(
+                    (emoji != null && emoji.isNotEmpty) ? emoji : '•',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _FilterActionsMenu extends StatelessWidget {
+  const _FilterActionsMenu({required this.filter, required this.canManage});
+
+  final CameraFilterEntity filter;
+  final bool canManage;
+
+  @override
+  Widget build(BuildContext context) {
     if (!canManage) return const SizedBox.shrink();
     final l10n = context.l10n;
     final bloc = context.read<FiltersEffectsBloc>();
@@ -209,10 +343,7 @@ class FiltersTab extends StatelessWidget {
           value: 'preview',
           child: Text(l10n.tOr('fePreview', 'Preview')),
         ),
-        PopupMenuItem(
-          value: 'edit',
-          child: Text(l10n.tOr('feEdit', 'Edit')),
-        ),
+        PopupMenuItem(value: 'edit', child: Text(l10n.tOr('feEdit', 'Edit'))),
         PopupMenuItem(
           value: filter.isActive ? 'deactivate' : 'activate',
           child: Text(
@@ -234,52 +365,99 @@ class _FilterMobileCard extends StatelessWidget {
   const _FilterMobileCard({
     required this.filter,
     required this.canManage,
-    required this.dateFmt,
+    required this.selectionEnabled,
+    required this.isSelected,
   });
 
   final CameraFilterEntity filter;
   final bool canManage;
-  final DateFormat dateFmt;
+  final bool selectionEnabled;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final defaults = <String>[
+      if (filter.isOriginal) l10n.tOr('feFlagOriginal', 'Original'),
+      if (filter.isBeautyDefault)
+        l10n.tOr('feFlagBeautyDefault', 'Beauty default'),
+    ].join(', ');
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: isSelected
+            ? scheme.primaryContainer.withValues(alpha: 0.22)
+            : scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
+        border: Border.all(
+          color: isSelected ? scheme.primary : scheme.outlineVariant,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              filter.displayLabel,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+            Row(
+              children: [
+                if (selectionEnabled) ...[
+                  Checkbox(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    value: isSelected,
+                    onChanged: (_) => context.read<FiltersEffectsBloc>().add(
+                      ToggleFilterSelectionEvent(filter.id),
+                    ),
                   ),
-            ),
-            const SizedBox(height: 4),
-            Text('${filter.slug} · ${filter.engineKey}'),
-            if (filter.updatedAt != null)
-              Text(
-                dateFmt.format(filter.updatedAt!.toLocal()),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            if (canManage) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed: () => _openEditor(context, filterId: filter.id),
-                  child: Text(l10n.tOr('feEdit', 'Edit')),
+                  const SizedBox(width: 4),
+                ],
+                _FilterThumb(filter: filter),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        filter.displayLabel,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${filter.slug} · ${feFilterRenderTypeLabel(context, filter.renderType)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                _FilterActionsMenu(filter: filter, canManage: canManage),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                DashboardStatusChip(
+                  label: filter.isActive
+                      ? l10n.tOr('feActive', 'Active')
+                      : l10n.tOr('feInactive', 'Inactive'),
+                  tone: filter.isActive
+                      ? DashboardStatusTone.success
+                      : DashboardStatusTone.neutral,
+                ),
+                if (defaults.isNotEmpty)
+                  Text(defaults, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  '${l10n.tOr('feColSortOrder', 'Order')}: ${filter.sortOrder}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
           ],
         ),
       ),

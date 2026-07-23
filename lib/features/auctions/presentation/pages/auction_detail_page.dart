@@ -7,6 +7,7 @@ import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../../users/domain/usecases/get_user_by_id.dart';
 import '../../../users/presentation/widgets/admin_user_search_field.dart';
@@ -19,9 +20,269 @@ import '../widgets/auction_card.dart';
 import '../widgets/auction_edit_dialog.dart';
 import '../widgets/auction_detail_dashboard_widgets.dart';
 
+void _confirmAuctionRefund(BuildContext context) {
+  final l10n = context.l10n;
+  final scheme = Theme.of(context).colorScheme;
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(l10n.t('forceEscrowRefundTitle')),
+      content: Text(l10n.t('forceEscrowRefundBody')),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(l10n.t('cancel')),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            context.read<AuctionDetailBloc>().add(AdminRefundFulfillmentEvent());
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          child: Text(l10n.t('refundEscrow')),
+        ),
+      ],
+    ),
+  );
+}
+
+void _confirmAuctionRelease(BuildContext context) {
+  final l10n = context.l10n;
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(l10n.t('forceEscrowReleaseTitle')),
+      content: Text(l10n.t('forceEscrowReleaseBody')),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(l10n.t('cancel')),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            context.read<AuctionDetailBloc>().add(AdminReleaseFulfillmentEvent());
+          },
+          child: Text(l10n.t('releaseEscrow')),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Styled refund / release controls for the Escrow fulfillment panel.
+class _AuctionFulfillmentActionsBar extends StatelessWidget {
+  const _AuctionFulfillmentActionsBar({
+    required this.auction,
+  });
+
+  final AuctionEntity auction;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!PermissionManager.canFulfillAuctions(context)) {
+      return const SizedBox.shrink();
+    }
+
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final cards = <Widget>[];
+
+    if (auction.canAdminRefundEscrow) {
+      cards.add(
+        _FulfillmentActionCard(
+          title: l10n.t('forceEscrowRefund'),
+          subtitle: l10n.tOr(
+            'forceEscrowRefundShort',
+            'Return gift coins to senders',
+          ),
+          icon: Icons.replay_circle_filled_outlined,
+          accent: scheme.error,
+          surface: scheme.errorContainer.withValues(alpha: 0.55),
+          onTap: () => _confirmAuctionRefund(context),
+        ),
+      );
+    }
+    if (auction.canAdminReleaseEscrow) {
+      cards.add(
+        _FulfillmentActionCard(
+          title: l10n.t('forceEscrowRelease'),
+          subtitle: l10n.tOr(
+            'forceEscrowReleaseShort',
+            'Pay host and settle escrow',
+          ),
+          icon: Icons.volunteer_activism_outlined,
+          accent: scheme.primary,
+          surface: scheme.primaryContainer.withValues(alpha: 0.65),
+          onTap: () => _confirmAuctionRelease(context),
+        ),
+      );
+    }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = DashboardSpace.md;
+        final sideBySide = cards.length > 1 && constraints.maxWidth >= 520;
+
+        if (sideBySide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) SizedBox(width: spacing),
+                Expanded(child: cards[i]),
+              ],
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) SizedBox(height: spacing),
+              cards[i],
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FulfillmentActionCard extends StatefulWidget {
+  const _FulfillmentActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accent,
+    required this.surface,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accent;
+  final Color surface;
+  final VoidCallback onTap;
+
+  @override
+  State<_FulfillmentActionCard> createState() => _FulfillmentActionCardState();
+}
+
+class _FulfillmentActionCardState extends State<_FulfillmentActionCard> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final elevation = _hovered ? 6.0 : 2.0;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.985 : (_hovered ? 1.008 : 1),
+          duration: const Duration(milliseconds: 140),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(DashboardSpace.lg),
+            decoration: BoxDecoration(
+              color: widget.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: widget.accent.withValues(alpha: _hovered ? 0.55 : 0.32),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: elevation * 2.5,
+                  offset: Offset(0, elevation * 0.75),
+                  color: widget.accent.withValues(alpha: _hovered ? 0.22 : 0.1),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: widget.accent.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: widget.accent.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Icon(widget.icon, size: 22, color: widget.accent),
+                ),
+                const SizedBox(width: DashboardSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: DashboardSpace.sm),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: widget.accent.withValues(alpha: 0.85),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AuctionDetailPage extends StatefulWidget {
-  const AuctionDetailPage({super.key, required this.auctionId});
+  const AuctionDetailPage({
+    super.key,
+    required this.auctionId,
+    this.listPreview,
+  });
+
   final String auctionId;
+  final AuctionEntity? listPreview;
 
   @override
   State<AuctionDetailPage> createState() => _AuctionDetailPageState();
@@ -32,7 +293,10 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
   void initState() {
     super.initState();
     context.read<AuctionDetailBloc>().add(
-          LoadAuctionDetailsEvent(widget.auctionId),
+          LoadAuctionDetailsEvent(
+            widget.auctionId,
+            listPreview: widget.listPreview,
+          ),
         );
   }
 
@@ -74,10 +338,30 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         listener: (context, state) {
           if (state is AuctionDetailLoaded) {
             _syncToListBloc(context, state.auction);
+            final l10n = context.l10n;
             if (state.successMessage != null) {
+              final sm = state.successMessage!;
+              final message = () {
+                if (sm.startsWith('auction_fulfillment_refund')) {
+                  final parts = sm.split(':');
+                  if (parts.length == 2 && parts[1].isNotEmpty) {
+                    return context.tr('auctionFulfillmentRefundSuccess', {
+                      'count': parts[1],
+                    });
+                  }
+                  return l10n.t('auctionFulfillmentRefundSuccessGeneric');
+                }
+                return switch (sm) {
+                  'auction_fulfillment_release' =>
+                    l10n.t('auctionFulfillmentReleaseSuccess'),
+                  'auction_fulfillment_already_settled' =>
+                    l10n.t('auctionFulfillmentAlreadySettled'),
+                  _ => sm,
+                };
+              }();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.successMessage!),
+                  content: Text(message),
                   backgroundColor: scheme.primary,
                 ),
               );
@@ -100,6 +384,7 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
             return _ErrorBody(
               message: state.message,
               auctionId: widget.auctionId,
+              listPreview: widget.listPreview,
             );
           }
           if (state is AuctionDetailLoaded) {
@@ -155,6 +440,7 @@ class _DetailBody extends StatelessWidget {
             ? _AuctionWinnerSection(auction: auction)
             : null;
         final admin = _AuctionAdminSection(state: state);
+        final fulfillment = _AuctionFulfillmentSection(state: state);
         final gifts = _AuctionGiftTransactionsSection(
           auction: auction,
           transactions: auction.giftTransactions ?? const [],
@@ -177,7 +463,7 @@ class _DetailBody extends StatelessWidget {
                 children: [
                   Expanded(
                     flex: 3,
-                    child: spaced([stats, admin]),
+                    child: spaced([stats, fulfillment, admin]),
                   ),
                   const SizedBox(width: gap),
                   Expanded(
@@ -198,6 +484,7 @@ class _DetailBody extends StatelessWidget {
             hero,
             progress,
             stats,
+            fulfillment,
             host,
             if (winner != null) winner,
             admin,
@@ -583,6 +870,21 @@ class _AuctionStatsSection extends StatelessWidget {
                   ? l10n.tOr('yes', 'Yes')
                   : l10n.tOr('no', 'No'),
             ),
+            MetricCard(
+              icon: Icons.account_balance_wallet_outlined,
+              label: l10n.tOr('escrow', 'Escrow'),
+              value: auction.effectiveEscrowEnabled
+                  ? l10n.tOr('enabled', 'Enabled')
+                  : l10n.tOr('disabled', 'Disabled'),
+            ),
+            if (auction.fulfillmentStatus != null &&
+                auction.fulfillmentStatus!.isNotEmpty &&
+                auction.fulfillmentStatus != 'NONE')
+              MetricCard(
+                icon: Icons.local_shipping_outlined,
+                label: l10n.tOr('fulfillmentStatus', 'Fulfillment'),
+                value: auction.fulfillmentStatus!,
+              ),
           ];
 
           return Wrap(
@@ -942,6 +1244,122 @@ class _AuctionWinnerSection extends StatelessWidget {
   }
 }
 
+class _AuctionFulfillmentSection extends StatelessWidget {
+  const _AuctionFulfillmentSection({required this.state});
+
+  final AuctionDetailLoaded state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final auction = state.auction;
+    final canFulfill = PermissionManager.canFulfillAuctions(context);
+
+    if (!canFulfill || !auction.showEscrowFulfillmentTools) {
+      return const SizedBox.shrink();
+    }
+
+    final hasActions =
+        auction.canAdminRefundEscrow || auction.canAdminReleaseEscrow;
+    if (!hasActions) {
+      return const SizedBox.shrink();
+    }
+
+    return ActionPanel(
+      title: l10n.t('auctionFulfillmentTitle'),
+      isLoading: state.isActioning,
+      children: [
+        if (auction.isDisputed) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(DashboardSpace.md),
+            decoration: BoxDecoration(
+              color: scheme.errorContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.gavel_rounded, size: 18, color: scheme.error),
+                const SizedBox(width: DashboardSpace.sm),
+                Expanded(
+                  child: Text(
+                    l10n.t('auctionFulfillmentDisputeHint'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: DashboardSpace.md),
+        ],
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(DashboardSpace.md),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 18,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: DashboardSpace.sm),
+                  Expanded(
+                    child: Text(
+                      auction.isDisputed
+                          ? l10n.t('auctionFulfillmentDisputeHint')
+                          : l10n.t('auctionEscrowEnabledHint'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (auction.fulfillmentStatus != null &&
+                  auction.fulfillmentStatus!.isNotEmpty &&
+                  auction.fulfillmentStatus != 'NONE') ...[
+                const SizedBox(height: DashboardSpace.sm),
+                Text(
+                  '${l10n.t('fulfillmentStatus')}: ${auction.fulfillmentStatus}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              const SizedBox(height: DashboardSpace.sm),
+              Text(
+                context.tr('auctionFulfillmentHeldCoins', {
+                  'coins': CoinFormat.coins(auction.currentTotalCoins),
+                }),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DashboardSpace.lg),
+        _AuctionFulfillmentActionsBar(auction: auction),
+      ],
+    );
+  }
+}
+
 class _AuctionAdminSection extends StatelessWidget {
   const _AuctionAdminSection({required this.state});
   final AuctionDetailLoaded state;
@@ -1002,10 +1420,57 @@ class _AuctionAdminSection extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final auction = state.auction;
+    final canModerate = PermissionManager.canModerateAuctions(context);
+    final canResolve = PermissionManager.canResolveAuctions(context);
 
-    if (!auction.isActive && auction.isCompleted) {
+    final moderationButtons = <Widget>[];
+
+    if (canResolve && auction.canAdminForceResolve) {
+      moderationButtons.add(
+        ActionPanelButton(
+          label: l10n.t('manuallyResolve'),
+          icon: Icons.check_circle_rounded,
+          onTap: () => _showResolveDialog(context),
+        ),
+      );
+    }
+    if (canModerate && auction.canAdminCancelOrBan) {
+      moderationButtons.add(
+        ActionPanelButton(
+          label: l10n.t('forceCancel'),
+          icon: Icons.cancel_outlined,
+          variant: ActionPanelButtonVariant.destructive,
+          onTap: () => _confirmCancel(context),
+        ),
+      );
+      moderationButtons.add(
+        ActionPanelButton(
+          label: l10n.tOr('banAuction', 'Ban auction'),
+          icon: Icons.block_outlined,
+          variant: ActionPanelButtonVariant.destructive,
+          onTap: () => _confirmBan(context),
+        ),
+      );
+    }
+    if (canModerate && auction.isAdminEditable) {
+      moderationButtons.add(
+        ActionPanelButton(
+          label: l10n.tOr('editAuction', 'Edit auction'),
+          icon: Icons.edit_outlined,
+          onTap: () => _showEditDialog(context, auction),
+        ),
+      );
+    }
+
+    if (moderationButtons.isEmpty && !auction.isCompleted) {
+      return const SizedBox.shrink();
+    }
+
+    // Completed badge alone (no moderation buttons) still shows the panel.
+    if (moderationButtons.isEmpty && auction.isCompleted) {
       return ActionPanel(
         title: l10n.t('actions'),
+        isLoading: state.isActioning,
         children: [
           Container(
             padding: const EdgeInsets.all(DashboardSpace.lg),
@@ -1016,8 +1481,45 @@ class _AuctionAdminSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.check_circle_rounded,
-                    size: 18, color: scheme.onPrimaryContainer),
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: scheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: DashboardSpace.sm),
+                Text(
+                  l10n.t('completed'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ActionPanel(
+      title: l10n.t('actions'),
+      isLoading: state.isActioning,
+      children: [
+        if (auction.isCompleted) ...[
+          Container(
+            padding: const EdgeInsets.all(DashboardSpace.lg),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: scheme.onPrimaryContainer,
+                ),
                 const SizedBox(width: DashboardSpace.sm),
                 Text(
                   l10n.t('completed'),
@@ -1030,60 +1532,8 @@ class _AuctionAdminSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: DashboardSpace.md),
-          _actionButtonsRow([
-            ActionPanelButton(
-              label: l10n.tOr('editAuction', 'Edit auction'),
-              icon: Icons.edit_outlined,
-              onTap: () => _showEditDialog(context, auction),
-            ),
-          ]),
         ],
-      );
-    }
-
-    if (!auction.isActive) {
-      return ActionPanel(
-        title: l10n.t('actions'),
-        children: [
-          _actionButtonsRow([
-            ActionPanelButton(
-              label: l10n.tOr('editAuction', 'Edit auction'),
-              icon: Icons.edit_outlined,
-              onTap: () => _showEditDialog(context, auction),
-            ),
-          ]),
-        ],
-      );
-    }
-
-    return ActionPanel(
-      title: l10n.t('actions'),
-      isLoading: state.isActioning,
-      children: [
-        _actionButtonsRow([
-          ActionPanelButton(
-            label: l10n.t('manuallyResolve'),
-            icon: Icons.check_circle_rounded,
-            onTap: () => _showResolveDialog(context),
-          ),
-          ActionPanelButton(
-            label: l10n.t('forceCancel'),
-            icon: Icons.cancel_outlined,
-            variant: ActionPanelButtonVariant.destructive,
-            onTap: () => _confirmCancel(context),
-          ),
-          ActionPanelButton(
-            label: l10n.tOr('banAuction', 'Ban auction'),
-            icon: Icons.block_outlined,
-            variant: ActionPanelButtonVariant.destructive,
-            onTap: () => _confirmBan(context),
-          ),
-          ActionPanelButton(
-            label: l10n.tOr('editAuction', 'Edit auction'),
-            icon: Icons.edit_outlined,
-            onTap: () => _showEditDialog(context, auction),
-          ),
-        ]),
+        _actionButtonsRow(moderationButtons),
       ],
     );
   }
@@ -1459,9 +1909,15 @@ class _StatusBadge extends StatelessWidget {
 }
 
 class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({required this.message, required this.auctionId});
+  const _ErrorBody({
+    required this.message,
+    required this.auctionId,
+    this.listPreview,
+  });
+
   final String message;
   final String auctionId;
+  final AuctionEntity? listPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -1496,7 +1952,10 @@ class _ErrorBody extends StatelessWidget {
             FilledButton.icon(
               onPressed: () => context
                   .read<AuctionDetailBloc>()
-                  .add(LoadAuctionDetailsEvent(auctionId)),
+                  .add(LoadAuctionDetailsEvent(
+                    auctionId,
+                    listPreview: listPreview,
+                  )),
               icon: const Icon(Icons.refresh_rounded, size: 16),
               label: Text(l10n.t('retry')),
               style: FilledButton.styleFrom(

@@ -2,30 +2,44 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../../domain/entities/gift_group_entities.dart';
+import '../../domain/enums/gift_size.dart';
 import '../../domain/repositories/gifts_repository.dart';
-import '../models/admin_bulk_gift_action.dart';
 import '../models/admin_bulk_gifts_dto.dart';
 import '../models/bulk_admin_gift_action_result.dart';
+import '../models/gift_group_models.dart';
 import '../models/gift_model.dart';
 
 abstract class GiftsRemoteDataSource {
   Future<List<GiftModel>> getAdminGifts();
-
-  /// Upload raw image bytes and return the resulting absolute URL.
   Future<String> uploadGiftImage(Uint8List bytes, String filename);
-
   Future<GiftModel> createGiftWithUrl({
     required String name,
     required String thumbnailUrl,
     required double priceCoins,
+    GiftSize size = GiftSize.medium,
     bool isActive = true,
     DateTime? publishedAt,
     String? animationUrl,
   });
-
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
   Future<BulkAdminGiftActionResult> executeAdminBulkAction(AdminBulkGiftsDto dto);
+
+  Future<List<GiftGroupEntity>> getGiftGroups();
+  Future<GiftGroupEntity> createGiftGroup(CreateGiftGroupData data);
+  Future<List<GiftGroupEntity>> reorderGiftGroups(
+    List<GiftGroupReorderItem> items,
+  );
+  Future<GiftGroupEntity> updateGiftGroup(
+    String groupId,
+    UpdateGiftGroupData data,
+  );
+  Future<void> deleteGiftGroup(String groupId);
+  Future<GiftGroupEntity> replaceGroupGifts(
+    String groupId,
+    List<GiftGroupMembershipItem> gifts,
+  );
 }
 
 class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
@@ -101,6 +115,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     required String name,
     required String thumbnailUrl,
     required double priceCoins,
+    GiftSize size = GiftSize.medium,
     bool isActive = true,
     DateTime? publishedAt,
     String? animationUrl,
@@ -109,10 +124,10 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       'name': name,
       'thumbnailUrl': thumbnailUrl,
       'priceCoins': priceCoins,
+      'size': size.apiValue,
       'isActive': isActive,
-      // Always send publishedAt; use provided value or default to now.
-      'publishedAt':
-          (publishedAt ?? DateTime.now()).toUtc().toIso8601String(),
+      if (publishedAt != null)
+        'publishedAt': publishedAt.toUtc().toIso8601String(),
       if (animationUrl != null && animationUrl.isNotEmpty)
         'animationUrl': animationUrl,
     };
@@ -132,11 +147,18 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     final body = <String, dynamic>{};
     if (data.name != null) body['name'] = data.name;
     if (data.thumbnailUrl != null) body['thumbnailUrl'] = data.thumbnailUrl;
-    if (data.animationUrl != null) body['animationUrl'] = data.animationUrl;
     if (data.priceCoins != null) body['priceCoins'] = data.priceCoins;
+    if (data.size != null) body['size'] = data.size!.apiValue;
     if (data.isActive != null) body['isActive'] = data.isActive;
-    if (data.publishedAt != null) {
+    if (data.clearPublishedAt) {
+      body['publishedAt'] = null;
+    } else if (data.publishedAt != null) {
       body['publishedAt'] = data.publishedAt!.toUtc().toIso8601String();
+    }
+    if (data.clearAnimationUrl) {
+      body['animationUrl'] = null;
+    } else if (data.animationUrl != null) {
+      body['animationUrl'] = data.animationUrl;
     }
 
     final response = await _dio.patch(
@@ -170,42 +192,30 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     AdminBulkGiftsDto dto,
     dynamic data,
   ) {
-    final isDelete = dto.action == AdminBulkGiftAction.delete;
-
     if (data is! Map<String, dynamic>) {
-      return BulkAdminGiftActionResult(
-        affectedGiftIds: dto.giftIds,
-        isDelete: isDelete,
-      );
+      return BulkAdminGiftActionResult(action: dto.action.apiValue);
     }
 
     final nested = data['data'] ?? data;
     if (nested is! Map<String, dynamic>) {
-      return BulkAdminGiftActionResult(
-        affectedGiftIds: dto.giftIds,
-        isDelete: isDelete,
-      );
+      return BulkAdminGiftActionResult(action: dto.action.apiValue);
     }
 
-    final failed = _readStringList(
-      nested['failedGiftIds'] ?? nested['failedIds'] ?? nested['errors'],
-    );
-    final succeeded = _readStringList(
-      nested['succeededGiftIds'] ??
-          nested['successGiftIds'] ??
-          nested['affectedGiftIds'] ??
-          nested['giftIds'],
-    );
-
-    final affected = succeeded.isNotEmpty
-        ? succeeded
-        : dto.giftIds.where((id) => !failed.contains(id)).toList();
-
     return BulkAdminGiftActionResult(
-      affectedGiftIds: affected,
-      failedGiftIds: failed,
-      isDelete: isDelete,
+      action: nested['action']?.toString() ?? dto.action.apiValue,
+      successCount: _asInt(nested['successCount']),
+      notFoundCount: _asInt(nested['notFoundCount']),
+      giftIds: _readStringList(nested['giftIds']),
+      notFoundIds: _readStringList(nested['notFoundIds']),
+      deactivatedCount: _asInt(nested['deactivatedCount']),
+      deactivatedIds: _readStringList(nested['deactivatedIds']),
     );
+  }
+
+  int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   List<String> _readStringList(dynamic value) {
@@ -225,5 +235,70 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       return GiftModel.fromJson(payload);
     }
     throw Exception('Invalid gift response format');
+  }
+
+  String _extractErrorMessage(DioException error) {
+    final responseData = error.response?.data;
+    if (responseData is Map<String, dynamic>) {
+      final message = responseData['message'];
+      if (message is String && message.isNotEmpty) return message;
+    }
+    return error.message ?? error.toString();
+  }
+
+  @override
+  Future<List<GiftGroupEntity>> getGiftGroups() async {
+    final response = await _dio.get('/gifts/admin/groups');
+    return parseGiftGroupList(response.data);
+  }
+
+  @override
+  Future<GiftGroupEntity> createGiftGroup(CreateGiftGroupData data) async {
+    final response = await _dio.post('/gifts/admin/groups', data: data.toJson());
+    return parseGiftGroup(response.data);
+  }
+
+  @override
+  Future<List<GiftGroupEntity>> reorderGiftGroups(
+    List<GiftGroupReorderItem> items,
+  ) async {
+    final response = await _dio.patch(
+      '/gifts/admin/groups/reorder',
+      data: {'items': items.map((item) => item.toJson()).toList()},
+    );
+    return parseGiftGroupList(response.data);
+  }
+
+  @override
+  Future<GiftGroupEntity> updateGiftGroup(
+    String groupId,
+    UpdateGiftGroupData data,
+  ) async {
+    final response = await _dio.patch(
+      '/gifts/admin/groups/$groupId',
+      data: data.toJson(),
+    );
+    return parseGiftGroup(response.data);
+  }
+
+  @override
+  Future<void> deleteGiftGroup(String groupId) async {
+    try {
+      await _dio.delete('/gifts/admin/groups/$groupId');
+    } on DioException catch (e) {
+      throw Exception(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<GiftGroupEntity> replaceGroupGifts(
+    String groupId,
+    List<GiftGroupMembershipItem> gifts,
+  ) async {
+    final response = await _dio.put(
+      '/gifts/admin/groups/$groupId/gifts',
+      data: {'gifts': gifts.map((item) => item.toJson()).toList()},
+    );
+    return parseGiftGroup(response.data);
   }
 }
