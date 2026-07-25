@@ -148,8 +148,13 @@ class UserModel extends UserEntity {
   }
 
   static UserRole _mapRole(String role) {
-    switch (role.toUpperCase()) {
+    switch (role.toUpperCase().replaceAll('-', '_')) {
       case 'ADMIN':
+        return UserRole.admin;
+      case 'SUPER_ADMIN':
+      case 'SUPERADMIN':
+        // Legacy directory may label platform owners this way; treat as admin
+        // for dashboard access while RBAC resolves the precise super-admin role.
         return UserRole.admin;
       case 'MODERATOR':
         return UserRole.moderator;

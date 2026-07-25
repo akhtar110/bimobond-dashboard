@@ -27,6 +27,9 @@ abstract class FiltersEffectsRemoteDataSource {
   Future<void> deleteFilter(String id);
 
   Future<BulkCameraFiltersResult> bulkFilters(BulkCameraFiltersRequest request);
+  Future<PaginatedCameraFiltersEntity> bulkUpdateFilters(
+    BulkUpdateCameraFiltersRequest request,
+  );
   Future<List<CameraFilterCategoryEntity>> getFilterCategories();
   Future<CameraFilterCategoryEntity> createFilterCategory(
     CreateCategoryRequest request,
@@ -175,6 +178,17 @@ class FiltersEffectsRemoteDataSourceImpl
       data: request.toJson(),
     );
     return BulkCameraFiltersResultModel.fromJson(_map(response.data));
+  }
+
+  @override
+  Future<PaginatedCameraFiltersEntity> bulkUpdateFilters(
+    BulkUpdateCameraFiltersRequest request,
+  ) async {
+    final response = await _dio.patch(
+      '$_base/filters/bulk',
+      data: request.toJson(),
+    );
+    return _parsePaginatedFilters(response.data);
   }
 
   @override
@@ -622,29 +636,32 @@ class CameraFilterModel extends CameraFilterEntity {
   const CameraFilterModel({
     required super.id,
     required super.slug,
-    required super.renderType,
     required super.label,
     super.customLabel,
     super.labelKey,
     super.emoji,
     super.thumbnailUrl,
     super.previewColorHex,
-    super.colorMatrix,
-    super.lutUrl,
-    super.lutAsset,
-    super.adjustments,
-    super.filterSettings,
-    super.isOriginal,
-    super.isBeautyDefault,
-    super.isActive,
-    super.sortOrder,
+    super.filterSettings = FilterSettingsEntity.empty,
+    super.isOriginal = false,
+    super.isBeautyDefault = false,
+    super.isActive = true,
+    super.sortOrder = 0,
     super.createdAt,
     super.updatedAt,
+    super.renderType = 'lut',
+    super.colorMatrix = const [],
+    super.lutUrl,
+    super.lutAsset,
+    super.adjustments = const CameraFilterAdjustments(),
   });
 
   factory CameraFilterModel.fromJson(Map<String, dynamic> json) {
-    final adjustments = _parseAdjustments(json['adjustments']);
-    final filterSettings = _parseAdjustments(json['filterSettings']);
+    final rawSettings = json['filterSettings'];
+    final FilterSettingsEntity filterSettingsEntity = rawSettings is Map<String, dynamic>
+        ? FilterSettingsEntity.fromJson(rawSettings)
+        : (rawSettings is Map ? FilterSettingsEntity.fromJson(Map<String, dynamic>.from(rawSettings)) : FilterSettingsEntity.empty);
+
     final label =
         json['label']?.toString() ??
         json['customLabel']?.toString() ??
@@ -653,9 +670,6 @@ class CameraFilterModel extends CameraFilterEntity {
     return CameraFilterModel(
       id: json['id']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      renderType: CameraFilterRenderTypeApi.fromResponse(
-        json['renderType']?.toString() ?? '',
-      ),
       label: label,
       customLabel: json['customLabel']?.toString(),
       labelKey: json['labelKey']?.toString(),
@@ -664,19 +678,22 @@ class CameraFilterModel extends CameraFilterEntity {
           resolveMediaUrl(json['thumbnailUrl']?.toString()) ??
           json['thumbnailUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
-      colorMatrix: _parseColorMatrix(json['colorMatrix']),
-      lutUrl:
-          resolveMediaUrl(json['lutUrl']?.toString()) ??
-          json['lutUrl']?.toString(),
-      lutAsset: json['lutAsset']?.toString(),
-      adjustments: adjustments,
-      filterSettings: filterSettings,
+      filterSettings: filterSettingsEntity,
       isOriginal: json['isOriginal'] == true,
       isBeautyDefault: json['isBeautyDefault'] == true,
       isActive: json['isActive'] != false,
       sortOrder: _int(json['sortOrder']),
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
+      renderType: CameraFilterRenderTypeApi.fromResponse(
+        json['renderType']?.toString() ?? '',
+      ),
+      colorMatrix: _parseColorMatrix(json['colorMatrix']),
+      lutUrl:
+          resolveMediaUrl(json['lutUrl']?.toString()) ??
+          json['lutUrl']?.toString(),
+      lutAsset: json['lutAsset']?.toString(),
+      adjustments: _parseAdjustments(json['adjustments']),
     );
   }
 }

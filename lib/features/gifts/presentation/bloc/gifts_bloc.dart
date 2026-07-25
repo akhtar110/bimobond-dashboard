@@ -798,6 +798,11 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     emit(c.copyWith(isActioning: true, clearMessages: true));
     try {
       final updated = await _updateGift(event.giftId, event.data);
+      await _syncGiftGroupMembership(
+        giftId: event.giftId,
+        previousGroupId: event.data.previousAssignGroupId,
+        nextGroupId: event.data.assignGroupId,
+      );
       final gifts =
           c.gifts.map((g) => g.id == event.giftId ? updated : g).toList();
       emit(c.copyWith(
@@ -848,6 +853,45 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     }
   }
 
+  Future<void> _syncGiftGroupMembership({
+    required String giftId,
+    required String? previousGroupId,
+    required String? nextGroupId,
+  }) async {
+    if (previousGroupId == nextGroupId) return;
+
+    if (previousGroupId != null) {
+      await _removeGiftFromGroup(previousGroupId, giftId);
+    }
+    if (nextGroupId != null) {
+      await _assignGiftToGroup(nextGroupId, giftId);
+    }
+  }
+
+  Future<void> _removeGiftFromGroup(String groupId, String giftId) async {
+    final groups = await _getGiftGroups();
+    GiftGroupEntity? group;
+    for (final candidate in groups) {
+      if (candidate.id == groupId) {
+        group = candidate;
+        break;
+      }
+    }
+    if (group == null) return;
+
+    final remaining = <GiftGroupMembershipItem>[];
+    for (final member in group.gifts) {
+      if (member.gift.id == giftId) continue;
+      remaining.add(
+        GiftGroupMembershipItem(
+          giftId: member.gift.id,
+          sortOrder: remaining.length,
+        ),
+      );
+    }
+    await _replaceGroupGifts(groupId, remaining);
+  }
+
   Future<void> _assignGiftToGroup(String groupId, String giftId) async {
     final groups = await _getGiftGroups();
     GiftGroupEntity? group;
@@ -858,6 +902,9 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
       }
     }
     if (group == null) return;
+
+    final alreadyIn = group.gifts.any((m) => m.gift.id == giftId);
+    if (alreadyIn) return;
 
     final members = [
       for (final member in group.gifts)

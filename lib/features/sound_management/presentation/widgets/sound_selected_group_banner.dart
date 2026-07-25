@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/sound_group_entities.dart';
 
 /// Optional banner when a sound group tab is selected.
@@ -13,6 +15,8 @@ class SoundSelectedGroupBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final resolved = resolveMediaUrl(group.iconUrl) ?? group.iconUrl?.trim();
+    final hasIcon = resolved != null && resolved.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
@@ -26,7 +30,28 @@ class SoundSelectedGroupBanner extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Icon(Icons.tab_rounded, size: 18, color: scheme.primary),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: hasIcon
+                      ? CachedNetworkImage(
+                          imageUrl: resolved,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) => Icon(
+                            Icons.tab_rounded,
+                            size: 18,
+                            color: scheme.primary,
+                          ),
+                        )
+                      : Icon(
+                          Icons.tab_rounded,
+                          size: 18,
+                          color: scheme.primary,
+                        ),
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

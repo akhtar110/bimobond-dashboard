@@ -112,89 +112,146 @@ class FilterSettingsSchemaEntity extends Equatable {
   ];
 }
 
-/// Strongly typed filter slider values keyed by schema setting key.
+/// Strongly typed filter beauty and adjustment settings.
 class FilterSettingsEntity extends Equatable {
-  const FilterSettingsEntity(this.values);
+  const FilterSettingsEntity({
+    this.smooth,
+    this.whiten,
+    this.brighten,
+    this.blush,
+    this.lipStrength,
+    this.lipTint,
+    this.defaultIntensity,
+    this.brightness,
+    this.contrast,
+    this.saturation,
+    this.warmth,
+    this.values = const {},
+  });
 
+  final int? smooth;
+  final int? whiten;
+  final int? brighten;
+  final int? blush;
+  final int? lipStrength;
+  final String? lipTint;
+  final int? defaultIntensity;
+  final int? brightness;
+  final int? contrast;
+  final int? saturation;
+  final int? warmth;
   final Map<String, int> values;
 
-  static const empty = FilterSettingsEntity({});
+  static const empty = FilterSettingsEntity();
 
-  int valueFor(FilterSettingDefinitionEntity definition) =>
-      values[definition.key] ?? definition.defaultValue;
+  static const defaultSmooth = 55;
+  static const defaultWhiten = 0;
+  static const defaultBrighten = 0;
+  static const defaultBlush = 0;
+  static const defaultLipStrength = 0;
+  static const defaultLipTint = '#E8527A';
+  static const defaultIntensityVal = 70;
+  static const defaultBrightness = 50;
+  static const defaultContrast = 50;
+  static const defaultSaturation = 50;
+  static const defaultWarmth = 50;
 
-  FilterSettingsEntity withValue(String key, int value) {
-    final next = Map<String, int>.from(values);
-    next[key] = value;
-    return FilterSettingsEntity(next);
-  }
+  factory FilterSettingsEntity.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return empty;
+    final map = <String, int>{};
+    json.forEach((k, v) {
+      if (v is num) map[k] = v.toInt();
+    });
 
-  FilterSettingsEntity mergeFromMap(Map<String, int> incoming) {
-    if (incoming.isEmpty) return this;
-    final next = Map<String, int>.from(values);
-    next.addAll(incoming);
-    return FilterSettingsEntity(next);
-  }
-
-  FilterSettingsEntity resetToDefaults(FilterSettingsSchemaEntity schema) =>
-      FilterSettingsEntity(schema.defaultValues());
-
-  /// Create payload: only non-default values.
-  Map<String, dynamic> toApiJson(FilterSettingsSchemaEntity schema) {
-    final json = <String, dynamic>{};
-    for (final definition in schema.settings) {
-      final value = valueFor(definition);
-      if (value != definition.defaultValue) {
-        json[definition.key] = value;
-      }
+    int? parseInt(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt().clamp(0, 100);
+      return int.tryParse(v.toString())?.clamp(0, 100);
     }
-    return json;
-  }
 
-  /// Update payload: every key that changed vs [previous], including resets to
-  /// default (so merged PATCH does not leave stale beauty values).
-  Map<String, dynamic> toUpdateApiJson(
-    FilterSettingsSchemaEntity schema, {
-    required FilterSettingsEntity previous,
-  }) {
-    final json = <String, dynamic>{};
-    for (final definition in schema.settings) {
-      final value = valueFor(definition);
-      final prev = previous.valueFor(definition);
-      if (value != prev) {
-        json[definition.key] = value;
-      }
+    String? parseHex(dynamic v) {
+      if (v == null) return null;
+      final str = v.toString().trim();
+      return str.isNotEmpty ? str : null;
     }
-    return json;
+
+    return FilterSettingsEntity(
+      smooth: parseInt(json['smooth']),
+      whiten: parseInt(json['whiten']),
+      brighten: parseInt(json['brighten']),
+      blush: parseInt(json['blush']),
+      lipStrength: parseInt(json['lipStrength']),
+      lipTint: parseHex(json['lipTint']),
+      defaultIntensity: parseInt(json['defaultIntensity']),
+      brightness: parseInt(json['brightness']),
+      contrast: parseInt(json['contrast']),
+      saturation: parseInt(json['saturation']),
+      warmth: parseInt(json['warmth']),
+      values: map,
+    );
   }
 
-  /// Full snapshot of all schema keys (replace-style writes).
-  Map<String, dynamic> toFullApiJson(FilterSettingsSchemaEntity schema) {
+  Map<String, dynamic> toJson() {
     return {
-      for (final definition in schema.settings)
-        definition.key: valueFor(definition),
+      if (smooth != null) 'smooth': smooth,
+      if (whiten != null) 'whiten': whiten,
+      if (brighten != null) 'brighten': brighten,
+      if (blush != null) 'blush': blush,
+      if (lipStrength != null) 'lipStrength': lipStrength,
+      if (lipTint != null && lipTint!.isNotEmpty) 'lipTint': lipTint,
+      if (defaultIntensity != null) 'defaultIntensity': defaultIntensity,
+      if (brightness != null) 'brightness': brightness,
+      if (contrast != null) 'contrast': contrast,
+      if (saturation != null) 'saturation': saturation,
+      if (warmth != null) 'warmth': warmth,
+      ...values.map((k, v) => MapEntry(k, v)),
     };
   }
 
-  bool equalsDefaults(FilterSettingsSchemaEntity schema) {
-    for (final definition in schema.settings) {
-      if (valueFor(definition) != definition.defaultValue) return false;
-    }
-    return true;
-  }
-
-  List<({FilterSettingDefinitionEntity definition, int value})>
-  nonDefaultEntries(FilterSettingsSchemaEntity schema) {
-    final entries = <({FilterSettingDefinitionEntity definition, int value})>[];
-    for (final definition in schema.settings) {
-      final value = valueFor(definition);
-      if (value != definition.defaultValue) {
-        entries.add((definition: definition, value: value));
-      }
-    }
-    return entries;
+  FilterSettingsEntity copyWith({
+    int? smooth,
+    int? whiten,
+    int? brighten,
+    int? blush,
+    int? lipStrength,
+    String? lipTint,
+    int? defaultIntensity,
+    int? brightness,
+    int? contrast,
+    int? saturation,
+    int? warmth,
+    Map<String, int>? values,
+    bool clearLipTint = false,
+  }) {
+    return FilterSettingsEntity(
+      smooth: smooth ?? this.smooth,
+      whiten: whiten ?? this.whiten,
+      brighten: brighten ?? this.brighten,
+      blush: blush ?? this.blush,
+      lipStrength: lipStrength ?? this.lipStrength,
+      lipTint: clearLipTint ? null : (lipTint ?? this.lipTint),
+      defaultIntensity: defaultIntensity ?? this.defaultIntensity,
+      brightness: brightness ?? this.brightness,
+      contrast: contrast ?? this.contrast,
+      saturation: saturation ?? this.saturation,
+      warmth: warmth ?? this.warmth,
+      values: values ?? this.values,
+    );
   }
 
   @override
-  List<Object?> get props => [values];
+  List<Object?> get props => [
+    smooth,
+    whiten,
+    brighten,
+    blush,
+    lipStrength,
+    lipTint,
+    defaultIntensity,
+    brightness,
+    contrast,
+    saturation,
+    warmth,
+    values,
+  ];
 }

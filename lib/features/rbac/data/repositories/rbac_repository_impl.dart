@@ -11,11 +11,16 @@ import '../models/assign_roles_request_model.dart';
 import '../models/role_user_model.dart';
 
 class RbacRepositoryImpl implements RbacRepository {
-  const RbacRepositoryImpl(this._remoteDataSource, {GetUsers? getUsers})
+  RbacRepositoryImpl(this._remoteDataSource, {GetUsers? getUsers})
       : _getUsers = getUsers;
 
   final RbacRemoteDataSource _remoteDataSource;
   final GetUsers? _getUsers;
+
+  /// Shared across a single enrich / fallback pass so we don't re-page users
+  /// once per role.
+  List<UserEntity>? _usersCache;
+  Future<List<UserEntity>>? _usersCacheFuture;
 
   @override
   Future<UserAuthContextEntity> getCurrentPermissions() =>
@@ -26,11 +31,21 @@ class RbacRepositoryImpl implements RbacRepository {
       _remoteDataSource.getPermissions();
 
   @override
-  Future<List<RoleEntity>> getRoles() => _remoteDataSource.getRoles();
+  Future<List<RoleEntity>> getRoles() async {
+    final roles = await _remoteDataSource.getRoles();
+    return _enrichRolesWithLiveUserCounts(roles);
+  }
 
   @override
-  Future<RoleEntity> getRoleDetails(String roleId) =>
-      _remoteDataSource.getRoleDetails(roleId);
+  Future<RoleEntity> getRoleDetails(String roleId) async {
+    final role = await _remoteDataSource.getRoleDetails(roleId);
+    try {
+      final users = await _usersForRole(role);
+      return role.copyWith(userCount: users.length);
+    } catch (_) {
+      return role;
+    }
+  }
 
   @override
   Future<RoleEntity> createRole(RoleDraft draft) =>
@@ -60,16 +75,151 @@ class RbacRepositoryImpl implements RbacRepository {
 
   @override
   Future<List<RoleUserEntity>> getRoleUsers(String roleId) async {
-    try {
-      return await _remoteDataSource.getRoleUsers(roleId);
-    } on RbacApiException catch (error) {
-      // Dedicated role-users route is optional on some backends.
-      if (_shouldFallbackRoleUsers(error)) {
-        return _fallbackRoleUsers(roleId);
+    final role = await _resolveRole(roleId);
+    if (role == null) {
+      // Still try the dedicated endpoint when role metadata is unavailable.
+      try {
+        return await _remoteDataSource.getRoleUsers(roleId);
+      } catch (_) {
+        return const [];
       }
-      rethrow;
+    }
+    return _usersForRole(role);
+  }
+
+  /// Make the Users column match what "View users" returns.
+  Future<List<RoleEntity>> _enrichRolesWithLiveUserCounts(
+    List<RoleEntity> roles,
+  ) async {
+    if (roles.isEmpty) return roles;
+
+    await _ensureUsersCache();
+
+    final enriched = await Future.wait(
+      roles.map((role) async {
+        try {
+          final users = await _usersForRole(role);
+          if (users.isEmpty) {
+            // Keep backend count when live resolution failed (e.g. transient).
+            return role;
+          }
+          if (users.length == role.userCount) return role;
+          return role.copyWith(userCount: users.length);
+        } catch (_) {
+          return role;
+        }
+      }),
+    );
+
+    _clearUsersCache();
+    return enriched;
+  }
+
+  /// Single source of truth for both the Users column and the holders popup.
+  Future<List<RoleUserEntity>> _usersForRole(RoleEntity role) async {
+    final kind = _kindForSlug(role.slug);
+
+    List<RoleUserEntity>? fromApi;
+    try {
+      fromApi = await _remoteDataSource.getRoleUsers(role.id);
+    } on RbacApiException catch (error) {
+      if (!_shouldFallbackRoleUsers(error)) rethrow;
     } catch (_) {
-      return _fallbackRoleUsers(roleId);
+      fromApi = null;
+    }
+
+    if (kind == SystemRoleKind.superAdmin) {
+      if (fromApi != null && fromApi.isNotEmpty) return fromApi;
+      // Dedicated holders route is often empty/missing for super-admin.
+      // Resolve via `/rbac/users/:id/roles` on admin candidates only — never
+      // treat every legacy admin as a super-admin.
+      final assigned = await _usersWithRbacRole(role);
+      if (assigned.isNotEmpty) return assigned;
+      return fromApi ?? const [];
+    }
+
+    if (kind != null) {
+      final fromLegacy = await _legacyUsersForKind(kind);
+      if (fromApi == null) return fromLegacy;
+      // `/rbac/roles/:id/users` often under-reports members (0) while the
+      // users directory still has many `USER` accounts — prefer the fuller list.
+      if (fromLegacy.length > fromApi.length) return fromLegacy;
+      return fromApi;
+    }
+
+    if (fromApi != null && fromApi.isNotEmpty) return fromApi;
+    // Custom roles: fall back to per-user RBAC assignment checks when the
+    // holders route is empty but the role reports holders.
+    if (role.userCount > 0) {
+      final assigned = await _usersWithRbacRole(role);
+      if (assigned.isNotEmpty) return assigned;
+    }
+    return fromApi ?? const [];
+  }
+
+  /// Finds users who actually have [role] assigned in RBAC (by id or slug).
+  Future<List<RoleUserEntity>> _usersWithRbacRole(RoleEntity role) async {
+    final users = await _ensureUsersCache();
+    if (users.isEmpty) return const [];
+
+    final kind = _kindForSlug(role.slug);
+    // Super-admin holders are almost always also legacy admins — scan those
+    // first to avoid N role lookups across the whole user directory.
+    var candidates = users
+        .where((user) => user.roles.contains(UserRole.admin))
+        .toList(growable: false);
+    if (candidates.isEmpty || kind != SystemRoleKind.superAdmin) {
+      // For custom roles (or when no admins exist), scan a bounded set.
+      candidates = users.take(200).toList(growable: false);
+    }
+
+    final matches = <RoleUserEntity>[];
+    await Future.wait(
+      candidates.map((user) async {
+        try {
+          final ctx = await _remoteDataSource.getUserRoles(user.id);
+          final assigned = ctx.roles.any((r) => r.id == role.id) ||
+              ctx.roleSlugs.any(
+                (slug) =>
+                    slug == role.slug ||
+                    slug.toLowerCase() == role.slug.toLowerCase(),
+              ) ||
+              ctx.roles.any(
+                (r) =>
+                    r.slug == role.slug ||
+                    r.slug.toLowerCase() == role.slug.toLowerCase(),
+              );
+          if (!assigned) return;
+          matches.add(
+            RoleUserModel(
+              id: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              email: user.email,
+              avatarUrl: user.avatarUrl,
+              isBanned: user.isBanned,
+              isVerified: user.isVerified,
+            ),
+          );
+        } catch (_) {
+          // Ignore per-user failures; other candidates may still resolve.
+        }
+      }),
+    );
+    return matches;
+  }
+
+  Future<RoleEntity?> _resolveRole(String roleId) async {
+    try {
+      return await _remoteDataSource.getRoleDetails(roleId);
+    } catch (_) {
+      try {
+        final roles = await _remoteDataSource.getRoles();
+        for (final item in roles) {
+          if (item.id == roleId) return item;
+        }
+      } catch (_) {}
+      return null;
     }
   }
 
@@ -83,55 +233,67 @@ class RbacRepositoryImpl implements RbacRepository {
         code == 503;
   }
 
-  Future<List<RoleUserEntity>> _fallbackRoleUsers(String roleId) async {
+  Future<List<RoleUserEntity>> _legacyUsersForKind(SystemRoleKind kind) async {
+    if (kind == SystemRoleKind.superAdmin) return const [];
+
+    final users = await _ensureUsersCache();
+    if (users.isEmpty) return const [];
+
+    return users
+        .where((user) => _userMatchesKind(user, kind))
+        .map(
+          (user) => RoleUserModel(
+            id: user.id,
+            username: user.username,
+            fullName: user.fullName,
+            email: user.email,
+            avatarUrl: user.avatarUrl,
+            isBanned: user.isBanned,
+            isVerified: user.isVerified,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<UserEntity>> _ensureUsersCache() async {
+    if (_usersCache != null) return _usersCache!;
+    final pending = _usersCacheFuture;
+    if (pending != null) return pending;
+
+    final future = _fetchUsersPages();
+    _usersCacheFuture = future;
+    try {
+      final users = await future;
+      _usersCache = users;
+      return users;
+    } finally {
+      _usersCacheFuture = null;
+    }
+  }
+
+  void _clearUsersCache() {
+    _usersCache = null;
+    _usersCacheFuture = null;
+  }
+
+  Future<List<UserEntity>> _fetchUsersPages() async {
     final getUsers = _getUsers;
     if (getUsers == null) return const [];
 
     try {
-      RoleEntity? role;
-      try {
-        role = await _remoteDataSource.getRoleDetails(roleId);
-      } catch (_) {
-        final roles = await _remoteDataSource.getRoles();
-        for (final item in roles) {
-          if (item.id == roleId) {
-            role = item;
-            break;
-          }
-        }
-      }
-      if (role == null) return const [];
-
-      final kind = _kindForSlug(role.slug);
-      if (kind == null) return const [];
-
-      final matches = <RoleUserEntity>[];
+      final all = <UserEntity>[];
       var page = 1;
       const limit = 100;
       var lastPage = 1;
-      while (page <= lastPage && page <= 5) {
+      // Cap pages to keep role-list loads responsive on large directories.
+      while (page <= lastPage && page <= 20) {
         final result = await getUsers(page: page, limit: limit);
         lastPage = result.lastPage;
-        for (final user in result.users) {
-          if (_userMatchesKind(user, kind)) {
-            matches.add(
-              RoleUserModel(
-                id: user.id,
-                username: user.username,
-                fullName: user.fullName,
-                email: user.email,
-                avatarUrl: user.avatarUrl,
-                isBanned: user.isBanned,
-                isVerified: user.isVerified,
-              ),
-            );
-          }
-        }
+        all.addAll(result.users);
         page++;
       }
-      return matches;
+      return all;
     } catch (_) {
-      // Fallback scan failed (network/CORS/etc.) — surface empty rather than crash UI.
       return const [];
     }
   }
@@ -144,12 +306,15 @@ class RbacRepositoryImpl implements RbacRepository {
   }
 
   bool _userMatchesKind(UserEntity user, SystemRoleKind kind) {
+    final roles = user.roles;
     return switch (kind) {
-      SystemRoleKind.admin => user.roles.contains(UserRole.admin),
-      SystemRoleKind.superAdmin => user.roles.contains(UserRole.admin),
-      SystemRoleKind.moderator => user.roles.contains(UserRole.moderator),
+      SystemRoleKind.admin => roles.contains(UserRole.admin),
+      SystemRoleKind.superAdmin => false,
+      SystemRoleKind.moderator => roles.contains(UserRole.moderator),
       SystemRoleKind.member =>
-        user.roles.contains(UserRole.user) || user.roles.isEmpty,
+        (roles.contains(UserRole.user) || roles.isEmpty) &&
+            !roles.contains(UserRole.admin) &&
+            !roles.contains(UserRole.moderator),
     };
   }
 

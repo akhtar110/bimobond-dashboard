@@ -16,6 +16,7 @@ class FiltersEffectsBloc
     required UpdateCameraFilterUseCase updateFilter,
     required DeleteCameraFilterUseCase deleteFilter,
     required BulkCameraFiltersUseCase bulkFilters,
+    BulkUpdateCameraFiltersUseCase? bulkUpdateFilters,
     required ActivateCameraFilterUseCase activateFilter,
     required DeactivateCameraFilterUseCase deactivateFilter,
     required GetCameraFilterCategoriesUseCase getFilterCategories,
@@ -46,6 +47,7 @@ class FiltersEffectsBloc
        _updateFilter = updateFilter,
        _deleteFilter = deleteFilter,
        _bulkFilters = bulkFilters,
+       _bulkUpdateFilters = bulkUpdateFilters,
        _activateFilter = activateFilter,
        _deactivateFilter = deactivateFilter,
        _getFilterCategories = getFilterCategories,
@@ -74,6 +76,23 @@ class FiltersEffectsBloc
     on<LoadFiltersEffectsOverview>(_onLoadOverview);
     on<LoadFiltersEffectsCatalog>(_onLoadCatalog);
     on<LoadCameraFilters>(_onLoadFilters);
+    on<RefreshFilters>((event, emit) => _onLoadAll(const LoadFiltersEffects(), emit));
+    on<SearchFilters>((event, emit) => _onSearchChanged(FiltersEffectsSearchChanged(event.query), emit));
+    on<FilterByCategory>((event, emit) {
+      _query = _query.copyWith(category: event.categorySlug, clearCategory: event.categorySlug == null);
+      add(const LoadCameraFilters());
+    });
+    on<FilterByCategoryId>((event, emit) {
+      _query = _query.copyWith(categoryId: event.categoryId, clearCategoryId: event.categoryId == null);
+      add(const LoadCameraFilters());
+    });
+    on<FilterByStatus>((event, emit) {
+      _query = _query.copyWith(status: event.status);
+      add(const LoadCameraFilters());
+    });
+    on<LoadSingleFilter>((event, emit) => _onLoadSingleFilter(event.id, emit));
+    on<BulkUpdateFilters>(_onBulkUpdateFilters);
+    on<BulkActionFilters>(_onBulkActionFilters);
     on<LoadCameraFilterCategories>(_onLoadFilterCategories);
     on<LoadCameraEffects>(_onLoadEffects);
     on<LoadCameraEffectCategories>(_onLoadEffectCategories);
@@ -120,6 +139,7 @@ class FiltersEffectsBloc
   final UpdateCameraFilterUseCase _updateFilter;
   final DeleteCameraFilterUseCase _deleteFilter;
   final BulkCameraFiltersUseCase _bulkFilters;
+  final BulkUpdateCameraFiltersUseCase? _bulkUpdateFilters;
   final ActivateCameraFilterUseCase _activateFilter;
   final DeactivateCameraFilterUseCase _deactivateFilter;
   final GetCameraFilterCategoriesUseCase _getFilterCategories;
@@ -277,6 +297,98 @@ class FiltersEffectsBloc
       emit(current.copyWith(catalog: catalog));
     } catch (e) {
       emit(current.copyWith(message: e.toString(), isErrorMessage: true));
+    }
+  }
+
+  Future<void> _onLoadSingleFilter(
+    String id,
+    Emitter<FiltersEffectsState> emit,
+  ) async {
+    final current = _currentLoaded();
+    if (current == null) return;
+    try {
+      await _getFilters(FiltersEffectsListQuery(search: id));
+      emit(current.copyWith(operationSuccess: true));
+    } catch (e) {
+      emit(current.copyWith(message: formatFeApiError(e), isErrorMessage: true));
+    }
+  }
+
+  Future<void> _onBulkUpdateFilters(
+    BulkUpdateFilters event,
+    Emitter<FiltersEffectsState> emit,
+  ) async {
+    final current = _currentLoaded();
+    if (current == null) return;
+    emit(current.copyWith(isActioning: true, clearMessage: true));
+    try {
+      if (_bulkUpdateFilters != null) {
+        await _bulkUpdateFilters(event.request);
+      }
+      await _reloadCore(emit);
+      final updated = _currentLoaded();
+      if (updated != null) {
+        emit(
+          updated.copyWith(
+            selectedFilterIds: const {},
+            message: 'feBulkUpdateSuccess',
+            isErrorMessage: false,
+            operationSuccess: true,
+          ),
+        );
+      }
+    } catch (e) {
+      final after = _currentLoaded();
+      if (after != null) {
+        emit(
+          after.copyWith(
+            isActioning: false,
+            message: formatFeApiError(e),
+            isErrorMessage: true,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _onBulkActionFilters(
+    BulkActionFilters event,
+    Emitter<FiltersEffectsState> emit,
+  ) async {
+    final current = _currentLoaded();
+    if (current == null) return;
+    emit(current.copyWith(
+      isActioning: true,
+      isBulkDeleting: event.request.action == FiltersEffectsBulkAction.delete,
+      clearMessage: true,
+    ));
+    try {
+      await _bulkFilters(event.request);
+      await _reloadCore(emit);
+      final updated = _currentLoaded();
+      if (updated != null) {
+        emit(
+          updated.copyWith(
+            selectedFilterIds: const {},
+            isBulkDeleting: false,
+            message: 'feBulkActionSuccess',
+            isErrorMessage: false,
+            operationSuccess: true,
+          ),
+        );
+      }
+    } catch (e) {
+      final after = _currentLoaded();
+      if (after != null) {
+        emit(
+          after.copyWith(
+            isActioning: false,
+            isBulkDeleting: false,
+            message: formatFeApiError(e),
+            isErrorMessage: true,
+          ),
+        );
+      }
     }
   }
 

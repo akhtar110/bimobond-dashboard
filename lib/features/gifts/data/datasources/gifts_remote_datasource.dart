@@ -97,6 +97,8 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     if (url == null || url.isEmpty) {
       throw Exception('Image upload failed: no URL returned');
     }
+    // Keep relative paths for gift group `iconUrl` (API max 500). Callers
+    // resolve for display via [resolveMediaUrl].
     return url;
   }
 

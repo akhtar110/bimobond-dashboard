@@ -10,38 +10,48 @@ class FilterEditorFormData extends Equatable {
   const FilterEditorFormData({
     required this.slug,
     required this.label,
-    this.renderType = CameraFilterRenderTypeApi.lut,
+    this.customLabel,
     this.labelKey,
     this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
+    this.filterSettings = FilterSettingsEntity.empty,
+    this.isActive = true,
+    this.sortOrder = 0,
+    this.isOriginal = false,
+    this.isBeautyDefault = false,
+    this.renderType = CameraFilterRenderTypeApi.lut,
     this.lutUrl,
     this.lutAsset,
     this.adjustments = const {},
     this.colorMatrix = const [],
-    this.isActive = true,
-    this.sortOrder = 0,
   });
 
   final String slug;
   final String label;
-  final String renderType;
+  final String? customLabel;
   final String? labelKey;
   final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
+  final FilterSettingsEntity filterSettings;
+  final bool isActive;
+  final int sortOrder;
+  final bool isOriginal;
+  final bool isBeautyDefault;
+  final String renderType;
   final String? lutUrl;
   final String? lutAsset;
   final Map<String, int> adjustments;
   final List<double> colorMatrix;
-  final bool isActive;
-  final int sortOrder;
 
   bool get isLut => CameraFilterRenderTypeApi.isLut(renderType);
 
   bool get isMatrix => CameraFilterRenderTypeApi.isMatrix(renderType);
 
   String get displayLabel {
+    final custom = customLabel?.trim();
+    if (custom != null && custom.isNotEmpty) return custom;
     final primary = label.trim();
     if (primary.isNotEmpty) return primary;
     final s = slug.trim();
@@ -56,17 +66,22 @@ class FilterEditorFormData extends Equatable {
   FilterEditorFormData copyWith({
     String? slug,
     String? label,
-    String? renderType,
+    String? customLabel,
     String? labelKey,
     String? emoji,
     String? thumbnailUrl,
     String? previewColorHex,
+    FilterSettingsEntity? filterSettings,
+    bool? isActive,
+    int? sortOrder,
+    bool? isOriginal,
+    bool? isBeautyDefault,
+    String? renderType,
     String? lutUrl,
     String? lutAsset,
     Map<String, int>? adjustments,
     List<double>? colorMatrix,
-    bool? isActive,
-    int? sortOrder,
+    bool clearCustomLabel = false,
     bool clearLabelKey = false,
     bool clearEmoji = false,
     bool clearThumbnailUrl = false,
@@ -78,7 +93,7 @@ class FilterEditorFormData extends Equatable {
     return FilterEditorFormData(
       slug: slug ?? this.slug,
       label: label ?? this.label,
-      renderType: renderType ?? this.renderType,
+      customLabel: clearCustomLabel ? null : (customLabel ?? this.customLabel),
       labelKey: clearLabelKey ? null : (labelKey ?? this.labelKey),
       emoji: clearEmoji ? null : (emoji ?? this.emoji),
       thumbnailUrl: clearThumbnailUrl
@@ -87,14 +102,18 @@ class FilterEditorFormData extends Equatable {
       previewColorHex: clearPreviewColorHex
           ? null
           : (previewColorHex ?? this.previewColorHex),
+      filterSettings: filterSettings ?? this.filterSettings,
+      isActive: isActive ?? this.isActive,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isOriginal: isOriginal ?? this.isOriginal,
+      isBeautyDefault: isBeautyDefault ?? this.isBeautyDefault,
+      renderType: renderType ?? this.renderType,
       lutUrl: clearLutUrl ? null : (lutUrl ?? this.lutUrl),
       lutAsset: clearLutAsset ? null : (lutAsset ?? this.lutAsset),
       adjustments: clearAdjustments
           ? const {}
           : (adjustments ?? this.adjustments),
       colorMatrix: colorMatrix ?? this.colorMatrix,
-      isActive: isActive ?? this.isActive,
-      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -102,17 +121,21 @@ class FilterEditorFormData extends Equatable {
   List<Object?> get props => [
     slug,
     label,
-    renderType,
+    customLabel,
     labelKey,
     emoji,
     thumbnailUrl,
     previewColorHex,
+    filterSettings,
+    isActive,
+    sortOrder,
+    isOriginal,
+    isBeautyDefault,
+    renderType,
     lutUrl,
     lutAsset,
     adjustments,
     colorMatrix,
-    isActive,
-    sortOrder,
   ];
 }
 

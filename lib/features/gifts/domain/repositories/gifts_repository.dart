@@ -52,6 +52,8 @@ class UpdateGiftData {
     this.animationBytes,
     this.animationName,
     this.clearAnimationUrl = false,
+    this.assignGroupId,
+    this.previousAssignGroupId,
   });
 
   final String? name;
@@ -67,6 +69,12 @@ class UpdateGiftData {
   final Uint8List? animationBytes;
   final String? animationName;
   final bool clearAnimationUrl;
+
+  /// Desired panel tab after update (`null` = none / remove from tab).
+  final String? assignGroupId;
+
+  /// Tab the gift was in when the edit dialog opened (for move/remove).
+  final String? previousAssignGroupId;
 }
 
 abstract class GiftsRepository {

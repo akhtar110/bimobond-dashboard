@@ -30,6 +30,81 @@ class LoadCameraFilters extends FiltersEffectsEvent {
   const LoadCameraFilters();
 }
 
+typedef LoadFilters = LoadCameraFilters;
+
+class RefreshFilters extends FiltersEffectsEvent {
+  const RefreshFilters();
+}
+
+class SearchFilters extends FiltersEffectsEvent {
+  const SearchFilters(this.query);
+
+  final String query;
+
+  @override
+  List<Object?> get props => [query];
+}
+
+class FilterByCategory extends FiltersEffectsEvent {
+  const FilterByCategory(this.categorySlug);
+
+  final String? categorySlug;
+
+  @override
+  List<Object?> get props => [categorySlug];
+}
+
+class FilterByCategoryId extends FiltersEffectsEvent {
+  const FilterByCategoryId(this.categoryId);
+
+  final String? categoryId;
+
+  @override
+  List<Object?> get props => [categoryId];
+}
+
+class FilterByStatus extends FiltersEffectsEvent {
+  const FilterByStatus(this.status);
+
+  final FiltersEffectsStatusFilter status;
+
+  @override
+  List<Object?> get props => [status];
+}
+
+class LoadSingleFilter extends FiltersEffectsEvent {
+  const LoadSingleFilter(this.id);
+
+  final String id;
+
+  @override
+  List<Object?> get props => [id];
+}
+
+typedef CreateFilter = CreateCameraFilterEvent;
+typedef UpdateFilter = UpdateCameraFilterEvent;
+typedef DeleteFilter = DeleteCameraFilterEvent;
+typedef ActivateFilter = ActivateCameraFilterEvent;
+typedef DeactivateFilter = DeactivateCameraFilterEvent;
+
+class BulkUpdateFilters extends FiltersEffectsEvent {
+  const BulkUpdateFilters(this.request);
+
+  final BulkUpdateCameraFiltersRequest request;
+
+  @override
+  List<Object?> get props => [request];
+}
+
+class BulkActionFilters extends FiltersEffectsEvent {
+  const BulkActionFilters(this.request);
+
+  final BulkCameraFiltersRequest request;
+
+  @override
+  List<Object?> get props => [request];
+}
+
 class LoadCameraFilterCategories extends FiltersEffectsEvent {
   const LoadCameraFilterCategories();
 }

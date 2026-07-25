@@ -48,14 +48,18 @@ class SoundFormResult {
     this.uploadData,
     this.updateData,
     this.assignGroupId,
+    this.previousAssignGroupId,
   });
 
   final CreateSoundData? createData;
   final UploadSoundData? uploadData;
   final UpdateSoundData? updateData;
 
-  /// Optional shelf to add the new sound to after create (`PUT .../groups/:id/sounds`).
+  /// Desired shelf for the sound (`PUT .../groups/:id/sounds`).
   final String? assignGroupId;
+
+  /// Group the sound belonged to when the edit dialog opened (if any).
+  final String? previousAssignGroupId;
 }
 
 class _SoundFormDialogState extends State<SoundFormDialog> {
@@ -81,6 +85,7 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
   List<SoundGroupEntity> _groups = const [];
   bool _loadingGroups = false;
   String? _selectedGroupId;
+  String? _initialGroupId;
 
   bool get _hasCover =>
       (_coverPreviewBytes != null && _coverPreviewBytes!.isNotEmpty) ||
@@ -105,14 +110,15 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
     );
     _isActive = sound?.isActive ?? true;
     _detectedDuration = sound?.duration;
-    if (!widget.isEditing) {
-      _loadGroups();
-    }
+    _loadGroups();
   }
 
   Future<void> _loadGroups() async {
     if (widget.initialGroups != null) {
-      setState(() => _groups = widget.initialGroups!);
+      setState(() {
+        _groups = widget.initialGroups!;
+        _applyInitialGroupSelection();
+      });
       return;
     }
     setState(() => _loadingGroups = true);
@@ -122,10 +128,24 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
       setState(() {
         _groups = groups;
         _loadingGroups = false;
+        _applyInitialGroupSelection();
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadingGroups = false);
+    }
+  }
+
+  void _applyInitialGroupSelection() {
+    final soundId = widget.sound?.id;
+    if (soundId == null || soundId.isEmpty) return;
+    for (final group in _groups) {
+      final inGroup = group.sounds.any((member) => member.sound.id == soundId);
+      if (inGroup) {
+        _selectedGroupId = group.id;
+        _initialGroupId = group.id;
+        return;
+      }
     }
   }
 
@@ -263,6 +283,8 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
                 : null,
             isActive: _isActive,
           ),
+          assignGroupId: _selectedGroupId,
+          previousAssignGroupId: _initialGroupId,
         ),
       );
       return;
@@ -583,41 +605,39 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
                       v == null || v.trim().isEmpty ? l10n.t('requiredField') : null,
                 ),
                 const SizedBox(height: 12),
-                if (!editing) ...[
-                  if (_loadingGroups)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
-                      child: LinearProgressIndicator(),
-                    )
-                  else
-                    DropdownButtonFormField<String?>(
-                      value: _groups.any((g) => g.id == _selectedGroupId)
-                          ? _selectedGroupId
-                          : null,
-                      decoration: InputDecoration(
-                        labelText: l10n.tOr('soundGroupName', 'Group name'),
-                        helperText: l10n.tOr(
-                          'soundGroupNameHint',
-                          'Optional — add this sound to a library shelf',
-                        ),
+                if (_loadingGroups)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: LinearProgressIndicator(),
+                  )
+                else
+                  DropdownButtonFormField<String?>(
+                    value: _groups.any((g) => g.id == _selectedGroupId)
+                        ? _selectedGroupId
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: l10n.tOr('soundGroupName', 'Group name'),
+                      helperText: l10n.tOr(
+                        'soundGroupNameHint',
+                        'Optional — add this sound to a library shelf',
                       ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text(l10n.t('soundAddNoneGroup')),
-                        ),
-                        for (final group in _groups)
-                          DropdownMenuItem<String?>(
-                            value: group.id,
-                            child: Text(group.name),
-                          ),
-                      ],
-                      onChanged: busy
-                          ? null
-                          : (value) => setState(() => _selectedGroupId = value),
                     ),
-                  const SizedBox(height: 12),
-                ],
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(l10n.t('soundAddNoneGroup')),
+                      ),
+                      for (final group in _groups)
+                        DropdownMenuItem<String?>(
+                          value: group.id,
+                          child: Text(group.name),
+                        ),
+                    ],
+                    onChanged: busy
+                        ? null
+                        : (value) => setState(() => _selectedGroupId = value),
+                  ),
+                const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(l10n.t('soundStatusActive')),

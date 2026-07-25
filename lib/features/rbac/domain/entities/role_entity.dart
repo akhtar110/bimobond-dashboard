@@ -29,6 +29,35 @@ class RoleEntity extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  RoleEntity copyWith({
+    String? id,
+    String? slug,
+    String? name,
+    String? description,
+    bool? isSystem,
+    bool? isActive,
+    int? userCount,
+    int? permissionCount,
+    List<PermissionEntity>? permissions,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool clearDescription = false,
+  }) {
+    return RoleEntity(
+      id: id ?? this.id,
+      slug: slug ?? this.slug,
+      name: name ?? this.name,
+      description: clearDescription ? null : (description ?? this.description),
+      isSystem: isSystem ?? this.isSystem,
+      isActive: isActive ?? this.isActive,
+      userCount: userCount ?? this.userCount,
+      permissionCount: permissionCount ?? this.permissionCount,
+      permissions: permissions ?? this.permissions,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   @override
   List<Object?> get props => [
     id,

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../../../core/utils/media_url_resolver.dart';
+import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../constants/fe_preview_assets.dart';
 import '../utils/fe_filter_preview_support.dart';
@@ -25,6 +26,7 @@ class FePreviewSceneView extends StatefulWidget {
     this.lutPreviewFilename,
     this.colorMatrix = const [],
     this.adjustments = const {},
+    this.filterSettings,
     this.effectRenderType,
     this.effectAssetUrl,
     this.effectEmoji,
@@ -41,6 +43,7 @@ class FePreviewSceneView extends StatefulWidget {
   final String? lutPreviewFilename;
   final List<double> colorMatrix;
   final Map<String, int> adjustments;
+  final FilterSettingsEntity? filterSettings;
   final String? effectRenderType;
   final String? effectAssetUrl;
   final String? effectEmoji;
@@ -368,6 +371,7 @@ class _FePreviewSceneViewState extends State<FePreviewSceneView> {
   List<double>? _resolveColorMatrix() {
     return resolveFePreviewFilterMatrix(
       renderType: widget.renderType,
+      filterSettings: widget.filterSettings,
       adjustments: widget.adjustments,
       colorMatrix: widget.colorMatrix,
     );

@@ -58,17 +58,7 @@ class FilterSettingsSchemaModel extends FilterSettingsSchemaEntity {
 
 FilterSettingsEntity parseFilterSettings(dynamic raw) {
   if (raw is! Map) return FilterSettingsEntity.empty;
-  final values = <String, int>{};
-  for (final entry in raw.entries) {
-    final key = entry.key.toString();
-    final value = entry.value;
-    if (value is num) {
-      values[key] = value.round();
-    } else {
-      values[key] = int.tryParse(value.toString()) ?? 0;
-    }
-  }
-  return FilterSettingsEntity(values);
+  return FilterSettingsEntity.fromJson(Map<String, dynamic>.from(raw));
 }
 
 List<double> parseColorMatrix(dynamic raw) {

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/sound_group_entities.dart';
 import '../../domain/repositories/sound_management_repository.dart';
@@ -74,6 +75,8 @@ class _SoundGroupFormDialogState extends State<SoundGroupFormDialog> {
   bool get _hasIcon =>
       (_iconPreviewBytes != null && _iconPreviewBytes!.isNotEmpty) ||
       (_iconUrl != null && _iconUrl!.trim().isNotEmpty);
+
+  String? get _resolvedIconUrl => resolveMediaUrl(_iconUrl) ?? _iconUrl;
 
   Future<void> _pickIcon() async {
     final picked = await pickCoverImageFile();
@@ -256,24 +259,30 @@ class _SoundGroupFormDialogState extends State<SoundGroupFormDialog> {
                                   _iconPreviewBytes!,
                                   fit: BoxFit.cover,
                                 )
-                              : CachedNetworkImage(
-                                  imageUrl: _iconUrl!,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                              : (_resolvedIconUrl != null &&
+                                      _resolvedIconUrl!.trim().isNotEmpty)
+                                  ? CachedNetworkImage(
+                                      imageUrl: _resolvedIconUrl!,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => Icon(
+                                        Icons.broken_image_outlined,
                                         color: scheme.onSurfaceVariant,
                                       ),
+                                    )
+                                  : Icon(
+                                      Icons.image_outlined,
+                                      color: scheme.onSurfaceVariant,
                                     ),
-                                  ),
-                                  errorWidget: (context, url, error) => Icon(
-                                    Icons.broken_image_outlined,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
                         ),
                       ),
                       const SizedBox(width: 12),

@@ -17,6 +17,7 @@ import '../bloc/filter_editor_event.dart';
 import '../bloc/filter_editor_state.dart';
 
 import '../utils/fe_filter_preview_support.dart';
+import '../widgets/filter_beauty_settings_section.dart';
 import '../widgets/filter_editor_basic_section.dart';
 import '../widgets/filter_editor_preview_panel.dart';
 
@@ -298,116 +299,95 @@ class _FilterEditorReadyBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 900;
 
-    return BlocSelector<FilterEditorBloc, FilterEditorState, bool>(
-      selector: (state) => state is FilterEditorReady ? state.isSaving : false,
-      builder: (context, isSaving) {
+    return BlocBuilder<FilterEditorBloc, FilterEditorState>(
+      builder: (context, state) {
+        if (state is! FilterEditorReady) return const SizedBox.shrink();
+        final ready = state;
+        final isSaving = ready.isSaving;
+
+        final basicSection = FilterEditorBasicSection(
+          key: ValueKey(ready.filterId ?? 'new-filter'),
+          state: ready,
+          embedded: true,
+        );
+
+        final previewPanel = FilterEditorPreviewPanel(
+          key: ValueKey(
+            '${ready.form.lutUrl}|'
+            '${ready.form.renderType}|'
+            '${ready.form.previewColorHex}|'
+            '${ready.form.label}|'
+            '${ready.form.customLabel}|'
+            '${ready.form.emoji}|'
+            '${ready.form.thumbnailUrl}|'
+            '${ready.form.filterSettings}',
+          ),
+          state: ready,
+          embedded: true,
+        );
+
+        final beautySection = FilterBeautySettingsSection(state: ready);
+
+        Widget bodyContent;
+        if (isDesktop) {
+          bodyContent = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left Column: Basic Information & Filter Beauty Settings
+              Expanded(
+                flex: 52,
+                child: _DialogColumn(
+                  title: context.l10n.tOr('feFilterSectionBasicSettings', 'Filter Configuration'),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(right: 12, bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        basicSection,
+                        const SizedBox(height: 16),
+                        beautySection,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              VerticalDivider(width: 1, color: scheme.outlineVariant),
+              // Right Column: Live Preview Image & Summary
+              Expanded(
+                flex: 48,
+                child: _DialogColumn(
+                  title: context.l10n.tOr('feFilterSectionPreview', 'Live Preview'),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(left: 4, right: 8, bottom: 12),
+                    child: previewPanel,
+                  ),
+                ),
+              ),
+            ],
+          );
+        } else {
+          // Mobile / Tablet: Single Column (Basic -> Beauty -> Preview)
+          bodyContent = SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                basicSection,
+                const SizedBox(height: 16),
+                beautySection,
+                const SizedBox(height: 16),
+                previewPanel,
+              ],
+            ),
+          );
+        }
+
         return Stack(
           fit: StackFit.expand,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 55,
-                  child: _DialogColumn(
-                    title: context.l10n.tOr(
-                      'feFilterSectionBasic',
-                      'Basic information',
-                    ),
-                    child: BlocSelector<
-                      FilterEditorBloc,
-                      FilterEditorState,
-                      FilterEditorReady?
-                    >(
-                      selector: (state) =>
-                          state is FilterEditorReady ? state : null,
-                      builder: (context, ready) {
-                        if (ready == null) return const SizedBox.shrink();
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.only(right: 4, bottom: 8),
-                          child: FilterEditorBasicSection(
-                            key: ValueKey(ready.filterId ?? 'new-filter'),
-                            state: ready,
-                            embedded: true,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                VerticalDivider(width: 1, color: scheme.outlineVariant),
-                Expanded(
-                  flex: 45,
-                  child: _DialogColumn(
-                    title: context.l10n.tOr(
-                      'feFilterSectionPreview',
-                      'Preview',
-                    ),
-                    child: RepaintBoundary(
-                      child: BlocBuilder<
-                        FilterEditorBloc,
-                        FilterEditorState
-                      >(
-                        buildWhen: (previous, current) {
-                          if (previous is! FilterEditorReady ||
-                              current is! FilterEditorReady) {
-                            return previous.runtimeType != current.runtimeType;
-                          }
-                          // Rebuild for caption/summary text, but preview scene
-                          // keys ignore label/slug so the image is not remounted.
-                          return previous.form.lutUrl != current.form.lutUrl ||
-                              previous.form.renderType !=
-                                  current.form.renderType ||
-                              previous.form.previewColorHex !=
-                                  current.form.previewColorHex ||
-                              previous.form.adjustments !=
-                                  current.form.adjustments ||
-                              previous.form.colorMatrix !=
-                                  current.form.colorMatrix ||
-                              previous.form.label != current.form.label ||
-                              previous.form.slug != current.form.slug ||
-                              previous.form.emoji != current.form.emoji ||
-                              previous.lutPreviewBytes !=
-                                  current.lutPreviewBytes ||
-                              previous.lutFileName != current.lutFileName ||
-                              previous.isUploadingLut !=
-                                  current.isUploadingLut;
-                        },
-                        builder: (context, state) {
-                          final ready = state is FilterEditorReady
-                              ? state
-                              : null;
-                          if (ready == null) return const SizedBox.shrink();
-                          return SingleChildScrollView(
-                            padding: const EdgeInsets.only(
-                              right: 4,
-                              bottom: 8,
-                            ),
-                            child: FilterEditorPreviewPanel(
-                              // Stable across label/slug edits — only visual
-                              // filter inputs remount the LUT scene.
-                              key: ValueKey(
-                                '${ready.form.lutUrl}|'
-                                '${ready.form.renderType}|'
-                                '${ready.form.previewColorHex}|'
-                                '${ready.form.adjustments}|'
-                                '${ready.form.colorMatrix}|'
-                                '${ready.lutPreviewBytes?.length}|'
-                                '${ready.lutFileName}|'
-                                '${ready.isUploadingLut}',
-                              ),
-                              state: ready,
-                              embedded: true,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            bodyContent,
             if (isSaving)
               const ColoredBox(
                 color: Color(0x44000000),

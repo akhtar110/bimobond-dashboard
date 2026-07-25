@@ -68,6 +68,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   final _scrollController = ScrollController();
   String? _pendingSoundId;
   String? _pendingAssignGroupId;
+  String? _pendingPreviousAssignGroupId;
   String? _selectedGroupId;
 
   @override
@@ -156,11 +157,22 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
     _refreshOverview();
 
     final groupId = _pendingAssignGroupId;
+    final previousGroupId = _pendingPreviousAssignGroupId;
     _pendingAssignGroupId = null;
-    if (mutation == SoundLibraryMutation.created &&
-        groupId != null &&
-        state.sound != null) {
+    _pendingPreviousAssignGroupId = null;
+    if (state.sound == null) return;
+
+    if (mutation == SoundLibraryMutation.created && groupId != null) {
       _assignCreatedSoundToGroup(groupId, state.sound!);
+      return;
+    }
+
+    if (mutation == SoundLibraryMutation.updated) {
+      _syncSoundGroupMembership(
+        sound: state.sound!,
+        previousGroupId: previousGroupId,
+        nextGroupId: groupId,
+      );
     }
   }
 
@@ -192,6 +204,75 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
     context.read<SoundGroupsBloc>().add(
           ReplaceGroupSoundsEvent(groupId: groupId, sounds: members),
         );
+  }
+
+  void _syncSoundGroupMembership({
+    required SoundEntity sound,
+    required String? previousGroupId,
+    required String? nextGroupId,
+  }) {
+    if (previousGroupId == nextGroupId) return;
+
+    final groupsState = context.read<SoundGroupsBloc>().state;
+    if (groupsState is! SoundGroupsLoaded) return;
+    final groups = groupsState.groups;
+
+    if (previousGroupId != null) {
+      SoundGroupEntity? previous;
+      for (final group in groups) {
+        if (group.id == previousGroupId) {
+          previous = group;
+          break;
+        }
+      }
+      if (previous != null) {
+        final remaining = <SoundGroupMembershipItem>[];
+        for (final member in previous.sounds) {
+          if (member.sound.id == sound.id) continue;
+          remaining.add(
+            SoundGroupMembershipItem(
+              soundId: member.sound.id,
+              sortOrder: remaining.length,
+            ),
+          );
+        }
+        context.read<SoundGroupsBloc>().add(
+              ReplaceGroupSoundsEvent(
+                groupId: previous.id,
+                sounds: remaining,
+              ),
+            );
+      }
+    }
+
+    if (nextGroupId != null) {
+      SoundGroupEntity? next;
+      for (final group in groups) {
+        if (group.id == nextGroupId) {
+          next = group;
+          break;
+        }
+      }
+      if (next == null) return;
+
+      final alreadyIn = next.sounds.any((m) => m.sound.id == sound.id);
+      if (alreadyIn) return;
+
+      final members = [
+        for (final member in next.sounds)
+          SoundGroupMembershipItem(
+            soundId: member.sound.id,
+            sortOrder: member.sortOrder,
+          ),
+        SoundGroupMembershipItem(
+          soundId: sound.id,
+          sortOrder: next.sounds.length,
+        ),
+      ];
+      context.read<SoundGroupsBloc>().add(
+            ReplaceGroupSoundsEvent(groupId: next.id, sounds: members),
+          );
+    }
   }
 
   void _applyBulkSuccess(BulkSoundActionSuccess state) {
@@ -337,11 +418,19 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   }
 
   Future<void> _openEditDialog(SoundEntity sound) async {
-    final result = await SoundFormDialog.show(context, sound: sound);
+    final groupsState = context.read<SoundGroupsBloc>().state;
+    final groups = groupsState is SoundGroupsLoaded ? groupsState.groups : null;
+    final result = await SoundFormDialog.show(
+      context,
+      sound: sound,
+      groups: groups,
+    );
     if (!mounted || result?.updateData == null) return;
     _pendingSoundId = sound.id;
+    _pendingAssignGroupId = result!.assignGroupId;
+    _pendingPreviousAssignGroupId = result.previousAssignGroupId;
     context.read<SoundCrudBloc>().add(
-          UpdateSoundEvent(soundId: sound.id, data: result!.updateData!),
+          UpdateSoundEvent(soundId: sound.id, data: result.updateData!),
         );
   }
 
@@ -413,6 +502,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
             } else if (state is SoundCrudError) {
               _pendingSoundId = null;
               _pendingAssignGroupId = null;
+              _pendingPreviousAssignGroupId = null;
               _showSnack(state.message, isError: true);
               context.read<SoundCrudBloc>().add(const ResetSoundCrudEvent());
             }

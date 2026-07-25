@@ -7,8 +7,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/entities/gift_group_entities.dart';
 import '../../domain/enums/gift_size.dart';
 import '../../domain/repositories/gifts_repository.dart';
+import '../../domain/usecases/gift_group_usecases.dart';
+import '../bloc/gift_groups_bloc.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
@@ -64,6 +67,10 @@ class EditGiftDialogState extends State<EditGiftDialog> {
   String? _animationError;
   DateTime? _publishedAt;
   late GiftSize _selectedSize;
+  String? _selectedGroupId;
+  String? _initialGroupId;
+  bool _loadingGroups = false;
+  List<GiftGroupEntity> _groups = const [];
 
   @override
   void initState() {
@@ -75,6 +82,43 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     _selectedSize = widget.gift.size;
     _animationUrl = widget.gift.animationUrl;
     _animationName = widget.gift.animationUrl;
+    if (!widget.previewOnly) {
+      _loadGroups();
+    }
+  }
+
+  Future<void> _loadGroups() async {
+    final blocState = widget.pageContext.read<GiftGroupsBloc>().state;
+    if (blocState is GiftGroupsLoaded) {
+      if (!mounted) return;
+      _applyGroups(blocState.groups);
+      return;
+    }
+    if (mounted) setState(() => _loadingGroups = true);
+    try {
+      final groups = await di.sl<GetGiftGroupsUseCase>()();
+      if (!mounted) return;
+      _applyGroups(groups);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingGroups = false);
+    }
+  }
+
+  void _applyGroups(List<GiftGroupEntity> groups) {
+    String? currentGroupId;
+    for (final group in groups) {
+      if (group.gifts.any((m) => m.gift.id == widget.gift.id)) {
+        currentGroupId = group.id;
+        break;
+      }
+    }
+    setState(() {
+      _groups = groups;
+      _initialGroupId = currentGroupId;
+      _selectedGroupId = currentGroupId;
+      _loadingGroups = false;
+    });
   }
 
   @override
@@ -179,6 +223,8 @@ class EditGiftDialogState extends State<EditGiftDialog> {
             imageName: _newImageName,
             animationUrl: animationUrl,
             clearAnimationUrl: clearAnimationUrl,
+            assignGroupId: _selectedGroupId,
+            previousAssignGroupId: _initialGroupId,
           ),
         ));
   }
@@ -401,6 +447,41 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                                 }
                               },
                       ),
+                      const SizedBox(height: 14),
+                      if (_loadingGroups)
+                        const LinearProgressIndicator()
+                      else
+                        DropdownButtonFormField<String?>(
+                          value: _groups.any((g) => g.id == _selectedGroupId)
+                              ? _selectedGroupId
+                              : null,
+                          decoration: InputDecoration(
+                            labelText: l10n.tOr('giftGroupName', 'Tab name'),
+                            helperText: l10n.tOr(
+                              'giftGroupNameHint',
+                              'Optional — add to a gift panel tab',
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child:
+                                  Text(l10n.tOr('giftAddNoneGroup', 'None')),
+                            ),
+                            for (final group in _groups)
+                              DropdownMenuItem<String?>(
+                                value: group.id,
+                                child: Text(group.name),
+                              ),
+                          ],
+                          onChanged: isActioning
+                              ? null
+                              : (value) =>
+                                  setState(() => _selectedGroupId = value),
+                        ),
                       const SizedBox(height: 14),
 
                       GiftPriceCoinsField(

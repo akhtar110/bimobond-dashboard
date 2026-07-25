@@ -30,6 +30,7 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     on<LoadFilterEditorEvent>(_onLoad);
     on<FilterBasicFieldChanged>(_onBasicChanged);
     on<FilterPreviewColorChanged>(_onPreviewColorChanged);
+    on<FilterSettingChanged>(_onSettingChanged);
     on<FilterAdjustmentChanged>(_onAdjustmentChanged);
     on<ResetFilterEditorEvent>(_onResetEditor);
     on<UploadFilterThumbnailEvent>(_onUploadThumbnail);
@@ -104,6 +105,7 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     var nextForm = current.form.copyWith(
       slug: event.slug,
       label: event.label,
+      customLabel: event.customLabel,
       labelKey: event.labelKey,
       emoji: event.emoji,
       thumbnailUrl: event.thumbnailUrl,
@@ -112,6 +114,7 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
       lutAsset: event.lutAsset,
       isActive: event.isActive,
       sortOrder: event.sortOrder,
+      clearCustomLabel: event.clearCustomLabel,
       clearLabelKey: event.clearLabelKey,
       clearEmoji: event.clearEmoji,
       clearThumbnailUrl: event.clearThumbnailUrl,
@@ -140,6 +143,36 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
         clearFieldErrors: true,
         clearLutFileName: event.clearLutUrl,
         clearLutPreviewBytes: event.clearLutUrl,
+      ),
+    );
+  }
+
+  void _onSettingChanged(
+    FilterSettingChanged event,
+    Emitter<FilterEditorState> emit,
+  ) {
+    final current = state;
+    if (current is! FilterEditorReady) return;
+
+    final nextSettings = current.form.filterSettings.copyWith(
+      smooth: event.smooth,
+      whiten: event.whiten,
+      brighten: event.brighten,
+      blush: event.blush,
+      lipStrength: event.lipStrength,
+      lipTint: event.lipTint,
+      defaultIntensity: event.defaultIntensity,
+      brightness: event.brightness,
+      contrast: event.contrast,
+      saturation: event.saturation,
+      warmth: event.warmth,
+      clearLipTint: event.clearLipTint,
+    );
+
+    emit(
+      current.copyWith(
+        form: current.form.copyWith(filterSettings: nextSettings),
+        clearFieldErrors: true,
       ),
     );
   }
@@ -351,17 +384,21 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     return FilterEditorFormData(
       slug: filter.slug,
       label: filter.label,
-      renderType: CameraFilterRenderTypeApi.fromResponse(filter.renderType),
+      customLabel: filter.customLabel,
       labelKey: filter.labelKey,
       emoji: filter.emoji,
       thumbnailUrl: filter.thumbnailUrl,
       previewColorHex: filter.previewColorHex,
+      filterSettings: filter.filterSettings,
+      isActive: filter.isActive,
+      sortOrder: filter.sortOrder,
+      isOriginal: filter.isOriginal,
+      isBeautyDefault: filter.isBeautyDefault,
+      renderType: CameraFilterRenderTypeApi.fromResponse(filter.renderType),
       lutUrl: filter.lutUrl,
       lutAsset: filter.lutAsset,
       adjustments: _adjustmentsFromEntity(filter),
       colorMatrix: List<double>.from(filter.colorMatrix),
-      isActive: filter.isActive,
-      sortOrder: filter.sortOrder,
     );
   }
 
@@ -393,24 +430,20 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
         errors['previewColorHex'] = 'feInvalidHex';
       }
     }
-    final hasLut =
-        (form.lutUrl?.trim().isNotEmpty ?? false) ||
-        (form.lutAsset?.trim().isNotEmpty ?? false);
-    if (form.isLut && !hasLut) {
-      errors['lut'] = 'feLutRequired';
+    final lipTint = form.filterSettings.lipTint?.trim();
+    if (lipTint != null && lipTint.isNotEmpty) {
+      if (lipTint.length > 7 || !isValidFePreviewHex(lipTint)) {
+        errors['lipTint'] = 'feInvalidHex';
+      }
+    }
+    if (form.sortOrder < 0) {
+      errors['sortOrder'] = 'feInvalidSortOrder';
     }
     final thumb = form.thumbnailUrl?.trim();
     if (thumb != null && thumb.isNotEmpty) {
       final uri = Uri.tryParse(thumb);
       if (uri == null || !uri.hasScheme) {
         errors['thumbnailUrl'] = 'feInvalidUrl';
-      }
-    }
-    final lutUrl = form.lutUrl?.trim();
-    if (form.isLut && lutUrl != null && lutUrl.isNotEmpty) {
-      final uri = Uri.tryParse(lutUrl);
-      if (uri == null || !uri.hasScheme) {
-        errors['lutUrl'] = 'feInvalidUrl';
       }
     }
     return errors;
@@ -420,16 +453,13 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     final form = current.form;
     return CreateFilterRequest(
       slug: form.slug.trim(),
-      renderType: form.renderType,
       label: form.label.trim(),
+      customLabel: _nullableTrim(form.customLabel),
       labelKey: _nullableTrim(form.labelKey),
       emoji: _nullableTrim(form.emoji),
       thumbnailUrl: _nullableTrim(form.thumbnailUrl),
       previewColorHex: _nullableTrim(form.previewColorHex),
-      lutUrl: form.isLut ? _nullableTrim(form.lutUrl) : null,
-      lutAsset: form.isLut ? _nullableTrim(form.lutAsset) : null,
-      colorMatrix: form.isMatrix ? List<double>.from(form.colorMatrix) : const [],
-      adjustments: form.isMatrix ? form.adjustmentsPayload : const CameraFilterAdjustments(),
+      filterSettings: form.filterSettings,
       sortOrder: form.sortOrder,
       isActive: form.isActive,
     );
@@ -438,31 +468,28 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
   UpdateFilterRequest _buildUpdateRequest(FilterEditorReady current) {
     final form = current.form;
     final baseline = current.baseline;
-    final adjustmentsChanged = form.isMatrix &&
-        !_mapsEqual(form.adjustments, baseline.adjustments);
-    final colorMatrixChanged = form.isMatrix &&
-        form.colorMatrix.length == 20 &&
-        !_listsEqual(form.colorMatrix, baseline.colorMatrix);
+    final settingsChanged = form.filterSettings != baseline.filterSettings;
+
     return UpdateFilterRequest(
       slug: form.slug.trim() != baseline.slug ? form.slug.trim() : null,
-      renderType: form.renderType != baseline.renderType ? form.renderType : null,
       label: form.label.trim() != baseline.label ? form.label.trim() : null,
-      labelKey: form.labelKey != baseline.labelKey ? form.labelKey : null,
-      emoji: form.emoji != baseline.emoji ? form.emoji : null,
+      customLabel: form.customLabel != baseline.customLabel
+          ? _nullableTrim(form.customLabel)
+          : null,
+      labelKey: form.labelKey != baseline.labelKey ? _nullableTrim(form.labelKey) : null,
+      emoji: form.emoji != baseline.emoji ? _nullableTrim(form.emoji) : null,
       thumbnailUrl: form.thumbnailUrl != baseline.thumbnailUrl
-          ? form.thumbnailUrl
+          ? _nullableTrim(form.thumbnailUrl)
           : null,
       previewColorHex: form.previewColorHex != baseline.previewColorHex
-          ? form.previewColorHex
+          ? _nullableTrim(form.previewColorHex)
           : null,
-      lutUrl: form.isLut && form.lutUrl != baseline.lutUrl ? form.lutUrl : null,
-      lutAsset: form.isLut && form.lutAsset != baseline.lutAsset
-          ? form.lutAsset
-          : null,
-      adjustments: adjustmentsChanged ? form.adjustmentsPayload : null,
-      colorMatrix: colorMatrixChanged ? List<double>.from(form.colorMatrix) : null,
+      filterSettings: settingsChanged ? form.filterSettings : null,
       sortOrder: form.sortOrder != baseline.sortOrder ? form.sortOrder : null,
       isActive: form.isActive != baseline.isActive ? form.isActive : null,
+      clearCustomLabel:
+          (form.customLabel == null || form.customLabel!.isEmpty) &&
+          (baseline.customLabel?.isNotEmpty ?? false),
       clearLabelKey:
           (form.labelKey == null || form.labelKey!.isEmpty) &&
           (baseline.labelKey?.isNotEmpty ?? false),
@@ -475,36 +502,10 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
       clearPreviewColorHex:
           (form.previewColorHex == null || form.previewColorHex!.isEmpty) &&
           (baseline.previewColorHex?.isNotEmpty ?? false),
-      clearLutUrl:
-          form.isLut &&
-          (form.lutUrl == null || form.lutUrl!.isEmpty) &&
-          (baseline.lutUrl?.isNotEmpty ?? false),
-      clearLutAsset:
-          form.isLut &&
-          (form.lutAsset == null || form.lutAsset!.isEmpty) &&
-          (baseline.lutAsset?.isNotEmpty ?? false),
-      clearAdjustments:
-          form.isMatrix &&
-          form.adjustments.isEmpty &&
-          baseline.adjustments.isNotEmpty,
     );
   }
 
-  bool _mapsEqual(Map<String, int> a, Map<String, int> b) {
-    if (a.length != b.length) return false;
-    for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
-    }
-    return true;
-  }
 
-  bool _listsEqual(List<double> a, List<double> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
 
   String? _lutFileNameFromFilter(CameraFilterEntity filter) {
     final asset = filter.lutAsset?.trim();
