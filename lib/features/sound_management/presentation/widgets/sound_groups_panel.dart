@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../domain/entities/sound_group_entities.dart';
 import '../../../promotions/presentation/widgets/promotions_dashboard_widgets.dart';
@@ -217,9 +219,19 @@ class _SoundGroupTile extends StatelessWidget {
               color: enabled ? scheme.onSurfaceVariant : scheme.outline,
             ),
           ),
-          title: Text(
-            group.name,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          title: Row(
+            children: [
+              _GroupIcon(iconUrl: group.iconUrl),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  group.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           subtitle: Text(
             '${group.slug} · ${group.soundCount} ${l10n.tOr('soundGroupSoundsCount', 'sounds')}',
@@ -325,5 +337,42 @@ class _SoundGroupTile extends StatelessWidget {
         if (confirmed != true || !context.mounted) return;
         bloc.add(DeleteSoundGroupEvent(group.id));
     }
+  }
+}
+
+class _GroupIcon extends StatelessWidget {
+  const _GroupIcon({required this.iconUrl});
+
+  final String? iconUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final resolved = resolveMediaUrl(iconUrl) ?? iconUrl?.trim();
+    final hasIcon = resolved != null && resolved.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 32,
+        height: 32,
+        color: scheme.surfaceContainerHighest,
+        child: hasIcon
+            ? CachedNetworkImage(
+                imageUrl: resolved,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) => Icon(
+                  Icons.library_music_outlined,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+              )
+            : Icon(
+                Icons.library_music_outlined,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+      ),
+    );
   }
 }

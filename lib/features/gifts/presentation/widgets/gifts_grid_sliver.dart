@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
@@ -81,59 +81,39 @@ class GiftsGridSliver extends GiftsContentSliver {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<GiftsBloc, GiftsState>(
-      buildWhen: (prev, curr) {
-        if (prev is! GiftsLoaded || curr is! GiftsLoaded) {
-          return prev.runtimeType != curr.runtimeType;
-        }
-        return prev.gifts != curr.gifts ||
-            prev.selectedTab != curr.selectedTab ||
-            prev.selectedSort != curr.selectedSort ||
-            prev.viewType != curr.viewType ||
-            prev.searchQuery != curr.searchQuery ||
-            prev.fromDate != curr.fromDate ||
-            prev.toDate != curr.toDate ||
-            prev.minPriceFilter != curr.minPriceFilter ||
-            prev.maxPriceFilter != curr.maxPriceFilter ||
-            prev.selectedGiftIds != curr.selectedGiftIds ||
-            prev.isPerformingBulkAction != curr.isPerformingBulkAction ||
-            prev.currentPage != curr.currentPage;
-      },
-      builder: (context, state) {
-        if (state is! GiftsLoaded) return const SliverToBoxAdapter();
+    final state = context.watch<GiftsBloc>().state;
+    if (state is! GiftsLoaded) return const SliverToBoxAdapter();
 
-        final filterKey = giftIdFilter == null
-            ? 'all'
-            : giftIdFilter!.join(',');
-        final contentKey =
-            'gifts-${state.viewType.name}-${state.selectedTab.name}-'
-            '${state.searchQuery}-'
-            '${state.fromDate?.millisecondsSinceEpoch}-'
-            '${state.toDate?.millisecondsSinceEpoch}-'
-            '${state.minPriceFilter}-'
-            '${state.maxPriceFilter}-'
-            '${state.selectedSort.name}-'
-            '${state.currentPage}-'
-            '${state.displayed.length}-'
-            '$filterKey';
+    final filterKey = giftIdFilter == null
+        ? 'all'
+        : giftIdFilter!.join(',');
+    final contentKey =
+        'gifts-${state.viewType.name}-${state.selectedTab.name}-'
+        '${state.searchQuery}-'
+        '${state.fromDate?.millisecondsSinceEpoch}-'
+        '${state.toDate?.millisecondsSinceEpoch}-'
+        '${state.minPriceFilter}-'
+        '${state.maxPriceFilter}-'
+        '${state.selectedSort.name}-'
+        '${state.currentPage}-'
+        '${state.displayed.length}-'
+        '$filterKey';
 
-        return state.viewType == GiftsViewType.grid
-            ? GiftsSliverGrid(
-                key: ValueKey('grid-$contentKey'),
-                loaded: state,
-                onPreviewGift: onPreviewGift,
-                giftIdFilter: giftIdFilter,
-                preferGiftIdOrder: preferGiftIdOrder,
-              )
-            : GiftsSliverList(
-                key: ValueKey('list-$contentKey'),
-                loaded: state,
-                onPreviewGift: onPreviewGift,
-                giftIdFilter: giftIdFilter,
-                preferGiftIdOrder: preferGiftIdOrder,
-              );
-      },
-    );
+    return state.viewType == GiftsViewType.grid
+        ? GiftsSliverGrid(
+            key: ValueKey('grid-$contentKey'),
+            loaded: state,
+            onPreviewGift: onPreviewGift,
+            giftIdFilter: giftIdFilter,
+            preferGiftIdOrder: preferGiftIdOrder,
+          )
+        : GiftsSliverList(
+            key: ValueKey('list-$contentKey'),
+            loaded: state,
+            onPreviewGift: onPreviewGift,
+            giftIdFilter: giftIdFilter,
+            preferGiftIdOrder: preferGiftIdOrder,
+          );
   }
 }
 

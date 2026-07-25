@@ -14,8 +14,11 @@ List<UserRole> parseUserRoles(dynamic raw) {
 }
 
 UserRole _mapRole(String role) {
-  switch (role.toUpperCase()) {
+  switch (role.toUpperCase().replaceAll('-', '_')) {
     case 'ADMIN':
+      return UserRole.admin;
+    case 'SUPER_ADMIN':
+    case 'SUPERADMIN':
       return UserRole.admin;
     case 'MODERATOR':
       return UserRole.moderator;

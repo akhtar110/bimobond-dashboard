@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/sound_group_entities.dart';
 import '../bloc/sound_groups_bloc.dart';
 import 'sound_group_form_dialog.dart';
@@ -359,14 +361,25 @@ class _GroupTabChipState extends State<_GroupTabChip> {
               onTap: widget.enabled ? widget.onTap : null,
               borderRadius: BorderRadius.circular(999),
               child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(14, 9, 6, 9),
-                child: Text(
-                  widget.group.name,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: selected ? scheme.onPrimary : scheme.onSurface,
-                      ),
+                padding: const EdgeInsetsDirectional.fromSTEB(10, 7, 6, 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _TabIcon(
+                      iconUrl: widget.group.iconUrl,
+                      selected: selected,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.group.name,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color:
+                                selected ? scheme.onPrimary : scheme.onSurface,
+                          ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -425,6 +438,57 @@ class _GroupTabChipState extends State<_GroupTabChip> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TabIcon extends StatelessWidget {
+  const _TabIcon({
+    required this.iconUrl,
+    required this.selected,
+  });
+
+  final String? iconUrl;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final resolved = resolveMediaUrl(iconUrl) ?? iconUrl?.trim();
+    final hasIcon = resolved != null && resolved.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 22,
+        height: 22,
+        color: selected
+            ? scheme.onPrimary.withValues(alpha: 0.18)
+            : scheme.surfaceContainerHighest,
+        alignment: Alignment.center,
+        child: hasIcon
+            ? CachedNetworkImage(
+                imageUrl: resolved,
+                width: 22,
+                height: 22,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Icon(
+                  Icons.library_music_outlined,
+                  size: 14,
+                  color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+                ),
+                errorWidget: (context, url, error) => Icon(
+                  Icons.library_music_outlined,
+                  size: 14,
+                  color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+                ),
+              )
+            : Icon(
+                Icons.library_music_outlined,
+                size: 14,
+                color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+              ),
       ),
     );
   }

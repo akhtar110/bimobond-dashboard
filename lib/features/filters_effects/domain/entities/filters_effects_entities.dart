@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'filter_settings_entities.dart';
+
 class FiltersEffectsCountSummary extends Equatable {
   const FiltersEffectsCountSummary({
     required this.total,
@@ -43,7 +45,7 @@ class FiltersEffectsOverviewEntity extends Equatable {
   ];
 }
 
-/// Free-form adjustment map from the admin API (`adjustments` / `filterSettings`).
+/// Free-form adjustment map from the admin API (`adjustments` / legacy).
 class CameraFilterAdjustments extends Equatable {
   const CameraFilterAdjustments([this.values = const {}]);
 
@@ -70,50 +72,48 @@ class CameraFilterEntity extends Equatable {
   const CameraFilterEntity({
     required this.id,
     required this.slug,
-    required this.renderType,
     required this.label,
     this.customLabel,
     this.labelKey,
     this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
-    this.colorMatrix = const [],
-    this.lutUrl,
-    this.lutAsset,
-    this.adjustments = const CameraFilterAdjustments(),
-    this.filterSettings = const CameraFilterAdjustments(),
+    this.filterSettings = FilterSettingsEntity.empty,
     this.isOriginal = false,
     this.isBeautyDefault = false,
     this.isActive = true,
     this.sortOrder = 0,
     this.createdAt,
     this.updatedAt,
+    this.renderType = 'lut',
+    this.colorMatrix = const [],
+    this.lutUrl,
+    this.lutAsset,
+    this.adjustments = const CameraFilterAdjustments(),
   });
 
   final String id;
   final String slug;
-  final String renderType;
   final String label;
   final String? customLabel;
   final String? labelKey;
   final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
-  final List<double> colorMatrix;
-  final String? lutUrl;
-  final String? lutAsset;
-  final CameraFilterAdjustments adjustments;
-  final CameraFilterAdjustments filterSettings;
+  final FilterSettingsEntity filterSettings;
   final bool isOriginal;
   final bool isBeautyDefault;
   final bool isActive;
   final int sortOrder;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String renderType;
+  final List<double> colorMatrix;
+  final String? lutUrl;
+  final String? lutAsset;
+  final CameraFilterAdjustments adjustments;
 
-  /// Prefer `adjustments`; fall back to legacy `filterSettings`.
-  CameraFilterAdjustments get effectiveAdjustments =>
-      adjustments.isEmpty ? filterSettings : adjustments;
+  CameraFilterAdjustments get effectiveAdjustments => adjustments;
 
   String get displayLabel {
     final custom = customLabel?.trim();
@@ -127,17 +127,12 @@ class CameraFilterEntity extends Equatable {
   List<Object?> get props => [
     id,
     slug,
-    renderType,
     label,
     customLabel,
     labelKey,
     emoji,
     thumbnailUrl,
     previewColorHex,
-    colorMatrix,
-    lutUrl,
-    lutAsset,
-    adjustments,
     filterSettings,
     isOriginal,
     isBeautyDefault,
@@ -145,6 +140,11 @@ class CameraFilterEntity extends Equatable {
     sortOrder,
     createdAt,
     updatedAt,
+    renderType,
+    colorMatrix,
+    lutUrl,
+    lutAsset,
+    adjustments,
   ];
 }
 
@@ -540,54 +540,50 @@ class FilterLutUploadResult extends Equatable {
 class CreateFilterRequest extends Equatable {
   const CreateFilterRequest({
     required this.slug,
-    required this.renderType,
     required this.label,
+    this.customLabel,
     this.labelKey,
     this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
+    this.filterSettings,
+    this.sortOrder = 0,
+    this.isActive = true,
+    this.renderType = 'lut',
     this.colorMatrix = const [],
     this.lutUrl,
     this.lutAsset,
     this.adjustments = const CameraFilterAdjustments(),
-    this.sortOrder = 0,
-    this.isActive = true,
   });
 
   final String slug;
-  final String renderType;
   final String label;
+  final String? customLabel;
   final String? labelKey;
   final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
+  final FilterSettingsEntity? filterSettings;
+  final int sortOrder;
+  final bool isActive;
+  final String renderType;
   final List<double> colorMatrix;
   final String? lutUrl;
   final String? lutAsset;
   final CameraFilterAdjustments adjustments;
-  final int sortOrder;
-  final bool isActive;
 
   Map<String, dynamic> toJson() {
-    final normalized = CameraFilterRenderTypeApi.fromResponse(renderType);
     return {
       'slug': slug,
-      'renderType': CameraFilterRenderTypeApi.toRequestJson(normalized),
       'label': label,
+      if (customLabel != null && customLabel!.isNotEmpty) 'customLabel': customLabel,
       if (labelKey != null && labelKey!.isNotEmpty) 'labelKey': labelKey,
       if (emoji != null && emoji!.isNotEmpty) 'emoji': emoji,
       if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
         'thumbnailUrl': thumbnailUrl,
       if (previewColorHex != null && previewColorHex!.isNotEmpty)
         'previewColorHex': previewColorHex,
-      if (CameraFilterRenderTypeApi.isLut(normalized)) ...{
-        if (lutUrl != null && lutUrl!.isNotEmpty) 'lutUrl': lutUrl,
-        if (lutAsset != null && lutAsset!.isNotEmpty) 'lutAsset': lutAsset,
-      },
-      if (CameraFilterRenderTypeApi.isMatrix(normalized)) ...{
-        if (colorMatrix.length == 20) 'colorMatrix': colorMatrix,
-        if (!adjustments.isEmpty) 'adjustments': adjustments.toJson(),
-      },
+      if (filterSettings != null) 'filterSettings': filterSettings!.toJson(),
       'sortOrder': sortOrder,
       'isActive': isActive,
     };
@@ -596,16 +592,13 @@ class CreateFilterRequest extends Equatable {
   @override
   List<Object?> get props => [
     slug,
-    renderType,
     label,
+    customLabel,
     labelKey,
     emoji,
     thumbnailUrl,
     previewColorHex,
-    colorMatrix,
-    lutUrl,
-    lutAsset,
-    adjustments,
+    filterSettings,
     sortOrder,
     isActive,
   ];
@@ -614,55 +607,57 @@ class CreateFilterRequest extends Equatable {
 class UpdateFilterRequest extends Equatable {
   const UpdateFilterRequest({
     this.slug,
-    this.renderType,
     this.label,
+    this.customLabel,
     this.labelKey,
     this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
-    this.colorMatrix,
-    this.lutUrl,
-    this.lutAsset,
-    this.adjustments,
+    this.filterSettings,
     this.sortOrder,
     this.isActive,
+    this.clearCustomLabel = false,
     this.clearLabelKey = false,
     this.clearEmoji = false,
     this.clearThumbnailUrl = false,
     this.clearPreviewColorHex = false,
-    this.clearLutUrl = false,
-    this.clearLutAsset = false,
-    this.clearAdjustments = false,
+    this.renderType,
+    this.colorMatrix,
+    this.lutUrl,
+    this.lutAsset,
+    this.adjustments,
   });
 
   final String? slug;
-  final String? renderType;
   final String? label;
+  final String? customLabel;
   final String? labelKey;
   final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
-  final List<double>? colorMatrix;
-  final String? lutUrl;
-  final String? lutAsset;
-  final CameraFilterAdjustments? adjustments;
+  final FilterSettingsEntity? filterSettings;
   final int? sortOrder;
   final bool? isActive;
+  final bool clearCustomLabel;
   final bool clearLabelKey;
   final bool clearEmoji;
   final bool clearThumbnailUrl;
   final bool clearPreviewColorHex;
-  final bool clearLutUrl;
-  final bool clearLutAsset;
-  final bool clearAdjustments;
+  final String? renderType;
+  final List<double>? colorMatrix;
+  final String? lutUrl;
+  final String? lutAsset;
+  final CameraFilterAdjustments? adjustments;
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (slug != null) json['slug'] = slug;
-    if (renderType != null) {
-      json['renderType'] = CameraFilterRenderTypeApi.toRequestJson(renderType!);
-    }
     if (label != null) json['label'] = label;
+    if (clearCustomLabel) {
+      json['customLabel'] = null;
+    } else if (customLabel != null) {
+      json['customLabel'] = customLabel;
+    }
     if (clearLabelKey) {
       json['labelKey'] = null;
     } else if (labelKey != null) {
@@ -683,23 +678,8 @@ class UpdateFilterRequest extends Equatable {
     } else if (previewColorHex != null) {
       json['previewColorHex'] = previewColorHex;
     }
-    if (clearLutUrl) {
-      json['lutUrl'] = null;
-    } else if (lutUrl != null) {
-      json['lutUrl'] = lutUrl;
-    }
-    if (clearLutAsset) {
-      json['lutAsset'] = null;
-    } else if (lutAsset != null) {
-      json['lutAsset'] = lutAsset;
-    }
-    if (clearAdjustments) {
-      json['adjustments'] = {};
-    } else if (adjustments != null) {
-      json['adjustments'] = adjustments!.toJson();
-    }
-    if (colorMatrix != null && colorMatrix!.length == 20) {
-      json['colorMatrix'] = colorMatrix;
+    if (filterSettings != null) {
+      json['filterSettings'] = filterSettings!.toJson();
     }
     if (sortOrder != null) json['sortOrder'] = sortOrder;
     if (isActive != null) json['isActive'] = isActive;
@@ -709,25 +689,20 @@ class UpdateFilterRequest extends Equatable {
   @override
   List<Object?> get props => [
     slug,
-    renderType,
     label,
+    customLabel,
     labelKey,
     emoji,
     thumbnailUrl,
     previewColorHex,
-    colorMatrix,
-    lutUrl,
-    lutAsset,
-    adjustments,
+    filterSettings,
     sortOrder,
     isActive,
+    clearCustomLabel,
     clearLabelKey,
     clearEmoji,
     clearThumbnailUrl,
     clearPreviewColorHex,
-    clearLutUrl,
-    clearLutAsset,
-    clearAdjustments,
   ];
 }
 
@@ -1116,6 +1091,73 @@ class PaginatedCameraEffectsEntity extends Equatable {
 
   @override
   List<Object?> get props => [data, meta];
+}
+
+class BulkUpdateCameraFilterItem extends Equatable {
+  const BulkUpdateCameraFilterItem({
+    required this.id,
+    this.label,
+    this.customLabel,
+    this.labelKey,
+    this.emoji,
+    this.thumbnailUrl,
+    this.previewColorHex,
+    this.filterSettings,
+    this.sortOrder,
+    this.isActive,
+  });
+
+  final String id;
+  final String? label;
+  final String? customLabel;
+  final String? labelKey;
+  final String? emoji;
+  final String? thumbnailUrl;
+  final String? previewColorHex;
+  final FilterSettingsEntity? filterSettings;
+  final int? sortOrder;
+  final bool? isActive;
+
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'id': id};
+    if (label != null) json['label'] = label;
+    if (customLabel != null) json['customLabel'] = customLabel;
+    if (labelKey != null) json['labelKey'] = labelKey;
+    if (emoji != null) json['emoji'] = emoji;
+    if (thumbnailUrl != null) json['thumbnailUrl'] = thumbnailUrl;
+    if (previewColorHex != null) json['previewColorHex'] = previewColorHex;
+    if (filterSettings != null) json['filterSettings'] = filterSettings!.toJson();
+    if (sortOrder != null) json['sortOrder'] = sortOrder;
+    if (isActive != null) json['isActive'] = isActive;
+    return json;
+  }
+
+  @override
+  List<Object?> get props => [
+    id,
+    label,
+    customLabel,
+    labelKey,
+    emoji,
+    thumbnailUrl,
+    previewColorHex,
+    filterSettings,
+    sortOrder,
+    isActive,
+  ];
+}
+
+class BulkUpdateCameraFiltersRequest extends Equatable {
+  const BulkUpdateCameraFiltersRequest({required this.items});
+
+  final List<BulkUpdateCameraFilterItem> items;
+
+  Map<String, dynamic> toJson() => {
+    'items': items.map((e) => e.toJson()).toList(),
+  };
+
+  @override
+  List<Object?> get props => [items];
 }
 
 enum FiltersEffectsBulkAction { activate, deactivate, delete }

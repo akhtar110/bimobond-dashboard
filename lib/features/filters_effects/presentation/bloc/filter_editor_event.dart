@@ -20,6 +20,7 @@ class FilterBasicFieldChanged extends FilterEditorEvent {
   const FilterBasicFieldChanged({
     this.slug,
     this.label,
+    this.customLabel,
     this.renderType,
     this.labelKey,
     this.emoji,
@@ -29,6 +30,7 @@ class FilterBasicFieldChanged extends FilterEditorEvent {
     this.lutAsset,
     this.isActive,
     this.sortOrder,
+    this.clearCustomLabel = false,
     this.clearLabelKey = false,
     this.clearEmoji = false,
     this.clearThumbnailUrl = false,
@@ -39,6 +41,7 @@ class FilterBasicFieldChanged extends FilterEditorEvent {
 
   final String? slug;
   final String? label;
+  final String? customLabel;
   final String? renderType;
   final String? labelKey;
   final String? emoji;
@@ -48,6 +51,7 @@ class FilterBasicFieldChanged extends FilterEditorEvent {
   final String? lutAsset;
   final bool? isActive;
   final int? sortOrder;
+  final bool clearCustomLabel;
   final bool clearLabelKey;
   final bool clearEmoji;
   final bool clearThumbnailUrl;
@@ -59,6 +63,7 @@ class FilterBasicFieldChanged extends FilterEditorEvent {
   List<Object?> get props => [
     slug,
     label,
+    customLabel,
     renderType,
     labelKey,
     emoji,
@@ -68,6 +73,7 @@ class FilterBasicFieldChanged extends FilterEditorEvent {
     lutAsset,
     isActive,
     sortOrder,
+    clearCustomLabel,
     clearLabelKey,
     clearEmoji,
     clearThumbnailUrl,
@@ -84,6 +90,52 @@ class FilterPreviewColorChanged extends FilterEditorEvent {
 
   @override
   List<Object?> get props => [hex];
+}
+
+class FilterSettingChanged extends FilterEditorEvent {
+  const FilterSettingChanged({
+    this.smooth,
+    this.whiten,
+    this.brighten,
+    this.blush,
+    this.lipStrength,
+    this.lipTint,
+    this.defaultIntensity,
+    this.brightness,
+    this.contrast,
+    this.saturation,
+    this.warmth,
+    this.clearLipTint = false,
+  });
+
+  final int? smooth;
+  final int? whiten;
+  final int? brighten;
+  final int? blush;
+  final int? lipStrength;
+  final String? lipTint;
+  final int? defaultIntensity;
+  final int? brightness;
+  final int? contrast;
+  final int? saturation;
+  final int? warmth;
+  final bool clearLipTint;
+
+  @override
+  List<Object?> get props => [
+    smooth,
+    whiten,
+    brighten,
+    blush,
+    lipStrength,
+    lipTint,
+    defaultIntensity,
+    brightness,
+    contrast,
+    saturation,
+    warmth,
+    clearLipTint,
+  ];
 }
 
 class FilterAdjustmentChanged extends FilterEditorEvent {

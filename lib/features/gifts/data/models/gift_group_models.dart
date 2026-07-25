@@ -56,6 +56,7 @@ class GiftGroupModel extends GiftGroupEntity {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
+      // Keep raw path from API; tabs/form resolve via resolveMediaUrl for display.
       iconUrl: json['iconUrl']?.toString(),
       sortOrder: _groupAsInt(json['sortOrder']),
       isActive: json['isActive'] != false,

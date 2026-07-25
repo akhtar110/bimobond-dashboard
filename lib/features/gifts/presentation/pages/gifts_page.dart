@@ -177,6 +177,11 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                     if (state is! GiftsLoaded) return;
                     final messenger = ScaffoldMessenger.of(ctx);
                     if (state.successMessage != null) {
+                      // Keep tab membership UI in sync after create/update
+                      // (group assign runs in GiftsBloc via replace-group-gifts).
+                      ctx.read<GiftGroupsBloc>().add(
+                            const LoadGiftGroupsEvent(refresh: true),
+                          );
                       messenger
                         ..hideCurrentSnackBar()
                         ..showSnackBar(

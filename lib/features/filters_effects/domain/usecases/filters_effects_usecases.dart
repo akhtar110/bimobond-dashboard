@@ -97,6 +97,16 @@ class BulkCameraFiltersUseCase {
       _repository.bulkFilters(request);
 }
 
+class BulkUpdateCameraFiltersUseCase {
+  const BulkUpdateCameraFiltersUseCase(this._repository);
+
+  final FiltersEffectsRepository _repository;
+
+  Future<PaginatedCameraFiltersEntity> call(
+    BulkUpdateCameraFiltersRequest request,
+  ) => _repository.bulkUpdateFilters(request);
+}
+
 class GetCameraFilterCategoriesUseCase {
   const GetCameraFilterCategoriesUseCase(this._repository);
 

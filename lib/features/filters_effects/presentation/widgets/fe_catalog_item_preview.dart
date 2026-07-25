@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
+import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../utils/fe_effect_emoji_display.dart';
 import '../utils/fe_preview_color_utils.dart';
@@ -45,6 +46,7 @@ class FeCatalogItemPreview extends StatelessWidget {
     this.lutPreviewFilename,
     this.colorMatrix = const [],
     this.adjustments = const {},
+    this.filterSettings,
     this.effectAnchor = const {},
     this.effectStickers = const [],
     this.distortionPreset,
@@ -65,6 +67,7 @@ class FeCatalogItemPreview extends StatelessWidget {
   final String? lutPreviewFilename;
   final List<double> colorMatrix;
   final Map<String, int> adjustments;
+  final FilterSettingsEntity? filterSettings;
   final Map<String, dynamic> effectAnchor;
   final List<CameraEffectStickerLayer> effectStickers;
   final String? distortionPreset;
@@ -111,7 +114,7 @@ class FeCatalogItemPreview extends StatelessWidget {
             // the scene or re-apply the LUT.
             '$previewColorHex|$trimmedAsset|$lutUrl|'
             '${lutPreviewBytes?.length}|$lutPreviewFilename|'
-            '$renderType|$colorMatrix|$adjustments',
+            '$renderType|$colorMatrix|$adjustments|$filterSettings',
           );
 
     return Column(
@@ -124,19 +127,27 @@ class FeCatalogItemPreview extends StatelessWidget {
           ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              children: [
-                AspectRatio(
-                  aspectRatio: 9 / 14,
-                  child: ClipRRect(
+        AspectRatio(
+          aspectRatio: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: scheme.outlineVariant),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Stack(
                       fit: StackFit.expand,
@@ -151,6 +162,7 @@ class FeCatalogItemPreview extends StatelessWidget {
                               isEffect ? null : lutPreviewFilename,
                           colorMatrix: isEffect ? const [] : colorMatrix,
                           adjustments: isEffect ? const {} : adjustments,
+                          filterSettings: isEffect ? null : filterSettings,
                           effectRenderType: isEffect ? renderType : null,
                           effectAssetUrl: isEffect ? assetImageUrl : null,
                           effectEmoji: isEffect ? emojiText : null,
@@ -222,23 +234,23 @@ class FeCatalogItemPreview extends StatelessWidget {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  mode == FeCatalogPreviewMode.filter
-                      ? l10n.tOr(
-                          'fePreviewFilterHint',
-                          'Scene preview with LUT or color matrix applied.',
-                        )
-                      : _effectHint(context, effectType!),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          mode == FeCatalogPreviewMode.filter
+              ? l10n.tOr(
+                  'fePreviewFilterHint',
+                  'Scene preview with LUT or color matrix applied.',
+                )
+              : _effectHint(context, effectType!),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.35,
           ),
         ),
       ],

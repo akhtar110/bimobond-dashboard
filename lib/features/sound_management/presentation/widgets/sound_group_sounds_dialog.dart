@@ -111,6 +111,23 @@ class _SoundGroupSoundsDialogState extends State<SoundGroupSoundsDialog> {
     Navigator.of(context).pop(items);
   }
 
+  void _selectAllFiltered() {
+    setState(() {
+      final filtered = _filteredAvailable;
+      for (final sound in filtered) {
+        if (!_orderedIds.contains(sound.id)) {
+          _orderedIds.add(sound.id);
+        }
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _orderedIds.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -141,12 +158,40 @@ class _SoundGroupSoundsDialogState extends State<SoundGroupSoundsDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              l10n.tOr(
-                'soundGroupSelectedCount',
-                '{count} selected',
-              ).replaceAll('{count}', '${_orderedIds.length}'),
-              style: Theme.of(context).textTheme.labelMedium,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.tOr(
+                      'soundGroupSelectedCount',
+                      '{count} selected',
+                    ).replaceAll('{count}', '${_orderedIds.length}'),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _loading || _filteredAvailable.isEmpty ? null : _selectAllFiltered,
+                  icon: const Icon(Icons.select_all_rounded, size: 16),
+                  label: Text(l10n.tOr('selectAll', 'Select all')),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                TextButton.icon(
+                  onPressed: _orderedIds.isEmpty ? null : _clearSelection,
+                  icon: const Icon(Icons.deselect_rounded, size: 16),
+                  label: Text(l10n.tOr('clearSelection', 'Clear selection')),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: scheme.error,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Expanded(

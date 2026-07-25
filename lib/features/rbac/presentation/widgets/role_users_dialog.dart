@@ -113,8 +113,8 @@ class _RoleUsersPopupBodyState extends State<_RoleUsersPopupBody> {
         .toList(growable: false);
   }
 
-  Future<void> _copyUserId(String id) async {
-    await Clipboard.setData(ClipboardData(text: id));
+  Future<void> _copyUsername(String username) async {
+    await Clipboard.setData(ClipboardData(text: username));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -260,7 +260,7 @@ class _RoleUsersPopupBodyState extends State<_RoleUsersPopupBody> {
                     final user = filtered[index];
                     return _RoleUserTile(
                       user: user,
-                      onCopyId: () => _copyUserId(user.id),
+                      onCopyUsername: () => _copyUsername(user.username),
                     );
                   },
                 );
@@ -276,11 +276,11 @@ class _RoleUsersPopupBodyState extends State<_RoleUsersPopupBody> {
 class _RoleUserTile extends StatelessWidget {
   const _RoleUserTile({
     required this.user,
-    required this.onCopyId,
+    required this.onCopyUsername,
   });
 
   final RoleUserEntity user;
-  final VoidCallback onCopyId;
+  final VoidCallback onCopyUsername;
 
   String _initials() {
     final source = user.displayName.trim();
@@ -373,8 +373,8 @@ class _RoleUserTile extends StatelessWidget {
                 ),
               ),
             IconButton(
-              onPressed: onCopyId,
-              tooltip: l10n.tOr('copyUserId', 'Copy user ID'),
+              onPressed: onCopyUsername,
+              tooltip: l10n.tOr('copyUsername', 'Copy username'),
               icon: const Icon(Icons.copy_rounded, size: 18),
               visualDensity: VisualDensity.compact,
             ),

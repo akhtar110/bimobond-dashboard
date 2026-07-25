@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../bloc/filter_editor_state.dart';
-import 'fe_filter_form_fields.dart';
 import 'fe_catalog_item_preview.dart';
 
 class FilterEditorPreviewPanel extends StatelessWidget {
@@ -45,44 +44,24 @@ class FilterEditorPreviewPanel extends StatelessWidget {
           lutPreviewFilename: state.lutFileName,
           colorMatrix: form.colorMatrix,
           adjustments: form.adjustments,
+          filterSettings: form.filterSettings,
           externalLoading: state.isUploadingLut,
         ),
         const SizedBox(height: 12),
         _SummaryCard(
           children: [
             _SummaryRow(
-              label: l10n.tOr('feFieldRenderType', 'Render type'),
-              value: feFilterRenderTypeLabel(context, form.renderType),
-            ),
-            _SummaryRow(
               label: l10n.tOr('feFieldSlug', 'Slug'),
               value: form.slug.trim().isEmpty ? '—' : form.slug.trim(),
             ),
-            if (form.isLut) ...[
+            _SummaryRow(
+              label: l10n.tOr('feFieldLabel', 'Label'),
+              value: form.label.trim().isEmpty ? '—' : form.label.trim(),
+            ),
+            if (form.customLabel != null && form.customLabel!.trim().isNotEmpty)
               _SummaryRow(
-                label: l10n.tOr('feFieldLutUrl', 'LUT URL'),
-                value: (form.lutUrl?.trim().isNotEmpty ?? false)
-                    ? form.lutUrl!.trim()
-                    : '—',
-              ),
-              _SummaryRow(
-                label: l10n.tOr('feFieldLutAsset', 'LUT asset'),
-                value: (form.lutAsset?.trim().isNotEmpty ?? false)
-                    ? form.lutAsset!.trim()
-                    : '—',
-              ),
-            ],
-            if (form.isMatrix)
-              _SummaryRow(
-                label: l10n.tOr('feFilterSettingsSummary', 'Modified settings'),
-                value: form.adjustments.isEmpty
-                    ? l10n.tOr(
-                        'feFilterSettingsAllDefault',
-                        'All settings use defaults.',
-                      )
-                    : context.tr('feFilterSettingsCount', {
-                        'count': '${form.adjustments.length}',
-                      }),
+                label: l10n.tOr('feFieldCustomLabel', 'Custom Label'),
+                value: form.customLabel!.trim(),
               ),
             if (state.isEditing && form != baseline)
               _SummaryRow(

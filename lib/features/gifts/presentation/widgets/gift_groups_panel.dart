@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../domain/entities/gift_group_entities.dart';
 import '../bloc/gift_groups_bloc.dart';
@@ -218,9 +219,19 @@ class _GiftGroupTile extends StatelessWidget {
               color: enabled ? scheme.onSurfaceVariant : scheme.outline,
             ),
           ),
-          title: Text(
-            group.name,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          title: Row(
+            children: [
+              _GroupIcon(iconUrl: group.iconUrl),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  group.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           subtitle: Text(
             '${group.slug} · ${group.giftCount} ${l10n.tOr('giftGroupGiftsCount', 'gifts')}',
@@ -333,6 +344,43 @@ class _GiftGroupTile extends StatelessWidget {
         if (confirmed != true || !context.mounted) return;
         bloc.add(DeleteGiftGroupEvent(group.id));
     }
+  }
+}
+
+class _GroupIcon extends StatelessWidget {
+  const _GroupIcon({required this.iconUrl});
+
+  final String? iconUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final resolved = resolveMediaUrl(iconUrl) ?? iconUrl?.trim();
+    final hasIcon = resolved != null && resolved.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 32,
+        height: 32,
+        color: scheme.surfaceContainerHighest,
+        child: hasIcon
+            ? CachedNetworkImage(
+                imageUrl: resolved,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) => Icon(
+                  Icons.category_outlined,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+              )
+            : Icon(
+                Icons.category_outlined,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+      ),
+    );
   }
 }
 

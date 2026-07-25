@@ -905,6 +905,9 @@ Future<void> init() async {
     () => BulkCameraFiltersUseCase(sl<FiltersEffectsRepository>()),
   );
   sl.registerLazySingleton(
+    () => BulkUpdateCameraFiltersUseCase(sl<FiltersEffectsRepository>()),
+  );
+  sl.registerLazySingleton(
     () => ActivateCameraFilterUseCase(sl<FiltersEffectsRepository>()),
   );
   sl.registerLazySingleton(

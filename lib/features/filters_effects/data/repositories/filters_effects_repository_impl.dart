@@ -55,6 +55,11 @@ class FiltersEffectsRepositoryImpl implements FiltersEffectsRepository {
       _remote.bulkFilters(request);
 
   @override
+  Future<PaginatedCameraFiltersEntity> bulkUpdateFilters(
+    BulkUpdateCameraFiltersRequest request,
+  ) => _remote.bulkUpdateFilters(request);
+
+  @override
   Future<List<CameraFilterCategoryEntity>> getFilterCategories() =>
       _remote.getFilterCategories();
 

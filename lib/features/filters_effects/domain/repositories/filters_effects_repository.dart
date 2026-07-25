@@ -30,6 +30,10 @@ abstract class FiltersEffectsRepository {
 
   Future<BulkCameraFiltersResult> bulkFilters(BulkCameraFiltersRequest request);
 
+  Future<PaginatedCameraFiltersEntity> bulkUpdateFilters(
+    BulkUpdateCameraFiltersRequest request,
+  );
+
   Future<List<CameraFilterCategoryEntity>> getFilterCategories();
 
   Future<CameraFilterCategoryEntity> createFilterCategory(

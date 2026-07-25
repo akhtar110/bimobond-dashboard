@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_group_entities.dart';
 import '../../domain/repositories/gifts_repository.dart';
@@ -45,6 +46,7 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
   late final TextEditingController _sortOrderController;
   late bool _isActive;
 
+  /// Raw value sent to the API (`iconUrl`, max 500 per admin API).
   String? _iconUrl;
   Uint8List? _iconPreviewBytes;
   String? _iconFileName;
@@ -75,6 +77,9 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
       (_iconPreviewBytes != null && _iconPreviewBytes!.isNotEmpty) ||
       (_iconUrl != null && _iconUrl!.trim().isNotEmpty);
 
+  String? get _resolvedIconUrl =>
+      resolveMediaUrl(_iconUrl) ?? _iconUrl;
+
   Future<void> _pickIcon() async {
     final picked = await pickGiftImage();
     if (!mounted || picked == null) return;
@@ -92,8 +97,10 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
             picked.name,
           );
       if (!mounted) return;
+      // Keep the upload path as returned (often relative) for PATCH/POST
+      // `iconUrl` (API max length 500). Resolve only for display.
       setState(() {
-        _iconUrl = url;
+        _iconUrl = url.trim();
         _uploadingIcon = false;
       });
     } catch (e) {
@@ -128,7 +135,7 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
           UpdateGiftGroupData(
             name: _nameController.text.trim(),
             slug: _slugController.text.trim(),
-            iconUrl: iconUrl?.isEmpty ?? true ? null : iconUrl,
+            iconUrl: iconUrl == null || iconUrl.isEmpty ? null : iconUrl,
             clearIconUrl: iconUrl == null || iconUrl.isEmpty,
             sortOrder: sortOrder,
             isActive: _isActive,
@@ -143,7 +150,7 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
         CreateGiftGroupData(
           name: _nameController.text.trim(),
           slug: _slugController.text.trim(),
-          iconUrl: iconUrl?.isEmpty ?? true ? null : iconUrl,
+          iconUrl: iconUrl == null || iconUrl.isEmpty ? null : iconUrl,
           sortOrder: sortOrder,
           isActive: _isActive,
         ),
@@ -155,6 +162,7 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final resolvedIcon = _resolvedIconUrl;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -257,24 +265,30 @@ class _GiftGroupFormDialogState extends State<GiftGroupFormDialog> {
                                   _iconPreviewBytes!,
                                   fit: BoxFit.cover,
                                 )
-                              : CachedNetworkImage(
-                                  imageUrl: _iconUrl!,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                              : (resolvedIcon != null &&
+                                      resolvedIcon.trim().isNotEmpty)
+                                  ? CachedNetworkImage(
+                                      imageUrl: resolvedIcon,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => Icon(
+                                        Icons.broken_image_outlined,
                                         color: scheme.onSurfaceVariant,
                                       ),
+                                    )
+                                  : Icon(
+                                      Icons.image_outlined,
+                                      color: scheme.onSurfaceVariant,
                                     ),
-                                  ),
-                                  errorWidget: (context, url, error) => Icon(
-                                    Icons.broken_image_outlined,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
                         ),
                       ),
                       const SizedBox(width: 12),
