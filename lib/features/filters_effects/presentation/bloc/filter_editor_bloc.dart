@@ -154,12 +154,19 @@ class FilterEditorBloc extends Bloc<FilterEditorEvent, FilterEditorState> {
     final current = state;
     if (current is! FilterEditorReady) return;
 
+    int? lipStrength = event.lipStrength;
+    if (event.lipTint != null && event.lipTint!.isNotEmpty && lipStrength == null) {
+      if ((current.form.filterSettings.lipStrength ?? 0) == 0) {
+        lipStrength = 60;
+      }
+    }
+
     final nextSettings = current.form.filterSettings.copyWith(
       smooth: event.smooth,
       whiten: event.whiten,
       brighten: event.brighten,
       blush: event.blush,
-      lipStrength: event.lipStrength,
+      lipStrength: lipStrength,
       lipTint: event.lipTint,
       defaultIntensity: event.defaultIntensity,
       brightness: event.brightness,

@@ -38,25 +38,20 @@ List<double>? buildFePreviewMatrixFromFilterSettings(FilterSettingsEntity settin
   final whitenVal = settings.whiten ?? FilterSettingsEntity.defaultWhiten;
   final brightenVal = settings.brighten ?? FilterSettingsEntity.defaultBrighten;
   final blushVal = settings.blush ?? FilterSettingsEntity.defaultBlush;
+  final smoothVal = settings.smooth ?? FilterSettingsEntity.defaultSmooth;
+  final intensityVal = settings.defaultIntensity ?? FilterSettingsEntity.defaultIntensityVal;
 
-  final hasEffect = brightnessVal != 50 ||
-      contrastVal != 50 ||
-      saturationVal != 50 ||
-      warmthVal != 50 ||
-      whitenVal != 0 ||
-      brightenVal != 0 ||
-      blushVal != 0;
+  final intensityFactor = intensityVal / 70.0;
 
-  if (!hasEffect) return null;
+  final brightness = ((brightnessVal - 50) / 50.0 + (brightenVal / 180.0) + (whitenVal / 220.0)) * intensityFactor;
+  final contrast = 1.0 + ((contrastVal - 50) / 50.0 * 0.4) * intensityFactor;
+  final saturation = 1.0 + ((saturationVal - 50) / 50.0 * 0.8) * intensityFactor;
+  final warmth = ((warmthVal - 50) / 50.0 * 0.25 + (blushVal / 250.0)) * intensityFactor;
+  final smoothSoftness = (smoothVal / 100.0) * 8.0;
 
-  final brightness = (brightnessVal - 50) / 50.0 + (brightenVal / 200.0) + (whitenVal / 250.0);
-  final contrast = 1.0 + (contrastVal - 50) / 50.0 * 0.5;
-  final saturation = saturationVal / 50.0;
-  final warmth = (warmthVal - 50) / 50.0 * 0.2 + (blushVal / 300.0);
-
-  final brightnessBias = brightness * 35;
-  final rScale = contrast * (1 + warmth);
-  final bScale = contrast * (1 - warmth * 0.6);
+  final brightnessBias = brightness * 35.0 + smoothSoftness;
+  final rScale = contrast * (1.0 + warmth);
+  final bScale = contrast * (1.0 - warmth * 0.6);
 
   return cameraEngineFilterMatrix(
     rR: rScale,
@@ -64,8 +59,8 @@ List<double>? buildFePreviewMatrixFromFilterSettings(FilterSettingsEntity settin
     bB: bScale,
     rBias: brightnessBias,
     gBias: brightnessBias,
-    bBias: brightnessBias - warmth * 10,
-    sat: saturation.clamp(0, 3),
+    bBias: brightnessBias - warmth * 12.0,
+    sat: saturation.clamp(0.0, 3.0),
   );
 }
 
