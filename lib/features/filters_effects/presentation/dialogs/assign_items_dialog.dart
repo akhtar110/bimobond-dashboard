@@ -138,6 +138,17 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
     });
   }
 
+  void _selectAll(List<String> ids) {
+    setState(() {
+      for (final id in ids) {
+        _selectedIds.add(id);
+        if (!_orderedIds.contains(id)) {
+          _orderedIds.add(id);
+        }
+      }
+    });
+  }
+
   void _submit(FiltersEffectsLoaded loaded) {
     final bloc = context.read<FiltersEffectsBloc>();
     final categoryId = _categoryId();
@@ -217,6 +228,12 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
               .toList()
         : const <CameraFilterEntity>[];
 
+    final currentVisibleIds = widget.isEffectCategory
+        ? visibleEffects.map((e) => e.id).toList()
+        : visibleFilters.map((f) => f.id).toList();
+    final isAllSelected = currentVisibleIds.isNotEmpty &&
+        currentVisibleIds.every((id) => _selectedIds.contains(id));
+
     return AlertDialog(
       title: Text(title),
       content: SizedBox(
@@ -242,13 +259,37 @@ class _AssignItemsDialogState extends State<AssignItemsDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton.icon(
-                onPressed: _selectedIds.isEmpty ? null : _clearAll,
-                icon: const Icon(Icons.clear_all_rounded, size: 18),
-                label: Text(l10n.tOr('feClearAll', 'Clear all')),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: currentVisibleIds.isEmpty
+                      ? null
+                      : () {
+                          if (isAllSelected) {
+                            _clearAll();
+                          } else {
+                            _selectAll(currentVisibleIds);
+                          }
+                        },
+                  icon: Icon(
+                    isAllSelected
+                        ? Icons.deselect_rounded
+                        : Icons.select_all_rounded,
+                    size: 18,
+                  ),
+                  label: Text(
+                    isAllSelected
+                        ? l10n.tOr('feDeselectAll', 'Deselect all')
+                        : l10n.tOr('feSelectAll', 'Select all'),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _selectedIds.isEmpty ? null : _clearAll,
+                  icon: const Icon(Icons.clear_all_rounded, size: 18),
+                  label: Text(l10n.tOr('feClearAll', 'Clear all')),
+                ),
+              ],
             ),
             Expanded(
               child: ListView(

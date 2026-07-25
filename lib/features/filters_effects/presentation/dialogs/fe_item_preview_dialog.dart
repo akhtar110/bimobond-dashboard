@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/entities/filter_settings_entities.dart';
 import '../../domain/entities/filters_effects_entities.dart';
 import '../utils/fe_filter_preview_support.dart';
 import '../utils/fe_preview_color_utils.dart';
@@ -19,6 +20,7 @@ void showFilterPreviewDialog(BuildContext context, CameraFilterEntity filter) {
       emoji: filter.emoji,
       thumbnailUrl: filter.thumbnailUrl,
       renderType: filter.renderType,
+      filterSettings: filter.filterSettings,
       lutUrl: filter.lutUrl,
       colorMatrix: filter.colorMatrix,
       hexLabel: ctx.l10n.tOr('fePreviewColorHexLabel', 'Stored hex'),
@@ -63,6 +65,7 @@ class _FeItemPreviewDialog extends StatelessWidget {
     this.emoji,
     this.thumbnailUrl,
     this.renderType,
+    this.filterSettings,
     this.lutUrl,
     this.colorMatrix = const [],
     this.effectAnchor = const {},
@@ -80,6 +83,7 @@ class _FeItemPreviewDialog extends StatelessWidget {
   final String? emoji;
   final String? thumbnailUrl;
   final String? renderType;
+  final FilterSettingsEntity? filterSettings;
   final String? lutUrl;
   final List<double> colorMatrix;
   final Map<String, dynamic> effectAnchor;
@@ -110,6 +114,7 @@ class _FeItemPreviewDialog extends StatelessWidget {
                   emoji: emoji,
                   thumbnailUrl: thumbnailUrl,
                   renderType: renderType,
+                  filterSettings: filterSettings,
                   lutUrl: lutUrl,
                   colorMatrix: colorMatrix,
                   effectAnchor: effectAnchor,

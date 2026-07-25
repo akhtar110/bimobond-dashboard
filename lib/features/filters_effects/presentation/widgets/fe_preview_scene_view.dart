@@ -27,6 +27,7 @@ class FePreviewSceneView extends StatefulWidget {
     this.colorMatrix = const [],
     this.adjustments = const {},
     this.filterSettings,
+    this.thumbnailUrl,
     this.effectRenderType,
     this.effectAssetUrl,
     this.effectEmoji,
@@ -44,6 +45,7 @@ class FePreviewSceneView extends StatefulWidget {
   final List<double> colorMatrix;
   final Map<String, int> adjustments;
   final FilterSettingsEntity? filterSettings;
+  final String? thumbnailUrl;
   final String? effectRenderType;
   final String? effectAssetUrl;
   final String? effectEmoji;
@@ -277,10 +279,16 @@ class _FePreviewSceneViewState extends State<FePreviewSceneView> {
       );
     }
 
+    final lipTintHex = widget.filterSettings?.lipTint?.trim();
+    final lipStrength = widget.filterSettings?.lipStrength ?? 0;
+    final hasLipTint = lipTintHex != null && lipTintHex.isNotEmpty;
+
     return Stack(
       fit: StackFit.expand,
       children: [
         scene,
+        if (hasLipTint)
+          _LipTintOverlay(hex: lipTintHex, strength: lipStrength),
         if (_showsLoadingOverlay)
           const ColoredBox(
             color: Color(0x44000000),
@@ -615,6 +623,51 @@ class _DistortionBadge extends StatelessWidget {
     return Align(
       alignment: const Alignment(0, -0.22),
       child: Icon(icon, size: 46, color: Colors.white.withValues(alpha: 0.9)),
+    );
+  }
+}
+
+class _LipTintOverlay extends StatelessWidget {
+  const _LipTintOverlay({
+    required this.hex,
+    required this.strength,
+  });
+
+  final String hex;
+  final int strength;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = parsePreviewColorHex(hex);
+    if (color == null) return const SizedBox.shrink();
+
+    final effectiveStrength = strength <= 0 ? 60 : strength.clamp(1, 100);
+    final opacity = (effectiveStrength / 100.0 * 0.65 + 0.15).clamp(0.0, 0.85);
+
+    return Align(
+      alignment: const Alignment(0.0, 0.04),
+      child: Container(
+        width: 54,
+        height: 22,
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.all(Radius.elliptical(27, 11)),
+          gradient: RadialGradient(
+            colors: [
+              color.withValues(alpha: opacity),
+              color.withValues(alpha: opacity * 0.7),
+              color.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: opacity * 0.6),
+              blurRadius: 10,
+              spreadRadius: 3,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
