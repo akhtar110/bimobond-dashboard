@@ -6,6 +6,7 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/sound_entities.dart';
 import '../services/sound_preview_service.dart';
+import 'sound_details_dialog.dart';
 import 'sound_preview_widgets.dart';
 
 const double kSoundsTableHeaderHeight = 40;
@@ -281,7 +282,15 @@ class _SoundsTableRowState extends State<SoundsTableRow> {
               overflow: TextOverflow.ellipsis,
               style: cellStyle,
             ),
-            status: SoundStatusBadge(isActive: widget.sound.isActive),
+            status: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SoundStatusBadge(isActive: widget.sound.isActive),
+                SoundOriginBadge(isFromDashboard: widget.sound.isFromDashboard),
+              ],
+            ),
             published: widget.density == SoundsTableDensity.wide
                 ? Text(
                     widget.sound.createdAt != null
@@ -297,6 +306,7 @@ class _SoundsTableRowState extends State<SoundsTableRow> {
                 : const SizedBox.shrink(),
             actions: _SoundRowActions(
               sound: widget.sound,
+              preview: widget.preview,
               onEdit: widget.onEdit,
               onToggleActive: widget.onToggleActive,
               onDelete: widget.onDelete,
@@ -430,12 +440,14 @@ class _SoundCoverThumb extends StatelessWidget {
 class _SoundRowActions extends StatelessWidget {
   const _SoundRowActions({
     required this.sound,
+    required this.preview,
     required this.onEdit,
     required this.onToggleActive,
     required this.onDelete,
   });
 
   final SoundEntity sound;
+  final SoundPreviewService preview;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
   final VoidCallback onDelete;
@@ -449,6 +461,13 @@ class _SoundRowActions extends StatelessWidget {
       iconSize: 20,
       onSelected: (value) {
         switch (value) {
+          case 'details':
+            SoundDetailsDialog.show(
+              context,
+              soundId: sound.id,
+              sound: sound,
+              preview: preview,
+            );
           case 'edit':
             onEdit();
           case 'toggle':
@@ -458,6 +477,10 @@ class _SoundRowActions extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'details',
+          child: Text(l10n.tOr('viewDetails', 'View details')),
+        ),
         PopupMenuItem(value: 'edit', child: Text(l10n.t('edit'))),
         PopupMenuItem(
           value: 'toggle',

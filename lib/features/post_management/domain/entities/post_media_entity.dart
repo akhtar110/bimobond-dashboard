@@ -14,14 +14,26 @@ class PostMediaEntity {
   final String? id;
 
   /// Resolved type after URL/extension inspection (handles mislabeled API data).
+  ///
+  /// Attached soundtrack / AUDIO items stay audio — they must not be treated as
+  /// video (image posts with sound are still images).
   String get effectiveMediaType {
     final normalized = mediaType.trim().toUpperCase();
-    if (normalized == 'VIDEO' || normalized == 'AUDIO') return 'VIDEO';
+    if (normalized == 'AUDIO' ||
+        normalized == 'SOUND' ||
+        isLikelyAudioFileUrl(url)) {
+      return 'AUDIO';
+    }
+    if (normalized == 'VIDEO') return 'VIDEO';
     if (isLikelyVideoFileUrl(url)) return 'VIDEO';
     return 'IMAGE';
   }
 
   bool get isVideo => effectiveMediaType == 'VIDEO';
+
+  bool get isAudio => effectiveMediaType == 'AUDIO';
+
+  bool get isImage => effectiveMediaType == 'IMAGE';
 
   PostMediaEntity normalized() {
     return PostMediaEntity(
@@ -115,7 +127,7 @@ String? resolvePostDisplayThumbnailUrl({
   Iterable<String> excludeUrls = const [],
 }) {
   for (final item in media) {
-    if (!item.isVideo &&
+    if (item.isImage &&
         isUsablePostThumbnailUrl(item.url, excludeUrls: excludeUrls)) {
       return item.url;
     }
@@ -135,4 +147,15 @@ bool isLikelyVideoFileUrl(String url) {
       path.endsWith('.mov') ||
       path.endsWith('.m3u8') ||
       path.endsWith('.mkv');
+}
+
+bool isLikelyAudioFileUrl(String url) {
+  final path = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
+  return path.endsWith('.mp3') ||
+      path.endsWith('.m4a') ||
+      path.endsWith('.aac') ||
+      path.endsWith('.wav') ||
+      path.endsWith('.ogg') ||
+      path.endsWith('.flac') ||
+      path.endsWith('.opus');
 }

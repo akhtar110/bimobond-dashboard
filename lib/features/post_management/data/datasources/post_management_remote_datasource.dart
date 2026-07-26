@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/comment_entity.dart';import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/entities/post_engagement_user_item.dart';
@@ -54,8 +55,21 @@ class PostManagementRemoteDataSourceImpl
 
     for (final prefix in paths) {
       try {
-        final response = await _dio.get('$prefix$postId');
-        return _parsePostResponse(response.data);
+        // detail=1 asks feed-style endpoints to embed soundSegment.sound.
+        final response = await _dio.get(
+          '$prefix$postId',
+          queryParameters: const {'detail': 1},
+        );
+        if (kDebugMode) {
+          debugPrint('[GetPost] API response ($prefix$postId): ${response.data}');
+        }
+        final model = _parsePostResponse(response.data);
+        if (kDebugMode) {
+          debugPrint(
+            '[GetPost] Parsed Model: id=${model.id}, soundId=${model.soundId}, sound=${model.sound}, audioUrl=${model.sound?.audioUrl}',
+          );
+        }
+        return model;
       } on DioException catch (e) {
         lastError = e;
         final code = e.response?.statusCode;

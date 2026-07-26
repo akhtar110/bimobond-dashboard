@@ -125,6 +125,11 @@ import 'features/filters_effects/domain/usecases/filters_effects_usecases.dart';
 import 'features/filters_effects/presentation/bloc/effect_editor_bloc.dart';
 import 'features/filters_effects/presentation/bloc/filter_editor_bloc.dart';
 import 'features/filters_effects/presentation/bloc/filters_effects_bloc.dart';
+import 'features/filters_effects/data/datasources/ar_overlays_remote_datasource.dart';
+import 'features/filters_effects/data/repositories/ar_overlays_repository_impl.dart';
+import 'features/filters_effects/domain/repositories/ar_overlays_repository.dart';
+import 'features/filters_effects/domain/usecases/ar_overlays_usecases.dart';
+import 'features/filters_effects/presentation/bloc/ar_overlays_bloc.dart';
 
 import 'features/user_activity/data/datasources/user_activity_remote_data_source.dart';
 import 'features/user_activity/data/repositories/user_activity_repository_impl.dart';
@@ -608,7 +613,7 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(
+        () => AuthRepositoryImpl(
       sl<AuthRemoteDataSource>(),
       sl<AuthLocalDataSource>(),
     ),
@@ -631,7 +636,7 @@ Future<void> init() async {
   );
 
   sl.registerFactory<LoginBloc>(
-    () => LoginBloc(
+        () => LoginBloc(
       loginUseCase: sl<LoginUseCase>(),
       loginWithGoogleUseCase: sl<LoginWithGoogleUseCase>(),
       saveSessionUseCase: sl<SaveSessionUseCase>(),
@@ -751,7 +756,7 @@ Future<void> init() async {
   );
 
   sl.registerFactory(
-    () => UsersBloc(
+        () => UsersBloc(
       getUsers: sl<GetUsers>(),
       banUser: sl<BanUser>(),
       unbanUser: sl<UnbanUser>(),
@@ -1038,6 +1043,44 @@ Future<void> init() async {
       createEffect: sl<CreateCameraEffectUseCase>(),
       updateEffect: sl<UpdateCameraEffectUseCase>(),
       uploadEffectAsset: sl<UploadEffectAssetUseCase>(),
+    ),
+  );
+
+  // AR Overlays
+  sl.registerLazySingleton<ArOverlaysRemoteDataSource>(
+    () => ArOverlaysRemoteDataSourceImpl(dio: sl<Dio>()),
+  );
+  sl.registerLazySingleton<ArOverlaysRepository>(
+    () => ArOverlaysRepositoryImpl(
+      remoteDataSource: sl<ArOverlaysRemoteDataSource>(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminOverlaysUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetAdminOverlayByIdUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => CreateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => UpdateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeleteAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPublicArOverlaysCatalogUseCase(sl<ArOverlaysRepository>()),
+  );
+
+  sl.registerFactory(
+    () => ArOverlaysBloc(
+      getOverlays: sl<GetAdminOverlaysUseCase>(),
+      getOverlayById: sl<GetAdminOverlayByIdUseCase>(),
+      createOverlay: sl<CreateAdminOverlayUseCase>(),
+      updateOverlay: sl<UpdateAdminOverlayUseCase>(),
+      deleteOverlay: sl<DeleteAdminOverlayUseCase>(),
     ),
   );
 

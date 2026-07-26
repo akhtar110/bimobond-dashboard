@@ -220,13 +220,15 @@ class _BeautySliderTile extends StatelessWidget {
               ),
               Row(
                 children: [
-                  Text(
-                    '$value',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: scheme.primary,
-                        ),
+                  FeSyncedNumberInput(
+                    value: value,
+                    min: 0,
+                    max: 100,
+                    width: 56,
+                    height: 28,
+                    onChanged: (val) => onChanged(val.toDouble()),
                   ),
+                  const SizedBox(width: 4),
                   Text(
                     ' / 100',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(

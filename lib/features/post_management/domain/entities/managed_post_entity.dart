@@ -1,3 +1,4 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import 'managed_post_sound_entity.dart';
 import 'post_engagement_user_item.dart';
@@ -104,24 +105,76 @@ class ManagedPostEntity {
         excludeUrls: playableMediaUrls,
       );
 
-  bool get isVideoPost => type.toUpperCase() == 'VIDEO';
+  bool get isVideoPost => displayContentType == 'VIDEO';
 
-  bool get containsVideoMedia =>
-      isVideoPost || media.any((item) => item.isVideo);
+  bool get containsVideoMedia {
+    if (media.any((item) => item.isVideo)) return true;
+    final video = videoUrl?.trim();
+    if (video != null &&
+        video.isNotEmpty &&
+        isLikelyVideoFileUrl(video)) {
+      return true;
+    }
+    final hls = hlsUrl?.trim();
+    return hls != null && hls.isNotEmpty;
+  }
+
+  /// Visual content type for admin UI.
+  ///
+  /// An image post with an attached soundtrack is still [IMAGE] — sound does
+  /// not change the post type to video.
+  String get displayContentType {
+    if (media.any((item) => item.isVideo)) return 'VIDEO';
+
+    final video = videoUrl?.trim();
+    if (video != null &&
+        video.isNotEmpty &&
+        isLikelyVideoFileUrl(video)) {
+      return 'VIDEO';
+    }
+    final hls = hlsUrl?.trim();
+    if (hls != null && hls.isNotEmpty) return 'VIDEO';
+
+    if (media.any((item) => item.isImage) ||
+        isUsablePostThumbnailUrl(thumbnailUrl) ||
+        type.toUpperCase() == 'IMAGE' ||
+        type.toUpperCase() == 'PHOTO') {
+      return 'IMAGE';
+    }
+
+    // Backend sometimes labels photo + sound as VIDEO.
+    if (hasAttachedSound) return 'IMAGE';
+
+    final normalized = type.trim().toUpperCase();
+    if (normalized == 'VIDEO') return 'VIDEO';
+    if (normalized == 'IMAGE' || normalized == 'PHOTO') return 'IMAGE';
+    return normalized.isEmpty ? 'IMAGE' : normalized;
+  }
 
   bool get hasAttachedSound =>
-      soundId != null && soundId!.trim().isNotEmpty;
+      (soundId != null && soundId!.trim().isNotEmpty) ||
+      (sound != null &&
+          (sound!.audioUrl.trim().isNotEmpty || sound!.id.trim().isNotEmpty));
 
   String? get attachedSoundPlayUrl {
     final url = sound?.audioUrl;
-    if (url != null && url.trim().isNotEmpty) return url.trim();
+    if (url != null && url.trim().isNotEmpty) {
+      return resolveMediaUrl(url.trim()) ?? url.trim();
+    }
+    return null;
+  }
+
+  /// Non-empty sound UUID usable for `GET /sounds/:id` hydration.
+  String? get resolvedSoundId {
+    final top = soundId?.trim();
+    if (top != null && top.isNotEmpty) return top;
+    final nested = sound?.id.trim();
+    if (nested != null && nested.isNotEmpty) return nested;
     return null;
   }
 
   bool get shouldPlayAttachedSound =>
-      !containsVideoMedia &&
-      hasAttachedSound &&
-      attachedSoundPlayUrl != null;
+      hasAttachedSound && attachedSoundPlayUrl != null;
 
   /// List/card preview image. For video posts, prefers [thumbnailUrl] (never a playable video URL).
   String? get previewThumbnailUrl {

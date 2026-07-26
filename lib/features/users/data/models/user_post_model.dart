@@ -103,8 +103,7 @@ class UserPostModel extends UserPostEntity {
       updatedAt: _parseDate(json['updatedAt']) ?? DateTime.now(),
       storyExpiresAt: _parseDate(json['storyExpiresAt']),
       locationId: json['locationId']?.toString(),
-      playlistId: json['playlistId']?.toString(),
-      soundId: json['soundId']?.toString(),
+      soundId: _readSoundId(json),
       originalPostId: json['originalPostId']?.toString(),
       user: userMap,
       media: (json['media'] as List?)?.map((e) {
@@ -121,7 +120,7 @@ class UserPostModel extends UserPostEntity {
       hashtags: (json['hashtags'] as List?)
           ?.map((e) => e as Map<String, dynamic>)
           .toList(),
-      sound: json['sound'] as Map<String, dynamic>?,
+      sound: _readSoundMap(json),
       counts: json['_count'] as Map<String, dynamic>?,
       recentReposts: (json['recentReposts'] as List?)
           ?.map((e) => e as Map<String, dynamic>)
@@ -231,4 +230,68 @@ DateTime? _parseDate(dynamic v) {
   } catch (_) {
     return null;
   }
+}
+
+String? _readSoundId(Map<String, dynamic> json) {
+  final direct = json['soundId']?.toString().trim();
+  if (direct != null && direct.isNotEmpty) return direct;
+
+  for (final key in ['sound', 'newSound']) {
+    final raw = json[key];
+    if (raw is Map) {
+      final id = (raw['id'] ?? raw['audioUrl'] ?? raw['url'])?.toString().trim();
+      if (id != null && id.isNotEmpty) return id;
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      return raw.trim();
+    }
+  }
+
+  final segment = json['soundSegment'];
+  if (segment is Map) {
+    final nested = segment['sound'];
+    if (nested is Map) {
+      final id =
+          (nested['id'] ?? nested['audioUrl'] ?? nested['url'])?.toString().trim();
+      if (id != null && id.isNotEmpty) return id;
+    } else if (nested is String && nested.trim().isNotEmpty) {
+      return nested.trim();
+    }
+  }
+  return null;
+}
+
+Map<String, dynamic>? _readSoundMap(Map<String, dynamic> json) {
+  final sound = json['sound'];
+  if (sound is Map) {
+    return _normalizeSoundMap(Map<String, dynamic>.from(sound));
+  }
+
+  final segment = json['soundSegment'];
+  if (segment is Map) {
+    final nested = segment['sound'];
+    if (nested is Map) {
+      return _normalizeSoundMap(Map<String, dynamic>.from(nested));
+    }
+    // Segment without nested track — keep whatever URL fields exist.
+    return _normalizeSoundMap(Map<String, dynamic>.from(segment));
+  }
+
+  final newSound = json['newSound'];
+  if (newSound is Map) {
+    return _normalizeSoundMap(Map<String, dynamic>.from(newSound));
+  }
+  return null;
+}
+
+Map<String, dynamic> _normalizeSoundMap(Map<String, dynamic> map) {
+  final rawUrl = map['audioUrl']?.toString() ??
+      map['url']?.toString() ??
+      map['audio']?.toString() ??
+      map['soundUrl']?.toString() ??
+      map['fileUrl']?.toString() ??
+      map['path']?.toString();
+  if (rawUrl != null && rawUrl.isNotEmpty) {
+    map['audioUrl'] = resolveMediaUrl(rawUrl) ?? rawUrl;
+  }
+  return map;
 }

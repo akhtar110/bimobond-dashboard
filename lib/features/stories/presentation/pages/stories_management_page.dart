@@ -5,6 +5,8 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../posts/presentation/utils/posts_responsive.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
+import '../../../rbac/presentation/widgets/access_denied_view.dart';
 import '../../domain/entities/story_entity.dart';
 import '../../domain/entities/story_viewer_slide.dart';
 import '../bloc/stories_bloc.dart';
@@ -28,9 +30,12 @@ class StoriesManagementPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => di.sl<StoriesBloc>()..add(const LoadStoriesEvent()),
-      child: const _StoriesManagementView(),
+    return FeatureAccessBoundary(
+      canAccess: PermissionManager.canReadStories,
+      child: BlocProvider(
+        create: (_) => di.sl<StoriesBloc>()..add(const LoadStoriesEvent()),
+        child: const _StoriesManagementView(),
+      ),
     );
   }
 }

@@ -297,7 +297,6 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         type: _filters.type,
         sort: _filters.sort,
         isAuctionable: _filters.isAuctionable,
-        isStory: _filters.isStory,
         isAd: _filters.isAd,
       );
     }
@@ -311,10 +310,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   ) async {
     _filters = _filters.copyWith(
       isAuctionable: event.isAuctionable,
-      isStory: event.isStory,
       isAd: event.isAd,
       clearAuction: event.isAuctionable == null,
-      clearStory: event.isStory == null,
+      // Stories filter removed from the posts page UI.
+      clearStory: true,
       clearAd: event.isAd == null,
     );
 

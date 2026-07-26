@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/widgets/post_media_preview.dart';
+import '../../domain/entities/story_entity.dart';
 import '../../domain/entities/story_viewer_slide.dart';
 
 class StoryViewerMedia extends StatefulWidget {
@@ -77,11 +78,18 @@ class _StoryViewerMediaState extends State<StoryViewerMedia> {
     if (progressUrl != null) {
       final controller = _controller;
       if (controller == null || !controller.value.isInitialized) {
-        final fallback = slide.thumbnailUrl ?? slide.mediaUrl;
-        if (fallback != null && fallback.isNotEmpty) {
+        final fallback = slide.thumbnailUrl;
+        if (fallback != null &&
+            fallback.isNotEmpty &&
+            !StoryEntity.isVideoUrl(fallback)) {
           return CachedNetworkImage(imageUrl: fallback, fit: widget.fit);
         }
-        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+        return ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
       }
 
       return FittedBox(
@@ -95,7 +103,9 @@ class _StoryViewerMediaState extends State<StoryViewerMedia> {
     }
 
     final imageUrl = slide.mediaUrl ?? slide.thumbnailUrl;
-    if (imageUrl != null && imageUrl.isNotEmpty) {
+    if (imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        !StoryEntity.isVideoUrl(imageUrl)) {
       return CachedNetworkImage(imageUrl: imageUrl, fit: widget.fit);
     }
 

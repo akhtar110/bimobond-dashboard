@@ -8,6 +8,7 @@ import '../../../../core/utils/money_format.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
+import '../../../rbac/presentation/widgets/access_denied_view.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../../users/domain/usecases/get_user_by_id.dart';
 import '../../../users/presentation/widgets/admin_user_search_field.dart';
@@ -315,83 +316,86 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: scheme.surfaceContainerLowest,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: scheme.surface,
-        foregroundColor: scheme.onSurface,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        centerTitle: false,
-        iconTheme: IconThemeData(color: scheme.onSurface),
-        title: Text(
-          context.l10n.t('auctionDetails'),
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface,
-            letterSpacing: -0.4,
+    return FeatureAccessBoundary(
+      canAccess: PermissionManager.canReadAuctions,
+      child: Scaffold(
+        backgroundColor: scheme.surfaceContainerLowest,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: scheme.surface,
+          foregroundColor: scheme.onSurface,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          centerTitle: false,
+          iconTheme: IconThemeData(color: scheme.onSurface),
+          title: Text(
+            context.l10n.t('auctionDetails'),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+              letterSpacing: -0.4,
+            ),
           ),
         ),
-      ),
-      body: BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
-        listener: (context, state) {
-          if (state is AuctionDetailLoaded) {
-            _syncToListBloc(context, state.auction);
-            final l10n = context.l10n;
-            if (state.successMessage != null) {
-              final sm = state.successMessage!;
-              final message = () {
-                if (sm.startsWith('auction_fulfillment_refund')) {
-                  final parts = sm.split(':');
-                  if (parts.length == 2 && parts[1].isNotEmpty) {
-                    return context.tr('auctionFulfillmentRefundSuccess', {
-                      'count': parts[1],
-                    });
+        body: BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
+          listener: (context, state) {
+            if (state is AuctionDetailLoaded) {
+              _syncToListBloc(context, state.auction);
+              final l10n = context.l10n;
+              if (state.successMessage != null) {
+                final sm = state.successMessage!;
+                final message = () {
+                  if (sm.startsWith('auction_fulfillment_refund')) {
+                    final parts = sm.split(':');
+                    if (parts.length == 2 && parts[1].isNotEmpty) {
+                      return context.tr('auctionFulfillmentRefundSuccess', {
+                        'count': parts[1],
+                      });
+                    }
+                    return l10n.t('auctionFulfillmentRefundSuccessGeneric');
                   }
-                  return l10n.t('auctionFulfillmentRefundSuccessGeneric');
-                }
-                return switch (sm) {
-                  'auction_fulfillment_release' =>
-                    l10n.t('auctionFulfillmentReleaseSuccess'),
-                  'auction_fulfillment_already_settled' =>
-                    l10n.t('auctionFulfillmentAlreadySettled'),
-                  _ => sm,
-                };
-              }();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(message),
-                  backgroundColor: scheme.primary,
-                ),
+                  return switch (sm) {
+                    'auction_fulfillment_release' =>
+                      l10n.t('auctionFulfillmentReleaseSuccess'),
+                    'auction_fulfillment_already_settled' =>
+                      l10n.t('auctionFulfillmentAlreadySettled'),
+                    _ => sm,
+                  };
+                }();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(message),
+                    backgroundColor: scheme.primary,
+                  ),
+                );
+              }
+              if (state.errorMessage != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.errorMessage!),
+                    backgroundColor: scheme.error,
+                  ),
+                );
+              }
+            }
+          },
+          builder: (context, state) {
+            if (state is AuctionDetailLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (state is AuctionDetailError) {
+              return _ErrorBody(
+                message: state.message,
+                auctionId: widget.auctionId,
+                listPreview: widget.listPreview,
               );
             }
-            if (state.errorMessage != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.errorMessage!),
-                  backgroundColor: scheme.error,
-                ),
-              );
+            if (state is AuctionDetailLoaded) {
+              return _DetailBody(state: state);
             }
-          }
-        },
-        builder: (context, state) {
-          if (state is AuctionDetailLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is AuctionDetailError) {
-            return _ErrorBody(
-              message: state.message,
-              auctionId: widget.auctionId,
-              listPreview: widget.listPreview,
-            );
-          }
-          if (state is AuctionDetailLoaded) {
-            return _DetailBody(state: state);
-          }
-          return const SizedBox.shrink();
-        },
+            return const SizedBox.shrink();
+          },
+        ),
       ),
     );
   }

@@ -6,6 +6,8 @@ import '../../../../core/widgets/state_widgets.dart';
 import '../../../../core/widgets/web_dashboard_layout.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../promotions/presentation/widgets/promotions_dashboard_widgets.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
+import '../../../rbac/presentation/widgets/access_denied_view.dart';
 import '../../domain/entities/sound_entities.dart';
 import '../../domain/entities/sound_group_entities.dart';
 import '../bloc/bulk_sound_action_bloc.dart';
@@ -29,24 +31,27 @@ class SoundManagementPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (_) =>
-              di.sl<SoundOverviewBloc>()..add(const LoadSoundOverviewEvent()),
+    return FeatureAccessBoundary(
+      canAccess: PermissionManager.canManageSounds,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) =>
+                di.sl<SoundOverviewBloc>()..add(const LoadSoundOverviewEvent()),
+          ),
+          BlocProvider(
+            create: (_) => di.sl<SoundsBloc>()..add(const LoadSoundsEvent()),
+          ),
+          BlocProvider(create: (_) => di.sl<SoundCrudBloc>()),
+          BlocProvider(create: (_) => di.sl<BulkSoundActionBloc>()),
+          BlocProvider(
+            create: (_) =>
+                di.sl<SoundGroupsBloc>()..add(const LoadSoundGroupsEvent()),
+          ),
+        ],
+        child: const SoundPreviewHost(
+          child: _SoundManagementView(),
         ),
-        BlocProvider(
-          create: (_) => di.sl<SoundsBloc>()..add(const LoadSoundsEvent()),
-        ),
-        BlocProvider(create: (_) => di.sl<SoundCrudBloc>()),
-        BlocProvider(create: (_) => di.sl<BulkSoundActionBloc>()),
-        BlocProvider(
-          create: (_) =>
-              di.sl<SoundGroupsBloc>()..add(const LoadSoundGroupsEvent()),
-        ),
-      ],
-      child: const SoundPreviewHost(
-        child: _SoundManagementView(),
       ),
     );
   }
@@ -63,7 +68,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   static const _desktopPaginationBreakpoint =
       WebDashboardLayout.desktopBreakpoint;
   static const _maxContentWidth = 1680.0;
-  static const int maxAudioSizeBytes = 1024 * 1024;
+  static const int maxAudioSizeBytes = 500 * 1024 * 1024;
 
   final _scrollController = ScrollController();
   String? _pendingSoundId;
@@ -385,6 +390,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                 duration: duration,
                 coverBytes: upload.coverBytes,
                 coverFilename: upload.coverFilename,
+                isFromDashboard: upload.isFromDashboard,
               ),
             ),
           );
@@ -411,6 +417,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                 duration: duration,
                 coverUrl: create.coverUrl,
                 isActive: create.isActive,
+                isFromDashboard: create.isFromDashboard,
               ),
             ),
           );
@@ -578,7 +585,16 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                           _ => const SoundsQuery(),
                         },
                         builder: (context, query) {
-                          return SoundFiltersPanel(query: query);
+                          return SoundFiltersPanel(
+                            query: query,
+                            // Status filters apply to the full library. A group
+                            // tab would otherwise hide deactivated matches.
+                            onStatusChanged: () {
+                              if (_selectedGroupId != null) {
+                                setState(() => _selectedGroupId = null);
+                              }
+                            },
+                          );
                         },
                       ),
                       SizedBox(height: sectionGap),

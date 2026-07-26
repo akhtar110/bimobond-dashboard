@@ -69,19 +69,39 @@ class StoriesTable extends StatelessWidget {
                           child: SizedBox(
                             width: 42,
                             height: 42,
-                            child: story.thumbnailUrl.isNotEmpty
+                            child: story.validImageThumbnailUrl != null
                                 ? CachedNetworkImage(
-                                    imageUrl: story.thumbnailUrl,
+                                    imageUrl: story.validImageThumbnailUrl!,
                                     fit: BoxFit.cover,
                                   )
-                                : ColoredBox(
-                                    color: scheme.surfaceContainerHighest,
-                                    child: Icon(
-                                      Icons.auto_stories_outlined,
-                                      color: scheme.onSurfaceVariant,
-                                      size: 18,
-                                    ),
-                                  ),
+                                : (story.isVideo
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              scheme.primary.withValues(alpha: 0.25),
+                                              scheme.surfaceContainerHighest,
+                                            ],
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.play_arrow_rounded,
+                                            color: scheme.primary,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      )
+                                    : ColoredBox(
+                                        color: scheme.surfaceContainerHighest,
+                                        child: Icon(
+                                          Icons.auto_stories_outlined,
+                                          color: scheme.onSurfaceVariant,
+                                          size: 18,
+                                        ),
+                                      )),
                           ),
                         ),
                         const SizedBox(width: 10),

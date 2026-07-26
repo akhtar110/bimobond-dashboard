@@ -176,6 +176,60 @@ abstract final class PermissionManager {
       hasPermission(context, RbacPermissionKeys.manageCurrencies) ||
       isLegacyAdmin(context);
 
+  /// Mirrors HomeShell tab visibility: fine-grained RBAC keys where defined,
+  /// otherwise legacy admin / moderator dashboard tab rules.
+  static bool canAccessDashboardTab(BuildContext context, int tabIndex) {
+    final permissions = _keys(context) ?? const <String>{};
+    final roles = _roles(context);
+
+    if (tabIndex == 16) {
+      return permissions.contains(RbacPermissionKeys.manageCameraStudio) ||
+          roles.contains(UserRole.admin);
+    }
+    if (tabIndex == 6) {
+      return permissions.contains(RbacPermissionKeys.readStories) ||
+          roles.contains(UserRole.admin);
+    }
+    if (tabIndex == 13) {
+      return permissions.contains(RbacPermissionKeys.manageSounds) ||
+          roles.contains(UserRole.admin);
+    }
+    if (tabIndex == 18) {
+      return permissions.contains(RbacPermissionKeys.manageRoles) ||
+          roles.contains(UserRole.admin);
+    }
+
+    if (roles.contains(UserRole.admin)) return true;
+    if (!roles.contains(UserRole.moderator)) return false;
+    return switch (tabIndex) {
+      0 => true, // analytics
+      1 => true, // search management
+      9 => true, // auctions
+      12 => true, // promotions
+      14 => true, // reports
+      15 => true, // notifications
+      _ => false,
+    };
+  }
+
+  /// Admin-only surfaces (users, posts, wallets, settings, …).
+  static bool canAccessAdminDashboard(BuildContext context) =>
+      isLegacyAdmin(context);
+
+  /// Staff surfaces allowed for admin or moderator.
+  static bool canAccessStaffDashboard(BuildContext context) =>
+      isLegacyAdmin(context) || isLegacyModerator(context);
+
+  static List<UserRole> _roles(BuildContext context) {
+    try {
+      final auth = context.read<AuthBloc>().state;
+      if (auth is Authenticated) return auth.user.roles;
+    } on ProviderNotFoundException {
+      // Fall through.
+    }
+    return const [];
+  }
+
   static Set<String>? _keys(BuildContext context) {
     final rbacBloc = _tryReadRbacBloc(context);
     return rbacBloc?.state.authContext?.permissionKeys;

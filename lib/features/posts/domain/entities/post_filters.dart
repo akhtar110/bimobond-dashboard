@@ -28,9 +28,8 @@ class PostFilters {
 
   static const defaultSort = 'LATEST';
 
-  /// Which post-type chip is active (All / Auction / Stories / Ads).
+  /// Which post-type chip is active (All / Auction / Ads).
   PostTypeFilter get postTypeFilter {
-    if (isStory == true) return PostTypeFilter.stories;
     if (isAd == true) return PostTypeFilter.ads;
     if (isAuctionable == true) return PostTypeFilter.auction;
     return PostTypeFilter.all;
@@ -76,7 +75,6 @@ class PostFilters {
     if (type != null && type!.isNotEmpty) count++;
     if (sort != null && sort != defaultSort) count++;
     if (isAuctionable == true) count++;
-    if (isStory == true) count++;
     if (isAd == true) count++;
     return count;
   }
@@ -118,4 +116,4 @@ class PostFilters {
 }
 
 /// Mutually exclusive post-type filter selection.
-enum PostTypeFilter { all, auction, stories, ads }
+enum PostTypeFilter { all, auction, ads }

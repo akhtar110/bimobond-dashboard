@@ -1,3 +1,4 @@
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../promotions/domain/entities/pagination_meta.dart';
 import '../../domain/entities/sound_entities.dart';
 
@@ -19,6 +20,30 @@ class SoundCreatorModel extends SoundCreatorEntity {
   }
 }
 
+class SoundRecentPostModel extends SoundRecentPostEntity {
+  const SoundRecentPostModel({
+    required super.id,
+    super.caption,
+    super.videoUrl,
+    super.coverUrl,
+    super.likeCount = 0,
+    super.commentCount = 0,
+    super.createdAt,
+  });
+
+  factory SoundRecentPostModel.fromJson(Map<String, dynamic> json) {
+    return SoundRecentPostModel(
+      id: json['id']?.toString() ?? '',
+      caption: json['caption']?.toString() ?? json['description']?.toString(),
+      videoUrl: json['videoUrl']?.toString() ?? json['mediaUrl']?.toString(),
+      coverUrl: json['coverUrl']?.toString() ?? json['thumbnailUrl']?.toString(),
+      likeCount: SoundModel._asInt(json['likeCount'] ?? json['likesCount']),
+      commentCount: SoundModel._asInt(json['commentCount'] ?? json['commentsCount']),
+      createdAt: SoundModel._parseDate(json['createdAt']),
+    );
+  }
+}
+
 class SoundModel extends SoundEntity {
   const SoundModel({
     required super.id,
@@ -30,30 +55,51 @@ class SoundModel extends SoundEntity {
     required super.useCount,
     required super.isOriginal,
     required super.isActive,
+    super.isFromDashboard = true,
     super.originalSoundId,
     super.creatorId,
     super.createdAt,
     super.creator,
+    super.posts = const [],
   });
 
   factory SoundModel.fromJson(Map<String, dynamic> json) {
     final creatorJson = json['creator'];
+    final postsJson = json['posts'];
+    final isDash = json['isFromDashboard'];
+
+    final rawAudio = json['audioUrl']?.toString() ??
+        json['url']?.toString() ??
+        json['fileUrl']?.toString() ??
+        '';
+    final rawCover = json['coverUrl']?.toString();
     return SoundModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       author: json['author']?.toString() ?? '',
-      audioUrl: json['audioUrl']?.toString() ?? '',
-      coverUrl: json['coverUrl']?.toString(),
+      audioUrl: resolveMediaUrl(rawAudio) ?? rawAudio,
+      coverUrl: resolveMediaUrl(rawCover) ?? rawCover,
       duration: _asInt(json['duration']),
       useCount: _asInt(json['useCount']),
       isOriginal: json['isOriginal'] == true,
-      isActive: json['isActive'] != false,
+      // Deactivate / Hidden must parse false reliably (bool, "false", 0).
+      isActive: _readIsActive(json),
+      isFromDashboard: isDash == true ||
+          (isDash == null &&
+              (json['creatorId'] == null ||
+                  json['creatorId'].toString().isEmpty)),
       originalSoundId: json['originalSoundId']?.toString(),
       creatorId: json['creatorId']?.toString(),
       createdAt: _parseDate(json['createdAt']),
       creator: creatorJson is Map<String, dynamic>
           ? SoundCreatorModel.fromJson(creatorJson)
           : null,
+      posts: postsJson is List
+          ? postsJson
+              .whereType<Map<String, dynamic>>()
+              .map(SoundRecentPostModel.fromJson)
+              .toList()
+          : const [],
     );
   }
 
@@ -66,6 +112,49 @@ class SoundModel extends SoundEntity {
   static DateTime? _parseDate(Object? value) {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
+  }
+
+  /// Matches deactivate/hide semantics: `isActive: false` ⇒ Hidden.
+  static bool _readIsActive(Map<String, dynamic> json) {
+    if (json.containsKey('isActive')) {
+      return _asBool(json['isActive'], defaultValue: true);
+    }
+    if (json.containsKey('active')) {
+      return _asBool(json['active'], defaultValue: true);
+    }
+    final status = json['status']?.toString().trim().toUpperCase();
+    if (status == null || status.isEmpty) return true;
+    if (status == 'HIDDEN' ||
+        status == 'INACTIVE' ||
+        status == 'DEACTIVATED' ||
+        status == 'DISABLED') {
+      return false;
+    }
+    if (status == 'ACTIVE' || status == 'PUBLISHED') return true;
+    return true;
+  }
+
+  static bool _asBool(Object? value, {required bool defaultValue}) {
+    if (value == null) return defaultValue;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = value.toString().trim().toLowerCase();
+    if (normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'active') {
+      return true;
+    }
+    if (normalized == 'false' ||
+        normalized == '0' ||
+        normalized == 'no' ||
+        normalized == 'hidden' ||
+        normalized == 'inactive' ||
+        normalized == 'deactivated' ||
+        normalized == 'disabled') {
+      return false;
+    }
+    return defaultValue;
   }
 }
 
@@ -163,21 +252,31 @@ class PaginatedSoundsModel extends PaginatedSoundsEntity {
   factory PaginatedSoundsModel.fromJson(Map<String, dynamic> json) {
     final dataJson = json['data'];
     final metaJson = json['meta'];
+    final sounds = <SoundEntity>[];
+    if (dataJson is List) {
+      for (final item in dataJson) {
+        if (item is Map) {
+          sounds.add(SoundModel.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+    final meta = metaJson is Map
+        ? Map<String, dynamic>.from(metaJson)
+        : const <String, dynamic>{};
     return PaginatedSoundsModel(
-      data: dataJson is List
-          ? dataJson
-              .whereType<Map<String, dynamic>>()
-              .map(SoundModel.fromJson)
-              .toList()
-          : const [],
-      meta: metaJson is Map<String, dynamic>
-          ? PaginationMeta(
-              total: SoundModel._asInt(metaJson['total']),
-              page: SoundModel._asInt(metaJson['page']),
-              limit: SoundModel._asInt(metaJson['limit']),
-              totalPages: SoundModel._asInt(metaJson['totalPages']),
-            )
-          : const PaginationMeta(total: 0, page: 1, limit: 20, totalPages: 1),
+      data: sounds,
+      meta: PaginationMeta(
+        total: SoundModel._asInt(meta['total']),
+        page: SoundModel._asInt(meta['page']) == 0
+            ? 1
+            : SoundModel._asInt(meta['page']),
+        limit: SoundModel._asInt(meta['limit']) == 0
+            ? 20
+            : SoundModel._asInt(meta['limit']),
+        totalPages: SoundModel._asInt(meta['totalPages']) == 0
+            ? 1
+            : SoundModel._asInt(meta['totalPages']),
+      ),
     );
   }
 }

@@ -11,6 +11,7 @@ class PostVideoControlsOverlay extends StatefulWidget {
     this.autoHideAfter = const Duration(seconds: 3),
     this.enableFullscreen = true,
     this.showSeekBar = true,
+    this.onTogglePlayPause,
     this.onFullscreenWillOpen,
     this.onFullscreenDidClose,
   });
@@ -19,6 +20,10 @@ class PostVideoControlsOverlay extends StatefulWidget {
   final Duration autoHideAfter;
   final bool enableFullscreen;
   final bool showSeekBar;
+
+  /// Optional override for play/pause (e.g. sync attached sound).
+  /// Should return `true` when media is playing after the toggle.
+  final bool Function()? onTogglePlayPause;
   final VoidCallback? onFullscreenWillOpen;
   final VoidCallback? onFullscreenDidClose;
 
@@ -110,15 +115,26 @@ class _PostVideoControlsOverlayState extends State<PostVideoControlsOverlay> {
   void _togglePlayPause() {
     final controller = widget.controller;
     if (!controller.value.isInitialized) return;
-    if (controller.value.isPlaying) {
+
+    final bool playing;
+    final customToggle = widget.onTogglePlayPause;
+    if (customToggle != null) {
+      playing = customToggle();
+    } else if (controller.value.isPlaying) {
       controller.pause();
+      playing = false;
+    } else {
+      controller.play();
+      playing = true;
+    }
+
+    if (!playing) {
       _hideTimer?.cancel();
       setState(() => _controlsVisible = true);
     } else {
-      controller.play();
       _scheduleAutoHide();
+      setState(() {});
     }
-    setState(() {});
   }
 
   void _seekRelative(int seconds) {
@@ -157,6 +173,7 @@ class _PostVideoControlsOverlayState extends State<PostVideoControlsOverlay> {
         fullscreenDialog: true,
         builder: (ctx) => PostVideoFullscreenPage(
           controller: widget.controller,
+          onTogglePlayPause: widget.onTogglePlayPause,
         ),
       ),
     );
@@ -366,9 +383,11 @@ class PostVideoFullscreenPage extends StatelessWidget {
   const PostVideoFullscreenPage({
     super.key,
     required this.controller,
+    this.onTogglePlayPause,
   });
 
   final VideoPlayerController controller;
+  final bool Function()? onTogglePlayPause;
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +410,7 @@ class PostVideoFullscreenPage extends StatelessWidget {
             PostVideoControlsOverlay(
               controller: controller,
               enableFullscreen: false,
+              onTogglePlayPause: onTogglePlayPause,
             ),
             Positioned(
               top: 8,

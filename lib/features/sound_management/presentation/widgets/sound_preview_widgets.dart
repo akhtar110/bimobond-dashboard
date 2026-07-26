@@ -239,6 +239,39 @@ class SoundStatusBadge extends StatelessWidget {
   }
 }
 
+class SoundOriginBadge extends StatelessWidget {
+  const SoundOriginBadge({super.key, required this.isFromDashboard});
+
+  final bool isFromDashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final color = isFromDashboard ? scheme.tertiary : scheme.secondary;
+    final label = isFromDashboard
+        ? l10n.tOr('soundSourceDashboardBadge', 'Dashboard')
+        : l10n.tOr('soundSourceUserBadge', 'User');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 class SoundTypeBadge extends StatelessWidget {
   const SoundTypeBadge({super.key, required this.type});
 

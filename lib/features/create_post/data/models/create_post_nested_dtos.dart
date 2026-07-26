@@ -1,3 +1,4 @@
+import '../../domain/create_post_payload_builder.dart';
 import '../../domain/entities/create_post_location_entity.dart';
 import '../../domain/entities/create_post_new_sound_entity.dart';
 
@@ -72,11 +73,11 @@ class CreateNewSoundDto {
   }
 
   Map<String, dynamic> toJson() => {
-        'audioUrl': audioUrl.trim(),
+        'audioUrl': CreatePostPayloadBuilder.normalizeUploadUrl(audioUrl),
         'duration': duration,
         if (name != null && name!.trim().isNotEmpty) 'name': name!.trim(),
         if (coverUrl != null && coverUrl!.trim().isNotEmpty)
-          'coverUrl': coverUrl!.trim(),
+          'coverUrl': CreatePostPayloadBuilder.normalizeUploadUrl(coverUrl!),
         if (originalSoundId != null && originalSoundId!.trim().isNotEmpty)
           'originalSoundId': originalSoundId!.trim(),
       };

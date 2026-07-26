@@ -9,7 +9,7 @@ enum GiftsDeviceType {
 GiftsDeviceType getGiftsDeviceType(double width) {
   if (width < 480) return GiftsDeviceType.mobileSmall;
   if (width < 700) return GiftsDeviceType.mobileLarge;
-  if (width < 1200) return GiftsDeviceType.tablet;
+  if (width < 960) return GiftsDeviceType.tablet;
   return GiftsDeviceType.desktop;
 }
 

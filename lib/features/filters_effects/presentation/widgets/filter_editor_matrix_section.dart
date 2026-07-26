@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/filter_settings_entities.dart';
+import 'fe_editor_synced_text_field.dart';
 
 class FilterEditorMatrixSection extends StatelessWidget {
   const FilterEditorMatrixSection({
@@ -124,7 +125,6 @@ class _AdjustmentSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -138,12 +138,13 @@ class _AdjustmentSlider extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              '$value',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w700,
-              ),
+            FeSyncedNumberInput(
+              value: value,
+              min: definition.min,
+              max: definition.max,
+              width: 58,
+              height: 28,
+              onChanged: (val) => onChanged(val.toInt()),
             ),
           ],
         ),

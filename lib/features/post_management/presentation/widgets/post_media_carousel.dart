@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../core/widgets/post_media_preview.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/entities/post_media_entity.dart';
@@ -32,6 +33,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
   late final PageController _pageController;
   int _currentIndex = 0;
   final Map<int, double> _aspectRatios = {};
+  String? _linkedSoundUrl;
 
   List<PostMediaEntity> get _media => widget.post.media;
 
@@ -39,6 +41,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _linkPlaybackGroup();
   }
 
   @override
@@ -46,13 +49,58 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.post.id != widget.post.id ||
-        !_sameMedia(oldWidget.post.media, widget.post.media)) {
-      _currentIndex = 0;
-      _aspectRatios.clear();
-      if (_pageController.hasClients) {
-        _pageController.jumpToPage(0);
+        !_sameMedia(oldWidget.post.media, widget.post.media) ||
+        oldWidget.post.attachedSoundPlayUrl !=
+            widget.post.attachedSoundPlayUrl) {
+      if (oldWidget.post.id != widget.post.id ||
+          !_sameMedia(oldWidget.post.media, widget.post.media)) {
+        _currentIndex = 0;
+        _aspectRatios.clear();
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(0);
+        }
       }
+      _linkPlaybackGroup();
     }
+  }
+
+  String? _resolveUrl(String? raw) {
+    final trimmed = raw?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return resolveMediaUrl(trimmed) ?? trimmed;
+  }
+
+  String? _primaryVideoUrl() {
+    for (final item in _media) {
+      if (item.isVideo) return _resolveUrl(item.url);
+    }
+    final direct = widget.post.videoUrl;
+    if (direct != null && direct.trim().isNotEmpty) {
+      return _resolveUrl(direct);
+    }
+    final hls = widget.post.hlsUrl;
+    if (hls != null && hls.trim().isNotEmpty) {
+      return _resolveUrl(hls);
+    }
+    return null;
+  }
+
+  void _unlinkPlaybackGroup() {
+    final sound = _linkedSoundUrl;
+    if (sound != null) {
+      PostVideoControllerCache.instance.unlinkPlayback(sound);
+    }
+    _linkedSoundUrl = null;
+  }
+
+  void _linkPlaybackGroup() {
+    _unlinkPlaybackGroup();
+    if (!_hasAttachedSound) return;
+    final soundUrl = _resolveUrl(widget.post.attachedSoundPlayUrl);
+    final videoUrl = _primaryVideoUrl();
+    if (soundUrl == null || videoUrl == null) return;
+    PostVideoControllerCache.instance.linkPlayback(videoUrl, soundUrl);
+    _linkedSoundUrl = soundUrl;
   }
 
   bool _sameMedia(List<PostMediaEntity> a, List<PostMediaEntity> b) {
@@ -65,6 +113,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
 
   @override
   void dispose() {
+    _unlinkPlaybackGroup();
     _pageController.dispose();
     super.dispose();
   }
@@ -168,22 +217,22 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       widget.post.shouldPlayAttachedSound &&
       widget.post.attachedSoundPlayUrl != null;
 
-  Widget _buildAttachedSoundOverlay() {
+  Widget _buildAttachedSoundBar() {
     if (!_hasAttachedSound) return const SizedBox.shrink();
     final audioUrl = widget.post.attachedSoundPlayUrl!;
-    final preview = PostAttachedSoundPreview(
+    final sound = widget.post.sound;
+    final title = [
+      if (sound?.name.trim().isNotEmpty == true) sound!.name.trim(),
+      if (sound?.author.trim().isNotEmpty == true) sound!.author.trim(),
+    ].join(' · ');
+    return PostAttachedSoundPreview(
       key: ValueKey('attached_sound_${widget.post.id}_$audioUrl'),
       audioUrl: audioUrl,
+      title: title.isEmpty ? null : title,
       autoplay: true,
       looping: widget.soundLooping,
       showSeekBar: widget.showSeekBar,
     );
-    // Full-screen sound controls steal horizontal drags from PageView.
-    // Keep audio playing, but let carousel gestures pass through.
-    if (_media.length > 1) {
-      return IgnorePointer(child: preview);
-    }
-    return preview;
   }
 
   Widget _buildCarouselWithControls(double mediaHeight, ColorScheme scheme) {
@@ -193,7 +242,6 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       fit: StackFit.expand,
       children: [
         _buildPageView(mediaHeight),
-        _buildAttachedSoundOverlay(),
         if (hasMultiple) ...[
           _buildCarouselNavButton(
             scheme: scheme,
@@ -209,6 +257,15 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
             alignment: Alignment.centerRight,
           ),
         ],
+        // Bottom sound bar stays interactive (progress / play) without
+        // blocking carousel swipes on the rest of the media area.
+        if (_hasAttachedSound)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildAttachedSoundBar(),
+          ),
       ],
     );
   }
@@ -257,17 +314,22 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
       autoplay: true,
       looping: widget.videoLooping,
       showSeekBar: widget.showSeekBar,
+      muted: _hasAttachedSound,
       onAspectRatioDetermined: widget.onAspectRatioChanged,
     );
 
-    final soundOverlay = _buildAttachedSoundOverlay();
     if (!_hasAttachedSound) return preview;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         preview,
-        soundOverlay,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _buildAttachedSoundBar(),
+        ),
       ],
     );
   }
@@ -300,6 +362,7 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
             isActive: index == _currentIndex,
             videoLooping: widget.videoLooping,
             showSeekBar: widget.showSeekBar,
+            muted: _hasAttachedSound,
             hlsUrl: widget.post.hlsUrl,
             onAspectRatioDetermined: (ratio) => _onRatioDetermined(index, ratio),
           );

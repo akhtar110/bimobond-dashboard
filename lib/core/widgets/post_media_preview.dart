@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../utils/media_url_resolver.dart';
 import 'post_video_controls_overlay.dart';
 
 /// Reuses initialized controllers across carousel swipes for the same URL.
@@ -11,6 +13,9 @@ class PostVideoControllerCache {
   static final PostVideoControllerCache instance = PostVideoControllerCache._();
 
   final Map<String, _CachedVideoController> _cache = {};
+
+  /// Playback groups so post video + attached sound pause/play together.
+  final Map<String, Set<String>> _playbackGroups = {};
 
   VideoPlayerController obtain(String url, {bool looping = true}) {
     final existing = _cache[url];
@@ -23,7 +28,12 @@ class PostVideoControllerCache {
       return existing.controller;
     }
 
-    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    // mixWithOthers lets muted post video keep playing while attached sound
+    // uses a second controller for audio.
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     final entry = _CachedVideoController(controller, looping: looping);
     _cache[url] = entry;
     entry.refCount = 1;
@@ -38,6 +48,13 @@ class PostVideoControllerCache {
 
   VideoPlayerController? controllerFor(String url) => _cache[url]?.controller;
 
+  String? urlFor(VideoPlayerController controller) {
+    for (final entry in _cache.entries) {
+      if (identical(entry.value.controller, controller)) return entry.key;
+    }
+    return null;
+  }
+
   bool isInitialized(String url) => _cache[url]?.initialized ?? false;
 
   Future<void> waitForInitialize(String url) async {
@@ -45,6 +62,79 @@ class PostVideoControllerCache {
     if (entry?.initializeFuture != null) {
       await entry!.initializeFuture;
     }
+  }
+
+  /// Links video + attached-sound URLs so play/pause stays in sync.
+  void linkPlayback(String urlA, String urlB) {
+    final a = urlA.trim();
+    final b = urlB.trim();
+    if (a.isEmpty || b.isEmpty || a == b) return;
+    final group = <String>{
+      ...(_playbackGroups[a] ?? {a}),
+      ...(_playbackGroups[b] ?? {b}),
+      a,
+      b,
+    };
+    for (final url in group) {
+      _playbackGroups[url] = group;
+    }
+  }
+
+  void unlinkPlayback(String url) {
+    final group = _playbackGroups[url];
+    if (group == null) return;
+    for (final member in group) {
+      _playbackGroups.remove(member);
+    }
+  }
+
+  void pauseGroup(String url) {
+    for (final member in _playbackGroups[url] ?? {url}) {
+      final controller = _cache[member]?.controller;
+      if (controller != null && controller.value.isInitialized) {
+        controller.pause();
+      }
+    }
+  }
+
+  void playGroup(String url) {
+    for (final member in _playbackGroups[url] ?? {url}) {
+      final controller = _cache[member]?.controller;
+      if (controller != null && controller.value.isInitialized) {
+        controller.play();
+      }
+    }
+  }
+
+  /// Returns `true` when the group is playing after the toggle.
+  bool toggleGroup(String url) {
+    final controller = _cache[url]?.controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return false;
+    }
+    if (controller.value.isPlaying) {
+      pauseGroup(url);
+      return false;
+    }
+    playGroup(url);
+    return true;
+  }
+
+  /// Play/pause using a controller instance (resolves its cached URL).
+  bool toggleGroupForController(VideoPlayerController controller) {
+    final url = urlFor(controller);
+    if (url == null) {
+      if (controller.value.isInitialized) {
+        if (controller.value.isPlaying) {
+          controller.pause();
+          return false;
+        }
+        controller.play();
+        return true;
+      }
+      return false;
+    }
+    return toggleGroup(url);
   }
 
   void pauseAll() {
@@ -56,6 +146,19 @@ class PostVideoControllerCache {
     }
   }
 
+  /// Re-starts muted video controllers after attached sound begins playing.
+  /// Skips [exceptUrl] (the sound controller itself).
+  void resumeMutedExcept(String exceptUrl) {
+    for (final entry in _cache.entries) {
+      if (entry.key == exceptUrl) continue;
+      final controller = entry.value.controller;
+      if (!controller.value.isInitialized) continue;
+      if (controller.value.volume > 0) continue;
+      if (controller.value.isPlaying) continue;
+      controller.play();
+    }
+  }
+
   void release(String url) {
     final entry = _cache[url];
     if (entry == null) return;
@@ -63,6 +166,8 @@ class PostVideoControllerCache {
     if (entry.refCount <= 0) {
       entry.controller.dispose();
       _cache.remove(url);
+      // Playback groups are owned by the media carousel, not ref-counts.
+      _playbackGroups.remove(url);
     }
   }
 }
@@ -90,6 +195,7 @@ class PostMediaPreview extends StatefulWidget {
     this.looping = true,
     this.fit = BoxFit.contain,
     this.showSeekBar = true,
+    this.muted = false,
     this.onAspectRatioDetermined,
   });
 
@@ -102,6 +208,8 @@ class PostMediaPreview extends StatefulWidget {
   final bool looping;
   final BoxFit fit;
   final bool showSeekBar;
+  /// When true, video plays silently (e.g. attached post sound is used instead).
+  final bool muted;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -180,6 +288,7 @@ class _PostMediaPreviewState extends State<PostMediaPreview> {
             looping: widget.looping,
             fit: widget.fit,
             showSeekBar: widget.showSeekBar,
+            muted: widget.muted,
             onAspectRatioDetermined: widget.onAspectRatioDetermined,
           )
         : (_resolvedImageUrl != null
@@ -202,16 +311,23 @@ class _PostMediaPreviewState extends State<PostMediaPreview> {
   }
 }
 
+/// Compact always-visible sound player (play/pause + progress) for attached
+/// post sounds over image / video / carousel previews.
+///
+/// Uses [VideoPlayerController] (same path as sound management previews) so
+/// CDN audio loads reliably. Post video stays muted when this is active.
 class PostAttachedSoundPreview extends StatefulWidget {
   const PostAttachedSoundPreview({
     super.key,
     required this.audioUrl,
+    this.title,
     this.autoplay = true,
     this.looping = true,
     this.showSeekBar = true,
   });
 
   final String audioUrl;
+  final String? title;
   final bool autoplay;
   final bool looping;
   final bool showSeekBar;
@@ -222,83 +338,319 @@ class PostAttachedSoundPreview extends StatefulWidget {
 }
 
 class _PostAttachedSoundPreviewState extends State<PostAttachedSoundPreview> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
+  String? _resolvedUrl;
   bool _initialized = false;
   bool _failed = false;
+  double? _dragPositionMs;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = PostVideoControllerCache.instance.obtain(
-      widget.audioUrl,
-      looping: widget.looping,
-    );
     _bootstrap();
   }
 
+  String? _resolvePlayUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    return resolveMediaUrl(trimmed) ?? trimmed;
+  }
+
   Future<void> _bootstrap() async {
-    await PostVideoControllerCache.instance.waitForInitialize(widget.audioUrl);
-    if (!mounted) return;
-    final value = _controller.value;
+    final generation = ++_loadGeneration;
+    final playUrl = _resolvePlayUrl(widget.audioUrl);
+    if (kDebugMode) {
+      debugPrint(
+        '[PostAttachedSoundPreview] Initializing audioUrl: ${widget.audioUrl} → $playUrl',
+      );
+    }
+    if (playUrl == null || playUrl.isEmpty) {
+      if (mounted) setState(() => _failed = true);
+      return;
+    }
+
+    // Release previous controller if URL changed mid-flight.
+    final previousUrl = _resolvedUrl;
+    if (previousUrl != null && previousUrl != playUrl) {
+      PostVideoControllerCache.instance.release(previousUrl);
+      _controller = null;
+    }
+
+    _resolvedUrl = playUrl;
+    final controller = PostVideoControllerCache.instance.obtain(
+      playUrl,
+      looping: widget.looping,
+    );
+    _controller = controller;
+
+    await PostVideoControllerCache.instance.waitForInitialize(playUrl);
+    if (!mounted || generation != _loadGeneration) return;
+
+    final value = controller.value;
     if (value.hasError || !value.isInitialized) {
+      if (kDebugMode) {
+        debugPrint(
+          '[PostAttachedSoundPreview] Init failed: ${value.errorDescription}',
+        );
+      }
       setState(() => _failed = true);
       return;
     }
-    if (widget.autoplay) {
-      await _controller.play();
+
+    try {
+      await controller.setVolume(1);
+      if (widget.autoplay) {
+        await controller.play();
+        // Sound and muted post video can coexist; restore video if the
+        // platform paused it when the sound controller started.
+        PostVideoControllerCache.instance.resumeMutedExcept(playUrl);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[PostAttachedSoundPreview] Play failed: $e');
+      }
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _failed = true);
+      }
+      return;
     }
-    if (mounted) setState(() => _initialized = true);
+
+    if (mounted && generation == _loadGeneration) {
+      setState(() {
+        _initialized = true;
+        _failed = false;
+      });
+    }
   }
 
   @override
   void didUpdateWidget(PostAttachedSoundPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.audioUrl != widget.audioUrl) {
-      PostVideoControllerCache.instance.release(oldWidget.audioUrl);
-      _controller = PostVideoControllerCache.instance.obtain(
-        widget.audioUrl,
-        looping: widget.looping,
-      );
-      _initialized = false;
-      _failed = false;
+      setState(() {
+        _initialized = false;
+        _failed = false;
+        _dragPositionMs = null;
+      });
       _bootstrap();
       return;
     }
 
-    if (oldWidget.autoplay != widget.autoplay &&
-        _controller.value.isInitialized) {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    if (oldWidget.autoplay != widget.autoplay) {
       if (widget.autoplay) {
-        _controller.play();
+        controller.play();
       } else {
-        _controller.pause();
+        controller.pause();
       }
     }
   }
 
   @override
   void dispose() {
-    PostVideoControllerCache.instance.release(widget.audioUrl);
+    _loadGeneration++;
+    final url = _resolvedUrl;
+    if (url != null) {
+      PostVideoControllerCache.instance.release(url);
+    }
     super.dispose();
+  }
+
+  String _format(Duration d) {
+    final total = d.inSeconds;
+    final m = total ~/ 60;
+    final s = total % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _togglePlayPause() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    final url = _resolvedUrl;
+    if (url != null) {
+      PostVideoControllerCache.instance.toggleGroup(url);
+    } else if (controller.value.isPlaying) {
+      controller.pause();
+    } else {
+      controller.play();
+    }
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_failed ||
-        !_initialized ||
-        !_controller.value.isInitialized ||
-        _controller.value.hasError) {
-      return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final controller = _controller;
+
+    if (_failed) {
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          color: scheme.errorContainer.withValues(alpha: 0.92),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.music_off_rounded,
+                    size: 18, color: scheme.onErrorContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sound failed to load',
+                    style: TextStyle(
+                      color: scheme.onErrorContainer,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return PostVideoControlsOverlay(
-          controller: _controller,
-          enableFullscreen: false,
-          showSeekBar: widget.showSeekBar,
-        );
-      },
+    if (!_initialized ||
+        controller == null ||
+        !controller.value.isInitialized ||
+        controller.value.hasError) {
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.55),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Loading sound…',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final value = controller.value;
+          final durationMs = value.duration.inMilliseconds;
+          final positionMs =
+              _dragPositionMs ?? value.position.inMilliseconds.toDouble();
+          final maxMs = durationMs > 0 ? durationMs.toDouble() : 1.0;
+          final title = widget.title?.trim();
+
+          return Material(
+            color: Colors.black.withValues(alpha: 0.72),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        onPressed: _togglePlayPause,
+                        icon: Icon(
+                          value.isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                        ),
+                        tooltip: value.isPlaying ? 'Pause sound' : 'Play sound',
+                      ),
+                      Icon(
+                        Icons.music_note_rounded,
+                        size: 16,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          (title != null && title.isNotEmpty)
+                              ? title
+                              : 'Original sound',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_format(Duration(milliseconds: positionMs.round()))}'
+                        ' / ${_format(value.duration)}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 11,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.showSeekBar)
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 12,
+                        ),
+                        activeTrackColor: scheme.primary,
+                        inactiveTrackColor:
+                            Colors.white.withValues(alpha: 0.28),
+                        thumbColor: scheme.primary,
+                        overlayColor: scheme.primary.withValues(alpha: 0.2),
+                      ),
+                      child: Slider(
+                        value: positionMs.clamp(0, maxMs),
+                        max: maxMs,
+                        onChanged: (v) => setState(() => _dragPositionMs = v),
+                        onChangeEnd: (v) async {
+                          await controller.seekTo(
+                            Duration(milliseconds: v.round()),
+                          );
+                          if (mounted) {
+                            setState(() => _dragPositionMs = null);
+                          }
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -311,6 +663,7 @@ class PostVideoPreview extends StatefulWidget {
     this.looping = true,
     this.fit = BoxFit.contain,
     this.showSeekBar = true,
+    this.muted = false,
     this.onAspectRatioDetermined,
   });
 
@@ -319,6 +672,7 @@ class PostVideoPreview extends StatefulWidget {
   final bool looping;
   final BoxFit fit;
   final bool showSeekBar;
+  final bool muted;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -355,10 +709,16 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
       return;
     }
     _reportAspectRatio();
+    await _applyMute();
     if (widget.autoplay) {
       await _controller.play();
     }
     if (mounted) setState(() => _initialized = true);
+  }
+
+  Future<void> _applyMute() async {
+    if (!_controller.value.isInitialized) return;
+    await _controller.setVolume(widget.muted ? 0 : 1);
   }
 
   void _onFullscreenWillOpen() {
@@ -377,6 +737,7 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
     final wasPlaying = _controller.value.isPlaying;
     final position = _controller.value.position;
     await _controller.seekTo(position);
+    await _applyMute();
     if (!mounted) return;
     if (wasPlaying) {
       await _controller.play();
@@ -407,6 +768,10 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
       _aspectRatioReported = false;
       _bootstrap();
       return;
+    }
+
+    if (oldWidget.muted != widget.muted) {
+      _applyMute();
     }
 
     if (oldWidget.autoplay != widget.autoplay &&
@@ -464,6 +829,8 @@ class _PostVideoPreviewState extends State<PostVideoPreview> {
               PostVideoControlsOverlay(
                 controller: _controller,
                 showSeekBar: widget.showSeekBar,
+                onTogglePlayPause: () => PostVideoControllerCache.instance
+                    .toggleGroupForController(_controller),
                 onFullscreenWillOpen: _onFullscreenWillOpen,
                 onFullscreenDidClose: _onFullscreenDidClose,
               ),

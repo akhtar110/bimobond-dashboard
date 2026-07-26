@@ -167,10 +167,10 @@ class ManagedPostModel extends ManagedPostEntity {
       updatedAt: _readDate(json['updatedAt']),
       locationId: json['locationId'] as String?,
       playlistId: json['playlistId'] as String?,
-      soundId: json['soundId'] as String?,
+      soundId: readManagedPostSoundId(json),
       sound: parseManagedPostSound(
-        json['sound'],
-        soundId: json['soundId']?.toString(),
+        readManagedPostSoundRaw(json),
+        soundId: readManagedPostSoundId(json),
       ),
       originalPostId: json['originalPostId'] as String?,
     );

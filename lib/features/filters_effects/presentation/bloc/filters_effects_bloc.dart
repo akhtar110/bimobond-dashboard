@@ -193,6 +193,66 @@ class FiltersEffectsBloc
     );
   }
 
+  CameraStudioCatalogEntity _sanitizeCatalog(
+    CameraStudioCatalogEntity catalog, {
+    Set<String>? validFilterIds,
+    Set<String>? validEffectIds,
+    Set<String> deletedFilterCategoryIds = const {},
+    Set<String> deletedEffectCategoryIds = const {},
+  }) {
+    final newFilterCategories = catalog.filterCategories
+        .where((cat) => !deletedFilterCategoryIds.contains(cat.id))
+        .map((cat) {
+          final filteredList = cat.filters.where((f) {
+            if (validFilterIds != null && !validFilterIds.contains(f.id)) {
+              return false;
+            }
+            return true;
+          }).toList();
+          return CameraFilterCategoryEntity(
+            id: cat.id,
+            slug: cat.slug,
+            label: cat.label,
+            labelKey: cat.labelKey,
+            sortOrder: cat.sortOrder,
+            isActive: cat.isActive,
+            filters: filteredList,
+            createdAt: cat.createdAt,
+            updatedAt: cat.updatedAt,
+          );
+        })
+        .toList();
+
+    final newEffectCategories = catalog.effectCategories
+        .where((cat) => !deletedEffectCategoryIds.contains(cat.id))
+        .map((cat) {
+          final filteredList = cat.effects.where((e) {
+            if (validEffectIds != null && !validEffectIds.contains(e.id)) {
+              return false;
+            }
+            return true;
+          }).toList();
+          return CameraEffectCategoryEntity(
+            id: cat.id,
+            slug: cat.slug,
+            label: cat.label,
+            labelKey: cat.labelKey,
+            sortOrder: cat.sortOrder,
+            isActive: cat.isActive,
+            effects: filteredList,
+            createdAt: cat.createdAt,
+            updatedAt: cat.updatedAt,
+          );
+        })
+        .toList();
+
+    return CameraStudioCatalogEntity(
+      version: catalog.version,
+      filterCategories: newFilterCategories,
+      effectCategories: newEffectCategories,
+    );
+  }
+
   Future<void> _onLoadAll(
     LoadFiltersEffects event,
     Emitter<FiltersEffectsState> emit,
@@ -200,10 +260,29 @@ class FiltersEffectsBloc
     emit(FiltersEffectsLoading());
     try {
       final overview = await _getOverview();
-      final catalog = await _getCatalog();
+      final rawCatalog = await _getCatalog();
       final listData = await _fetchListData();
       final filterCategories = await _getFilterCategories();
       final effectCategories = await _getEffectCategories();
+
+      final activeFilterIds = listData.pickerFilters.map((f) => f.id).toSet();
+      final activeEffectIds = listData.pickerEffects.map((e) => e.id).toSet();
+      final activeFilterCatIds = filterCategories.map((c) => c.id).toSet();
+      final activeEffectCatIds = effectCategories.map((c) => c.id).toSet();
+
+      final catalog = _sanitizeCatalog(
+        rawCatalog,
+        validFilterIds: activeFilterIds,
+        validEffectIds: activeEffectIds,
+        deletedFilterCategoryIds: rawCatalog.filterCategories
+            .map((c) => c.id)
+            .where((id) => !activeFilterCatIds.contains(id))
+            .toSet(),
+        deletedEffectCategoryIds: rawCatalog.effectCategories
+            .map((c) => c.id)
+            .where((id) => !activeEffectCatIds.contains(id))
+            .toSet(),
+      );
 
       emit(
         FiltersEffectsLoaded(
@@ -228,10 +307,30 @@ class FiltersEffectsBloc
 
   Future<void> _reloadCore(Emitter<FiltersEffectsState> emit) async {
     final overview = await _getOverview();
-    final catalog = await _getCatalog();
+    final rawCatalog = await _getCatalog();
     final listData = await _fetchListData();
     final filterCategories = await _getFilterCategories();
     final effectCategories = await _getEffectCategories();
+
+    final activeFilterIds = listData.pickerFilters.map((f) => f.id).toSet();
+    final activeEffectIds = listData.pickerEffects.map((e) => e.id).toSet();
+    final activeFilterCatIds = filterCategories.map((c) => c.id).toSet();
+    final activeEffectCatIds = effectCategories.map((c) => c.id).toSet();
+
+    final catalog = _sanitizeCatalog(
+      rawCatalog,
+      validFilterIds: activeFilterIds,
+      validEffectIds: activeEffectIds,
+      deletedFilterCategoryIds: rawCatalog.filterCategories
+          .map((c) => c.id)
+          .where((id) => !activeFilterCatIds.contains(id))
+          .toSet(),
+      deletedEffectCategoryIds: rawCatalog.effectCategories
+          .map((c) => c.id)
+          .where((id) => !activeEffectCatIds.contains(id))
+          .toSet(),
+    );
+
     final current = _currentLoaded();
     emit(
       (current ??
@@ -293,7 +392,25 @@ class FiltersEffectsBloc
     final current = _currentLoaded();
     if (current == null) return;
     try {
-      final catalog = await _getCatalog();
+      final rawCatalog = await _getCatalog();
+      final activeFilterIds = current.allFiltersForPicker.map((f) => f.id).toSet();
+      final activeEffectIds = current.allEffectsForPicker.map((e) => e.id).toSet();
+      final activeFilterCatIds = current.filterCategories.map((c) => c.id).toSet();
+      final activeEffectCatIds = current.effectCategories.map((c) => c.id).toSet();
+
+      final catalog = _sanitizeCatalog(
+        rawCatalog,
+        validFilterIds: activeFilterIds.isNotEmpty ? activeFilterIds : null,
+        validEffectIds: activeEffectIds.isNotEmpty ? activeEffectIds : null,
+        deletedFilterCategoryIds: rawCatalog.filterCategories
+            .map((c) => c.id)
+            .where((id) => !activeFilterCatIds.contains(id))
+            .toSet(),
+        deletedEffectCategoryIds: rawCatalog.effectCategories
+            .map((c) => c.id)
+            .where((id) => !activeEffectCatIds.contains(id))
+            .toSet(),
+      );
       emit(current.copyWith(catalog: catalog));
     } catch (e) {
       emit(current.copyWith(message: e.toString(), isErrorMessage: true));

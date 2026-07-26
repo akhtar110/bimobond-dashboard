@@ -46,6 +46,13 @@ class FilterSoundsActiveEvent extends SoundsEvent {
   List<Object?> get props => [isActive];
 }
 
+class FilterSoundsIsFromDashboardEvent extends SoundsEvent {
+  const FilterSoundsIsFromDashboardEvent(this.isFromDashboard);
+  final bool? isFromDashboard;
+  @override
+  List<Object?> get props => [isFromDashboard];
+}
+
 class FilterSoundsCreatorEvent extends SoundsEvent {
   const FilterSoundsCreatorEvent(this.creatorId);
   final String? creatorId;
@@ -55,6 +62,22 @@ class FilterSoundsCreatorEvent extends SoundsEvent {
 
 class ClearSoundsFiltersEvent extends SoundsEvent {
   const ClearSoundsFiltersEvent();
+}
+
+/// Applies status / origin / sort in one shot (avoids stacked reloads).
+class ApplySoundsFiltersEvent extends SoundsEvent {
+  const ApplySoundsFiltersEvent({
+    this.isActive,
+    this.isFromDashboard,
+    required this.sort,
+  });
+
+  final bool? isActive;
+  final bool? isFromDashboard;
+  final SoundSortMode sort;
+
+  @override
+  List<Object?> get props => [isActive, isFromDashboard, sort];
 }
 
 class ToggleSoundSelectionEvent extends SoundsEvent {
@@ -185,7 +208,9 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
     on<SearchSoundsEvent>(_onSearch);
     on<SortSoundsEvent>(_onSort);
     on<FilterSoundsActiveEvent>(_onFilterActive);
+    on<FilterSoundsIsFromDashboardEvent>(_onFilterIsFromDashboard);
     on<FilterSoundsCreatorEvent>(_onFilterCreator);
+    on<ApplySoundsFiltersEvent>(_onApplyFilters);
     on<ClearSoundsFiltersEvent>(_onClearFilters);
     on<ToggleSoundSelectionEvent>(_onToggleSelection);
     on<SelectAllSoundsEvent>(_onSelectAll);
@@ -198,6 +223,11 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
   SoundsQuery _query = const SoundsQuery();
   bool _busy = false;
 
+  /// Next unfiltered admin-list page to scan when collecting Hidden sounds.
+  /// (Backend often ignores `isActive=false`, so we scan the full list.)
+  int _hiddenScanPage = 1;
+  bool _hiddenScanExhausted = false;
+
   @override
   Future<void> close() {
     _searchDebounce?.cancel();
@@ -209,21 +239,31 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
     Emitter<SoundsState> emit,
   ) async {
     final current = state;
+    final page = event.refresh ? 1 : (event.page ?? _query.page);
+    final requestQuery = _query.copyWith(page: page);
+    _query = requestQuery;
+
     if (current is SoundsLoaded) {
-      emit(current.copyWith(isRefreshing: true, isLoadingMore: false));
+      emit(
+        current.copyWith(
+          query: requestQuery,
+          isRefreshing: true,
+          isLoadingMore: false,
+        ),
+      );
     } else if (current is SoundsEmpty) {
-      emit(SoundsEmpty(query: _query, isLoading: true));
+      emit(SoundsEmpty(query: requestQuery, isLoading: true));
     } else {
       emit(SoundsLoading());
     }
 
-    final page = event.refresh ? 1 : (event.page ?? _query.page);
-    _query = _query.copyWith(page: page);
-
     try {
-      final result = await _getSounds(_query);
+      final result = await _loadSoundsForQuery(requestQuery);
+      // A newer filter/search won the race — drop this stale response.
+      if (_query != requestQuery) return;
+
       if (result.data.isEmpty) {
-        emit(SoundsEmpty(query: _query));
+        emit(SoundsEmpty(query: requestQuery));
       } else {
         final previousSelection =
             current is SoundsLoaded ? current.selectedIds : const <String>{};
@@ -231,20 +271,214 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
           SoundsLoaded(
             sounds: result.data,
             meta: result.meta,
-            query: _query,
+            query: requestQuery,
             selectedIds: previousSelection,
           ),
         );
       }
     } catch (e) {
+      if (_query != requestQuery) return;
       if (current is SoundsLoaded) {
-        emit(current.copyWith(isRefreshing: false, isLoadingMore: false));
+        emit(
+          current.copyWith(
+            query: requestQuery,
+            isRefreshing: false,
+            isLoadingMore: false,
+          ),
+        );
       } else if (current is SoundsEmpty) {
-        emit(SoundsEmpty(query: _query));
+        emit(SoundsEmpty(query: requestQuery));
       } else {
         emit(SoundsError(e.toString()));
       }
     }
+  }
+
+  /// Loads sounds and enforces Active/Hidden locally.
+  Future<PaginatedSoundsEntity> _loadSoundsForQuery(SoundsQuery query) async {
+    if (query.isActive == null) {
+      _resetHiddenScan();
+      return _getSounds(query);
+    }
+
+    // Active: API honors isActive=true.
+    if (query.isActive == true) {
+      _resetHiddenScan();
+      final result = await _getSounds(query);
+      return PaginatedSoundsEntity(
+        data: _filterSoundsByStatus(result.data, true),
+        meta: result.meta,
+      );
+    }
+
+    // Hidden / deactivated: API often ignores isActive=false (falsy check),
+    // so scan the unfiltered admin list and keep inactive rows only.
+    return _loadHiddenSounds(query);
+  }
+
+  Future<PaginatedSoundsEntity> _loadHiddenSounds(SoundsQuery query) async {
+    _resetHiddenScan();
+
+    // 1) Best-effort: ask the API for inactive rows.
+    final flagged = await _getSounds(query);
+    final fromApi = _filterSoundsByStatus(flagged.data, false);
+    final apiLooksFiltered = flagged.data.isNotEmpty &&
+        fromApi.length == flagged.data.length;
+    if (apiLooksFiltered) {
+      _hiddenScanExhausted = flagged.meta.hasReachedMax;
+      _hiddenScanPage = flagged.meta.page + 1;
+      return PaginatedSoundsEntity(data: fromApi, meta: flagged.meta);
+    }
+
+    // 2) Fallback: omit isActive, scan recent pages, collect deactivated.
+    //    (Nest handlers that use `if (isActive)` ignore false and return Actives.)
+    final collected = <SoundEntity>[...fromApi];
+    final seen = {for (final s in collected) s.id};
+    var lastMeta = flagged.meta;
+    const maxPages = 30;
+    final scanLimit = query.limit < 50 ? 50 : query.limit;
+
+    final scanBase = query.copyWith(
+      clearIsActive: true,
+      page: 1,
+      limit: scanLimit,
+      // Recent surfaces newly deactivated sounds faster than trending.
+      sort: SoundSortMode.recent,
+    );
+
+    var page = 1;
+    while (collected.length < query.limit && page <= maxPages) {
+      if (!_sameFilterQuery(_query, query)) break;
+      final chunk = await _getSounds(scanBase.copyWith(page: page));
+      if (!_sameFilterQuery(_query, query)) break;
+      lastMeta = chunk.meta;
+      for (final sound in chunk.data) {
+        if (!sound.isActive && seen.add(sound.id)) {
+          collected.add(sound);
+          if (collected.length >= query.limit) break;
+        }
+      }
+      _hiddenScanPage = page + 1;
+      if (_isScanPageExhausted(chunk, scanLimit)) {
+        _hiddenScanExhausted = true;
+        break;
+      }
+      page += 1;
+    }
+
+    if (page > maxPages) _hiddenScanExhausted = true;
+
+    final visible = collected.length > query.limit
+        ? collected.sublist(0, query.limit)
+        : collected;
+
+    final totalHint = visible.length < query.limit && _hiddenScanExhausted
+        ? visible.length
+        : (lastMeta.total > visible.length ? lastMeta.total : visible.length);
+
+    return PaginatedSoundsEntity(
+      data: visible,
+      meta: PaginationMeta(
+        total: totalHint,
+        page: 1,
+        limit: query.limit,
+        totalPages: _hiddenScanExhausted
+            ? 1
+            : ((totalHint / query.limit).ceil().clamp(1, 999999)),
+      ),
+    );
+  }
+
+  Future<PaginatedSoundsEntity> _loadMoreHiddenSounds(
+    SoundsQuery query,
+    List<SoundEntity> alreadyLoaded,
+  ) async {
+    if (_hiddenScanExhausted) {
+      return PaginatedSoundsEntity(
+        data: const [],
+        meta: PaginationMeta(
+          total: alreadyLoaded.length,
+          page: query.page,
+          limit: query.limit,
+          totalPages: query.page,
+        ),
+      );
+    }
+
+    final collected = <SoundEntity>[];
+    final seen = {for (final s in alreadyLoaded) s.id};
+    const maxPages = 20;
+    final scanLimit = query.limit < 50 ? 50 : query.limit;
+    final scanBase = query.copyWith(
+      clearIsActive: true,
+      limit: scanLimit,
+      sort: SoundSortMode.recent,
+    );
+
+    var pagesTried = 0;
+
+    while (collected.length < query.limit &&
+        !_hiddenScanExhausted &&
+        pagesTried < maxPages) {
+      if (!_sameFilterQuery(_query, query)) break;
+      final chunk =
+          await _getSounds(scanBase.copyWith(page: _hiddenScanPage));
+      if (!_sameFilterQuery(_query, query)) break;
+      pagesTried += 1;
+      for (final sound in chunk.data) {
+        if (!sound.isActive && seen.add(sound.id)) {
+          collected.add(sound);
+          if (collected.length >= query.limit) break;
+        }
+      }
+      _hiddenScanPage += 1;
+      if (_isScanPageExhausted(chunk, scanLimit)) {
+        _hiddenScanExhausted = true;
+        break;
+      }
+    }
+
+    final total = alreadyLoaded.length + collected.length;
+    return PaginatedSoundsEntity(
+      data: collected,
+      meta: PaginationMeta(
+        total: total,
+        page: query.page,
+        limit: query.limit,
+        totalPages: _hiddenScanExhausted ? query.page : query.page + 1,
+      ),
+    );
+  }
+
+  void _resetHiddenScan() {
+    _hiddenScanPage = 1;
+    _hiddenScanExhausted = false;
+  }
+
+  /// Avoid trusting `hasReachedMax` when `totalPages` is 0/invalid.
+  bool _isScanPageExhausted(PaginatedSoundsEntity chunk, int scanLimit) {
+    if (chunk.data.isEmpty) return true;
+    if (chunk.data.length < scanLimit) return true;
+    final pages = chunk.meta.totalPages;
+    if (pages > 0 && chunk.meta.page >= pages) return true;
+    return false;
+  }
+
+  bool _sameFilterQuery(SoundsQuery a, SoundsQuery b) {
+    return a.isActive == b.isActive &&
+        a.search == b.search &&
+        a.sort == b.sort &&
+        a.isFromDashboard == b.isFromDashboard &&
+        a.creatorId == b.creatorId &&
+        a.limit == b.limit;
+  }
+
+  List<SoundEntity> _filterSoundsByStatus(
+    List<SoundEntity> sounds,
+    bool? isActive,
+  ) {
+    if (isActive == null) return sounds;
+    return [for (final sound in sounds) if (sound.isActive == isActive) sound];
   }
 
   Future<void> _onLoadMore(
@@ -258,13 +492,27 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
     _busy = true;
     emit(current.copyWith(isLoadingMore: true));
     final nextPage = current.meta.page + 1;
-    _query = _query.copyWith(page: nextPage);
+    final requestQuery = _query.copyWith(page: nextPage);
+    _query = requestQuery;
 
     try {
-      final result = await _getSounds(_query);
-      final existingIds = current.sounds.map((s) => s.id).toSet();
+      final PaginatedSoundsEntity result;
+      if (requestQuery.isActive == false) {
+        result = await _loadMoreHiddenSounds(requestQuery, current.sounds);
+      } else {
+        final raw = await _getSounds(requestQuery);
+        result = PaginatedSoundsEntity(
+          data: _filterSoundsByStatus(raw.data, requestQuery.isActive),
+          meta: raw.meta,
+        );
+      }
+      if (!_sameFilterQuery(_query, requestQuery)) return;
+      final latest = state;
+      if (latest is! SoundsLoaded) return;
+
+      final existingIds = latest.sounds.map((s) => s.id).toSet();
       final appended = [
-        ...current.sounds,
+        ...latest.sounds,
         for (final sound in result.data)
           if (!existingIds.contains(sound.id)) sound,
       ];
@@ -272,12 +520,15 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
         SoundsLoaded(
           sounds: appended,
           meta: result.meta,
-          query: _query,
-          selectedIds: current.selectedIds,
+          query: requestQuery,
+          selectedIds: latest.selectedIds,
         ),
       );
     } catch (_) {
-      emit(current.copyWith(isLoadingMore: false));
+      final latest = state;
+      if (latest is SoundsLoaded) {
+        emit(latest.copyWith(isLoadingMore: false));
+      }
     } finally {
       _busy = false;
     }
@@ -297,6 +548,7 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
 
   void _onSort(SortSoundsEvent event, Emitter<SoundsState> emit) {
     _query = _query.copyWith(page: 1, sort: event.sort);
+    _emitQueryPreview(emit);
     add(const LoadSoundsEvent(refresh: true));
   }
 
@@ -309,6 +561,20 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
       isActive: event.isActive,
       clearIsActive: event.isActive == null,
     );
+    _emitQueryPreview(emit);
+    add(const LoadSoundsEvent(refresh: true));
+  }
+
+  void _onFilterIsFromDashboard(
+    FilterSoundsIsFromDashboardEvent event,
+    Emitter<SoundsState> emit,
+  ) {
+    _query = _query.copyWith(
+      page: 1,
+      isFromDashboard: event.isFromDashboard,
+      clearIsFromDashboard: event.isFromDashboard == null,
+    );
+    _emitQueryPreview(emit);
     add(const LoadSoundsEvent(refresh: true));
   }
 
@@ -321,13 +587,42 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
       creatorId: event.creatorId,
       clearCreatorId: event.creatorId == null || event.creatorId!.isEmpty,
     );
+    _emitQueryPreview(emit);
+    add(const LoadSoundsEvent(refresh: true));
+  }
+
+  void _onApplyFilters(
+    ApplySoundsFiltersEvent event,
+    Emitter<SoundsState> emit,
+  ) {
+    _searchDebounce?.cancel();
+    _query = _query.copyWith(
+      page: 1,
+      isActive: event.isActive,
+      clearIsActive: event.isActive == null,
+      isFromDashboard: event.isFromDashboard,
+      clearIsFromDashboard: event.isFromDashboard == null,
+      sort: event.sort,
+    );
+    _emitQueryPreview(emit);
     add(const LoadSoundsEvent(refresh: true));
   }
 
   void _onClearFilters(ClearSoundsFiltersEvent event, Emitter<SoundsState> emit) {
     _searchDebounce?.cancel();
     _query = const SoundsQuery();
+    _emitQueryPreview(emit);
     add(const LoadSoundsEvent(refresh: true));
+  }
+
+  /// Keeps filter chips / search UI in sync before the network round-trip.
+  void _emitQueryPreview(Emitter<SoundsState> emit) {
+    final current = state;
+    if (current is SoundsLoaded) {
+      emit(current.copyWith(query: _query, isRefreshing: true));
+    } else if (current is SoundsEmpty) {
+      emit(SoundsEmpty(query: _query, isLoading: true));
+    }
   }
 
   void _onToggleSelection(
@@ -461,15 +756,21 @@ class SoundsBloc extends Bloc<SoundsEvent, SoundsState> {
       useCount: updated.useCount,
       isOriginal: updated.isOriginal,
       isActive: updated.isActive,
+      isFromDashboard: updated.isFromDashboard,
       originalSoundId: updated.originalSoundId ?? existing.originalSoundId,
       creatorId: updated.creatorId ?? existing.creatorId,
       createdAt: updated.createdAt ?? existing.createdAt,
       creator: updated.creator ?? existing.creator,
+      posts: updated.posts.isNotEmpty ? updated.posts : existing.posts,
     );
   }
 
   bool _matchesQuery(SoundEntity sound, SoundsQuery query) {
     if (query.isActive != null && sound.isActive != query.isActive) {
+      return false;
+    }
+    if (query.isFromDashboard != null &&
+        sound.isFromDashboard != query.isFromDashboard) {
       return false;
     }
     final search = query.search?.trim().toLowerCase();

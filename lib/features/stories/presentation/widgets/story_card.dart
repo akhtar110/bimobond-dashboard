@@ -43,7 +43,6 @@ class _StoryCardState extends State<StoryCard> {
         final compact = constraints.maxWidth < 170;
         final bodyPadding = compact ? 6.0 : 8.0;
         final radius = compact ? 10.0 : 12.0;
-        final thumbUrl = story.thumbnailUrl;
 
         return MouseRegion(
           onEnter: (_) => setState(() => _hovered = true),
@@ -99,32 +98,23 @@ class _StoryCardState extends State<StoryCard> {
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              if (thumbUrl.isNotEmpty)
+                              if (story.validImageThumbnailUrl != null)
                                 CachedNetworkImage(
-                                  imageUrl: thumbUrl,
+                                  imageUrl: story.validImageThumbnailUrl!,
                                   fit: BoxFit.cover,
                                   memCacheWidth: 480,
                                   placeholder: (_, _) => ColoredBox(
                                     color: scheme.surfaceContainerHighest,
                                   ),
-                                  errorWidget: (_, _, _) => ColoredBox(
-                                    color: scheme.surfaceContainerHighest,
-                                    child: Icon(
-                                      Icons.image_not_supported_outlined,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
+                                  errorWidget: (_, _, _) => _buildVideoOrFallback(
+                                    context,
+                                    scheme,
+                                    story,
                                   ),
                                 )
                               else
-                                ColoredBox(
-                                  color: scheme.surfaceContainerHighest,
-                                  child: Icon(
-                                    Icons.auto_stories_outlined,
-                                    color: scheme.onSurfaceVariant,
-                                    size: 32,
-                                  ),
-                                ),
-                              if (story.isVideo)
+                                _buildVideoOrFallback(context, scheme, story),
+                              if (story.isVideo && story.validImageThumbnailUrl != null)
                                 Align(
                                   alignment: AlignmentDirectional.bottomEnd,
                                   child: Padding(
@@ -370,6 +360,50 @@ class _StoryCardState extends State<StoryCard> {
       default:
         return scheme.surfaceContainerHighest;
     }
+  }
+
+  Widget _buildVideoOrFallback(
+    BuildContext context,
+    ColorScheme scheme,
+    StoryEntity story,
+  ) {
+    if (story.isVideo) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primary.withValues(alpha: 0.25),
+              scheme.surfaceContainerHighest,
+              scheme.surfaceContainerLow,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: scheme.scrim.withValues(alpha: 0.45),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.play_arrow_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+        ),
+      );
+    }
+    return ColoredBox(
+      color: scheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.auto_stories_outlined,
+        color: scheme.onSurfaceVariant,
+        size: 32,
+      ),
+    );
   }
 }
 

@@ -94,7 +94,7 @@ Future<Uint8List> _readFileBytes(html.File file) async {
   return completer.future;
 }
 
-const kMaxAudioUploadBytes = 1024 * 1024; // 1 MB
+const kMaxAudioUploadBytes = 500 * 1024 * 1024; // 500 MB hard cap
 
 bool isAllowedAudioFilename(String filename) {
   final lower = filename.toLowerCase();

@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../../../core/widgets/post_media_preview.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
@@ -48,14 +47,14 @@ class StoryDetailsDialog extends StatelessWidget {
               if (media != null) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: media.isVideo
-                        ? _StoryVideoPreview(url: media.url)
-                        : CachedNetworkImage(
-                            imageUrl: media.url,
-                            fit: BoxFit.cover,
-                          ),
+                  child: PostMediaPreview(
+                    thumbnailUrl: story.validImageThumbnailUrl,
+                    videoUrl: media.isVideo ? media.url : null,
+                    type: media.isVideo ? 'VIDEO' : 'IMAGE',
+                    height: 380,
+                    autoplay: true,
+                    showSeekBar: true,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -229,50 +228,6 @@ class _InfoRow extends StatelessWidget {
           ),
           Expanded(child: Text(value)),
         ],
-      ),
-    );
-  }
-}
-
-class _StoryVideoPreview extends StatefulWidget {
-  const _StoryVideoPreview({required this.url});
-
-  final String url;
-
-  @override
-  State<_StoryVideoPreview> createState() => _StoryVideoPreviewState();
-}
-
-class _StoryVideoPreviewState extends State<_StoryVideoPreview> {
-  VideoPlayerController? _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = PostVideoControllerCache.instance.obtain(widget.url);
-    PostVideoControllerCache.instance.waitForInitialize(widget.url).then((_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    PostVideoControllerCache.instance.release(widget.url);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
-    return FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(
-        width: controller.value.size.width,
-        height: controller.value.size.height,
-        child: VideoPlayer(controller),
       ),
     );
   }

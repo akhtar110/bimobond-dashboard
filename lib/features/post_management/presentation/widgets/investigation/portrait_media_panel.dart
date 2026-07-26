@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/utils/media_url_resolver.dart';
+import '../../../../../injection_container.dart';
+import '../../../../sound_management/domain/usecases/sound_usecases.dart';
+import '../../../domain/entities/managed_post_sound_entity.dart';
 import '../post_media_carousel.dart';
 import '../post_media_snapshot.dart';
 import 'investigation_theme.dart';
@@ -20,11 +24,15 @@ class PortraitMediaPanel extends StatefulWidget {
 
 class _PortraitMediaPanelState extends State<PortraitMediaPanel> {
   late double _aspectRatio;
+  ManagedPostSoundEntity? _resolvedSound;
+  bool _resolvingSound = false;
 
   @override
   void initState() {
     super.initState();
     _aspectRatio = _calculateInitialAspectRatio();
+    _resolvedSound = widget.snapshot.sound;
+    _ensurePlayableSound();
   }
 
   @override
@@ -33,7 +41,9 @@ class _PortraitMediaPanelState extends State<PortraitMediaPanel> {
     if (oldWidget.snapshot != widget.snapshot) {
       setState(() {
         _aspectRatio = _calculateInitialAspectRatio();
+        _resolvedSound = widget.snapshot.sound;
       });
+      _ensurePlayableSound();
     }
   }
 
@@ -46,93 +56,178 @@ class _PortraitMediaPanelState extends State<PortraitMediaPanel> {
     }
 
     for (final item in snap.media) {
-      if (item.isVideo) return 9 / 16;
+      if (item.isVideo) return InvestigationTheme.portraitAspect;
     }
 
-    if (snap.type.toUpperCase() == 'VIDEO') return 9 / 16;
+    if (snap.type.toUpperCase() == 'VIDEO') {
+      return InvestigationTheme.portraitAspect;
+    }
     return 1.0;
+  }
+
+  Future<void> _ensurePlayableSound() async {
+    final snap = widget.snapshot;
+    final existingUrl = snap.attachedSoundPlayUrl;
+    if (existingUrl != null && existingUrl.isNotEmpty) {
+      final resolved = resolveMediaUrl(existingUrl) ?? existingUrl;
+      if (_resolvedSound?.audioUrl != resolved) {
+        setState(() {
+          _resolvedSound = (snap.sound ??
+                  ManagedPostSoundEntity(
+                    id: snap.resolvedSoundId ?? resolved,
+                  ))
+              .copyWith(audioUrl: resolved);
+        });
+      }
+      return;
+    }
+
+    final soundId = snap.resolvedSoundId;
+    if (soundId == null || soundId.isEmpty || _resolvingSound) return;
+
+    setState(() => _resolvingSound = true);
+    try {
+      final detail = await sl<GetSoundByIdUseCase>()(soundId);
+      if (!mounted) return;
+      final audioUrl =
+          resolveMediaUrl(detail.audioUrl) ?? detail.audioUrl.trim();
+      if (audioUrl.isEmpty) {
+        setState(() => _resolvingSound = false);
+        return;
+      }
+      setState(() {
+        _resolvingSound = false;
+        _resolvedSound = ManagedPostSoundEntity(
+          id: detail.id.isNotEmpty ? detail.id : soundId,
+          name: detail.name,
+          author: detail.author,
+          audioUrl: audioUrl,
+          duration: detail.duration,
+        );
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _resolvingSound = false);
+    }
+  }
+
+  /// Fills the available media column: portrait prefers height, landscape width.
+  ({double width, double height}) _fitMediaSize({
+    required double maxWidth,
+    required double maxHeight,
+    required double aspectRatio,
+  }) {
+    final isPortrait = aspectRatio < 0.98;
+    final isLandscape = aspectRatio > 1.02;
+
+    double width;
+    double height;
+
+    if (isPortrait) {
+      // Use the full portrait viewport height, then clamp width.
+      height = maxHeight;
+      width = height * aspectRatio;
+      if (width > maxWidth) {
+        width = maxWidth;
+        height = width / aspectRatio;
+      }
+    } else if (isLandscape) {
+      // Use the full landscape viewport width, then clamp height.
+      width = maxWidth;
+      height = width / aspectRatio;
+      if (height > maxHeight) {
+        height = maxHeight;
+        width = height * aspectRatio;
+      }
+    } else {
+      // Near-square: take the largest square that fits.
+      final side = maxWidth < maxHeight ? maxWidth : maxHeight;
+      width = side;
+      height = side;
+    }
+
+    return (width: width, height: height);
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final size = MediaQuery.sizeOf(context);
-    final post = widget.snapshot.toPostShell();
+    final post = widget.snapshot.toPostShell().copyWith(
+          soundId: widget.snapshot.resolvedSoundId ?? _resolvedSound?.id,
+          sound: _resolvedSound ?? widget.snapshot.sound,
+        );
     final isCarousel = post.media.length > 1;
     const double dotsHeight = 36.0;
 
-    final isMobile = size.width < InvestigationTheme.tablet;
-    final isTablet = size.width >= InvestigationTheme.tablet &&
-        size.width < InvestigationTheme.desktop;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite &&
+                constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : size.width;
 
-    double maxWidth;
-    double maxHeight;
+        // Leave room for app chrome / side panels; prefer tall portrait frames.
+        final viewportCap = size.height *
+            (size.width < InvestigationTheme.tablet
+                ? 0.78
+                : size.width < InvestigationTheme.desktop
+                    ? 0.82
+                    : 0.88);
+        final availableHeight = constraints.maxHeight.isFinite &&
+                constraints.maxHeight > 0 &&
+                constraints.maxHeight < viewportCap
+            ? constraints.maxHeight
+            : viewportCap;
 
-    if (isMobile) {
-      maxWidth = size.width - 40;
-      maxHeight = size.height * 0.68;
-    } else if (isTablet) {
-      if (_aspectRatio < 0.95) {
-        maxWidth = 360;
-      } else if (_aspectRatio > 1.05) {
-        maxWidth = 560;
-      } else {
-        maxWidth = 420;
-      }
-      maxHeight = size.height * 0.62;
-    } else {
-      if (_aspectRatio < 0.95) {
-        maxWidth = 380;
-        maxHeight = size.height * 0.76;
-      } else if (_aspectRatio > 1.05) {
-        maxWidth = 640;
-        maxHeight = size.height * 0.62;
-      } else {
-        maxWidth = 480;
-        maxHeight = size.height * 0.68;
-      }
-    }
+        final maxMediaHeight =
+            (availableHeight - (isCarousel ? dotsHeight : 0.0))
+                .clamp(160.0, double.infinity)
+                .toDouble();
 
-    final maxMediaHeight = maxHeight - (isCarousel ? dotsHeight : 0.0);
+        final fitted = _fitMediaSize(
+          maxWidth: availableWidth,
+          maxHeight: maxMediaHeight,
+          aspectRatio: _aspectRatio <= 0 ? 1 : _aspectRatio,
+        );
 
-    double mediaWidth = maxWidth;
-    double mediaHeight = mediaWidth / _aspectRatio;
+        final containerWidth = fitted.width;
+        final containerHeight =
+            fitted.height + (isCarousel ? dotsHeight : 0.0);
 
-    if (mediaHeight > maxMediaHeight) {
-      mediaHeight = maxMediaHeight;
-      mediaWidth = mediaHeight * _aspectRatio;
-    }
-
-    final containerWidth = mediaWidth;
-    final containerHeight = mediaHeight + (isCarousel ? dotsHeight : 0.0);
-
-    return Center(
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: InvestigationTheme.animMs),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: Container(
-          width: containerWidth,
-          height: containerHeight,
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
-            child: PostMediaCarousel(
-              key: ValueKey(post.id),
-              post: post,
-              fit: BoxFit.contain,
-              onAspectRatioChanged: (ratio) {
-                if (ratio <= 0 || ratio == _aspectRatio) return;
-                setState(() => _aspectRatio = ratio);
-                widget.onAspectRatioChanged?.call(ratio);
-              },
+        return Center(
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: InvestigationTheme.animMs),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: Container(
+              width: containerWidth,
+              height: containerHeight,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius:
+                    BorderRadius.circular(InvestigationTheme.radiusSm),
+              ),
+              child: ClipRRect(
+                borderRadius:
+                    BorderRadius.circular(InvestigationTheme.radiusSm),
+                child: PostMediaCarousel(
+                  // Keep media identity stable when attached sound hydrates so
+                  // video/image playback is not remounted / interrupted.
+                  key: ValueKey('post_media_${post.id}'),
+                  post: post,
+                  fit: BoxFit.contain,
+                  onAspectRatioChanged: (ratio) {
+                    if (ratio <= 0 || ratio == _aspectRatio) return;
+                    setState(() => _aspectRatio = ratio);
+                    widget.onAspectRatioChanged?.call(ratio);
+                  },
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

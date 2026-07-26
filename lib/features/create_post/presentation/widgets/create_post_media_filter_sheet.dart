@@ -7,11 +7,14 @@ import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../filters_effects/domain/entities/filters_effects_entities.dart';
 import '../../../filters_effects/domain/usecases/filters_effects_usecases.dart';
+import '../../../filters_effects/presentation/utils/fe_preview_adjustment_matrix.dart';
 import '../../../filters_effects/presentation/utils/fe_preview_color_utils.dart';
+import '../../../filters_effects/presentation/widgets/fe_editor_synced_text_field.dart';
 import '../../domain/entities/create_post_media_filter_entity.dart';
 import '../../domain/entities/local_media_file.dart';
 import '../../domain/services/create_post_media_filter_service.dart';
 import '../bloc/create_post_bloc.dart';
+import 'create_post_local_video_preview.dart';
 
 Future<void> showCreatePostMediaFilterSheet({
   required BuildContext context,
@@ -167,57 +170,79 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
     Navigator.of(context).pop();
   }
 
+  List<double>? _resolveMatrixForFilter(CameraFilterEntity filter) {
+    final resolved = resolveFePreviewFilterMatrix(
+      renderType: filter.renderType,
+      filterSettings: filter.filterSettings,
+      adjustments: filter.adjustments.values
+          .map((k, v) => MapEntry(k, v.toInt())),
+      colorMatrix: filter.colorMatrix,
+    );
+    if (resolved != null && resolved.length >= 20) {
+      return resolved;
+    }
+    final hex = filter.previewColorHex;
+    if (hex != null && hex.trim().isNotEmpty) {
+      return _buildMatrixFromColorHex(hex);
+    }
+    return null;
+  }
+
+  List<double>? _buildMatrixFromColorHex(String hex) {
+    final color = parsePreviewColorHex(hex);
+    if (color == null) return null;
+    final r = (color.r * 255.0).clamp(0.0, 255.0);
+    final g = (color.g * 255.0).clamp(0.0, 255.0);
+    final b = (color.b * 255.0).clamp(0.0, 255.0);
+
+    final rScale = 0.75 + (r / 255.0) * 0.35;
+    final gScale = 0.75 + (g / 255.0) * 0.35;
+    final bScale = 0.75 + (b / 255.0) * 0.35;
+
+    return [
+      rScale, 0, 0, 0, (r - 128) * 0.1,
+      0, gScale, 0, 0, (g - 128) * 0.1,
+      0, 0, bScale, 0, (b - 128) * 0.1,
+      0, 0, 0, 1, 0,
+    ];
+  }
+
   void _selectCatalogFilter(CameraFilterEntity? filter) {
     setState(() {
       _panel = _CreatePostFilterPanel.library;
       if (filter == null || filter.isOriginal) {
         _libraryFilter = CreatePostMediaFilterEntity.neutral;
       } else {
+        final matrix = _resolveMatrixForFilter(filter);
         _libraryFilter = CreatePostMediaFilterEntity.neutral.withCatalogFilter(
           id: filter.id,
           label: filter.displayLabel,
-          colorMatrix: CameraFilterRenderTypeApi.forAdminApi(filter.renderType) ==
-                  CameraFilterRenderTypeApi.matrix
-              ? filter.colorMatrix
-              : null,
+          colorMatrix: matrix,
         );
       }
     });
   }
 
   Widget _buildMediaPreview({required bool compact}) {
-    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final isImage = widget.file.mediaType == 'IMAGE';
     final bytes = widget.file.sourceBytes;
 
     Widget child;
     if (isImage) {
-      child = Image.memory(bytes, fit: BoxFit.contain);
+      child = _filterService.buildFilteredPreview(
+        child: Image.memory(bytes, fit: BoxFit.contain),
+        filter: _activeFilter,
+      );
     } else {
-      child = ColoredBox(
-        color: scheme.surfaceContainerHighest,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.videocam_rounded, size: compact ? 40 : 56),
-              const SizedBox(height: 8),
-              Text(
-                l10n.t('createPostMediaFilterVideoHint'),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
+      // Video filters are applied inside the player (CSS on web).
+      child = CreatePostLocalVideoPreview(
+        key: ValueKey('filter_sheet_video_${widget.file.id}'),
+        bytes: bytes,
+        fileName: widget.file.name,
+        filter: _activeFilter,
       );
     }
-
-    child = _filterService.buildFilteredPreview(
-      child: child,
-      filter: _activeFilter,
-    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -245,12 +270,15 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
         Row(
           children: [
             Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-            Text(
-              value.toStringAsFixed(2),
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            FeSyncedNumberInput(
+              value: value,
+              min: -1,
+              max: 1,
+              isDouble: true,
+              decimals: 2,
+              width: 58,
+              height: 28,
+              onChanged: (v) => onChanged(v.toDouble()),
             ),
           ],
         ),
@@ -385,11 +413,7 @@ class _CreatePostMediaFilterSheetState extends State<_CreatePostMediaFilterSheet
                 label: filter.displayLabel,
                 selected: _libraryFilter.catalogFilterId == filter.id,
                 previewBytes: bytes,
-                colorMatrix:
-                    CameraFilterRenderTypeApi.forAdminApi(filter.renderType) ==
-                            CameraFilterRenderTypeApi.matrix
-                        ? filter.colorMatrix
-                        : null,
+                colorMatrix: _resolveMatrixForFilter(filter),
                 previewColorHex: filter.previewColorHex,
                 onTap: () => _selectCatalogFilter(filter),
               ),

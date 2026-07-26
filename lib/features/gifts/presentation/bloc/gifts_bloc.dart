@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/utils/api_error_messages.dart';
 import '../../domain/entities/bulk_gift_action_request.dart';
 import '../../domain/entities/bulk_gift_action_result.dart';
 import '../../domain/entities/gift_group_entities.dart';
@@ -785,7 +787,10 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         successMessage: 'Gift "${gift.name}" created successfully',
       ));
     } catch (e) {
-      emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
+      emit(c.copyWith(
+        isActioning: false,
+        errorMessage: _giftActionErrorMessage(e, isCreate: true),
+      ));
     }
   }
 
@@ -811,7 +816,10 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         successMessage: 'Gift updated successfully',
       ));
     } catch (e) {
-      emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
+      emit(c.copyWith(
+        isActioning: false,
+        errorMessage: _giftActionErrorMessage(e, isCreate: false),
+      ));
     }
   }
 
@@ -918,5 +926,34 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
       ),
     ];
     await _replaceGroupGifts(groupId, members);
+  }
+
+  /// Maps backend create/update failures to snackbar-friendly keys/text.
+  String _giftActionErrorMessage(Object error, {required bool isCreate}) {
+    if (_isDuplicateGiftNameError(error)) {
+      return 'giftNameAlreadyExists';
+    }
+    return ApiErrorMessages.from(error);
+  }
+
+  bool _isDuplicateGiftNameError(Object error) {
+    final message = ApiErrorMessages.from(error).toLowerCase();
+    final looksLikeDuplicateName = message.contains('duplicate') ||
+        message.contains('already exist') ||
+        message.contains('already exists') ||
+        message.contains('unique') ||
+        (message.contains('name') &&
+            (message.contains('exist') ||
+                message.contains('taken') ||
+                message.contains('in use') ||
+                message.contains('conflict')));
+
+    if (error is DioException) {
+      final code = error.response?.statusCode;
+      if (code == 409) return true;
+      if ((code == 400 || code == 422) && looksLikeDuplicateName) return true;
+    }
+
+    return looksLikeDuplicateName;
   }
 }

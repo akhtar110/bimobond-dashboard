@@ -1045,6 +1045,7 @@ enum FiltersEffectsTab {
   filterCategories,
   effects,
   effectCategories,
+  arOverlays,
   catalog,
 }
 
