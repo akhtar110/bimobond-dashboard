@@ -67,11 +67,6 @@ class PostSettingsSection extends StatelessWidget {
           onChanged: (v) => onFieldUpdate(CreatePostField.allowStitch, v),
         ),
         _SwitchRow(
-          label: l10n.t('isStory'),
-          value: form.isStory,
-          onChanged: (v) => onFieldUpdate(CreatePostField.isStory, v),
-        ),
-        _SwitchRow(
           label: l10n.t('isAuctionable'),
           value: form.isAuctionable,
           onChanged: (v) => onFieldUpdate(CreatePostField.isAuctionable, v),

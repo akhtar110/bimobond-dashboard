@@ -333,10 +333,6 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
           child: Text(l10n.t('postFilterAuctionOnly')),
         ),
         DropdownMenuItem(
-          value: PostTypeFilter.stories,
-          child: Text(context.trOr('postFilterStoriesOnly', 'Stories Only')),
-        ),
-        DropdownMenuItem(
           value: PostTypeFilter.ads,
           child: Text(context.trOr('postFilterAdsOnly', 'Ads only')),
         ),
@@ -351,8 +347,6 @@ class _PostsFilterBarState extends State<PostsFilterBar> {
                   bloc.add(FilterPostsByTypeEvent());
                 case PostTypeFilter.auction:
                   bloc.add(FilterPostsByTypeEvent(isAuctionable: true));
-                case PostTypeFilter.stories:
-                  bloc.add(FilterPostsByTypeEvent(isStory: true));
                 case PostTypeFilter.ads:
                   bloc.add(FilterPostsByTypeEvent(isAd: true));
               }
@@ -489,13 +483,6 @@ class _ActiveFilterChips extends StatelessWidget {
     if (filters.isAuctionable == true) {
       addChip(
         l10n.t('postFilterAuctionOnly'),
-        () => context.read<PostsBloc>().add(FilterPostsByTypeEvent()),
-      );
-    }
-
-    if (filters.isStory == true) {
-      addChip(
-        context.trOr('postFilterStoriesOnly', 'Stories Only'),
         () => context.read<PostsBloc>().add(FilterPostsByTypeEvent()),
       );
     }

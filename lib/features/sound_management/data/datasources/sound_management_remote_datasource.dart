@@ -95,8 +95,21 @@ class SoundManagementRemoteDataSourceImpl
 
   @override
   Future<SoundEntity> getSoundById(String soundId) async {
-    final response = await _dio.get('/sounds/admin/$soundId');
-    return SoundModel.fromJson(_map(response.data));
+    // Public detail is the documented contract; admin list items may also
+    // resolve via /sounds/admin/:id on some deployments.
+    DioException? lastError;
+    for (final path in ['/sounds/$soundId', '/sounds/admin/$soundId']) {
+      try {
+        final response = await _dio.get(path);
+        return SoundModel.fromJson(_map(response.data));
+      } on DioException catch (e) {
+        lastError = e;
+        final code = e.response?.statusCode;
+        if (code == 404 || code == 405) continue;
+        rethrow;
+      }
+    }
+    throw lastError ?? Exception('Sound not found: $soundId');
   }
 
   @override
@@ -118,6 +131,7 @@ class SoundManagementRemoteDataSourceImpl
       MapEntry('name', data.name),
       MapEntry('author', data.author),
       MapEntry('duration', '${data.duration}'),
+      MapEntry('isFromDashboard', '${data.isFromDashboard}'),
     ]);
     if (data.coverBytes != null &&
         data.coverBytes!.isNotEmpty &&

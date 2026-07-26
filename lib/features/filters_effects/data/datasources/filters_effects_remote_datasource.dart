@@ -409,6 +409,10 @@ class FiltersEffectsRemoteDataSourceImpl
 
   @override
   Future<String> uploadEffectAsset(Uint8List bytes, String filename) async {
+    if (bytes.isEmpty) {
+      throw Exception('Asset upload failed: empty file bytes');
+    }
+
     final formData = FormData();
     formData.files.add(
       MapEntry('files', MultipartFile.fromBytes(bytes, filename: filename)),
@@ -423,26 +427,64 @@ class FiltersEffectsRemoteDataSourceImpl
       ),
     );
 
-    final data = response.data;
-    String? url;
-
-    if (data is Map<String, dynamic>) {
-      final nested = data['data'];
-      final urls =
-          data['urls'] ??
-          (nested is Map<String, dynamic> ? nested['urls'] : null);
-      if (urls is List && urls.isNotEmpty) {
-        url = _parseUploadUrl(urls.first);
-      }
-    } else if (data is List && data.isNotEmpty) {
-      url = _parseUploadUrl(data.first);
-    }
-
+    final url = _extractPostsUploadUrl(response.data);
     if (url == null || url.isEmpty) {
-      throw Exception('Asset upload failed: no URL returned');
+      throw Exception(
+        'Asset upload failed: no URL returned from server: ${response.data}',
+      );
     }
 
     return resolveMediaUrl(url) ?? url;
+  }
+
+  /// Parses `POST /posts/upload` responses across Map/List shapes (web-safe).
+  String? _extractPostsUploadUrl(dynamic data) {
+    if (data == null) return null;
+
+    if (data is String && data.trim().isNotEmpty) {
+      return _parseUploadUrl(data);
+    }
+
+    if (data is List && data.isNotEmpty) {
+      for (final item in data) {
+        final parsed = _parseUploadUrl(item);
+        if (parsed.isNotEmpty) return parsed;
+      }
+      return null;
+    }
+
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+
+    final topUrls = map['urls'];
+    if (topUrls is List && topUrls.isNotEmpty) {
+      for (final item in topUrls) {
+        final parsed = _parseUploadUrl(item);
+        if (parsed.isNotEmpty) return parsed;
+      }
+    }
+
+    final nested = map['data'];
+    if (nested is Map) {
+      final nestedMap = Map<String, dynamic>.from(nested);
+      final nestedUrls = nestedMap['urls'];
+      if (nestedUrls is List && nestedUrls.isNotEmpty) {
+        for (final item in nestedUrls) {
+          final parsed = _parseUploadUrl(item);
+          if (parsed.isNotEmpty) return parsed;
+        }
+      }
+      final fromNested = _extractPostsUploadUrl(nestedMap);
+      if (fromNested != null && fromNested.isNotEmpty) return fromNested;
+    } else if (nested is List || nested is String) {
+      final fromNested = _extractPostsUploadUrl(nested);
+      if (fromNested != null && fromNested.isNotEmpty) return fromNested;
+    }
+
+    final direct = _parseUploadUrl(
+      map['url'] ?? map['path'] ?? map['location'],
+    );
+    return direct.isEmpty ? null : direct;
   }
 
   @override

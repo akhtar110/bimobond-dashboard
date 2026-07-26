@@ -264,6 +264,8 @@ ManagedPostEntity hydrateManagedPostMedia(ManagedPostEntity post) {
   }
 
   for (final item in post.media) {
+    // Soundtrack belongs on [ManagedPostEntity.sound], not the visual carousel.
+    if (item.isAudio) continue;
     addItem(item);
   }
 
@@ -452,18 +454,28 @@ ManagedPostSoundEntity? _mergeSound(
   ManagedPostSoundEntity? fallback, {
   String? soundId,
 }) {
-  final id = soundId?.trim();
-  if (id == null || id.isEmpty) return null;
+  final id = (soundId != null && soundId.trim().isNotEmpty)
+      ? soundId.trim()
+      : (primary?.id.isNotEmpty == true
+          ? primary!.id
+          : (fallback?.id.isNotEmpty == true ? fallback!.id : null));
 
   if (primary != null && primary.hasPlayableAudio) {
-    return primary.id == id ? primary : primary.copyWith(id: id);
+    return id != null && primary.id != id ? primary.copyWith(id: id) : primary;
   }
   if (fallback != null && fallback.hasPlayableAudio) {
-    return fallback.id == id ? fallback : fallback.copyWith(id: id);
+    return id != null && fallback.id != id ? fallback.copyWith(id: id) : fallback;
   }
-  if (primary != null) return primary.id == id ? primary : primary.copyWith(id: id);
-  if (fallback != null) return fallback.id == id ? fallback : fallback.copyWith(id: id);
-  return ManagedPostSoundEntity(id: id);
+  if (primary != null) {
+    return id != null && primary.id != id ? primary.copyWith(id: id) : primary;
+  }
+  if (fallback != null) {
+    return id != null && fallback.id != id ? fallback.copyWith(id: id) : fallback;
+  }
+  if (id != null && id.isNotEmpty) {
+    return ManagedPostSoundEntity(id: id);
+  }
+  return null;
 }
 
 String? _pickNonEmptyStr(String? primary, String? fallback) {

@@ -1,22 +1,31 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/post_video_controls_overlay.dart';
+import '../../domain/entities/create_post_media_filter_entity.dart';
+import '../../domain/services/create_post_media_filter_service.dart';
+import '../utils/create_post_video_css_filter.dart';
 import '../utils/create_post_video_source.dart';
 
 /// Inline preview for a locally picked video file (web blob URL).
+///
+/// On web, library/custom color filters are applied via CSS `feColorMatrix`
+/// because [ColorFiltered] cannot tint HTML `<video>` platform views.
 class CreatePostLocalVideoPreview extends StatefulWidget {
   const CreatePostLocalVideoPreview({
     super.key,
     required this.bytes,
     required this.fileName,
+    this.filter = CreatePostMediaFilterEntity.neutral,
   });
 
   final List<int> bytes;
   final String fileName;
+  final CreatePostMediaFilterEntity filter;
 
   @override
   State<CreatePostLocalVideoPreview> createState() =>
@@ -25,6 +34,8 @@ class CreatePostLocalVideoPreview extends StatefulWidget {
 
 class _CreatePostLocalVideoPreviewState
     extends State<CreatePostLocalVideoPreview> {
+  static const _filterService = CreatePostMediaFilterService();
+
   VideoPlayerController? _controller;
   String? _objectUrl;
   bool _ready = false;
@@ -55,9 +66,33 @@ class _CreatePostLocalVideoPreviewState
       await controller.initialize();
       if (!mounted) return;
       setState(() => _ready = true);
+      _syncWebCssFilter();
     } catch (_) {
       if (mounted) setState(() => _failed = true);
     }
+  }
+
+  @override
+  void didUpdateWidget(CreatePostLocalVideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filter != widget.filter) {
+      _syncWebCssFilter();
+    }
+  }
+
+  void _syncWebCssFilter() {
+    final uri = _objectUrl;
+    if (uri == null || !kIsWeb) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final matrices = _filterService.colorMatricesFor(widget.filter);
+      if (matrices.isEmpty) {
+        clearCssColorFilterForVideoUrl(uri);
+      } else {
+        applyCssColorMatricesToVideoUrl(uri, matrices);
+      }
+    });
   }
 
   void _onFullscreenWillOpen() {
@@ -81,16 +116,20 @@ class _CreatePostLocalVideoPreviewState
     if (wasPlaying) {
       await controller.play();
     }
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _syncWebCssFilter();
+    }
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
     final uri = _objectUrl;
     if (uri != null) {
+      clearCssColorFilterForVideoUrl(uri);
       disposeVideoPreviewUri(uri);
     }
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -140,26 +179,36 @@ class _CreatePostLocalVideoPreviewState
     final controller = _controller!;
     final value = controller.value;
 
+    Widget video = Center(
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: value.size.width,
+          height: value.size.height,
+          child: _detachedForFullscreen
+              ? const SizedBox.shrink()
+              : VideoPlayer(
+                  controller,
+                  key: ValueKey('create_post_${widget.fileName}'),
+                ),
+        ),
+      ),
+    );
+
+    // Native / desktop texture videos still respond to ColorFiltered.
+    if (!kIsWeb && !widget.filter.isNeutral) {
+      video = _filterService.buildFilteredPreview(
+        child: video,
+        filter: widget.filter,
+      );
+    }
+
     return ColoredBox(
       color: scheme.surfaceContainerHighest,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Center(
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: SizedBox(
-                width: value.size.width,
-                height: value.size.height,
-                child: _detachedForFullscreen
-                    ? const SizedBox.shrink()
-                    : VideoPlayer(
-                        controller,
-                        key: ValueKey('create_post_${widget.fileName}'),
-                      ),
-              ),
-            ),
-          ),
+          video,
           PostVideoControlsOverlay(
             controller: controller,
             onFullscreenWillOpen: _onFullscreenWillOpen,

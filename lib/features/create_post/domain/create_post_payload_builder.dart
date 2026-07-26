@@ -86,10 +86,27 @@ class CreatePostPayloadBuilder {
           : null,
       location: CreatePostPayloadValidator.resolvesInlineLocation(form),
       playlistId: form.playlistId,
-      soundId: form.soundId,
-      newSound: (form.soundId == null || form.soundId!.trim().isEmpty)
+      soundId: (form.newSound != null && form.newSound!.isComplete)
+          ? null
+          : (form.soundId?.trim().isNotEmpty == true
+              ? form.soundId!.trim()
+              : (form.selectedSound?.id?.trim().isNotEmpty == true &&
+                      !form.selectedSound!.id.startsWith('sound_')
+                  ? form.selectedSound!.id.trim()
+                  : null)),
+      newSound: (form.newSound != null && form.newSound!.isComplete)
           ? form.newSound
-          : null,
+          : ((form.soundId == null || form.soundId!.trim().isEmpty) &&
+                  form.selectedSound != null &&
+                  form.selectedSound!.audioUrl.trim().isNotEmpty
+              ? CreatePostNewSoundEntity(
+                  audioUrl: form.selectedSound!.audioUrl,
+                  duration: form.selectedSound!.duration ?? 0,
+                  name: form.selectedSound!.name,
+                  coverUrl: form.selectedSound!.coverUrl,
+                )
+              : null),
+      selectedSound: form.selectedSound,
       originalPostId: form.originalPostId,
       hlsUrl: form.hlsUrl,
       animatedCoverUrl: form.animatedCoverUrl,

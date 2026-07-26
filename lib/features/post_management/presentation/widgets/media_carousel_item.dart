@@ -15,6 +15,7 @@ class MediaCarouselItem extends StatefulWidget {
     this.isActive = false,
     this.videoLooping = true,
     this.showSeekBar = true,
+    this.muted = false,
     this.onAspectRatioDetermined,
   });
 
@@ -25,6 +26,7 @@ class MediaCarouselItem extends StatefulWidget {
   final bool isActive;
   final bool videoLooping;
   final bool showSeekBar;
+  final bool muted;
   final ValueChanged<double>? onAspectRatioDetermined;
 
   @override
@@ -54,6 +56,7 @@ class _MediaCarouselItemState extends State<MediaCarouselItem>
           looping: widget.videoLooping,
           fit: widget.fit,
           showSeekBar: widget.showSeekBar,
+          muted: widget.muted,
           onAspectRatioDetermined: widget.onAspectRatioDetermined,
         ),
       );

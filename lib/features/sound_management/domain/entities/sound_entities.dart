@@ -47,6 +47,37 @@ class SoundCreatorEntity extends Equatable {
   List<Object?> get props => [id, username, fullName, avatarUrl];
 }
 
+class SoundRecentPostEntity extends Equatable {
+  const SoundRecentPostEntity({
+    required this.id,
+    this.caption,
+    this.videoUrl,
+    this.coverUrl,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.createdAt,
+  });
+
+  final String id;
+  final String? caption;
+  final String? videoUrl;
+  final String? coverUrl;
+  final int likeCount;
+  final int commentCount;
+  final DateTime? createdAt;
+
+  @override
+  List<Object?> get props => [
+        id,
+        caption,
+        videoUrl,
+        coverUrl,
+        likeCount,
+        commentCount,
+        createdAt,
+      ];
+}
+
 class SoundEntity extends Equatable {
   const SoundEntity({
     required this.id,
@@ -58,10 +89,12 @@ class SoundEntity extends Equatable {
     required this.useCount,
     required this.isOriginal,
     required this.isActive,
+    this.isFromDashboard = true,
     this.originalSoundId,
     this.creatorId,
     this.createdAt,
     this.creator,
+    this.posts = const [],
   });
 
   final String id;
@@ -73,10 +106,12 @@ class SoundEntity extends Equatable {
   final int useCount;
   final bool isOriginal;
   final bool isActive;
+  final bool isFromDashboard;
   final String? originalSoundId;
   final String? creatorId;
   final DateTime? createdAt;
   final SoundCreatorEntity? creator;
+  final List<SoundRecentPostEntity> posts;
 
   SoundLibraryType get libraryType {
     if (originalSoundId != null && originalSoundId!.isNotEmpty) {
@@ -99,10 +134,12 @@ class SoundEntity extends Equatable {
         useCount,
         isOriginal,
         isActive,
+        isFromDashboard,
         originalSoundId,
         creatorId,
         createdAt,
         creator,
+        posts,
       ];
 }
 
@@ -170,6 +207,7 @@ class SoundsQuery extends Equatable {
     this.sort = SoundSortMode.trending,
     this.isActive,
     this.creatorId,
+    this.isFromDashboard,
   });
 
   final int page;
@@ -178,6 +216,7 @@ class SoundsQuery extends Equatable {
   final SoundSortMode sort;
   final bool? isActive;
   final String? creatorId;
+  final bool? isFromDashboard;
 
   Map<String, dynamic> toQueryParameters() {
     final params = <String, dynamic>{
@@ -188,11 +227,16 @@ class SoundsQuery extends Equatable {
     if (search != null && search!.trim().isNotEmpty) {
       params['search'] = search!.trim();
     }
+    // Hidden = deactivated (isActive false). Send as "true"/"false" strings so
+    // Nest/query layers that drop boolean `false` still receive the filter.
     if (isActive != null) {
-      params['isActive'] = isActive;
+      params['isActive'] = isActive! ? 'true' : 'false';
     }
     if (creatorId != null && creatorId!.trim().isNotEmpty) {
       params['creatorId'] = creatorId!.trim();
+    }
+    if (isFromDashboard != null) {
+      params['isFromDashboard'] = isFromDashboard! ? 'true' : 'false';
     }
     return params;
   }
@@ -207,6 +251,8 @@ class SoundsQuery extends Equatable {
     bool clearIsActive = false,
     String? creatorId,
     bool clearCreatorId = false,
+    bool? isFromDashboard,
+    bool clearIsFromDashboard = false,
   }) {
     return SoundsQuery(
       page: page ?? this.page,
@@ -215,11 +261,14 @@ class SoundsQuery extends Equatable {
       sort: sort ?? this.sort,
       isActive: clearIsActive ? null : (isActive ?? this.isActive),
       creatorId: clearCreatorId ? null : (creatorId ?? this.creatorId),
+      isFromDashboard:
+          clearIsFromDashboard ? null : (isFromDashboard ?? this.isFromDashboard),
     );
   }
 
   @override
-  List<Object?> get props => [page, limit, search, sort, isActive, creatorId];
+  List<Object?> get props =>
+      [page, limit, search, sort, isActive, creatorId, isFromDashboard];
 }
 
 class PaginatedSoundsEntity extends Equatable {
@@ -244,6 +293,7 @@ class CreateSoundData extends Equatable {
     this.coverUrl,
     this.waveformPeaks,
     this.isActive = true,
+    this.isFromDashboard = true,
   });
 
   final String name;
@@ -253,6 +303,7 @@ class CreateSoundData extends Equatable {
   final String? coverUrl;
   final List<double>? waveformPeaks;
   final bool isActive;
+  final bool isFromDashboard;
 
   Map<String, dynamic> toJson() {
     final absoluteAudio =
@@ -267,12 +318,21 @@ class CreateSoundData extends Equatable {
       if (waveformPeaks != null && waveformPeaks!.isNotEmpty)
         'waveformPeaks': waveformPeaks,
       'isActive': isActive,
+      'isFromDashboard': isFromDashboard,
     };
   }
 
   @override
-  List<Object?> get props =>
-      [name, author, audioUrl, duration, coverUrl, waveformPeaks, isActive];
+  List<Object?> get props => [
+        name,
+        author,
+        audioUrl,
+        duration,
+        coverUrl,
+        waveformPeaks,
+        isActive,
+        isFromDashboard,
+      ];
 }
 
 class UploadSoundData extends Equatable {
@@ -284,6 +344,7 @@ class UploadSoundData extends Equatable {
     required this.duration,
     this.coverBytes,
     this.coverFilename,
+    this.isFromDashboard = true,
   });
 
   final List<int> bytes;
@@ -293,10 +354,19 @@ class UploadSoundData extends Equatable {
   final int duration;
   final List<int>? coverBytes;
   final String? coverFilename;
+  final bool isFromDashboard;
 
   @override
-  List<Object?> get props =>
-      [bytes, filename, name, author, duration, coverBytes, coverFilename];
+  List<Object?> get props => [
+        bytes,
+        filename,
+        name,
+        author,
+        duration,
+        coverBytes,
+        coverFilename,
+        isFromDashboard,
+      ];
 }
 
 class UpdateSoundData extends Equatable {
@@ -308,6 +378,7 @@ class UpdateSoundData extends Equatable {
     this.duration,
     this.waveformPeaks,
     this.isActive,
+    this.isFromDashboard,
     this.clearCoverUrl = false,
     this.clearWaveformPeaks = false,
   });
@@ -319,6 +390,7 @@ class UpdateSoundData extends Equatable {
   final int? duration;
   final List<double>? waveformPeaks;
   final bool? isActive;
+  final bool? isFromDashboard;
   final bool clearCoverUrl;
   final bool clearWaveformPeaks;
 
@@ -343,6 +415,7 @@ class UpdateSoundData extends Equatable {
       json['waveformPeaks'] = waveformPeaks;
     }
     if (isActive != null) json['isActive'] = isActive;
+    if (isFromDashboard != null) json['isFromDashboard'] = isFromDashboard;
     return json;
   }
 
@@ -368,6 +441,7 @@ class UpdateSoundData extends Equatable {
         duration,
         waveformPeaks,
         isActive,
+        isFromDashboard,
         clearCoverUrl,
         clearWaveformPeaks,
       ];

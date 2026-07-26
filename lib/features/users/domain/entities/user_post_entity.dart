@@ -1,3 +1,5 @@
+import '../../../../core/utils/media_url_resolver.dart';
+
 class UserPostEntity {
   final String id;
   final String userId;
@@ -92,6 +94,25 @@ class UserPostEntity {
     this.counts,
     this.recentReposts,
   });
+
+  bool get hasAttachedSound =>
+      (soundId != null && soundId!.trim().isNotEmpty) ||
+      (sound != null && (sound!['audioUrl']?.toString().trim().isNotEmpty == true || sound!['url']?.toString().trim().isNotEmpty == true));
+
+  String? get attachedSoundPlayUrl {
+    final rawUrl = sound?['audioUrl']?.toString() ??
+        sound?['url']?.toString() ??
+        sound?['audio']?.toString() ??
+        sound?['soundUrl']?.toString() ??
+        sound?['path']?.toString();
+    if (rawUrl != null && rawUrl.trim().isNotEmpty) {
+      return resolveMediaUrl(rawUrl.trim()) ?? rawUrl.trim();
+    }
+    return null;
+  }
+
+  bool get shouldPlayAttachedSound =>
+      hasAttachedSound && attachedSoundPlayUrl != null;
 }
 
 class UserPostsResponseEntity {

@@ -45,9 +45,7 @@ class GiftsContentSliver extends StatelessWidget {
             '${state.toDate?.millisecondsSinceEpoch}-'
             '${state.minPriceFilter}-'
             '${state.maxPriceFilter}-'
-            '${state.selectedSort.name}-'
-            '${state.currentPage}-'
-            '${state.displayed.length}';
+            '${state.selectedSort.name}';
 
         return state.viewType == GiftsViewType.grid
             ? GiftsSliverGrid(
@@ -95,8 +93,6 @@ class GiftsGridSliver extends GiftsContentSliver {
         '${state.minPriceFilter}-'
         '${state.maxPriceFilter}-'
         '${state.selectedSort.name}-'
-        '${state.currentPage}-'
-        '${state.displayed.length}-'
         '$filterKey';
 
     return state.viewType == GiftsViewType.grid
@@ -172,6 +168,13 @@ class GiftsSliverGrid extends StatelessWidget {
   final Set<String>? giftIdFilter;
   final List<String>? preferGiftIdOrder;
 
+  double _calculateChildAspectRatio(double itemWidth) {
+    if (itemWidth < 170) return 0.76;
+    if (itemWidth < 210) return 0.82;
+    if (itemWidth < 260) return 0.86;
+    return 0.88;
+  }
+
   @override
   Widget build(BuildContext context) {
     final metrics = GiftsLayoutMetrics(
@@ -194,62 +197,48 @@ class GiftsSliverGrid extends StatelessWidget {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final columns = giftsGridColumnCount(constraints.crossAxisExtent);
-        final rowCount = (gifts.length / columns).ceil();
         final metrics = GiftsLayoutMetrics(
           getGiftsDeviceType(constraints.crossAxisExtent),
         );
         final gap = metrics.gridGap;
         final pad = metrics.pageHorizontalPadding;
+        final availableWidth = constraints.crossAxisExtent - (pad * 2);
+        final itemWidth = (availableWidth - (gap * (columns - 1))) / columns;
+        final childAspectRatio = _calculateChildAspectRatio(itemWidth);
 
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(pad, metrics.gridTopPadding, pad, 0),
-          sliver: SliverList(
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisSpacing: gap,
+              crossAxisSpacing: gap,
+              childAspectRatio: childAspectRatio,
+            ),
             delegate: SliverChildBuilderDelegate(
-              (context, rowIndex) {
-                final start = rowIndex * columns;
-                final end = (start + columns).clamp(0, gifts.length);
-                final row = gifts.sublist(start, end);
-
-                return Padding(
-                  padding: EdgeInsets.only(
-                    bottom: rowIndex < rowCount - 1 ? gap : 0,
+              (context, index) {
+                final gift = gifts[index];
+                return SelectableGiftCard(
+                  key: ValueKey(gift.id),
+                  gift: gift,
+                  isSelected: loaded.selectedGiftIds.contains(gift.id),
+                  onSelectionChanged: (selected) => toggleGiftSelection(
+                    context,
+                    gift.id,
+                    selected ?? false,
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < columns; i++) ...[
-                        if (i > 0) SizedBox(width: gap),
-                        Expanded(
-                          child: i < row.length
-                              ? SelectableGiftCard(
-                                  gift: row[i],
-                                  isSelected: loaded.selectedGiftIds
-                                      .contains(row[i].id),
-                                  onSelectionChanged: (selected) =>
-                                      toggleGiftSelection(
-                                    context,
-                                    row[i].id,
-                                    selected ?? false,
-                                  ),
-                                  onEdit: () =>
-                                      showEditGiftDialog(context, row[i]),
-                                  onPreview: onPreviewGift == null
-                                      ? null
-                                      : () => onPreviewGift!(context, row[i]),
-                                  onDelete: () => confirmDeleteGift(
-                                    context,
-                                    row[i].id,
-                                    row[i].name,
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ],
+                  onEdit: () => showEditGiftDialog(context, gift),
+                  onPreview: onPreviewGift == null
+                      ? null
+                      : () => onPreviewGift!(context, gift),
+                  onDelete: () => confirmDeleteGift(
+                    context,
+                    gift.id,
+                    gift.name,
                   ),
                 );
               },
-              childCount: rowCount,
+              childCount: gifts.length,
             ),
           ),
         );
@@ -320,6 +309,7 @@ class GiftsSliverList extends StatelessWidget {
                     final isLast = index == gifts.length - 1;
 
                     return DecoratedBox(
+                      key: ValueKey(gift.id),
                       decoration: BoxDecoration(
                         color: scheme.surface,
                         border: Border(

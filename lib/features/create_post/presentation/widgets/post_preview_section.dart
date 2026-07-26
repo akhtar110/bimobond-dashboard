@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../../core/utils/coin_format.dart';
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../core/utils/money_format.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/post_media_preview.dart';
 import '../../domain/entities/create_post_entity.dart';
 import '../../domain/services/create_post_media_filter_service.dart';
 import 'create_post_local_video_preview.dart';
@@ -98,6 +101,7 @@ class _PostPreviewSectionState extends State<PostPreviewSection> {
               child: _MainMediaPreview(
                 key: ValueKey(selected.id),
                 file: selected,
+                soundUrl: widget.form.selectedSound?.audioUrl,
               ),
             ),
           ),
@@ -141,7 +145,6 @@ class _PostPreviewSectionState extends State<PostPreviewSection> {
               if (widget.form.category != null)
                 _Chip(label: widget.form.category!),
               if (widget.form.isAuctionable) const _Chip(label: 'Auction'),
-              if (widget.form.isStory) const _Chip(label: 'Story'),
             ],
           ),
           if (widget.form.isAuctionable && widget.form.auction != null)
@@ -218,25 +221,54 @@ class _AuctionPreviewSummary extends StatelessWidget {
 }
 
 class _MainMediaPreview extends StatelessWidget {
-  const _MainMediaPreview({super.key, required this.file});
+  const _MainMediaPreview({
+    super.key,
+    required this.file,
+    this.soundUrl,
+  });
 
   final LocalMediaFile file;
+  final String? soundUrl;
 
   @override
   Widget build(BuildContext context) {
     const filterService = CreatePostMediaFilterService();
 
-    Widget child;
+    final Widget filtered;
     if (file.mediaType == 'IMAGE') {
-      child = Image.memory(file.bytes, fit: BoxFit.contain);
+      filtered = filterService.buildFilteredPreview(
+        child: Image.memory(file.bytes, fit: BoxFit.contain),
+        filter: file.filter,
+      );
     } else {
-      child = CreatePostLocalVideoPreview(
+      // Video filters are applied inside the player (CSS on web).
+      filtered = CreatePostLocalVideoPreview(
         bytes: file.bytes,
         fileName: file.name,
+        filter: file.filter,
       );
     }
+    final resolvedAudio = (soundUrl != null && soundUrl!.trim().isNotEmpty)
+        ? (resolveMediaUrl(soundUrl!.trim()) ?? soundUrl!.trim())
+        : null;
 
-    return filterService.buildFilteredPreview(child: child, filter: file.filter);
+    if (resolvedAudio == null || resolvedAudio.isEmpty) {
+      return filtered;
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        filtered,
+        PostAttachedSoundPreview(
+          key: ValueKey('preview_media_sound_${file.id}_$resolvedAudio'),
+          audioUrl: resolvedAudio,
+          autoplay: true,
+          looping: true,
+          showSeekBar: true,
+        ),
+      ],
+    );
   }
 }
 
@@ -296,13 +328,16 @@ class _AttachedMediaThumb extends StatelessWidget {
                           fit: BoxFit.cover,
                         )
                       else
-                        ColoredBox(
-                          color: isDark
-                              ? const Color(0xFF1E293B)
-                              : const Color(0xFFF1F5F9),
-                          child: Icon(
-                            Icons.videocam_rounded,
-                            color: scheme.onSurfaceVariant,
+                        const CreatePostMediaFilterService().buildFilteredPreview(
+                          filter: file.filter,
+                          child: ColoredBox(
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF1F5F9),
+                            child: Icon(
+                              Icons.videocam_rounded,
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       if (!isImage)
@@ -420,31 +455,190 @@ class _SoundPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final audioUrl = resolveMediaUrl(sound.audioUrl) ?? sound.audioUrl;
 
-    return Row(
-      children: [
-        Icon(Icons.music_note_outlined, size: 18, color: theme.colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text(
-                l10n.t('createPostSound'),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              Icon(Icons.music_note_rounded, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.t('createPostSound'),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${sound.name} · ${sound.author}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                '${sound.name} · ${sound.author}',
-                style: theme.textTheme.bodyMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-        ),
-      ],
+          if (audioUrl.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _SoundPreviewAudioBar(audioUrl: audioUrl),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SoundPreviewAudioBar extends StatefulWidget {
+  const _SoundPreviewAudioBar({required this.audioUrl});
+
+  final String audioUrl;
+
+  @override
+  State<_SoundPreviewAudioBar> createState() => _SoundPreviewAudioBarState();
+}
+
+class _SoundPreviewAudioBarState extends State<_SoundPreviewAudioBar> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAudio();
+  }
+
+  Future<void> _initAudio() async {
+    try {
+      final controller = PostVideoControllerCache.instance.obtain(
+        widget.audioUrl,
+        looping: true,
+      );
+      _controller = controller;
+      await PostVideoControllerCache.instance.waitForInitialize(widget.audioUrl);
+      if (!mounted) return;
+      if (controller.value.hasError || !controller.value.isInitialized) {
+        setState(() => _failed = true);
+        return;
+      }
+      setState(() => _initialized = true);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_controller != null) {
+      PostVideoControllerCache.instance.release(widget.audioUrl);
+    }
+    super.dispose();
+  }
+
+  void _togglePlayPause() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isPlaying) {
+      controller.pause();
+    } else {
+      controller.play();
+    }
+    setState(() {});
+  }
+
+  String _formatTime(Duration d) {
+    final s = d.inSeconds;
+    final m = s ~/ 60;
+    final rem = s % 60;
+    return '$m:${rem.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final controller = _controller;
+
+    if (_failed || controller == null || !_initialized || !controller.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final value = controller.value;
+        final isPlaying = value.isPlaying;
+        final duration = value.duration;
+        final position = value.position;
+        final maxMs = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
+        final posMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs);
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(
+                  isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                  color: scheme.primary,
+                  size: 26,
+                ),
+                onPressed: _togglePlayPause,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                    activeTrackColor: scheme.primary,
+                    inactiveTrackColor: scheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    thumbColor: scheme.primary,
+                  ),
+                  child: Slider(
+                    value: posMs,
+                    max: maxMs,
+                    onChanged: (v) {
+                      controller.seekTo(Duration(milliseconds: v.round()));
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${_formatTime(position)} / ${_formatTime(duration)}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

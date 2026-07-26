@@ -11,11 +11,16 @@ class SoundPreviewScope extends InheritedWidget {
 
   final SoundPreviewService preview;
 
-  static SoundPreviewService of(BuildContext context) {
+  static SoundPreviewService? maybeOf(BuildContext context) {
     final scope =
         context.dependOnInheritedWidgetOfExactType<SoundPreviewScope>();
-    assert(scope != null, 'SoundPreviewScope not found');
-    return scope!.preview;
+    return scope?.preview;
+  }
+
+  static SoundPreviewService of(BuildContext context) {
+    final preview = maybeOf(context);
+    assert(preview != null, 'SoundPreviewScope not found');
+    return preview!;
   }
 
   @override
@@ -51,5 +56,6 @@ class _SoundPreviewHostState extends State<SoundPreviewHost> {
 }
 
 extension SoundPreviewContext on BuildContext {
+  SoundPreviewService? get soundPreviewMaybe => SoundPreviewScope.maybeOf(this);
   SoundPreviewService get soundPreview => SoundPreviewScope.of(this);
 }

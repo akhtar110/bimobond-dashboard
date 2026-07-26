@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/create_post_entity.dart';
+import '../../domain/services/create_post_media_filter_service.dart';
 import '../bloc/create_post_bloc.dart';
 import '../utils/media_file_picker.dart';
 import 'create_post_media_filter_sheet.dart';
@@ -228,17 +229,20 @@ class _MediaListTile extends StatelessWidget {
                         filter: file.filter,
                         fit: BoxFit.cover,
                       )
-                    : videoThumbnailBytes != null &&
-                            videoThumbnailBytes!.isNotEmpty
-                        ? Image.memory(
-                            videoThumbnailBytes!,
-                            fit: BoxFit.cover,
-                          )
-                        : ColoredBox(
-                        color: isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFF1F5F9),
-                        child: const Icon(Icons.videocam_rounded, size: 28),
+                    : const CreatePostMediaFilterService().buildFilteredPreview(
+                        filter: file.filter,
+                        child: videoThumbnailBytes != null &&
+                                videoThumbnailBytes!.isNotEmpty
+                            ? Image.memory(
+                                videoThumbnailBytes!,
+                                fit: BoxFit.cover,
+                              )
+                            : ColoredBox(
+                                color: isDark
+                                    ? const Color(0xFF1E293B)
+                                    : const Color(0xFFF1F5F9),
+                                child: const Icon(Icons.videocam_rounded, size: 28),
+                              ),
                       ),
               ),
             ),

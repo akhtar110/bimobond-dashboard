@@ -50,6 +50,7 @@ import '../../features/rbac/presentation/bloc/rbac_bloc.dart';
 import '../../features/rbac/presentation/bloc/rbac_event.dart';
 import '../../features/rbac/presentation/pages/rbac_dashboard_pages.dart';
 import '../../features/rbac/presentation/utils/permission_manager.dart';
+import '../../features/rbac/presentation/widgets/access_denied_view.dart';
 import '../../features/auction_reports/presentation/bloc/auction_report_detail_bloc.dart';
 import '../../features/auction_reports/presentation/pages/auction_report_detail_page.dart';
 import '../../features/user_reports/presentation/bloc/user_reports_bloc.dart';
@@ -87,6 +88,23 @@ class AppRouter {
     child: const HomeShell(),
   );
 
+  /// Ensures [RbacBloc] is available and shows Access Denied when [canAccess]
+  /// is false. Used for standalone routes outside [HomeShell].
+  static Widget _guarded({
+    required Widget child,
+    required bool Function(BuildContext context) canAccess,
+    bool requireAuthContext = false,
+  }) {
+    return BlocProvider.value(
+      value: di.sl<RbacBloc>()..add(const LoadCurrentPermissions()),
+      child: FeatureAccessBoundary(
+        canAccess: canAccess,
+        requireAuthContext: requireAuthContext,
+        child: child,
+      ),
+    );
+  }
+
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case AppRoutes.login:
@@ -94,13 +112,26 @@ class AppRouter {
       case AppRoutes.dashboard:
         return MaterialPageRoute(builder: (_) => _homeShell());
       case AppRoutes.analytics:
-        return MaterialPageRoute(builder: (_) => const AnalyticsPage());
+        return MaterialPageRoute(
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: const AnalyticsPage(),
+          ),
+        );
       case AppRoutes.notifications:
-        return MaterialPageRoute(builder: (_) => const NotificationsPage());
+        return MaterialPageRoute(
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: const NotificationsPage(),
+          ),
+        );
       case AppRoutes.userDetail:
         final user = settings.arguments as UserEntity;
         return MaterialPageRoute(
-          builder: (_) => UserDetailRouteScope(user: user),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessAdminDashboard,
+            child: UserDetailRouteScope(user: user),
+          ),
         );
       case AppRoutes.postManagementDetail:
         {
@@ -119,83 +150,130 @@ class AppRouter {
           }
           return AdminDetailPageRoute(
             settings: settings,
-            builder: (_) => PersistentBlocProvider<CategoriesBloc>(
-              debugLabel: 'PostManagementRoute',
-              create: () =>
-                  di.sl<CategoriesBloc>()
-                    ..add(LoadCategoriesEvent(forCatalog: true)),
-              child: PostManagementDetailScreen.fromArgs(args),
+            builder: (_) => _guarded(
+              canAccess: PermissionManager.canAccessAdminDashboard,
+              child: PersistentBlocProvider<CategoriesBloc>(
+                debugLabel: 'PostManagementRoute',
+                create: () =>
+                    di.sl<CategoriesBloc>()
+                      ..add(LoadCategoriesEvent(forCatalog: true)),
+                child: PostManagementDetailScreen.fromArgs(args),
+              ),
             ),
           );
         }
       case AppRoutes.auctionDetail:
         final auction = settings.arguments as AuctionEntity;
         return MaterialPageRoute(
-          builder: (_) => PersistentBlocProvider<AuctionDetailBloc>(
-            debugLabel: 'AuctionDetailRoute',
-            create: () => di.sl<AuctionDetailBloc>(),
-            child: AuctionDetailPage(
-              auctionId: auction.id,
-              listPreview: auction,
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canReadAuctions,
+            requireAuthContext: true,
+            child: PersistentBlocProvider<AuctionDetailBloc>(
+              debugLabel: 'AuctionDetailRoute',
+              create: () => di.sl<AuctionDetailBloc>(),
+              child: AuctionDetailPage(
+                auctionId: auction.id,
+                listPreview: auction,
+              ),
             ),
           ),
         );
       case AppRoutes.campaignDetail:
         final campaignId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => CampaignDetailPage(campaignId: campaignId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: CampaignDetailPage(campaignId: campaignId),
+          ),
         );
       case AppRoutes.promotedPostAnalytics:
         final postId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => PromotedPostAnalyticsPage(postId: postId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: PromotedPostAnalyticsPage(postId: postId),
+          ),
         );
       case AppRoutes.chatManagement:
-        return MaterialPageRoute(builder: (_) => const ChatManagementPage());
+        return MaterialPageRoute(
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessAdminDashboard,
+            child: const ChatManagementPage(),
+          ),
+        );
       case AppRoutes.soundManagement:
-        return MaterialPageRoute(builder: (_) => const SoundManagementPage());
+        return MaterialPageRoute(
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canManageSounds,
+            requireAuthContext: true,
+            child: const SoundManagementPage(),
+          ),
+        );
       case AppRoutes.walletDetail:
         final userId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => WalletDetailPage(userId: userId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessAdminDashboard,
+            child: WalletDetailPage(userId: userId),
+          ),
         );
       case AppRoutes.createPost:
-        return MaterialPageRoute(builder: (_) => const CreatePostRouteScope());
+        return MaterialPageRoute(
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessAdminDashboard,
+            child: const CreatePostRouteScope(),
+          ),
+        );
       case AppRoutes.giftReportDetail:
         final giftId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => GiftReportDetailPage(giftId: giftId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: GiftReportDetailPage(giftId: giftId),
+          ),
         );
       case AppRoutes.categoryReportDetail:
         final categoryId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => CategoryReportDetailPage(categoryId: categoryId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: CategoryReportDetailPage(categoryId: categoryId),
+          ),
         );
       case AppRoutes.userReportDetail:
         final userId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => PersistentBlocProvider<UserReportsBloc>(
-            debugLabel: 'UserReportDetailRoute',
-            create: () => di.sl<UserReportsBloc>(),
-            child: UserReportDetailPage(userId: userId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: PersistentBlocProvider<UserReportsBloc>(
+              debugLabel: 'UserReportDetailRoute',
+              create: () => di.sl<UserReportsBloc>(),
+              child: UserReportDetailPage(userId: userId),
+            ),
           ),
         );
       case AppRoutes.postReportDetail:
         final postId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => PersistentBlocProvider<PostReportDetailBloc>(
-            debugLabel: 'PostReportDetailRoute',
-            create: () => di.sl<PostReportDetailBloc>(),
-            child: PostReportDetailPage(postId: postId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: PersistentBlocProvider<PostReportDetailBloc>(
+              debugLabel: 'PostReportDetailRoute',
+              create: () => di.sl<PostReportDetailBloc>(),
+              child: PostReportDetailPage(postId: postId),
+            ),
           ),
         );
       case AppRoutes.auctionReportDetail:
         final auctionId = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => PersistentBlocProvider<AuctionReportDetailBloc>(
-            debugLabel: 'AuctionReportDetailRoute',
-            create: () => di.sl<AuctionReportDetailBloc>(),
-            child: AuctionReportDetailPage(auctionId: auctionId),
+          builder: (_) => _guarded(
+            canAccess: PermissionManager.canAccessStaffDashboard,
+            child: PersistentBlocProvider<AuctionReportDetailBloc>(
+              debugLabel: 'AuctionReportDetailRoute',
+              create: () => di.sl<AuctionReportDetailBloc>(),
+              child: AuctionReportDetailPage(auctionId: auctionId),
+            ),
           ),
         );
       case AppRoutes.root:
@@ -555,7 +633,7 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
 
   Widget _buildTabPage(int index) {
     final suffix = _tabKeySuffix;
-    return switch (index) {
+    final page = switch (index) {
       0 => AnalyticsPage(key: ValueKey('dashboard_tab_analytics_$suffix')),
       1 => SearchManagementPage(
         key: ValueKey('dashboard_tab_search_management_$suffix'),
@@ -593,6 +671,7 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
       ),
       _ => SizedBox.shrink(key: ValueKey('dashboard_tab_empty_$suffix')),
     };
+    return DashboardTabAccessBoundary(tabIndex: index, child: page);
   }
 
   Widget _tabAt(int index) {

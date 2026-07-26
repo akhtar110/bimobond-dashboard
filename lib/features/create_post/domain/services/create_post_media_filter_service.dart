@@ -51,6 +51,20 @@ class CreatePostMediaFilterService {
     return customColorFilterFor(filter) ?? catalogColorFilterFor(filter);
   }
 
+  /// Ordered color matrices for stacking (catalog then custom), used by web
+  /// CSS `feColorMatrix` on video elements where [ColorFiltered] is ignored.
+  List<List<double>> colorMatricesFor(CreatePostMediaFilterEntity filter) {
+    final matrices = <List<double>>[];
+    final catalog = filter.catalogColorMatrix;
+    if (catalog != null && catalog.length >= 20) {
+      matrices.add(catalog.take(20).toList(growable: false));
+    }
+    if (filter.hasCustomAdjustments) {
+      matrices.add(buildColorMatrix(filter));
+    }
+    return matrices;
+  }
+
   Widget buildFilteredPreview({
     required Widget child,
     required CreatePostMediaFilterEntity filter,
@@ -102,14 +116,26 @@ class CreatePostMediaFilterService {
   Future<CreatePostEntity> applyFiltersToImages(CreatePostEntity form) async {
     final updated = <LocalMediaFile>[];
     for (final file in form.localMedia) {
-      if (file.mediaType != 'IMAGE' || !file.hasFilter) {
+      if (file.mediaType == 'IMAGE' && file.hasFilter) {
+        final filteredBytes = await applyToImageBytes(file.bytes, file.filter);
+        updated.add(file.copyWith(bytes: filteredBytes));
+      } else {
         updated.add(file);
-        continue;
       }
-      final filteredBytes = await applyToImageBytes(file.bytes, file.filter);
-      updated.add(file.copyWith(bytes: filteredBytes));
     }
-    return form.copyWith(localMedia: updated);
+
+    var result = form.copyWith(localMedia: updated);
+    if (result.thumbnailBytes != null && result.thumbnailBytes!.isNotEmpty) {
+      final filteredVideos = result.localMedia.where((m) => m.mediaType == 'VIDEO' && m.hasFilter);
+      if (filteredVideos.isNotEmpty) {
+        final filteredThumb = await applyToImageBytes(
+          result.thumbnailBytes!,
+          filteredVideos.first.filter,
+        );
+        result = result.copyWith(thumbnailBytes: filteredThumb);
+      }
+    }
+    return result;
   }
 
   static List<double> _matrix({

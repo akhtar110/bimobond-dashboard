@@ -81,7 +81,8 @@ class PostContentSection extends StatelessWidget {
               _PostInfoRow(
                 icon: Icons.category_outlined,
                 label: l10n.t('type'),
-                value: draft.type,
+                // Image + attached sound is still IMAGE (not VIDEO).
+                value: draft.displayContentType,
               ),
               const SizedBox(height: InvestigationTheme.s8),
               _PostInfoRow(

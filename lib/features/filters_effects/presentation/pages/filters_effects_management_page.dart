@@ -10,6 +10,7 @@ import '../bloc/filters_effects_event.dart';
 import '../bloc/filters_effects_state.dart';
 import '../utils/fe_filter_preview_support.dart';
 import '../utils/filters_effects_responsive.dart';
+import '../widgets/ar_overlays_tab.dart';
 import '../widgets/catalog_tab.dart';
 import '../widgets/effects_tab.dart';
 import '../widgets/fe_bulk_selection_toolbar.dart';
@@ -307,6 +308,7 @@ class _ManagementBody extends StatelessWidget {
         selectedCategoryId: selectedEffectCategoryId,
         onClearCategory: onClearCategory,
       ),
+      FiltersEffectsTab.arOverlays => ArOverlaysTab(metrics: metrics),
       FiltersEffectsTab.catalog => CatalogTab(loaded: loaded, metrics: metrics),
     };
   }

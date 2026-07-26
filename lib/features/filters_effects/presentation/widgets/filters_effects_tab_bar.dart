@@ -53,6 +53,11 @@ class FiltersEffectsTabBar extends StatelessWidget {
         Icons.auto_awesome_rounded,
       ),
       (
+        FiltersEffectsTab.arOverlays,
+        l10n.tOr('arOverlays', 'AR Overlays'),
+        Icons.layers_outlined,
+      ),
+      (
         FiltersEffectsTab.catalog,
         l10n.tOr('feCatalog', 'Catalog'),
         Icons.inventory_2_outlined,
@@ -265,7 +270,8 @@ class _TabActions extends StatelessWidget {
       ),
       FiltersEffectsTab.catalog ||
       FiltersEffectsTab.filterCategories ||
-      FiltersEffectsTab.effectCategories => const SizedBox.shrink(),
+      FiltersEffectsTab.effectCategories ||
+      FiltersEffectsTab.arOverlays => const SizedBox.shrink(),
     };
   }
 

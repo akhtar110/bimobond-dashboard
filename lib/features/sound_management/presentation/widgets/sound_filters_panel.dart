@@ -278,18 +278,21 @@ class _SoundFilterPopup extends StatefulWidget {
 
 class _SoundFilterPopupState extends State<_SoundFilterPopup> {
   late bool? _isActive;
+  late bool? _isFromDashboard;
   late SoundSortMode _sort;
 
   @override
   void initState() {
     super.initState();
     _isActive = widget.query.isActive;
+    _isFromDashboard = widget.query.isFromDashboard;
     _sort = widget.query.sort;
   }
 
   void _reset() {
     setState(() {
       _isActive = null;
+      _isFromDashboard = null;
       _sort = SoundSortMode.trending;
     });
   }
@@ -300,9 +303,15 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
   }
 
   void _apply() {
+    // Notify host first (e.g. clear group tab) so Hidden/Active hits All Sounds.
     widget.onStatusChanged?.call();
-    widget.soundsBloc.add(FilterSoundsActiveEvent(_isActive));
-    widget.soundsBloc.add(SortSoundsEvent(_sort));
+    widget.soundsBloc.add(
+      ApplySoundsFiltersEvent(
+        isActive: _isActive,
+        isFromDashboard: _isFromDashboard,
+        sort: _sort,
+      ),
+    );
     _close();
   }
 
@@ -320,6 +329,14 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
               ? l10n.t('soundStatusActive')
               : l10n.t('soundStatusHidden'),
           onRemove: () => setState(() => _isActive = null),
+        ),
+      if (_isFromDashboard != null)
+        GiftsActiveFilterItem(
+          id: 'origin',
+          label: _isFromDashboard!
+              ? l10n.tOr('soundSourceDashboard', 'Dashboard Tracks')
+              : l10n.tOr('soundSourceUser', 'User Uploads'),
+          onRemove: () => setState(() => _isFromDashboard = null),
         ),
       if (_sort != SoundSortMode.trending)
         GiftsActiveFilterItem(
@@ -370,6 +387,28 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
                           label: l10n.t('soundStatusHidden'),
                           selected: _isActive == false,
                           onTap: () => setState(() => _isActive = false),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n.tOr('soundSourceSection', 'Source / Origin').toUpperCase(),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: l10n.t('all'),
+                          selected: _isFromDashboard == null,
+                          onTap: () => setState(() => _isFromDashboard = null),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('soundSourceDashboard', 'Dashboard Tracks'),
+                          selected: _isFromDashboard == true,
+                          onTap: () => setState(() => _isFromDashboard = true),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('soundSourceUser', 'User Uploads'),
+                          selected: _isFromDashboard == false,
+                          onTap: () => setState(() => _isFromDashboard = false),
                         ),
                       ],
                     ),

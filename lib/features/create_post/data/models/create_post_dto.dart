@@ -101,12 +101,26 @@ class CreatePostDto {
             )
           : null,
       playlistId: entity.playlistId,
-      soundId: entity.soundId,
-      newSound: (entity.soundId == null || entity.soundId!.trim().isEmpty) &&
-              entity.newSound != null &&
-              entity.newSound!.isComplete
+      soundId: (entity.newSound != null && entity.newSound!.isComplete)
+          ? null
+          : (entity.soundId?.trim().isNotEmpty == true
+              ? entity.soundId!.trim()
+              : (entity.selectedSound?.id?.trim().isNotEmpty == true &&
+                      !entity.selectedSound!.id.startsWith('sound_')
+                  ? entity.selectedSound!.id.trim()
+                  : null)),
+      newSound: (entity.newSound != null && entity.newSound!.isComplete)
           ? CreateNewSoundDto.fromEntity(entity.newSound!)
-          : null,
+          : ((entity.soundId == null || entity.soundId!.trim().isEmpty) &&
+                  entity.selectedSound != null &&
+                  entity.selectedSound!.audioUrl.trim().isNotEmpty
+              ? CreateNewSoundDto(
+                  audioUrl: entity.selectedSound!.audioUrl,
+                  duration: entity.selectedSound!.duration ?? 0,
+                  name: entity.selectedSound!.name,
+                  coverUrl: entity.selectedSound!.coverUrl,
+                )
+              : null),
       originalPostId: entity.originalPostId,
       media: entity.media.isEmpty
           ? null

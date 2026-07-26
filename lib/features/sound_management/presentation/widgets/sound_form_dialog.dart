@@ -70,6 +70,7 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
   late final TextEditingController _coverUrlController;
   late final TextEditingController _durationController;
   late bool _isActive;
+  late bool _isFromDashboard;
 
   String? _audioFilename;
   List<int>? _audioBytes;
@@ -109,6 +110,7 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
       text: sound != null && sound.duration > 0 ? '${sound.duration}' : '',
     );
     _isActive = sound?.isActive ?? true;
+    _isFromDashboard = sound?.isFromDashboard ?? true;
     _detectedDuration = sound?.duration;
     _loadGroups();
   }
@@ -282,6 +284,7 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
                 ? parsedDuration
                 : null,
             isActive: _isActive,
+            isFromDashboard: _isFromDashboard,
           ),
           assignGroupId: _selectedGroupId,
           previousAssignGroupId: _initialGroupId,
@@ -325,6 +328,7 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
             duration: duration,
             coverBytes: _coverBytes,
             coverFilename: _coverFilename,
+            isFromDashboard: _isFromDashboard,
           ),
           assignGroupId: _selectedGroupId,
         ),
@@ -343,6 +347,7 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
               ? null
               : _coverUrlController.text.trim(),
           isActive: _isActive,
+          isFromDashboard: _isFromDashboard,
         ),
         assignGroupId: _selectedGroupId,
       ),
@@ -643,6 +648,24 @@ class _SoundFormDialogState extends State<SoundFormDialog> {
                   title: Text(l10n.t('soundStatusActive')),
                   value: _isActive,
                   onChanged: busy ? null : (v) => setState(() => _isActive = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    l10n.tOr(
+                      'soundIsFromDashboard',
+                      'Public Dashboard Catalog Track',
+                    ),
+                  ),
+                  subtitle: Text(
+                    l10n.tOr(
+                      'soundIsFromDashboardHint',
+                      'Visible in public app library catalog',
+                    ),
+                    style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                  ),
+                  value: _isFromDashboard,
+                  onChanged: busy ? null : (v) => setState(() => _isFromDashboard = v),
                 ),
                 if (_fileError != null) ...[
                   const SizedBox(height: 8),

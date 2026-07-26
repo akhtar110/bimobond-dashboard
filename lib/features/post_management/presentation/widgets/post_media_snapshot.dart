@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/entities/managed_post_sound_entity.dart';
 import '../../domain/entities/post_media_entity.dart';
@@ -32,21 +33,30 @@ class PostMediaSnapshot {
   final ManagedPostSoundEntity? sound;
 
   bool get hasAttachedSound =>
-      soundId != null && soundId!.trim().isNotEmpty;
+      (soundId != null && soundId!.trim().isNotEmpty) ||
+      (sound != null &&
+          (sound!.audioUrl.trim().isNotEmpty || sound!.id.trim().isNotEmpty));
 
   String? get attachedSoundPlayUrl {
     final url = sound?.audioUrl;
-    if (url != null && url.trim().isNotEmpty) return url.trim();
+    if (url != null && url.trim().isNotEmpty) {
+      final trimmed = url.trim();
+      return resolveMediaUrl(trimmed) ?? trimmed;
+    }
     return null;
   }
 
-  bool get shouldPlayAttachedSound {
-    final isVideo = type.toUpperCase() == 'VIDEO';
-    final hasVideoMedia = isVideo || media.any((item) => item.isVideo);
-    return !hasVideoMedia &&
-        hasAttachedSound &&
-        attachedSoundPlayUrl != null;
+  /// Non-empty sound UUID usable for `GET /sounds/:id` hydration.
+  String? get resolvedSoundId {
+    final top = soundId?.trim();
+    if (top != null && top.isNotEmpty) return top;
+    final nested = sound?.id.trim();
+    if (nested != null && nested.isNotEmpty) return nested;
+    return null;
   }
+
+  bool get shouldPlayAttachedSound =>
+      hasAttachedSound && attachedSoundPlayUrl != null;
 
   factory PostMediaSnapshot.fromPost(ManagedPostEntity post) {
     return PostMediaSnapshot(

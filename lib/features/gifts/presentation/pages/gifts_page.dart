@@ -82,29 +82,40 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
       return;
     }
     if (position.pixels >= position.maxScrollExtent - 300) {
-      context.read<GiftsBloc>().add(LoadMoreGiftsEvent());
+      final bloc = context.read<GiftsBloc>();
+      final state = bloc.state;
+      if (state is GiftsLoaded && !state.hasReachedMaxGifts && !state.isActioning) {
+        bloc.add(LoadMoreGiftsEvent());
+      }
     }
   }
 
   double _horizontalPadding(double width) {
+    if (width < 360) return 8;
     if (width < 400) return 10;
     if (width < 600) return 14;
     return GiftsLayoutMetrics(getGiftsDeviceType(width)).pageHorizontalPadding;
   }
 
   double _verticalPadding(double width) {
+    if (width < 360) return 8;
     if (width < 400) return 10;
     if (width < 720) return 12;
     return 16;
   }
 
   double _sectionSpacing(double width) {
+    if (width < 360) return 6;
     if (width < 400) return 8;
     if (width < 720) return 10;
     return 12;
   }
 
-  double _panelRadius(double width) => width < 520 ? 12 : 16;
+  double _panelRadius(double width) {
+    if (width < 360) return 8;
+    if (width < 520) return 12;
+    return 16;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -193,11 +204,17 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                         );
                     }
                     if (state.errorMessage != null) {
+                      final l10n = ctx.l10n;
                       messenger
                         ..hideCurrentSnackBar()
                         ..showSnackBar(
                           SnackBar(
-                            content: Text(state.errorMessage!),
+                            content: Text(
+                              l10n.tOr(
+                                state.errorMessage!,
+                                state.errorMessage!,
+                              ),
+                            ),
                             backgroundColor: scheme.error,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -239,6 +256,8 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final width = constraints.maxWidth;
+                      final height = constraints.maxHeight;
+                      final hasBoundedHeight = constraints.hasBoundedHeight;
                       final metrics =
                           GiftsLayoutMetrics(getGiftsDeviceType(width));
                       final hPad = _horizontalPadding(width);
@@ -251,6 +270,132 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                           metrics.useDesktopPagination &&
                               loaded != null &&
                               loaded.giftsTotalCount > 0;
+
+                      final isLowHeight = !hasBoundedHeight || height < 550;
+
+                      Widget buildBodyPanel() {
+                        return _CatalogBodyPanel(
+                          state: state,
+                          radius: _panelRadius(width),
+                          scrollController: _scrollController,
+                          selectedGroupId: _selectedGroupId,
+                        );
+                      }
+
+                      final headerWidget = GiftsPageHeader(
+                        isLoading: state is GiftsLoading,
+                        showViewToggle: isLoaded,
+                        canAdd: isLoaded,
+                        compact: compactHeader,
+                        onAdd: () => showCreateGiftDialog(ctx),
+                        onRefresh: () {
+                          ctx
+                              .read<GiftsBloc>()
+                              .add(LoadAdminGiftsEvent());
+                          ctx.read<GiftGroupsBloc>().add(
+                                const LoadGiftGroupsEvent(
+                                  refresh: true,
+                                ),
+                              );
+                        },
+                      );
+
+                      final filtersPanelWidget = loaded != null
+                          ? GiftsFiltersPanel(
+                              loaded: loaded,
+                              screenWidth: width,
+                              onStatusFilterSelected: (_) {
+                                setState(
+                                  () => _selectedGroupId = null,
+                                );
+                              },
+                            )
+                          : null;
+
+                      final catalogTabsWidget = loaded != null
+                          ? GiftsCatalogTabsBar(
+                              selectedGroupId: _selectedGroupId,
+                              onGroupSelected: (group) {
+                                setState(
+                                  () => _selectedGroupId = group?.id,
+                                );
+                                if (group != null) {
+                                  ctx.read<GiftsBloc>().add(
+                                        GoToGiftsPageEvent(1),
+                                      );
+                                }
+                              },
+                            )
+                          : null;
+
+                      final bulkToolbarWidget = loaded != null
+                          ? const GiftsBulkSelectionToolbar()
+                          : null;
+
+                      final paginationWidget = showDesktopPagination
+                          ? _CatalogPagination(
+                              loaded: loaded,
+                              selectedGroupId: _selectedGroupId,
+                            )
+                          : null;
+
+                      Widget content;
+
+                      if (!isLowHeight) {
+                        content = Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            headerWidget,
+                            SizedBox(height: sectionGap),
+                            if (loaded != null) ...[
+                              filtersPanelWidget!,
+                              SizedBox(height: sectionGap),
+                              catalogTabsWidget!,
+                              SizedBox(height: width < 520 ? 8 : 10),
+                              bulkToolbarWidget!,
+                              SizedBox(height: width < 520 ? 8 : 10),
+                            ],
+                            Expanded(
+                              child: buildBodyPanel(),
+                            ),
+                            if (paginationWidget != null) ...[
+                              SizedBox(height: width < 720 ? 8 : 10),
+                              paginationWidget,
+                            ],
+                          ],
+                        );
+                      } else {
+                        final fallbackBodyHeight = hasBoundedHeight
+                            ? (height - 200).clamp(380.0, 700.0)
+                            : 480.0;
+
+                        content = SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              headerWidget,
+                              SizedBox(height: sectionGap),
+                              if (loaded != null) ...[
+                                filtersPanelWidget!,
+                                SizedBox(height: sectionGap),
+                                catalogTabsWidget!,
+                                SizedBox(height: width < 520 ? 8 : 10),
+                                bulkToolbarWidget!,
+                                SizedBox(height: width < 520 ? 8 : 10),
+                              ],
+                              SizedBox(
+                                height: fallbackBodyHeight,
+                                child: buildBodyPanel(),
+                              ),
+                              if (paginationWidget != null) ...[
+                                SizedBox(height: width < 720 ? 8 : 10),
+                                paginationWidget,
+                              ],
+                            ],
+                          ),
+                        );
+                      }
 
                       return Align(
                         alignment: Alignment.topCenter,
@@ -265,72 +410,7 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                               hPad,
                               vPad,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                GiftsPageHeader(
-                                  isLoading: state is GiftsLoading,
-                                  showViewToggle: isLoaded,
-                                  canAdd: isLoaded,
-                                  compact: compactHeader,
-                                  onAdd: () => showCreateGiftDialog(ctx),
-                                  onRefresh: () {
-                                    ctx
-                                        .read<GiftsBloc>()
-                                        .add(LoadAdminGiftsEvent());
-                                    ctx.read<GiftGroupsBloc>().add(
-                                          const LoadGiftGroupsEvent(
-                                            refresh: true,
-                                          ),
-                                        );
-                                  },
-                                ),
-                                SizedBox(height: sectionGap),
-                                if (loaded != null) ...[
-                                  GiftsFiltersPanel(
-                                    loaded: loaded,
-                                    screenWidth: width,
-                                    onStatusFilterSelected: (_) {
-                                      setState(
-                                        () => _selectedGroupId = null,
-                                      );
-                                    },
-                                  ),
-                                  SizedBox(height: sectionGap),
-                                  GiftsCatalogTabsBar(
-                                    selectedGroupId: _selectedGroupId,
-                                    onGroupSelected: (group) {
-                                      setState(
-                                        () => _selectedGroupId = group?.id,
-                                      );
-                                      if (group != null) {
-                                        ctx.read<GiftsBloc>().add(
-                                              GoToGiftsPageEvent(1),
-                                            );
-                                      }
-                                    },
-                                  ),
-                                  SizedBox(height: width < 520 ? 8 : 10),
-                                  const GiftsBulkSelectionToolbar(),
-                                  SizedBox(height: width < 520 ? 8 : 10),
-                                ],
-                                Expanded(
-                                  child: _CatalogBodyPanel(
-                                    state: state,
-                                    radius: _panelRadius(width),
-                                    scrollController: _scrollController,
-                                    selectedGroupId: _selectedGroupId,
-                                  ),
-                                ),
-                                if (showDesktopPagination) ...[
-                                  SizedBox(height: width < 720 ? 8 : 10),
-                                  _CatalogPagination(
-                                    loaded: loaded,
-                                    selectedGroupId: _selectedGroupId,
-                                  ),
-                                ],
-                              ],
-                            ),
+                            child: content,
                           ),
                         ),
                       );

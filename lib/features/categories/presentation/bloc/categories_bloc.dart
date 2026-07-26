@@ -1,7 +1,10 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/l10n_message.dart';
+import '../../../../core/utils/api_error_messages.dart';
 import '../../domain/entities/categories_admin_list_query.dart';
 import '../../domain/entities/category_entity.dart';
 import '../../domain/entities/category_filters.dart';
@@ -9,7 +12,6 @@ import '../../domain/usecases/create_category_usecase.dart';
 import '../../domain/usecases/delete_category_usecase.dart';
 import '../../domain/usecases/get_all_categories_usecase.dart';
 import '../../domain/usecases/update_category_usecase.dart';
-import '../../../../core/localization/l10n_message.dart';
 import '../models/category_ui_state.dart';
 
 export '../../domain/entities/category_filters.dart';
@@ -1034,7 +1036,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     } catch (e) {
       emit(current.copyWith(
         isSubmitting: false,
-        failureMessage: _msg(e),
+        failureMessage: _categoryActionErrorMessage(e),
       ));
     }
   }
@@ -1072,7 +1074,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
       emit(_emitWithFilters(current.copyWith(
         categories: list,
         isSubmitting: false,
-        failureMessage: _msg(e),
+        failureMessage: _categoryActionErrorMessage(e),
       )));
     }
   }
@@ -1451,7 +1453,35 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     ));
   }
 
-  String _msg(Object e) => e.toString().replaceFirst('Exception: ', '');
+  String _msg(Object e) => ApiErrorMessages.from(e);
+
+  String _categoryActionErrorMessage(Object error) {
+    if (_isDuplicateCategoryNameError(error)) {
+      return l10nMsg('categoryNameAlreadyExists');
+    }
+    return _msg(error);
+  }
+
+  bool _isDuplicateCategoryNameError(Object error) {
+    final message = ApiErrorMessages.from(error).toLowerCase();
+    final looksLikeDuplicateName = message.contains('duplicate') ||
+        message.contains('already exist') ||
+        message.contains('already exists') ||
+        message.contains('unique') ||
+        (message.contains('name') &&
+            (message.contains('exist') ||
+                message.contains('taken') ||
+                message.contains('in use') ||
+                message.contains('conflict')));
+
+    if (error is DioException) {
+      final code = error.response?.statusCode;
+      if (code == 409) return true;
+      if ((code == 400 || code == 422) && looksLikeDuplicateName) return true;
+    }
+
+    return looksLikeDuplicateName;
+  }
 
   @override
   Future<void> close() {

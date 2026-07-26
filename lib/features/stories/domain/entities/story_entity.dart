@@ -129,15 +129,47 @@ class StoryEntity extends Equatable {
 
   String? get previewUrl => primaryMedia?.url;
 
-  String get thumbnailUrl {
+  static bool isVideoUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    final lower = url.trim().toLowerCase();
+    return lower.contains('.mp4') ||
+        lower.contains('.mov') ||
+        lower.contains('.webm') ||
+        lower.contains('.m3u8') ||
+        lower.contains('.avi') ||
+        lower.contains('.mkv');
+  }
+
+  bool get hasValidImageThumbnail {
     final mediaItem = primaryMedia;
-    if (mediaItem == null) return '';
-    if (mediaItem.isVideo) {
-      return mediaItem.thumbnailUrl?.trim().isNotEmpty == true
-          ? mediaItem.thumbnailUrl!.trim()
-          : mediaItem.url;
+    if (mediaItem == null) return false;
+    final thumb = mediaItem.thumbnailUrl?.trim();
+    if (thumb != null && thumb.isNotEmpty && !isVideoUrl(thumb)) {
+      return true;
     }
-    return mediaItem.url;
+    if (!mediaItem.isVideo && mediaItem.url.trim().isNotEmpty && !isVideoUrl(mediaItem.url)) {
+      return true;
+    }
+    return false;
+  }
+
+  String? get validImageThumbnailUrl {
+    final mediaItem = primaryMedia;
+    if (mediaItem == null) return null;
+    final thumb = mediaItem.thumbnailUrl?.trim();
+    if (thumb != null && thumb.isNotEmpty && !isVideoUrl(thumb)) {
+      return thumb;
+    }
+    if (!mediaItem.isVideo && mediaItem.url.trim().isNotEmpty && !isVideoUrl(mediaItem.url)) {
+      return mediaItem.url.trim();
+    }
+    return null;
+  }
+
+  String get thumbnailUrl {
+    final validImg = validImageThumbnailUrl;
+    if (validImg != null && validImg.isNotEmpty) return validImg;
+    return primaryMedia?.url ?? '';
   }
 
   String get caption => description.trim();

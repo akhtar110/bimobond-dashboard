@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../utils/effect_anchor_form_data.dart';
+import 'fe_editor_synced_text_field.dart';
 
 /// Face pins, MediaPipe landmarks, and scale slider for sticker anchors.
 class EffectAnchorFieldsForm extends StatelessWidget {
@@ -487,24 +488,15 @@ class _AnchorScaleSlider extends StatelessWidget {
                     ),
                   ),
                 ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    child: Text(
-                      value.toStringAsFixed(1),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: scheme.onPrimaryContainer,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                FeSyncedNumberInput(
+                  value: value,
+                  min: EffectAnchorFormData.scaleMin,
+                  max: EffectAnchorFormData.scaleMax,
+                  isDouble: true,
+                  decimals: 1,
+                  width: 58,
+                  height: 28,
+                  onChanged: (v) => onChanged(v.toDouble()),
                 ),
               ],
             ),
@@ -585,6 +577,19 @@ class _AnchorFracSlider extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (enabled) ...[
+                  FeSyncedNumberInput(
+                    value: value,
+                    min: EffectAnchorFormData.fracMin,
+                    max: EffectAnchorFormData.fracMax,
+                    isDouble: true,
+                    decimals: 2,
+                    width: 62,
+                    height: 28,
+                    onChanged: (v) => onChanged(v.toDouble()),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Switch(
                   value: enabled,
                   onChanged: onToggle,
@@ -650,6 +655,19 @@ class _AnchorPivotSlider extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (enabled) ...[
+                  FeSyncedNumberInput(
+                    value: value,
+                    min: EffectAnchorFormData.pivotMin,
+                    max: EffectAnchorFormData.pivotMax,
+                    isDouble: true,
+                    decimals: 2,
+                    width: 62,
+                    height: 28,
+                    onChanged: (v) => onChanged(v.toDouble()),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Switch(
                   value: enabled,
                   onChanged: onToggle,

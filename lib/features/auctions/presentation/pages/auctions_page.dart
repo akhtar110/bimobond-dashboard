@@ -7,6 +7,7 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
+import '../../../rbac/presentation/widgets/access_denied_view.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../bloc/auctions_bloc.dart';
@@ -36,14 +37,17 @@ class AuctionsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kDebugMode) debugPrint('AuctionsPage rebuilt');
-    return PersistentBlocProvider<AuctionsBloc>(
-      debugLabel: 'AuctionsPage',
-      create: () =>
-          sl<AuctionsBloc>()..add(LoadAllAuctionsEvent(refresh: true)),
-      child: BlocProvider(
-        create: (_) => sl<SellerVerificationBloc>()
-          ..add(const LoadSellerVerificationsEvent(refresh: true)),
-        child: const _AuctionsPageView(),
+    return FeatureAccessBoundary(
+      canAccess: PermissionManager.canReadAuctions,
+      child: PersistentBlocProvider<AuctionsBloc>(
+        debugLabel: 'AuctionsPage',
+        create: () =>
+            sl<AuctionsBloc>()..add(LoadAllAuctionsEvent(refresh: true)),
+        child: BlocProvider(
+          create: (_) => sl<SellerVerificationBloc>()
+            ..add(const LoadSellerVerificationsEvent(refresh: true)),
+          child: const _AuctionsPageView(),
+        ),
       ),
     );
   }
@@ -199,12 +203,11 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
                         SliverPadding(
                           padding: EdgeInsets.all(metrics.pageHorizontalPadding),
                           sliver: SliverToBoxAdapter(
-                            child: Text(
-                              context.l10n.tOr(
+                            child: AccessDeniedView(
+                              message: context.l10n.tOr(
                                 'sellerVerificationNoAccess',
                                 'You do not have permission to review seller applications.',
                               ),
-                              style: TextStyle(color: scheme.onSurfaceVariant),
                             ),
                           ),
                         ),
