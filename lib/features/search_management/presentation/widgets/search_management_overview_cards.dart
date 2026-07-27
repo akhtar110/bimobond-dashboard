@@ -5,7 +5,8 @@ import '../../../promotions/presentation/widgets/promotions_dashboard_widgets.da
 import '../../domain/entities/search_management_entities.dart';
 import '../utils/search_management_responsive.dart';
 
-/// Compact KPI chips — wraps on narrow widths, scrolls horizontally otherwise.
+/// Compact KPI chips — always one horizontal strip on small/medium widths
+/// so they do not steal vertical space from the content tabs.
 class SearchManagementOverviewCards extends StatelessWidget {
   const SearchManagementOverviewCards({
     super.key,
@@ -17,9 +18,12 @@ class SearchManagementOverviewCards extends StatelessWidget {
   final SearchManagementLayoutMetrics? metrics;
 
   static const stripHeight = 38.0;
+  static const stripHeightCompact = 34.0;
   static const _defaultMaxTileWidth = 140.0;
   static const _wideMaxTileWidth = 176.0;
   static const _minTileWidth = 96.0;
+  static const _compactMinTileWidth = 88.0;
+  static const _compactMaxTileWidth = 128.0;
 
   @override
   Widget build(BuildContext context) {
@@ -70,56 +74,35 @@ class SearchManagementOverviewCards extends StatelessWidget {
       builder: (context, constraints) {
         final gap = metrics?.filterGap ?? PromotionsSpace.sm;
         final width = constraints.maxWidth;
-        final useWrap = width < 900;
+        final compact = width < 700;
+        final height = compact ? stripHeightCompact : stripHeight;
+        final minW = compact ? _compactMinTileWidth : _minTileWidth;
+        final maxW = compact ? _compactMaxTileWidth : _defaultMaxTileWidth;
 
-        if (useWrap) {
-          // Prefer equal-width tiles in a grid when wrapping.
-          final columns = width < 360
-              ? 1
-              : width < 520
-                  ? 2
-                  : width < 720
-                      ? 3
-                      : 3;
-          final tileWidth =
-              ((width - (gap * (columns - 1))) / columns).clamp(120.0, 220.0);
-
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final item in items)
-                SizedBox(
-                  width: tileWidth,
-                  child: _KpiTile(
-                    item: item,
-                    minWidth: tileWidth,
-                    maxWidth: tileWidth,
-                  ),
-                ),
-            ],
-          );
-        }
-
+        // One horizontal strip on every breakpoint — avoids multi-row Wrap
+        // eating vertical space on phones/tablets.
         return SizedBox(
-          height: stripHeight,
-          child: SingleChildScrollView(
+          height: height,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.hardEdge,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  if (i > 0) SizedBox(width: gap),
-                  _KpiTile(
-                    item: items[i],
-                    minWidth: _minTileWidth,
-                    maxWidth: items[i].maxWidth ?? _defaultMaxTileWidth,
-                  ),
-                ],
-              ],
-            ),
+            physics: const BouncingScrollPhysics(),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => SizedBox(width: gap),
+            itemBuilder: (context, i) {
+              final item = items[i];
+              return _KpiTile(
+                item: item,
+                height: height,
+                compact: compact,
+                minWidth: minW,
+                maxWidth: item.maxWidth != null
+                    ? (compact
+                        ? (item.maxWidth! * 0.85).clamp(minW, 148.0)
+                        : item.maxWidth!)
+                    : maxW,
+              );
+            },
           ),
         );
       },
@@ -139,30 +122,32 @@ class SearchManagementOverviewSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const widths = [112.0, 108.0, 100.0, 112.0, 120.0, 132.0];
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 700;
+    final height = compact
+        ? SearchManagementOverviewCards.stripHeightCompact
+        : SearchManagementOverviewCards.stripHeight;
+    final widths = compact
+        ? const [88.0, 84.0, 80.0, 88.0, 92.0, 104.0]
+        : const [112.0, 108.0, 100.0, 112.0, 120.0, 132.0];
 
     return SizedBox(
-      height: SearchManagementOverviewCards.stripHeight,
-      child: SingleChildScrollView(
+      height: height,
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
-        child: Row(
-          children: [
-            for (var i = 0; i < widths.length; i++) ...[
-              if (i > 0) const SizedBox(width: PromotionsSpace.sm),
-              Container(
-                width: widths[i],
-                height: SearchManagementOverviewCards.stripHeight,
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: scheme.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                ),
-              ),
-            ],
-          ],
+        itemCount: widths.length,
+        separatorBuilder: (_, _) => const SizedBox(width: PromotionsSpace.sm),
+        itemBuilder: (context, i) => Container(
+          width: widths[i],
+          height: height,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+          ),
         ),
       ),
     );
@@ -190,11 +175,15 @@ class _KpiTile extends StatelessWidget {
     required this.item,
     required this.minWidth,
     required this.maxWidth,
+    required this.height,
+    this.compact = false,
   });
 
   final _KpiItem item;
   final double minWidth;
   final double maxWidth;
+  final double height;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -209,19 +198,26 @@ class _KpiTile extends StatelessWidget {
           maxWidth: maxWidth,
         ),
         child: Container(
-          height: SearchManagementOverviewCards.stripHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          height: height,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 10,
+            vertical: compact ? 3 : 4,
+          ),
           decoration: BoxDecoration(
             color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(compact ? 8 : 10),
             border: Border.all(
               color: scheme.outlineVariant.withValues(alpha: 0.45),
             ),
           ),
           child: Row(
             children: [
-              Icon(item.icon, size: 14, color: scheme.primary),
-              const SizedBox(width: 6),
+              Icon(
+                item.icon,
+                size: compact ? 13 : 14,
+                color: scheme.primary,
+              ),
+              SizedBox(width: compact ? 5 : 6),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,18 +231,18 @@ class _KpiTile extends StatelessWidget {
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w800,
                             height: 1.0,
-                            fontSize: 13,
+                            fontSize: compact ? 12 : 13,
                           ),
                     ),
-                    const SizedBox(height: 1),
+                    SizedBox(height: compact ? 0 : 1),
                     Text(
                       item.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: scheme.onSurfaceVariant,
-                            fontSize: 10,
-                            height: 1.1,
+                            fontSize: compact ? 9 : 10,
+                            height: 1.05,
                           ),
                     ),
                   ],

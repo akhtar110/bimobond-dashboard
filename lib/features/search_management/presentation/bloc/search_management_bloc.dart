@@ -32,6 +32,7 @@ class SearchManagementBloc
     on<SearchManagementFilterAppliedEvent>(_onFilterApplied);
     on<SearchManagementFilterResetEvent>(_onFilterReset);
     on<SearchManagementLoadNextPageEvent>(_onLoadNextPage);
+    on<SearchManagementPageChangedEvent>(_onPageChanged);
     on<SearchManagementOpenDetailsEvent>(_onOpenDetails);
     on<SearchManagementSaveHistoryEvent>(_onSaveHistory);
     on<SearchManagementClearHistoryEvent>(_onClearHistory);
@@ -210,6 +211,16 @@ class SearchManagementBloc
         ),
       );
     }
+  }
+
+  Future<void> _onPageChanged(
+    SearchManagementPageChangedEvent event,
+    Emitter<SearchManagementState> emit,
+  ) async {
+    final page = event.page;
+    if (page < 1 || page == _filter.page) return;
+    _filter = _filter.copyWith(page: page);
+    await _reloadContent(emit);
   }
 
   void _onOpenDetails(

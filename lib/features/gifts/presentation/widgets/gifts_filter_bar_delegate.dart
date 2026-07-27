@@ -80,6 +80,8 @@ class GiftsFilterBarDelegate extends SliverPersistentHeaderDelegate {
           GiftSortType.priceHighToLow => l10n.t('priceHighToLow'),
           GiftSortType.dateOldToNew => 'Oldest Gifts',
           GiftSortType.dateNewToOld => 'Newest Gifts',
+          GiftSortType.sortOrderAsc => l10n.tOr('sortBySortOrder', 'Sort Order'),
+          GiftSortType.nameAsc => l10n.tOr('sortByName', 'Name'),
         };
 
     return Material(

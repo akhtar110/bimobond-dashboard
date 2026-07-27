@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../auctions/domain/entities/auction_entity.dart';
 import '../../../users/domain/entities/user_post_entity.dart';
@@ -29,6 +31,11 @@ class LoadGifts extends UserActivityEvent {}
 class LoadDevices extends UserActivityEvent {}
 
 class LoadMorePosts extends UserActivityEvent {}
+
+class ChangePostsPage extends UserActivityEvent {
+  ChangePostsPage(this.page);
+  final int page;
+}
 
 class LoadReposts extends UserActivityEvent {}
 
@@ -160,6 +167,14 @@ class UserActivityState {
 
   static const int _limit = 10;
 
+  /// Page size used by published posts pagination.
+  static const int postsPageLimit = 20;
+
+  int get postsLastPage {
+    if (postsTotal <= 0) return 1;
+    return (postsTotal + postsPageLimit - 1) ~/ postsPageLimit;
+  }
+
   UserActivityState copyWith({
     String? userId,
     List<UserPostEntity>? posts,
@@ -286,6 +301,7 @@ class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
     on<SetUserActivityUserId>(_onSetUserId);
     on<LoadPosts>(_onLoadPosts);
     on<LoadMorePosts>(_onLoadMorePosts);
+    on<ChangePostsPage>(_onChangePostsPage);
     on<LoadReposts>(_onLoadReposts);
     on<LoadMoreReposts>(_onLoadMoreReposts);
     on<LoadAuctions>(_onLoadAuctions);
@@ -307,7 +323,7 @@ class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
   final GetUserActivityDevices _getDevices;
   final DeleteRepostAdmin _deleteRepostAdmin;
 
-  static const int _postsLimit = 20;
+  static const int _postsLimit = UserActivityState.postsPageLimit;
   static const int _limit = UserActivityState._limit;
 
   void _onSetUserId(
@@ -335,6 +351,41 @@ class UserActivityBloc extends Bloc<UserActivityEvent, UserActivityState> {
       final page = await _getPosts(
         state.userId,
         page: 1,
+        limit: _postsLimit,
+      );
+      emit(
+        state.copyWith(
+          posts: page.items,
+          postsPage: page.page,
+          postsTotal: page.total,
+          postsHasReachedMax: page.hasReachedMax,
+          postsLoading: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(postsLoading: false, postsError: e.toString()));
+    }
+  }
+
+  Future<void> _onChangePostsPage(
+    ChangePostsPage event,
+    Emitter<UserActivityState> emit,
+  ) async {
+    if (state.userId.isEmpty) return;
+    final target = event.page.clamp(1, math.max(state.postsLastPage, 1)).toInt();
+    if (target == state.postsPage && state.posts.isNotEmpty) return;
+    if (state.postsLoading) return;
+
+    emit(
+      state.copyWith(
+        postsLoading: true,
+        clearPostsError: true,
+      ),
+    );
+    try {
+      final page = await _getPosts(
+        state.userId,
+        page: target,
         limit: _postsLimit,
       );
       emit(

@@ -7,6 +7,7 @@ import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/gift_group_entities.dart';
 import '../../domain/enums/gift_size.dart';
+import '../../domain/enums/gift_type.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../../domain/usecases/gift_group_usecases.dart';
 import '../bloc/gift_groups_bloc.dart';
@@ -14,9 +15,12 @@ import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
 import 'gift_animation_preview.dart';
+import 'gift_audio_preview.dart';
+import 'gift_color_picker_field.dart';
 import 'gift_dialog_layout.dart';
 import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
+import 'gift_type_selector.dart';
 
 void showCreateGiftDialog(BuildContext pageContext) {
   pageContext.read<GiftsBloc>().add(ClearGiftImageEvent());
@@ -37,6 +41,8 @@ class CreateGiftDialog extends StatefulWidget {
 class CreateGiftDialogState extends State<CreateGiftDialog> {
   final _nameCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final _tagCtrl = TextEditingController();
+  final _sortOrderCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String? _imageError;
   DateTime? _publishedAt = DateTime.now();
@@ -46,6 +52,14 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
   bool _uploadingAnimation = false;
   String? _animationError;
   GiftSize _selectedSize = GiftSize.medium;
+  GiftType _selectedType = GiftType.image;
+  String? _selectedColor;
+  bool _isActive = true;
+  String? _audioUrl;
+  String? _audioName;
+  Uint8List? _audioBytes;
+  bool _uploadingAudio = false;
+  String? _audioError;
   String? _selectedGroupId;
   bool _loadingGroups = false;
   List<GiftGroupEntity> _groups = const [];
@@ -80,6 +94,8 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
   void dispose() {
     _nameCtrl.dispose();
     _priceCtrl.dispose();
+    _tagCtrl.dispose();
+    _sortOrderCtrl.dispose();
     super.dispose();
   }
 
@@ -126,6 +142,38 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
     }
   }
 
+  Future<void> _pickAudio() async {
+    final picked = await pickGiftAudio();
+    if (!mounted || picked == null) return;
+
+    setState(() {
+      _audioBytes = picked.bytes;
+      _audioName = picked.name;
+      _audioUrl = null;
+      _uploadingAudio = true;
+      _audioError = null;
+    });
+
+    try {
+      final url = await di.sl<GiftsRepository>().uploadGiftFile(
+            picked.bytes,
+            picked.name,
+          );
+      if (!mounted) return;
+      setState(() {
+        _audioUrl = url;
+        _uploadingAudio = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingAudio = false;
+        _audioError = e.toString().replaceFirst('Exception: ', '');
+        _audioUrl = null;
+      });
+    }
+  }
+
   Future<void> _pickPublishedAt() async {
     final now = DateTime.now();
     final date = await showDatePicker(
@@ -153,24 +201,52 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
     });
   }
 
+  String? _normalizedTag() {
+    final raw = _tagCtrl.text.trim();
+    if (raw.isEmpty) return null;
+    return raw.length <= 50 ? raw : raw.substring(0, 50);
+  }
+
   void _submit(GiftsLoaded state) {
-    if (state.pendingImageBytes == null) {
+    if (_selectedType == GiftType.image && state.pendingImageBytes == null) {
       setState(() => _imageError = context.l10n.t('pleaseSelectImage'));
       return;
     }
-    if (_uploadingAnimation) return;
+    if (_uploadingAnimation || _uploadingAudio) return;
+    if (_selectedType == GiftType.audio &&
+        (_audioUrl == null || _audioUrl!.trim().isEmpty)) {
+      setState(() {
+        _audioError = context.l10n.tOr(
+          'giftAudioRequired',
+          'Audio file is required for audio gifts',
+        );
+      });
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     Navigator.pop(context);
     widget.pageContext.read<GiftsBloc>().add(
           CreateGiftEvent(
             CreateGiftData(
               name: _nameCtrl.text.trim(),
-              imageBytes: state.pendingImageBytes!,
-              imageName: state.pendingImageName ?? 'gift.jpg',
+              imageBytes: _selectedType == GiftType.image
+                  ? state.pendingImageBytes
+                  : null,
+              imageName: _selectedType == GiftType.image
+                  ? (state.pendingImageName ?? 'gift.jpg')
+                  : null,
               priceCoins: double.parse(_priceCtrl.text.trim()),
               size: _selectedSize,
+              type: _selectedType,
+              tag: _normalizedTag(),
+              color: _selectedType == GiftType.audio ? _selectedColor : null,
+              sortOrder: int.tryParse(_sortOrderCtrl.text.trim()),
+              isActive: _isActive,
               publishedAt: _publishedAt,
-              animationUrl: _animationUrl,
+              animationUrl: _selectedType == GiftType.image
+                  ? _animationUrl
+                  : null,
+              audioUrl: _selectedType == GiftType.audio ? _audioUrl : null,
               assignGroupId: _selectedGroupId,
             ),
           ),
@@ -196,8 +272,10 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
         if (state is! GiftsLoaded) return const SizedBox.shrink();
 
         final hasImage = state.pendingImageBytes != null;
-        final canCreate =
-            hasImage && !state.isActioning && !_uploadingAnimation;
+        final canCreate = !state.isActioning &&
+            !_uploadingAnimation &&
+            !_uploadingAudio &&
+            (_selectedType == GiftType.audio || hasImage);
 
         final mediaColumn = _buildMediaColumn(
           context: context,
@@ -231,6 +309,17 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      GiftTypeSelector(
+                        value: _selectedType,
+                        enabled: !state.isActioning,
+                        onChanged: (value) => setState(() {
+                          _selectedType = value;
+                          if (value == GiftType.audio) {
+                            _imageError = null;
+                          }
+                        }),
+                      ),
+                      SizedBox(height: layout.gap),
                       mediaColumn,
                       SizedBox(height: layout.gap),
                       fieldsColumn,
@@ -286,35 +375,31 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
           ),
         ],
         SizedBox(height: layout.fieldGap),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: AspectRatio(
-            aspectRatio: layout.mediaAspectRatio,
-            child: hasImage
-                ? Image.memory(
-                    state.pendingImageBytes!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                      color: scheme.surfaceContainerHighest,
-                      child: Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  )
-                : ColoredBox(
+        layout.mediaFrame(
+          child: hasImage
+              ? Image.memory(
+                  state.pendingImageBytes!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => ColoredBox(
                     color: scheme.surfaceContainerHighest,
                     child: Center(
                       child: Icon(
-                        Icons.card_giftcard_rounded,
-                        size: 36,
+                        Icons.broken_image_outlined,
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-          ),
+                )
+              : ColoredBox(
+                  color: scheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Icon(
+                      Icons.card_giftcard_rounded,
+                      size: 28,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
         ),
         if (hasImage) ...[
           const SizedBox(height: 4),
@@ -363,34 +448,34 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
         ],
         SizedBox(height: layout.fieldGap),
         if (hasAnimation)
-          GiftAnimationPreview(
-            key: const ValueKey('create-gift-animation-preview'),
-            compact: true,
-            bytes: _animationBytes,
-            networkUrl: _animationUrl,
-            fileName: _animationName ?? _animationUrl,
-            onClear: (state.isActioning || _uploadingAnimation)
-                ? null
-                : () => setState(() {
-                      _animationBytes = null;
-                      _animationUrl = null;
-                      _animationName = null;
-                      _animationError = null;
-                    }),
+          SizedBox(
+            height: layout.mediaMaxHeight + 56,
+            child: GiftAnimationPreview(
+              key: const ValueKey('create-gift-animation-preview'),
+              compact: true,
+              expandToFill: true,
+              bytes: _animationBytes,
+              networkUrl: _animationUrl,
+              fileName: _animationName ?? _animationUrl,
+              onClear: (state.isActioning || _uploadingAnimation)
+                  ? null
+                  : () => setState(() {
+                        _animationBytes = null;
+                        _animationUrl = null;
+                        _animationName = null;
+                        _animationError = null;
+                      }),
+            ),
           )
         else if (layout.useWideLayout)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: AspectRatio(
-              aspectRatio: layout.mediaAspectRatio,
-              child: ColoredBox(
-                color: scheme.surfaceContainerLow,
-                child: Center(
-                  child: Text(
-                    l10n.tOr('noAnimation', 'No animation'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+          layout.mediaFrame(
+            child: ColoredBox(
+              color: scheme.surfaceContainerLow,
+              child: Center(
+                child: Text(
+                  l10n.tOr('noAnimation', 'No animation'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -399,13 +484,121 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
       ],
     );
 
+    final hasAudio = (_audioBytes != null && _audioBytes!.isNotEmpty) ||
+        (_audioUrl != null && _audioUrl!.trim().isNotEmpty);
+    final audioTile = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: (state.isActioning || _uploadingAudio) ? null : _pickAudio,
+          icon: _uploadingAudio
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.audiotrack_rounded, size: 18),
+          label: Text(
+            _uploadingAudio
+                ? l10n.tOr('uploading', 'Uploading…')
+                : hasAudio
+                    ? l10n.tOr('changeAudio', 'Change audio')
+                    : l10n.tOr('uploadAudioRequired', 'Upload audio *'),
+          ),
+          style: layout.denseOutlinedButtonStyle(),
+        ),
+        if (_audioError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _audioError!,
+            style: TextStyle(color: scheme.error, fontSize: 12),
+          ),
+        ],
+        if (hasAudio) ...[
+          SizedBox(height: layout.fieldGap),
+          GiftAudioPreview(
+            key: ValueKey('create-audio-${_audioUrl ?? _audioName}'),
+            networkUrl: _audioUrl,
+            bytes: _audioBytes,
+            fileName: _audioName ?? _audioUrl,
+            onClear: (state.isActioning || _uploadingAudio)
+                ? null
+                : () => setState(() {
+                      _audioBytes = null;
+                      _audioUrl = null;
+                      _audioName = null;
+                      _audioError = null;
+                    }),
+          ),
+        ],
+      ],
+    );
+
+    final secondaryTile =
+        _selectedType == GiftType.audio ? audioTile : animationTile;
+
+    if (_selectedType == GiftType.audio) {
+      final colorTile = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GiftColorPickerField(
+            layout: layout,
+            value: _selectedColor,
+            enabled: !state.isActioning,
+            onChanged: (value) => setState(() => _selectedColor = value),
+          ),
+          SizedBox(height: layout.fieldGap),
+          layout.mediaFrame(
+            child: ColoredBox(
+              color: parseGiftHex(_selectedColor) ??
+                  scheme.surfaceContainerHighest,
+              child: Center(
+                child: Icon(
+                  Icons.audiotrack_rounded,
+                  size: 28,
+                  color: (parseGiftHex(_selectedColor) == null
+                          ? scheme.onSurfaceVariant
+                          : _contrastingOnColor(
+                              parseGiftHex(_selectedColor)!))
+                      .withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+
+      if (layout.useWideLayout) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: colorTile),
+            SizedBox(width: layout.fieldGap),
+            Expanded(child: audioTile),
+          ],
+        );
+      }
+
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          colorTile,
+          SizedBox(height: layout.fieldGap),
+          audioTile,
+        ],
+      );
+    }
+
     if (layout.useWideLayout) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: imageTile),
           SizedBox(width: layout.fieldGap),
-          Expanded(child: animationTile),
+          Expanded(child: secondaryTile),
         ],
       );
     }
@@ -416,9 +609,14 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
       children: [
         imageTile,
         SizedBox(height: layout.fieldGap),
-        animationTile,
+        secondaryTile,
       ],
     );
+  }
+
+  Color _contrastingOnColor(Color color) {
+    final luminance = color.computeLuminance();
+    return luminance > 0.55 ? Colors.black87 : Colors.white;
   }
 
   Widget _buildFieldsColumn({
@@ -436,6 +634,19 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
           decoration: layout.denseDecoration(labelText: l10n.t('giftNameLabel')),
           validator: (v) =>
               v?.trim().isEmpty == true ? l10n.t('requiredField') : null,
+        ),
+        SizedBox(height: layout.fieldGap),
+        TextFormField(
+          controller: _tagCtrl,
+          enabled: !state.isActioning,
+          maxLength: 50,
+          decoration: layout.denseDecoration(
+            labelText: l10n.tOr('giftTag', 'Tag'),
+            helperText: l10n.tOr(
+              'giftTagHint',
+              'Any string up to 50 chars, e.g. NEW, HOT, LIMITED',
+            ),
+          ),
         ),
         SizedBox(height: layout.fieldGap),
         if (layout.useWideLayout)
@@ -607,6 +818,29 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                 : null,
           ),
         ],
+        SizedBox(height: layout.fieldGap),
+        TextFormField(
+          controller: _sortOrderCtrl,
+          enabled: !state.isActioning,
+          keyboardType: TextInputType.number,
+          decoration: layout.denseDecoration(
+            labelText: l10n.tOr('giftSortOrder', 'Sort order'),
+          ),
+        ),
+        SizedBox(height: layout.fieldGap),
+        SwitchListTile.adaptive(
+          value: _isActive,
+          onChanged: state.isActioning
+              ? null
+              : (value) => setState(() => _isActive = value),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          title: Text(
+            l10n.tOr('activeLabel', 'Active'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
         if (state.isActioning) ...[
           SizedBox(height: layout.fieldGap),
           Row(

@@ -21,6 +21,15 @@ Future<({String name, Uint8List bytes})?> pickGiftAnimation() async {
   );
 }
 
+/// Opens the native file dialog for gift audio assets (MP3 / WAV / OGG / M4A).
+/// Returns [null] if the user cancels.
+// ignore: avoid_web_libraries_in_flutter
+Future<({String name, Uint8List bytes})?> pickGiftAudio() async {
+  return _pickFile(
+    accept: 'audio/*,.mp3,.wav,.ogg,.m4a,.aac',
+  );
+}
+
 Future<({String name, Uint8List bytes})?> _pickFile({
   required String accept,
 }) async {

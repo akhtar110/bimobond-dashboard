@@ -136,11 +136,13 @@ class ManagedPostModel extends ManagedPostEntity {
       likeCount: _readInt(json['likeCount']) ?? 0,
       commentCount: _readInt(json['commentCount']) ?? 0,
       saveCount: _readInt(json['saveCount']) ?? 0,
-      repostCount: _readInt(json['repostCount'] ?? json['reposts']) ?? 0,
-      recentReposts: (json['recentReposts'] as List?)
-              ?.whereType<Map<String, dynamic>>()
-              .toList() ??
-          const [],
+      repostCount: _readInt(json['repostCount']) ??
+          _readInt(json['repostsCount']) ??
+          (json['reposts'] is List
+              ? (json['reposts'] as List).length
+              : _readInt(json['reposts'])) ??
+          0,
+      recentReposts: _parseRecentRepostMaps(json),
       recentLikes: parseEngagementUserList(
         json['recentLikes'] ?? json['likes'],
         kind: PostEngagementKind.likes,
@@ -219,6 +221,25 @@ class ManagedPostModel extends ManagedPostEntity {
       }
     }
     return null;
+  }
+
+  static List<Map<String, dynamic>> _parseRecentRepostMaps(
+    Map<String, dynamic> json,
+  ) {
+    for (final key in ['recentReposts', 'reposts', 'repostUsers']) {
+      final raw = json[key];
+      if (raw is! List || raw.isEmpty) continue;
+      final mapped = <Map<String, dynamic>>[];
+      for (final entry in raw) {
+        if (entry is Map<String, dynamic>) {
+          mapped.add(entry);
+        } else if (entry is Map) {
+          mapped.add(Map<String, dynamic>.from(entry));
+        }
+      }
+      if (mapped.isNotEmpty) return mapped;
+    }
+    return const [];
   }
 
   static int? _readInt(dynamic value) {

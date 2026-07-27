@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/gift_group_entities.dart';
+import '../../domain/entities/gift_reorder_item.dart';
 import '../../domain/enums/gift_size.dart';
+import '../../domain/enums/gift_type.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../models/admin_bulk_gifts_dto.dart';
 import '../models/bulk_admin_gift_action_result.dart';
@@ -18,13 +20,19 @@ abstract class GiftsRemoteDataSource {
     required String thumbnailUrl,
     required double priceCoins,
     GiftSize size = GiftSize.medium,
+    GiftType type = GiftType.image,
+    String? tag,
+    String? color,
+    int? sortOrder,
     bool isActive = true,
     DateTime? publishedAt,
     String? animationUrl,
+    String? audioUrl,
   });
   Future<GiftModel> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
   Future<BulkAdminGiftActionResult> executeAdminBulkAction(AdminBulkGiftsDto dto);
+  Future<List<GiftModel>> reorderGifts(List<GiftReorderItem> items);
 
   Future<List<GiftGroupEntity>> getGiftGroups();
   Future<GiftGroupEntity> createGiftGroup(CreateGiftGroupData data);
@@ -118,20 +126,30 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     required String thumbnailUrl,
     required double priceCoins,
     GiftSize size = GiftSize.medium,
+    GiftType type = GiftType.image,
+    String? tag,
+    String? color,
+    int? sortOrder,
     bool isActive = true,
     DateTime? publishedAt,
     String? animationUrl,
+    String? audioUrl,
   }) async {
     final body = <String, dynamic>{
       'name': name,
       'thumbnailUrl': thumbnailUrl,
       'priceCoins': priceCoins,
       'size': size.apiValue,
+      'type': type.apiValue,
       'isActive': isActive,
+      if (tag != null && tag.isNotEmpty) 'tag': tag,
+      if (color != null && color.isNotEmpty) 'color': color,
+      if (sortOrder != null) 'sortOrder': sortOrder,
       if (publishedAt != null)
         'publishedAt': publishedAt.toUtc().toIso8601String(),
       if (animationUrl != null && animationUrl.isNotEmpty)
         'animationUrl': animationUrl,
+      if (audioUrl != null && audioUrl.isNotEmpty) 'audioUrl': audioUrl,
     };
 
     final response = await _dio.post(
@@ -151,16 +169,33 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     if (data.thumbnailUrl != null) body['thumbnailUrl'] = data.thumbnailUrl;
     if (data.priceCoins != null) body['priceCoins'] = data.priceCoins;
     if (data.size != null) body['size'] = data.size!.apiValue;
+    if (data.type != null) body['type'] = data.type!.apiValue;
+    if (data.sortOrder != null) body['sortOrder'] = data.sortOrder;
     if (data.isActive != null) body['isActive'] = data.isActive;
     if (data.clearPublishedAt) {
       body['publishedAt'] = null;
     } else if (data.publishedAt != null) {
       body['publishedAt'] = data.publishedAt!.toUtc().toIso8601String();
     }
+    if (data.clearTag) {
+      body['tag'] = null;
+    } else if (data.tag != null) {
+      body['tag'] = data.tag;
+    }
+    if (data.clearColor) {
+      body['color'] = null;
+    } else if (data.color != null) {
+      body['color'] = data.color;
+    }
     if (data.clearAnimationUrl) {
       body['animationUrl'] = null;
     } else if (data.animationUrl != null) {
       body['animationUrl'] = data.animationUrl;
+    }
+    if (data.clearAudioUrl) {
+      body['audioUrl'] = null;
+    } else if (data.audioUrl != null) {
+      body['audioUrl'] = data.audioUrl;
     }
 
     final response = await _dio.patch(
@@ -188,6 +223,21 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       options: Options(contentType: Headers.jsonContentType),
     );
     return _parseBulkResponse(dto, response.data);
+  }
+
+  @override
+  Future<List<GiftModel>> reorderGifts(List<GiftReorderItem> items) async {
+    final response = await _dio.patch(
+      '/gifts/admin/reorder',
+      data: {'items': items.map((e) => e.toJson()).toList()},
+      options: Options(contentType: Headers.jsonContentType),
+    );
+    final data = response.data;
+    final list =
+        data is List ? data : (data['gifts'] ?? data['data'] ?? []) as List;
+    return list
+        .map((e) => GiftModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   BulkAdminGiftActionResult _parseBulkResponse(

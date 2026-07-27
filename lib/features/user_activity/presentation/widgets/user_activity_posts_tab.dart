@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../post_management/data/mappers/managed_post_mapper.dart';
 import '../../../post_management/domain/entities/activity_context.dart';
@@ -31,33 +32,13 @@ class UserActivityPostsTab extends StatefulWidget {
 }
 
 class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
-  final ScrollController _scrollController = ScrollController();
-
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<CategoriesBloc>().add(LoadCategoriesEvent(forCatalog: true));
     });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final pos = _scrollController.position;
-    if (pos.pixels < pos.maxScrollExtent - 200) return;
-
-    final bloc = context.read<UserActivityBloc>();
-    final state = bloc.state;
-    if (state.postsHasReachedMax || state.postsLoadingMore) return;
-    bloc.add(LoadMorePosts());
   }
 
   Future<void> _openPost(UserPostEntity post) async {
@@ -82,6 +63,13 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
     final l10n = context.l10n;
 
     return BlocBuilder<UserActivityBloc, UserActivityState>(
+      buildWhen: (prev, curr) =>
+          prev.posts != curr.posts ||
+          prev.postsLoading != curr.postsLoading ||
+          prev.postsPage != curr.postsPage ||
+          prev.postsTotal != curr.postsTotal ||
+          prev.postsError != curr.postsError ||
+          prev.postsHasReachedMax != curr.postsHasReachedMax,
       builder: (context, state) {
         if (state.postsLoading && state.posts.isEmpty) {
           return UserActivityPostsGridShimmer(isDark: widget.isDark);
@@ -101,103 +89,115 @@ class _UserActivityPostsTabState extends State<UserActivityPostsTab> {
 
         final postCount =
             state.postsTotal > 0 ? state.postsTotal : state.posts.length;
+        final currentPage = state.postsPage < 1 ? 1 : state.postsPage;
+        final lastPage = state.postsLastPage;
 
-        return CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.t('publishedPosts'),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurface,
-                          ),
-                        ),
-                        Text(
-                          context.tr('postsCountSummary', {
-                            'count': '$postCount',
-                          }),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.t('tapPostAdminHint'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              sliver: SliverLayoutBuilder(
-                builder: (context, constraints) {
-                  var crossAxisCount = 4;
-                  final width = constraints.crossAxisExtent;
-                  if (width < 400) {
-                    crossAxisCount = 2;
-                  } else if (width < 700) {
-                    crossAxisCount = 3;
-                  }
-
-                  return SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.7,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final post = state.posts[index];
-                        return _PostGridTile(
-                          post: post,
-                          isDark: widget.isDark,
-                          onTap: () => _openPost(post),
-                        );
-                      },
-                      childCount: state.posts.length,
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (state.postsLoadingMore)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              ),
-            if (state.postsHasReachedMax && state.posts.isNotEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Center(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+              child: Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      l10n.t('allPostsLoaded'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                      l10n.t('publishedPosts'),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurface,
                       ),
                     ),
                   ),
-                ),
+                  Text(
+                    context.tr('postsCountSummary', {
+                      'count': '$postCount',
+                    }),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
+            ),
+            Expanded(
+              child: Stack(
+                children: [
+                  CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                        sliver: SliverLayoutBuilder(
+                          builder: (context, constraints) {
+                            var crossAxisCount = 4;
+                            final width = constraints.crossAxisExtent;
+                            if (width < 360) {
+                              crossAxisCount = 2;
+                            } else if (width < 560) {
+                              crossAxisCount = 3;
+                            } else if (width < 820) {
+                              crossAxisCount = 4;
+                            } else {
+                              crossAxisCount = 5;
+                            }
+
+                            return SliverGrid(
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 6,
+                                mainAxisSpacing: 6,
+                                childAspectRatio: 0.72,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final post = state.posts[index];
+                                  return _PostGridTile(
+                                    post: post,
+                                    isDark: widget.isDark,
+                                    onTap: () => _openPost(post),
+                                  );
+                                },
+                                childCount: state.posts.length,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (state.postsLoading)
+                    Positioned.fill(
+                      child: ColoredBox(
+                        color: scheme.surface.withValues(alpha: 0.35),
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: AppPaginationBar(
+                currentPage: currentPage,
+                lastPage: lastPage,
+                total: state.postsTotal > 0
+                    ? state.postsTotal
+                    : state.posts.length,
+                pageSize: UserActivityState.postsPageLimit,
+                itemCount: state.posts.length,
+                borderRadius: BorderRadius.circular(12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                onPageChanged: (page) => context
+                    .read<UserActivityBloc>()
+                    .add(ChangePostsPage(page)),
+              ),
+            ),
           ],
         );
       },

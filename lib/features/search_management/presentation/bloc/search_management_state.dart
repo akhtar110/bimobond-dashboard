@@ -77,6 +77,71 @@ class SearchManagementLoaded extends SearchManagementState {
     }
   }
 
+  /// Pagination snapshot for the active list tab (null when not pageable).
+  ({int page, int lastPage, int total, int pageSize, int itemCount})?
+      get listPagination {
+    switch (uiTab) {
+      case SearchManagementTab.searches:
+        final meta = history.meta;
+        final last = meta.totalPages < 1 ? 1 : meta.totalPages;
+        return (
+          page: meta.page < 1 ? 1 : meta.page,
+          lastPage: last,
+          total: meta.total > 0 ? meta.total : history.data.length,
+          pageSize: meta.limit > 0 ? meta.limit : filter.limit,
+          itemCount: history.data.length,
+        );
+      case SearchManagementTab.users:
+        final section = searchResult.users;
+        if (section == null) return null;
+        final meta = section.meta;
+        final last = meta.totalPages ??
+            ((meta.limit <= 0)
+                ? 1
+                : ((meta.total + meta.limit - 1) ~/ meta.limit).clamp(1, 9999));
+        return (
+          page: meta.page < 1 ? 1 : meta.page,
+          lastPage: last < 1 ? 1 : last,
+          total: meta.total > 0 ? meta.total : section.data.length,
+          pageSize: meta.limit > 0 ? meta.limit : filter.limit,
+          itemCount: section.data.length,
+        );
+      case SearchManagementTab.sounds:
+        final section = searchResult.sounds;
+        if (section == null) return null;
+        final meta = section.meta;
+        final last = meta.totalPages ??
+            ((meta.limit <= 0)
+                ? 1
+                : ((meta.total + meta.limit - 1) ~/ meta.limit).clamp(1, 9999));
+        return (
+          page: meta.page < 1 ? 1 : meta.page,
+          lastPage: last < 1 ? 1 : last,
+          total: meta.total > 0 ? meta.total : section.data.length,
+          pageSize: meta.limit > 0 ? meta.limit : filter.limit,
+          itemCount: section.data.length,
+        );
+      case SearchManagementTab.hashtags:
+        final section = searchResult.hashtags;
+        if (section == null) return null;
+        final meta = section.meta;
+        final last = meta.totalPages ??
+            ((meta.limit <= 0)
+                ? 1
+                : ((meta.total + meta.limit - 1) ~/ meta.limit).clamp(1, 9999));
+        return (
+          page: meta.page < 1 ? 1 : meta.page,
+          lastPage: last < 1 ? 1 : last,
+          total: meta.total > 0 ? meta.total : section.data.length,
+          pageSize: meta.limit > 0 ? meta.limit : filter.limit,
+          itemCount: section.data.length,
+        );
+      case SearchManagementTab.overview:
+      case SearchManagementTab.trends:
+        return null;
+    }
+  }
+
   SearchManagementLoaded copyWith({
     SearchManagementFilterQuery? filter,
     SearchManagementTab? uiTab,

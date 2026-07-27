@@ -2,10 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
+import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/user_detail_bloc.dart';
 import '../bloc/user_detail_event.dart';
 import '../bloc/user_detail_state.dart';
+import '../utils/user_detail_layout_metrics.dart';
 import '../widgets/user_admin_actions/user_admin_actions_section.dart';
 import '../widgets/user_detail_activity_tabs.dart';
 import '../widgets/user_detail_header.dart';
@@ -219,31 +221,61 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
             if (state is UserDetailLoaded) {
               final user = state.userDetail.user;
-              final isBusy = state.executingAction != null;
+              final width = MediaQuery.sizeOf(context).width;
+              final metrics = userDetailLayoutMetrics(width);
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(metrics.pagePadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    UserDetailHeader(
-                      user: user,
-                      onAvatarTap: () => _showAvatarPreview(user),
-                      adminActions: UserAdminActionsSection(
-                        user: user,
-                        executingAction: state.executingAction,
-                        isBusy: isBusy,
-                      ),
+                    BlocSelector<UserDetailBloc, UserDetailState,
+                        ({
+                          UserEntity user,
+                          UserAdminActionType? executingAction
+                        })?>(
+                      selector: (s) {
+                        if (s is! UserDetailLoaded) return null;
+                        return (
+                          user: s.userDetail.user,
+                          executingAction: s.executingAction,
+                        );
+                      },
+                      builder: (context, data) {
+                        if (data == null) return const SizedBox.shrink();
+                        return UserDetailHeader(
+                          user: data.user,
+                          onAvatarTap: () => _showAvatarPreview(data.user),
+                          adminActions: UserAdminActionsSection(
+                            user: data.user,
+                            executingAction: data.executingAction,
+                            isBusy: data.executingAction != null,
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 12),
-                    UserDetailStatsGrid(
-                      user: user,
-                      wallet: state.userDetail.wallet,
+                    SizedBox(height: metrics.sectionSpacing),
+                    BlocSelector<UserDetailBloc, UserDetailState,
+                        ({UserEntity user, Map<String, dynamic>? wallet})?>(
+                      selector: (s) {
+                        if (s is! UserDetailLoaded) return null;
+                        return (
+                          user: s.userDetail.user,
+                          wallet: s.userDetail.wallet,
+                        );
+                      },
+                      builder: (context, data) {
+                        if (data == null) return const SizedBox.shrink();
+                        return UserDetailStatsGrid(
+                          user: data.user,
+                          wallet: data.wallet,
+                        );
+                      },
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: metrics.sectionSpacing),
                     if (user.isProfileLocked) ...[
                       UserDetailLockedCard(user: user),
-                      const SizedBox(height: 12),
+                      SizedBox(height: metrics.sectionSpacing),
                       UserDetailPersonalInfo(user: user),
                     ] else
                       UserDetailInfoActivitySection(

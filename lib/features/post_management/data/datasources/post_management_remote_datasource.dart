@@ -215,6 +215,7 @@ class PostManagementRemoteDataSourceImpl
       PostEngagementKind.likes => 'likes',
       PostEngagementKind.views => 'views',
       PostEngagementKind.mentions => 'mentions',
+      PostEngagementKind.reposts => 'reposts',
     };
 
     return _fetchPostEngagementPage(
@@ -233,6 +234,11 @@ class PostManagementRemoteDataSourceImpl
           ),
         PostEngagementKind.mentions =>
           PostEngagementUsersPageModel.fromMentionsJson(
+            data,
+            limit: limit,
+          ),
+        PostEngagementKind.reposts =>
+          PostEngagementUsersPageModel.fromRepostsJson(
             data,
             limit: limit,
           ),

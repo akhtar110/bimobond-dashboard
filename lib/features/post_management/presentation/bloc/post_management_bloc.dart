@@ -146,6 +146,7 @@ class PostManagementLoaded extends PostManagementState {
     this.likes = const PostEngagementListState(),
     this.views = const PostEngagementListState(),
     this.mentions = const PostEngagementListState(),
+    this.reposts = const PostEngagementListState(),
   });
 
   final ManagedPostEntity post;
@@ -168,12 +169,14 @@ class PostManagementLoaded extends PostManagementState {
   final PostEngagementListState likes;
   final PostEngagementListState views;
   final PostEngagementListState mentions;
+  final PostEngagementListState reposts;
 
   PostEngagementListState engagementFor(PostEngagementKind kind) {
     return switch (kind) {
       PostEngagementKind.likes => likes,
       PostEngagementKind.views => views,
       PostEngagementKind.mentions => mentions,
+      PostEngagementKind.reposts => reposts,
     };
   }
 
@@ -200,6 +203,7 @@ class PostManagementLoaded extends PostManagementState {
     PostEngagementListState? likes,
     PostEngagementListState? views,
     PostEngagementListState? mentions,
+    PostEngagementListState? reposts,
   }) {
     return PostManagementLoaded(
       post: post ?? this.post,
@@ -227,6 +231,7 @@ class PostManagementLoaded extends PostManagementState {
       likes: likes ?? this.likes,
       views: views ?? this.views,
       mentions: mentions ?? this.mentions,
+      reposts: reposts ?? this.reposts,
     );
   }
 }
@@ -358,6 +363,45 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       likes: PostEngagementListState(items: post.recentLikes),
       views: PostEngagementListState(items: post.recentViews),
       mentions: PostEngagementListState(items: post.recentMentions),
+      reposts: PostEngagementListState(
+        items: post.recentReposts
+            .map(_repostItemFromMap)
+            .where((item) => item.userId.isNotEmpty || item.username != null)
+            .toList(),
+      ),
+    );
+  }
+
+  static PostEngagementUserItem _repostItemFromMap(Map<String, dynamic> raw) {
+    final user = raw['user'] is Map
+        ? Map<String, dynamic>.from(raw['user'] as Map)
+        : (raw['repostedBy'] is Map
+            ? Map<String, dynamic>.from(raw['repostedBy'] as Map)
+            : (raw['reposter'] is Map
+                ? Map<String, dynamic>.from(raw['reposter'] as Map)
+                : raw));
+    final quote = raw['quote']?.toString() ?? raw['caption']?.toString();
+    return PostEngagementUserItem(
+      id: raw['id']?.toString() ??
+          raw['repostId']?.toString() ??
+          user['id']?.toString() ??
+          '',
+      userId: raw['userId']?.toString() ?? user['id']?.toString() ?? '',
+      username: user['username']?.toString() ?? user['name']?.toString(),
+      fullName: user['fullName']?.toString(),
+      avatarUrl: (user['avatarUrl'] ??
+              user['avatar'] ??
+              user['profileImage'])
+          ?.toString(),
+      isVerified: user['isVerified'] as bool? ?? false,
+      isBanned: user['isBanned'] as bool? ?? false,
+      createdAt: DateTime.tryParse(
+            (raw['createdAt'] ?? raw['repostedAt'] ?? user['repostedAt'])
+                    ?.toString() ??
+                '',
+          ) ??
+          DateTime.now(),
+      subtitle: quote != null && quote.trim().isNotEmpty ? quote.trim() : null,
     );
   }
 
@@ -850,6 +894,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       likes: event.kind == PostEngagementKind.likes ? loadingState : null,
       views: event.kind == PostEngagementKind.views ? loadingState : null,
       mentions: event.kind == PostEngagementKind.mentions ? loadingState : null,
+      reposts: event.kind == PostEngagementKind.reposts ? loadingState : null,
     ));
 
     try {
@@ -864,48 +909,32 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       final prior = loaded.engagementFor(event.kind);
       final mergedItems =
           page.items.isNotEmpty ? page.items : prior.items;
+      final next = prior.copyWith(
+        items: mergedItems,
+        page: page.page,
+        hasMore: page.hasMore,
+        isLoading: false,
+        loaded: true,
+      );
       emit(loaded.copyWith(
-        likes: event.kind == PostEngagementKind.likes
-            ? prior.copyWith(
-                items: mergedItems,
-                page: page.page,
-                hasMore: page.hasMore,
-                isLoading: false,
-                loaded: true,
-              )
-            : null,
-        views: event.kind == PostEngagementKind.views
-            ? prior.copyWith(
-                items: mergedItems,
-                page: page.page,
-                hasMore: page.hasMore,
-                isLoading: false,
-                loaded: true,
-              )
-            : null,
-        mentions: event.kind == PostEngagementKind.mentions
-            ? prior.copyWith(
-                items: mergedItems,
-                page: page.page,
-                hasMore: page.hasMore,
-                isLoading: false,
-                loaded: true,
-              )
-            : null,
+        likes: event.kind == PostEngagementKind.likes ? next : null,
+        views: event.kind == PostEngagementKind.views ? next : null,
+        mentions: event.kind == PostEngagementKind.mentions ? next : null,
+        reposts: event.kind == PostEngagementKind.reposts ? next : null,
       ));
     } catch (e) {
       final loaded = (state as PostManagementLoaded);
       final prior = loaded.engagementFor(event.kind);
+      final failed = prior.copyWith(
+        isLoading: false,
+        loaded: true,
+        error: _messageFrom(e),
+      );
       emit(loaded.copyWith(
-        likes: event.kind == PostEngagementKind.likes
-            ? prior.copyWith(isLoading: false, loaded: true, error: _messageFrom(e))
-            : null,
-        views: event.kind == PostEngagementKind.views
-            ? prior.copyWith(isLoading: false, loaded: true, error: _messageFrom(e))
-            : null,
-        mentions: event.kind == PostEngagementKind.mentions
-            ? prior.copyWith(isLoading: false, loaded: true, error: _messageFrom(e))
-            : null,
+        likes: event.kind == PostEngagementKind.likes ? failed : null,
+        views: event.kind == PostEngagementKind.views ? failed : null,
+        mentions: event.kind == PostEngagementKind.mentions ? failed : null,
+        reposts: event.kind == PostEngagementKind.reposts ? failed : null,
       ));
     }
   }
@@ -935,6 +964,9 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       mentions: event.kind == PostEngagementKind.mentions
           ? existing.copyWith(isLoadingMore: true, clearError: true)
           : null,
+      reposts: event.kind == PostEngagementKind.reposts
+          ? existing.copyWith(isLoadingMore: true, clearError: true)
+          : null,
     ));
 
     try {
@@ -947,45 +979,28 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       );
       final loaded = (state as PostManagementLoaded);
       final prior = loaded.engagementFor(event.kind);
+      final next = prior.copyWith(
+        items: [...prior.items, ...page.items],
+        page: page.page,
+        hasMore: page.hasMore,
+        isLoadingMore: false,
+      );
       emit(loaded.copyWith(
-        likes: event.kind == PostEngagementKind.likes
-            ? prior.copyWith(
-                items: [...prior.items, ...page.items],
-                page: page.page,
-                hasMore: page.hasMore,
-                isLoadingMore: false,
-              )
-            : null,
-        views: event.kind == PostEngagementKind.views
-            ? prior.copyWith(
-                items: [...prior.items, ...page.items],
-                page: page.page,
-                hasMore: page.hasMore,
-                isLoadingMore: false,
-              )
-            : null,
-        mentions: event.kind == PostEngagementKind.mentions
-            ? prior.copyWith(
-                items: [...prior.items, ...page.items],
-                page: page.page,
-                hasMore: page.hasMore,
-                isLoadingMore: false,
-              )
-            : null,
+        likes: event.kind == PostEngagementKind.likes ? next : null,
+        views: event.kind == PostEngagementKind.views ? next : null,
+        mentions: event.kind == PostEngagementKind.mentions ? next : null,
+        reposts: event.kind == PostEngagementKind.reposts ? next : null,
       ));
     } catch (e) {
       final loaded = (state as PostManagementLoaded);
       final prior = loaded.engagementFor(event.kind);
+      final failed =
+          prior.copyWith(isLoadingMore: false, error: _messageFrom(e));
       emit(loaded.copyWith(
-        likes: event.kind == PostEngagementKind.likes
-            ? prior.copyWith(isLoadingMore: false, error: _messageFrom(e))
-            : null,
-        views: event.kind == PostEngagementKind.views
-            ? prior.copyWith(isLoadingMore: false, error: _messageFrom(e))
-            : null,
-        mentions: event.kind == PostEngagementKind.mentions
-            ? prior.copyWith(isLoadingMore: false, error: _messageFrom(e))
-            : null,
+        likes: event.kind == PostEngagementKind.likes ? failed : null,
+        views: event.kind == PostEngagementKind.views ? failed : null,
+        mentions: event.kind == PostEngagementKind.mentions ? failed : null,
+        reposts: event.kind == PostEngagementKind.reposts ? failed : null,
       ));
     }
   }

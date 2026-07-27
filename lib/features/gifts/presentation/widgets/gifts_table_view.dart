@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gifts_page_layout.dart';
 
@@ -167,11 +168,22 @@ class _GiftsTableRowState extends State<GiftsTableRow> {
                   width: density == GiftsTableDensity.narrow ? 6 : 10,
                 ),
                 Expanded(
-                  child: Text(
-                    gift.name,
-                    maxLines: density == GiftsTableDensity.narrow ? 1 : 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        gift.name,
+                        maxLines: density == GiftsTableDensity.narrow ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            cellStyle?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      if (density != GiftsTableDensity.narrow) ...[
+                        const SizedBox(height: 2),
+                        _GiftTableBadges(gift: gift),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -442,6 +454,88 @@ class _GiftTableThumb extends StatelessWidget {
       ),
     );
   }
+}
+
+class _GiftTableBadges extends StatelessWidget {
+  const _GiftTableBadges({required this.gift});
+
+  final GiftEntity gift;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Icon(
+          gift.type == GiftType.audio
+              ? Icons.audiotrack_rounded
+              : Icons.image_rounded,
+          size: 11,
+          color: scheme.onSurfaceVariant,
+        ),
+        _TableMiniBadge(
+          label: gift.size.apiValue,
+          fg: scheme.onSurfaceVariant,
+          bg: scheme.surfaceContainerHighest,
+        ),
+        if (gift.tag != null && gift.tag!.trim().isNotEmpty)
+          _TableMiniBadge(
+            label: gift.tag!,
+            fg: scheme.onTertiaryContainer,
+            bg: scheme.tertiaryContainer,
+          ),
+        if (gift.color != null && gift.color!.trim().isNotEmpty)
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: _parseTableHexColor(gift.color) ?? scheme.outlineVariant,
+              shape: BoxShape.circle,
+              border: Border.all(color: scheme.outlineVariant, width: 0.75),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TableMiniBadge extends StatelessWidget {
+  const _TableMiniBadge({
+    required this.label,
+    required this.fg,
+    required this.bg,
+  });
+
+  final String label;
+  final Color fg;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(5)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 8.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.1,
+          color: fg,
+        ),
+      ),
+    );
+  }
+}
+
+Color? _parseTableHexColor(String? hex) {
+  if (hex == null || hex.trim().isEmpty) return null;
+  final cleaned = hex.trim().replaceFirst('#', '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(cleaned)) return null;
+  return Color(int.parse('FF$cleaned', radix: 16));
 }
 
 class _GiftStatusChip extends StatelessWidget {

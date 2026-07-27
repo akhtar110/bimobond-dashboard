@@ -23,6 +23,10 @@ class SearchManagementLayoutMetrics {
 
   bool get useCompactTable => isMobile;
 
+  /// Desktop uses [AppPaginationBar]; mobile/tablet append on scroll.
+  bool get useDesktopPagination =>
+      deviceType == SearchManagementDeviceType.desktop;
+
   double get pageHorizontalPadding => switch (deviceType) {
         SearchManagementDeviceType.mobileSmall => 8,
         SearchManagementDeviceType.mobileLarge => 10,

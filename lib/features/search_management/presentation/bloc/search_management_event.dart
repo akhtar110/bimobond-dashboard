@@ -85,6 +85,14 @@ class SearchManagementLoadNextPageEvent extends SearchManagementEvent {
   const SearchManagementLoadNextPageEvent();
 }
 
+class SearchManagementPageChangedEvent extends SearchManagementEvent {
+  const SearchManagementPageChangedEvent(this.page);
+  final int page;
+
+  @override
+  List<Object?> get props => [page];
+}
+
 class SearchManagementOpenDetailsEvent extends SearchManagementEvent {
   const SearchManagementOpenDetailsEvent(this.payload);
   final Object payload;

@@ -349,24 +349,8 @@ class _Body extends StatelessWidget {
               .read<SearchManagementBloc>()
               .add(const LoadSearchManagementEvent()),
         ),
-      SearchManagementLoaded loaded => Stack(
-          children: [
-            SearchManagementContentPanel(state: loaded, metrics: metrics),
-            if (loaded.isLoadingMore)
-              const Positioned(
-                left: 0,
-                right: 0,
-                bottom: 8,
-                child: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
-          ],
-        ),
+      SearchManagementLoaded loaded =>
+          SearchManagementContentPanel(state: loaded, metrics: metrics),
       _ => const SizedBox.shrink(),
     };
   }

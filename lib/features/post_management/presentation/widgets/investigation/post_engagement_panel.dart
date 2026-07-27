@@ -55,7 +55,7 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
     _tabController.addListener(_onTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (_engagementLoadIndex(initialIndex) >= 2) {
+      if (_engagementLoadIndex(initialIndex) >= 1) {
         _loadEngagementForTab(initialIndex);
       }
     });
@@ -75,6 +75,7 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
 
   void _loadEngagementForTab(int index) {
     final kind = switch (_engagementLoadIndex(index)) {
+      1 => PostEngagementKind.reposts,
       2 => PostEngagementKind.likes,
       3 => PostEngagementKind.mentions,
       4 => PostEngagementKind.views,
@@ -157,7 +158,7 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
                           s is PostManagementLoaded ? s.post : null,
                       builder: (context, post) {
                         if (post == null) return const SizedBox.shrink();
-                        return PostRepostsPanel(post: post);
+                        return PostRepostsPanel(totalCount: post.repostCount);
                       },
                     ),
                     BlocSelector<PostManagementBloc, PostManagementState,
