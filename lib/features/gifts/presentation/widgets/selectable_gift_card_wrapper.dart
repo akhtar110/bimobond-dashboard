@@ -6,23 +6,32 @@ import '../bloc/gifts_bloc.dart';
 import 'gift_card.dart';
 
 /// Wraps [GiftCard] with a selection checkbox without modifying the card design.
+///
+/// Selection state is read via [BlocSelector] so only this card's overlay
+/// rebuilds when its checkbox changes — the grid body stays stable while scrolling.
 class SelectableGiftCard extends StatelessWidget {
   const SelectableGiftCard({
     super.key,
     required this.gift,
-    required this.isSelected,
     required this.onSelectionChanged,
     required this.onEdit,
     this.onPreview,
     required this.onDelete,
+    this.compact,
+    this.dense,
+    this.cacheWidth,
   });
 
   final GiftEntity gift;
-  final bool isSelected;
   final ValueChanged<bool?> onSelectionChanged;
   final VoidCallback onEdit;
   final VoidCallback? onPreview;
   final VoidCallback onDelete;
+
+  /// When set (from the grid), skips per-card [LayoutBuilder].
+  final bool? compact;
+  final bool? dense;
+  final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +43,9 @@ class SelectableGiftCard extends StatelessWidget {
         GiftCard(
           key: ValueKey('gift_card_${gift.id}'),
           gift: gift,
+          compact: compact,
+          dense: dense,
+          cacheWidth: cacheWidth,
           onEdit: onEdit,
           onPreview: onPreview,
           onDelete: onDelete,
@@ -41,26 +53,39 @@ class SelectableGiftCard extends StatelessWidget {
         PositionedDirectional(
           top: 8,
           start: 8,
-          child: _SelectionCheckboxOverlay(
-            isSelected: isSelected,
-            onChanged: onSelectionChanged,
-            accentColor: scheme.primary,
+          child: BlocSelector<GiftsBloc, GiftsState, bool>(
+            selector: (state) =>
+                state is GiftsLoaded &&
+                state.selectedGiftIds.contains(gift.id),
+            builder: (context, isSelected) {
+              return _SelectionCheckboxOverlay(
+                isSelected: isSelected,
+                onChanged: onSelectionChanged,
+                accentColor: scheme.primary,
+              );
+            },
           ),
         ),
-        if (isSelected)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: scheme.primary.withValues(alpha: 0.55),
-                    width: 2,
+        BlocSelector<GiftsBloc, GiftsState, bool>(
+          selector: (state) =>
+              state is GiftsLoaded && state.selectedGiftIds.contains(gift.id),
+          builder: (context, isSelected) {
+            if (!isSelected) return const SizedBox.shrink();
+            return Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.55),
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
+        ),
       ],
     );
   }

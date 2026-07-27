@@ -1,4 +1,30 @@
-﻿import 'gifts_responsive.dart';
+﻿import 'package:flutter/material.dart';
+
+import 'gifts_responsive.dart';
+
+/// Scroll-stable viewport width for gifts catalog layout.
+///
+/// Prefer this over [SliverLayoutBuilder]: sliver constraints include
+/// scrollOffset, so that builder rebuilds every scroll frame.
+class GiftsViewportWidth extends InheritedWidget {
+  const GiftsViewportWidth({
+    super.key,
+    required this.width,
+    required super.child,
+  });
+
+  final double width;
+
+  static double of(BuildContext context) {
+    final inherited =
+        context.dependOnInheritedWidgetOfExactType<GiftsViewportWidth>();
+    return inherited?.width ?? MediaQuery.sizeOf(context).width;
+  }
+
+  @override
+  bool updateShouldNotify(GiftsViewportWidth oldWidget) =>
+      oldWidget.width != width;
+}
 
 /// Responsive column count for the admin gift grid.
 int giftsGridColumnCount(double width) {

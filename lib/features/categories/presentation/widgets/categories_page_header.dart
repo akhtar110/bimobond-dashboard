@@ -5,8 +5,10 @@ import '../../../../core/localization/localization.dart';
 import '../bloc/categories_bloc.dart';
 import 'category_form_dialog.dart';
 
+/// Compact categories top bar — title + actions, no subtitle/stat badges.
 class CategoriesPageHeader extends StatelessWidget {
   const CategoriesPageHeader({
+    super.key,
     required this.isDark,
     required this.state,
     this.compact = false,
@@ -20,128 +22,84 @@ class CategoriesPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final loaded = state is CategoriesLoaded ? state as CategoriesLoaded : null;
-    final total = loaded?.categories.length ?? 0;
-    final rootCount = loaded?.roots.length ?? 0;
-    final subCount = total - rootCount;
-    final active = loaded?.categories.where((c) => c.isActive).length ?? 0;
     final scheme = theme.colorScheme;
-    final titleColor = scheme.onSurface;
-    final subtitleColor = scheme.onSurfaceVariant;
-    final outlineBorder = scheme.outlineVariant;
+    final controlSize = compact ? 36.0 : 40.0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        LayoutBuilder(builder: (context, constraints) {
-          final compact = constraints.maxWidth < 720;
+    final refreshBtn = CategoriesHeaderIconButton(
+      isDark: isDark,
+      icon: Icons.refresh_rounded,
+      tooltip: l10n.t('refresh'),
+      size: controlSize,
+      onTap: () =>
+          context.read<CategoriesBloc>().add(LoadCategoriesEvent()),
+    );
 
-          final titleBlock = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.t('categoriesTitle'),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.6,
-                  color: titleColor,
-                  height: 1.15,
-                ),
+    final addBtn = compact
+        ? FilledButton(
+            onPressed: () => showCategoryForm(context),
+            style: FilledButton.styleFrom(
+              elevation: 0,
+              minimumSize: Size(controlSize, controlSize),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.t('categoriesSubtitle'),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: subtitleColor,
-                  fontSize: 14,
-                  height: 1.45,
-                ),
+            ),
+            child: const Icon(Icons.add_rounded, size: 18),
+          )
+        : FilledButton.icon(
+            onPressed: () => showCategoryForm(context),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(l10n.t('newCategory')),
+            style: FilledButton.styleFrom(
+              elevation: 0,
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              if (total > 0) ...[
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    CategoriesHeaderBadge(
-                      icon: Icons.layers_outlined,
-                      label: '$rootCount root',
-                      isDark: isDark,
-                    ),
-                    if (subCount > 0)
-                      CategoriesHeaderBadge(
-                        icon: Icons.account_tree_outlined,
-                        label: '$subCount subcategories',
-                        isDark: isDark,
-                        accent: theme.colorScheme.secondary,
-                      ),
-                    CategoriesHeaderBadge(
-                      icon: Icons.check_circle_outline_rounded,
-                      label: '$active ${l10n.t('active').toLowerCase()}',
-                      isDark: isDark,
-                      accent: theme.colorScheme.tertiary,
-                    ),
-                  ],
-                ),
-              ],
-            ],
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           );
 
-          final actions = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CategoriesHeaderIconButton(
-                isDark: isDark,
-                icon: Icons.refresh_rounded,
-                tooltip: l10n.t('refresh'),
-                onTap: () =>
-                    context.read<CategoriesBloc>().add(LoadCategoriesEvent()),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              l10n.t('categoriesTitle'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: (compact
+                      ? theme.textTheme.titleLarge
+                      : theme.textTheme.headlineSmall)
+                  ?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: scheme.onSurface,
+                height: 1.1,
               ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: () => showCategoryForm(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(l10n.t('newCategory')),
-                style: FilledButton.styleFrom(
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                titleBlock,
-                const SizedBox(height: 20),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: actions,
-                ),
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: titleBlock), actions],
-          );
-        }),
-        SizedBox(height: compact ? 12 : 24),
-        if (!compact) Divider(height: 1, thickness: 1, color: outlineBorder),
-      ],
+            ),
+          ),
+          addBtn,
+          SizedBox(width: compact ? 6 : 8),
+          refreshBtn,
+        ],
+      ),
     );
   }
 }
 
 class CategoriesHeaderBadge extends StatelessWidget {
   const CategoriesHeaderBadge({
+    super.key,
     required this.icon,
     required this.label,
     required this.isDark,
@@ -184,22 +142,27 @@ class CategoriesHeaderBadge extends StatelessWidget {
 
 class CategoriesHeaderIconButton extends StatefulWidget {
   const CategoriesHeaderIconButton({
+    super.key,
     required this.isDark,
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.size = 44,
   });
 
   final bool isDark;
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+  final double size;
 
   @override
-  State<CategoriesHeaderIconButton> createState() => CategoriesHeaderIconButtonState();
+  State<CategoriesHeaderIconButton> createState() =>
+      CategoriesHeaderIconButtonState();
 }
 
-class CategoriesHeaderIconButtonState extends State<CategoriesHeaderIconButton> {
+class CategoriesHeaderIconButtonState
+    extends State<CategoriesHeaderIconButton> {
   bool _hovered = false;
 
   @override
@@ -218,13 +181,13 @@ class CategoriesHeaderIconButtonState extends State<CategoriesHeaderIconButton> 
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
-            width: 44,
-            height: 44,
+            width: widget.size,
+            height: widget.size,
             decoration: BoxDecoration(
               color: _hovered
                   ? scheme.surfaceContainerHigh
                   : scheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: _hovered
                     ? scheme.primary.withValues(alpha: 0.35)
@@ -234,7 +197,7 @@ class CategoriesHeaderIconButtonState extends State<CategoriesHeaderIconButton> 
             alignment: Alignment.center,
             child: Icon(
               widget.icon,
-              size: 20,
+              size: widget.size <= 36 ? 18 : 20,
               color: scheme.onSurfaceVariant,
             ),
           ),
@@ -246,6 +209,7 @@ class CategoriesHeaderIconButtonState extends State<CategoriesHeaderIconButton> 
 
 class CategoriesActionToolButton extends StatefulWidget {
   const CategoriesActionToolButton({
+    super.key,
     required this.tooltip,
     required this.onTap,
     required this.backgroundColor,
@@ -262,16 +226,17 @@ class CategoriesActionToolButton extends StatefulWidget {
   final bool isDark;
 
   @override
-  State<CategoriesActionToolButton> createState() => CategoriesActionToolButtonState();
+  State<CategoriesActionToolButton> createState() =>
+      CategoriesActionToolButtonState();
 }
 
-class CategoriesActionToolButtonState extends State<CategoriesActionToolButton> {
+class CategoriesActionToolButtonState
+    extends State<CategoriesActionToolButton> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final outlineBorder =
-        Theme.of(context).colorScheme.outlineVariant;
+    final outlineBorder = Theme.of(context).colorScheme.outlineVariant;
     final disabled = widget.onTap == null;
 
     return Tooltip(

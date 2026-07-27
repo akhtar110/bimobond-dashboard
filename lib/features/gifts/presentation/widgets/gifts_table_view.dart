@@ -19,14 +19,10 @@ class GiftsTableHeader extends StatelessWidget {
     super.key,
     required this.l10n,
     required this.density,
-    required this.allVisibleSelected,
-    required this.someVisibleSelected,
   });
 
   final AppLocalizations l10n;
   final GiftsTableDensity density;
-  final bool allVisibleSelected;
-  final bool someVisibleSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -44,17 +40,27 @@ class GiftsTableHeader extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: _rowHorizontalPadding(density)),
       child: _GiftsTableRowLayout(
         density: density,
-        checkbox: Checkbox(
-          tristate: true,
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          value: allVisibleSelected
-              ? true
-              : someVisibleSelected
-                  ? null
-                  : false,
-          onChanged: (_) =>
-              context.read<GiftsBloc>().add(SelectAllGiftsEvent()),
+        checkbox: BlocSelector<GiftsBloc, GiftsState, (bool, bool)>(
+          selector: (state) {
+            if (state is! GiftsLoaded) return (false, false);
+            return (state.allVisibleSelected, state.someVisibleSelected);
+          },
+          builder: (context, flags) {
+            final allVisibleSelected = flags.$1;
+            final someVisibleSelected = flags.$2;
+            return Checkbox(
+              tristate: true,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              value: allVisibleSelected
+                  ? true
+                  : someVisibleSelected
+                      ? null
+                      : false,
+              onChanged: (_) =>
+                  context.read<GiftsBloc>().add(SelectAllGiftsEvent()),
+            );
+          },
         ),
         giftName: Text(
           l10n.t('giftNameLabel').replaceAll(' *', ''),
@@ -214,15 +220,11 @@ class GiftsTableHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.l10n,
     required this.scheme,
     required this.density,
-    required this.allVisibleSelected,
-    required this.someVisibleSelected,
   });
 
   final AppLocalizations l10n;
   final ColorScheme scheme;
   final GiftsTableDensity density;
-  final bool allVisibleSelected;
-  final bool someVisibleSelected;
 
   @override
   double get minExtent => kGiftsTableHeaderHeight;
@@ -243,11 +245,6 @@ class GiftsTableHeaderDelegate extends SliverPersistentHeaderDelegate {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow,
-          border: Border(
-            top: BorderSide(color: scheme.outlineVariant),
-            left: BorderSide(color: scheme.outlineVariant),
-            right: BorderSide(color: scheme.outlineVariant),
-          ),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
         ),
         child: ClipRRect(
@@ -255,8 +252,6 @@ class GiftsTableHeaderDelegate extends SliverPersistentHeaderDelegate {
           child: GiftsTableHeader(
             l10n: l10n,
             density: density,
-            allVisibleSelected: allVisibleSelected,
-            someVisibleSelected: someVisibleSelected,
           ),
         ),
       ),
@@ -265,9 +260,7 @@ class GiftsTableHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant GiftsTableHeaderDelegate oldDelegate) {
-    return oldDelegate.density != density ||
-        oldDelegate.allVisibleSelected != allVisibleSelected ||
-        oldDelegate.someVisibleSelected != someVisibleSelected;
+    return oldDelegate.density != density;
   }
 }
 
@@ -425,8 +418,13 @@ class _GiftTableThumb extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: gift.thumbnailUrl,
                   fit: BoxFit.contain,
-                  placeholder: (_, __) => _placeholder(scheme),
-                  errorWidget: (_, __, ___) => _placeholder(scheme),
+                  memCacheWidth: (size *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .round(),
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  placeholder: (_, _) => _placeholder(scheme),
+                  errorWidget: (_, _, _) => _placeholder(scheme),
                 ),
               )
             : _placeholder(scheme),
