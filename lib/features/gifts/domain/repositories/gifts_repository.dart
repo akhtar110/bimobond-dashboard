@@ -4,34 +4,53 @@ import '../entities/bulk_gift_action_request.dart';
 import '../entities/bulk_gift_action_result.dart';
 import '../entities/gift_entity.dart';
 import '../entities/gift_group_entities.dart';
+import '../entities/gift_reorder_item.dart';
 import '../enums/gift_size.dart';
+import '../enums/gift_type.dart';
 
 /// Payload for creating a new gift.
 class CreateGiftData {
   const CreateGiftData({
     required this.name,
-    required this.imageBytes,
-    required this.imageName,
+    this.imageBytes,
+    this.imageName,
     required this.priceCoins,
     this.size = GiftSize.medium,
+    this.type = GiftType.image,
+    this.tag,
+    this.color,
+    this.sortOrder,
     this.isActive = true,
     this.publishedAt,
     this.animationUrl,
     this.animationBytes,
     this.animationName,
+    this.audioUrl,
+    this.audioBytes,
+    this.audioName,
     this.assignGroupId,
   });
 
   final String name;
-  final Uint8List imageBytes;
-  final String imageName;
+
+  /// Required for [GiftType.image]. Optional for [GiftType.audio]
+  /// (a solid-color thumbnail is generated from [color] when omitted).
+  final Uint8List? imageBytes;
+  final String? imageName;
   final double priceCoins;
   final GiftSize size;
+  final GiftType type;
+  final String? tag;
+  final String? color;
+  final int? sortOrder;
   final bool isActive;
   final DateTime? publishedAt;
   final String? animationUrl;
   final Uint8List? animationBytes;
   final String? animationName;
+  final String? audioUrl;
+  final Uint8List? audioBytes;
+  final String? audioName;
 
   /// Optional panel tab to add the gift to after create.
   final String? assignGroupId;
@@ -42,15 +61,25 @@ class UpdateGiftData {
     this.name,
     this.thumbnailUrl,
     this.animationUrl,
+    this.audioUrl,
+    this.color,
+    this.type,
+    this.tag,
     this.priceCoins,
     this.size,
+    this.sortOrder,
     this.isActive,
     this.publishedAt,
     this.clearPublishedAt = false,
+    this.clearTag = false,
+    this.clearColor = false,
+    this.clearAudioUrl = false,
     this.imageBytes,
     this.imageName,
     this.animationBytes,
     this.animationName,
+    this.audioBytes,
+    this.audioName,
     this.clearAnimationUrl = false,
     this.assignGroupId,
     this.previousAssignGroupId,
@@ -59,15 +88,25 @@ class UpdateGiftData {
   final String? name;
   final String? thumbnailUrl;
   final String? animationUrl;
+  final String? audioUrl;
+  final String? color;
+  final GiftType? type;
+  final String? tag;
   final double? priceCoins;
   final GiftSize? size;
+  final int? sortOrder;
   final bool? isActive;
   final DateTime? publishedAt;
   final bool clearPublishedAt;
+  final bool clearTag;
+  final bool clearColor;
+  final bool clearAudioUrl;
   final Uint8List? imageBytes;
   final String? imageName;
   final Uint8List? animationBytes;
   final String? animationName;
+  final Uint8List? audioBytes;
+  final String? audioName;
   final bool clearAnimationUrl;
 
   /// Desired panel tab after update (`null` = none / remove from tab).
@@ -83,6 +122,7 @@ abstract class GiftsRepository {
   Future<GiftEntity> updateGift(String giftId, UpdateGiftData data);
   Future<void> deleteGift(String giftId);
   Future<BulkGiftActionResult> executeBulkAction(BulkGiftActionRequest request);
+  Future<List<GiftEntity>> reorderGifts(List<GiftReorderItem> items);
   Future<String> uploadGiftFile(Uint8List bytes, String filename);
 
   Future<List<GiftGroupEntity>> getGiftGroups();

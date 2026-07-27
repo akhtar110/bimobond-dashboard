@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
+import '../utils/gift_schedule_label.dart';
 
 // ─── Main card ────────────────────────────────────────────────────────────────
 
@@ -134,7 +136,8 @@ class GiftCard extends StatelessWidget {
                       compact: compact,
                     ),
                     if (gift.animationUrl != null &&
-                        gift.animationUrl!.isNotEmpty) ...[
+                        gift.animationUrl!.isNotEmpty &&
+                        gift.type != GiftType.audio) ...[
                       const SizedBox(width: 4),
                       Icon(
                         Icons.animation_rounded,
@@ -142,14 +145,19 @@ class GiftCard extends StatelessWidget {
                         color: scheme.onSurfaceVariant,
                       ),
                     ],
+                    if (gift.type == GiftType.audio) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.audiotrack_rounded,
+                        size: 13,
+                        color: scheme.primary,
+                      ),
+                    ],
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: _PublishedDate(
-                          gift: gift,
-                          compact: true,
-                        ),
+                      child: _PublishedDate(
+                        gift: gift,
+                        compact: true,
                       ),
                     ),
                   ],
@@ -173,6 +181,44 @@ class GiftCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── Meta badges (used on thumbnail overlays) ───────────────────────────────
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge({required this.label, required this.fg, required this.bg});
+
+  final String label;
+  final Color fg;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 8.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.1,
+          color: fg,
+        ),
+      ),
+    );
+  }
+}
+
+/// Parses a `#RRGGBB` (or `RRGGBB`) hex string into a [Color].
+Color? _parseGiftHexColor(String? hex) {
+  if (hex == null || hex.trim().isEmpty) return null;
+  final cleaned = hex.trim().replaceFirst('#', '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(cleaned)) return null;
+  return Color(int.parse('FF$cleaned', radix: 16));
 }
 
 class _GiftActionBar extends StatelessWidget {
@@ -263,31 +309,44 @@ class _PublishedDate extends StatelessWidget {
   final GiftEntity gift;
   final bool compact;
 
-  static final _fmt = DateFormat('MMM d, yyyy');
+  static final _dateFmt = DateFormat('MMM d, yyyy');
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final date = gift.publishedAt;
-    if (date == null) return const SizedBox.shrink();
+    final label = giftScheduleLabelFor(l10n, gift);
+    final color = label.status == GiftScheduleStatus.publishesTomorrow ||
+            label.status == GiftScheduleStatus.scheduled
+        ? scheme.tertiary
+        : scheme.onSurfaceVariant;
+    final icon = switch (label.status) {
+      GiftScheduleStatus.availableNow => Icons.bolt_rounded,
+      GiftScheduleStatus.publishesTomorrow ||
+      GiftScheduleStatus.scheduled =>
+        Icons.schedule_rounded,
+      GiftScheduleStatus.published => Icons.calendar_today_outlined,
+    };
+
+    // Card shows date only (no "Published on" prefix).
+    final text = label.status == GiftScheduleStatus.published &&
+            gift.publishedAt != null
+        ? _dateFmt.format(gift.publishedAt!.toLocal())
+        : label.text;
 
     return Row(
       children: [
-        Icon(
-          Icons.calendar_today_outlined,
-          size: compact ? 10 : 11,
-          color: scheme.onSurfaceVariant,
-        ),
+        Icon(icon, size: compact ? 10 : 11, color: color),
         SizedBox(width: compact ? 3 : 4),
         Expanded(
           child: Text(
-            _fmt.format(date.toLocal()),
+            text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.end,
             style: TextStyle(
               fontSize: compact ? 9.5 : 10.5,
-              color: scheme.onSurfaceVariant,
+              color: color,
               height: 1.1,
               fontWeight: FontWeight.w500,
             ),
@@ -346,6 +405,8 @@ class _GiftThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final accent = _parseGiftHexColor(gift.color);
+    final isAudio = gift.type == GiftType.audio;
     return AspectRatio(
       // Wider than tall so grid cards stay shorter.
       aspectRatio: compact ? 1.45 : 1.55,
@@ -353,26 +414,60 @@ class _GiftThumbnail extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           ColoredBox(
-            color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-            child: gift.thumbnailUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: gift.thumbnailUrl,
-                    fit: BoxFit.contain,
-                    memCacheWidth: cacheWidth,
-                    fadeInDuration: Duration.zero,
-                    fadeOutDuration: Duration.zero,
-                    placeholder: (context, url) =>
-                        _placeholder(scheme, compact),
-                    errorWidget: (context, url, error) =>
-                        _placeholder(scheme, compact),
+            color: isAudio && accent != null
+                ? accent
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+            child: isAudio && accent != null
+                ? Center(
+                    child: Icon(
+                      Icons.audiotrack_rounded,
+                      size: compact ? 28 : 32,
+                      color: accent.computeLuminance() > 0.55
+                          ? Colors.black87
+                          : Colors.white,
+                    ),
                   )
-                : _placeholder(scheme, compact),
+                : (gift.thumbnailUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: gift.thumbnailUrl,
+                        fit: BoxFit.contain,
+                        memCacheWidth: cacheWidth,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: (context, url) =>
+                            _placeholder(scheme, compact),
+                        errorWidget: (context, url, error) =>
+                            _placeholder(scheme, compact),
+                      )
+                    : _placeholder(scheme, compact)),
+          ),
+          if (accent != null && !isAudio)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(width: 3, color: accent),
+            ),
+          Positioned(
+            top: compact ? 5 : 6,
+            left: compact ? 5 : 6,
+            child: _TypeSizeBadge(gift: gift, compact: compact),
           ),
           Positioned(
             top: compact ? 5 : 6,
             right: compact ? 5 : 6,
             child: _ActiveBadge(isActive: gift.isActive, compact: true),
           ),
+          if (gift.tag != null && gift.tag!.trim().isNotEmpty)
+            Positioned(
+              bottom: compact ? 5 : 6,
+              left: compact ? 5 : 6,
+              child: _MiniBadge(
+                label: gift.tag!,
+                fg: scheme.onTertiaryContainer,
+                bg: scheme.tertiaryContainer,
+              ),
+            ),
         ],
       ),
     );
@@ -385,6 +480,53 @@ class _GiftThumbnail extends StatelessWidget {
           color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
         ),
       );
+}
+
+class _TypeSizeBadge extends StatelessWidget {
+  const _TypeSizeBadge({required this.gift, required this.compact});
+
+  final GiftEntity gift;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isAudio = gift.type == GiftType.audio;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 6,
+        vertical: compact ? 2 : 2.5,
+      ),
+      decoration: BoxDecoration(
+        color: (isAudio ? scheme.secondaryContainer : scheme.primaryContainer)
+            .withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAudio ? Icons.audiotrack_rounded : Icons.image_rounded,
+            size: compact ? 10 : 11,
+            color: isAudio
+                ? scheme.onSecondaryContainer
+                : scheme.onPrimaryContainer,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            gift.size.apiValue,
+            style: TextStyle(
+              fontSize: compact ? 8 : 8.5,
+              fontWeight: FontWeight.w800,
+              color: isAudio
+                  ? scheme.onSecondaryContainer
+                  : scheme.onPrimaryContainer,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Active badge ─────────────────────────────────────────────────────────────

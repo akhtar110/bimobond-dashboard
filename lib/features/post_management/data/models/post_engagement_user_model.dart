@@ -94,6 +94,37 @@ class PostEngagementUserModel extends PostEngagementUserItem {
     );
   }
 
+  factory PostEngagementUserModel.fromRepostJson(Map<String, dynamic> json) {
+    var user = _userMap(json);
+    if (user.isEmpty &&
+        (json.containsKey('username') ||
+            json.containsKey('fullName') ||
+            json.containsKey('avatarUrl'))) {
+      user = json;
+    }
+    final quote = json['quote']?.toString() ?? json['caption']?.toString();
+    return PostEngagementUserModel(
+      id: json['id']?.toString() ??
+          json['repostId']?.toString() ??
+          user['id']?.toString() ??
+          '',
+      userId: json['userId']?.toString() ?? user['id']?.toString() ?? '',
+      username: user['username']?.toString() ?? user['name']?.toString(),
+      fullName: user['fullName']?.toString(),
+      avatarUrl: resolveMediaUrl(
+        user['avatarUrl'] as String? ??
+            user['avatar'] as String? ??
+            user['profileImage'] as String?,
+      ),
+      isVerified: user['isVerified'] as bool? ?? false,
+      isBanned: user['isBanned'] as bool? ?? false,
+      createdAt: _readDate(
+        json['createdAt'] ?? json['repostedAt'] ?? user['repostedAt'],
+      ),
+      subtitle: quote != null && quote.trim().isNotEmpty ? quote.trim() : null,
+    );
+  }
+
   static PostEngagementUserModel _fromActivityUser({
     required String id,
     required String userId,
@@ -119,8 +150,15 @@ class PostEngagementUserModel extends PostEngagementUserItem {
     bool preferMentioned = false,
   }) {
     final keys = preferMentioned
-        ? ['mentionedUser', 'user', 'viewer', 'liker']
-        : ['user', 'mentionedUser', 'viewer', 'liker'];
+        ? ['mentionedUser', 'user', 'viewer', 'liker', 'repostedBy', 'reposter']
+        : [
+            'user',
+            'repostedBy',
+            'reposter',
+            'mentionedUser',
+            'viewer',
+            'liker',
+          ];
     for (final key in keys) {
       final raw = json[key];
       if (raw is Map<String, dynamic>) return raw;
@@ -187,6 +225,18 @@ class PostEngagementUsersPageModel extends PostEngagementUsersPageEntity {
     );
   }
 
+  factory PostEngagementUsersPageModel.fromRepostsJson(
+    Map<String, dynamic> json, {
+    required int limit,
+  }) {
+    return _build(
+      json: json,
+      limit: limit,
+      listKeys: const ['reposts', 'recentReposts', 'data', 'items'],
+      mapper: PostEngagementUserModel.fromRepostJson,
+    );
+  }
+
   factory PostEngagementUsersPageModel.fromJson(
     Map<String, dynamic> json, {
     required int limit,
@@ -246,28 +296,38 @@ class PostEngagementUsersPageModel extends PostEngagementUsersPageEntity {
     List<String> listKeys,
   ) {
     if (json['data'] is List) {
-      return (json['data'] as List).whereType<Map<String, dynamic>>().toList();
+      return _asMapList(json['data'] as List);
     }
 
     final unwrapped = _unwrap(json);
     if (unwrapped['data'] is List) {
-      return (unwrapped['data'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
+      return _asMapList(unwrapped['data'] as List);
     }
 
     for (final key in listKeys) {
       final direct = json[key];
       if (direct is List) {
-        return direct.whereType<Map<String, dynamic>>().toList();
+        return _asMapList(direct);
       }
       final nested = unwrapped[key];
       if (nested is List) {
-        return nested.whereType<Map<String, dynamic>>().toList();
+        return _asMapList(nested);
       }
     }
 
     return const [];
+  }
+
+  static List<Map<String, dynamic>> _asMapList(List raw) {
+    final mapped = <Map<String, dynamic>>[];
+    for (final entry in raw) {
+      if (entry is Map<String, dynamic>) {
+        mapped.add(entry);
+      } else if (entry is Map) {
+        mapped.add(Map<String, dynamic>.from(entry));
+      }
+    }
+    return mapped;
   }
 
   static int? _readInt(dynamic value) {
@@ -283,16 +343,25 @@ List<PostEngagementUserItem> parseEngagementUserList(
   PostEngagementKind? kind,
 }) {
   if (raw is! List) return const [];
-  return raw.whereType<Map<String, dynamic>>().map((entry) {
+  return raw.whereType<Map>().map((entry) {
+    final map = entry is Map<String, dynamic>
+        ? entry
+        : Map<String, dynamic>.from(entry);
+    if (kind == PostEngagementKind.reposts ||
+        map.containsKey('repostedBy') ||
+        map.containsKey('reposter') ||
+        map.containsKey('repostId')) {
+      return PostEngagementUserModel.fromRepostJson(map);
+    }
     if (kind == PostEngagementKind.mentions ||
-        entry.containsKey('commentId') ||
-        entry.containsKey('mentionedUser') ||
-        entry['comment'] is Map) {
-      return PostEngagementUserModel.fromMentionJson(entry);
+        map.containsKey('commentId') ||
+        map.containsKey('mentionedUser') ||
+        map['comment'] is Map) {
+      return PostEngagementUserModel.fromMentionJson(map);
     }
-    if (kind == PostEngagementKind.likes || entry.containsKey('postId')) {
-      return PostEngagementUserModel.fromLikeJson(entry);
+    if (kind == PostEngagementKind.likes || map.containsKey('postId')) {
+      return PostEngagementUserModel.fromLikeJson(map);
     }
-    return PostEngagementUserModel.fromJson(entry);
+    return PostEngagementUserModel.fromJson(map);
   }).toList();
 }

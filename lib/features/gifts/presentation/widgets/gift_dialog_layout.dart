@@ -27,8 +27,20 @@ class GiftDialogLayout {
 
   double get fieldGap => 10;
 
-  /// Compact square-ish media tiles in the dialog.
-  double get mediaAspectRatio => useWideLayout ? 1.15 : 1.25;
+  /// Caps preview tile height so image/animation don't dominate the dialog.
+  double get mediaMaxHeight => useWideLayout ? 118 : 104;
+
+  /// Fixed-height media frame used by create/edit image & animation tiles.
+  Widget mediaFrame({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        height: mediaMaxHeight,
+        width: double.infinity,
+        child: child,
+      ),
+    );
+  }
 
   InputDecoration denseDecoration({
     required String labelText,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/enums/gift_size.dart';
+import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 
 /// Counts applied catalog filters (excludes search — search stays outside).
@@ -12,6 +14,10 @@ int giftsAppliedFilterCount(GiftsLoaded loaded) {
   if (loaded.maxPriceFilter != null) count++;
   if (loaded.fromDate != null) count++;
   if (loaded.toDate != null) count++;
+  if (loaded.typeFilter != null) count++;
+  if (loaded.tagFilter != GiftTagFilter.any) count++;
+  if (loaded.sizeFilter != null) count++;
+  if (loaded.publishedFilter != GiftPublishedFilter.any) count++;
   return count;
 }
 
@@ -24,6 +30,10 @@ class GiftsFilterDraft {
     this.maxPrice,
     this.fromDate,
     this.toDate,
+    this.typeFilter,
+    this.tagFilter = GiftTagFilter.any,
+    this.sizeFilter,
+    this.publishedFilter = GiftPublishedFilter.any,
   });
 
   factory GiftsFilterDraft.fromLoaded(GiftsLoaded loaded) {
@@ -34,6 +44,10 @@ class GiftsFilterDraft {
       maxPrice: loaded.maxPriceFilter,
       fromDate: loaded.fromDate,
       toDate: loaded.toDate,
+      typeFilter: loaded.typeFilter,
+      tagFilter: loaded.tagFilter,
+      sizeFilter: loaded.sizeFilter,
+      publishedFilter: loaded.publishedFilter,
     );
   }
 
@@ -43,6 +57,10 @@ class GiftsFilterDraft {
   double? maxPrice;
   DateTime? fromDate;
   DateTime? toDate;
+  GiftType? typeFilter;
+  GiftTagFilter tagFilter;
+  GiftSize? sizeFilter;
+  GiftPublishedFilter publishedFilter;
 
   GiftsFilterDraft copy() => GiftsFilterDraft(
         status: status,
@@ -51,6 +69,10 @@ class GiftsFilterDraft {
         maxPrice: maxPrice,
         fromDate: fromDate,
         toDate: toDate,
+        typeFilter: typeFilter,
+        tagFilter: tagFilter,
+        sizeFilter: sizeFilter,
+        publishedFilter: publishedFilter,
       );
 
   void reset() {
@@ -60,6 +82,10 @@ class GiftsFilterDraft {
     maxPrice = null;
     fromDate = null;
     toDate = null;
+    typeFilter = null;
+    tagFilter = GiftTagFilter.any;
+    sizeFilter = null;
+    publishedFilter = GiftPublishedFilter.any;
   }
 
   int get activeCount {
@@ -70,6 +96,10 @@ class GiftsFilterDraft {
     if (maxPrice != null) count++;
     if (fromDate != null) count++;
     if (toDate != null) count++;
+    if (typeFilter != null) count++;
+    if (tagFilter != GiftTagFilter.any) count++;
+    if (sizeFilter != null) count++;
+    if (publishedFilter != GiftPublishedFilter.any) count++;
     return count;
   }
 }
@@ -88,6 +118,46 @@ String giftsFilterSortLabel(AppLocalizations l10n, GiftSortType sort) {
     GiftSortType.priceHighToLow => l10n.t('priceHighToLow'),
     GiftSortType.dateOldToNew => l10n.tOr('oldestGifts', 'Oldest Gifts'),
     GiftSortType.dateNewToOld => l10n.tOr('newestGifts', 'Newest Gifts'),
+    GiftSortType.sortOrderAsc => l10n.tOr('sortBySortOrder', 'Sort Order'),
+    GiftSortType.nameAsc => l10n.tOr('sortByName', 'Name'),
+  };
+}
+
+String giftsFilterTypeLabel(AppLocalizations l10n, GiftType? type) {
+  if (type == null) return l10n.tOr('allTypes', 'All');
+  return switch (type) {
+    GiftType.image => l10n.tOr('giftTypeImage', 'IMAGE'),
+    GiftType.audio => l10n.tOr('giftTypeAudio', 'AUDIO'),
+  };
+}
+
+String giftsFilterTagLabel(AppLocalizations l10n, GiftTagFilter tag) {
+  return switch (tag) {
+    GiftTagFilter.any => l10n.tOr('giftFilterAllShort', 'All'),
+    GiftTagFilter.hasTag => l10n.tOr('giftHasTag', 'Has Tag'),
+    GiftTagFilter.none => l10n.tOr('giftNoTag', 'No Tag'),
+  };
+}
+
+String giftsFilterSizeLabel(AppLocalizations l10n, GiftSize? size) {
+  if (size == null) return l10n.tOr('giftFilterAllShort', 'All');
+  return switch (size) {
+    GiftSize.small => l10n.tOr('giftSizeSmall', 'SMALL'),
+    GiftSize.medium => l10n.tOr('giftSizeMedium', 'MEDIUM'),
+    GiftSize.large => l10n.tOr('giftSizeLarge', 'LARGE'),
+  };
+}
+
+String giftsFilterPublishedLabel(
+  AppLocalizations l10n,
+  GiftPublishedFilter published,
+) {
+  return switch (published) {
+    GiftPublishedFilter.any => l10n.tOr('giftFilterAllShort', 'All'),
+    GiftPublishedFilter.published => l10n.tOr('giftPublishedNow', 'Published'),
+    GiftPublishedFilter.scheduled => l10n.tOr('giftScheduled', 'Scheduled'),
+    GiftPublishedFilter.unpublished =>
+      l10n.tOr('giftFilterUnpublished', 'Unpublished'),
   };
 }
 
@@ -201,6 +271,58 @@ List<GiftsActiveFilterItem> giftsActiveFilterItems(
             '${l10n.tOr('giftFilterToChip', 'To')} ${giftsFilterFormatDate(draft.toDate)}',
         onRemove: () {
           draft.toDate = null;
+          onChanged();
+        },
+      ),
+    );
+  }
+
+  if (draft.typeFilter != null) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'type',
+        label: giftsFilterTypeLabel(l10n, draft.typeFilter),
+        onRemove: () {
+          draft.typeFilter = null;
+          onChanged();
+        },
+      ),
+    );
+  }
+
+  if (draft.tagFilter != GiftTagFilter.any) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'tag',
+        label: giftsFilterTagLabel(l10n, draft.tagFilter),
+        onRemove: () {
+          draft.tagFilter = GiftTagFilter.any;
+          onChanged();
+        },
+      ),
+    );
+  }
+
+  if (draft.sizeFilter != null) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'size',
+        label: giftsFilterSizeLabel(l10n, draft.sizeFilter),
+        onRemove: () {
+          draft.sizeFilter = null;
+          onChanged();
+        },
+      ),
+    );
+  }
+
+  if (draft.publishedFilter != GiftPublishedFilter.any) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'published',
+        label: giftsFilterPublishedLabel(l10n, draft.publishedFilter),
+        onRemove: () {
+          draft.publishedFilter = GiftPublishedFilter.any;
           onChanged();
         },
       ),

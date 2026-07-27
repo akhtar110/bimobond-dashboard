@@ -8,7 +8,10 @@ import '../../domain/entities/bulk_gift_action_request.dart';
 import '../../domain/entities/bulk_gift_action_result.dart';
 import '../../domain/entities/gift_group_entities.dart';
 import '../../domain/entities/gift_entity.dart';
+import '../../domain/entities/gift_reorder_item.dart';
 import '../../domain/enums/bulk_gift_action_type.dart';
+import '../../domain/enums/gift_size.dart';
+import '../../domain/enums/gift_type.dart';
 import '../../domain/enums/gifts_view_type.dart';
 import '../../domain/repositories/gifts_repository.dart';
 import '../../domain/usecases/bulk_gift_action_usecase.dart';
@@ -16,6 +19,7 @@ import '../../domain/usecases/create_gift_usecase.dart';
 import '../../domain/usecases/delete_gift_usecase.dart';
 import '../../domain/usecases/get_admin_gifts_usecase.dart';
 import '../../domain/usecases/gift_group_usecases.dart';
+import '../../domain/usecases/reorder_gifts_usecase.dart';
 import '../../domain/usecases/update_gift_usecase.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -27,7 +31,14 @@ enum GiftSortType {
   priceHighToLow,
   dateOldToNew,
   dateNewToOld,
+  sortOrderAsc,
+  nameAsc,
 }
+
+/// Tag filter for free-form gift tags.
+enum GiftTagFilter { any, hasTag, none }
+
+enum GiftPublishedFilter { any, published, scheduled, unpublished }
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +75,82 @@ class UpdatePriceRangeFilterEvent extends GiftsEvent {
   UpdatePriceRangeFilterEvent({required this.minPrice, required this.maxPrice});
   final double? minPrice;
   final double? maxPrice;
+}
+
+/// Filter by [GiftType]. Pass null to clear (show all types).
+class SetGiftTypeFilterEvent extends GiftsEvent {
+  SetGiftTypeFilterEvent(this.type);
+  final GiftType? type;
+}
+
+/// Filter by [GiftTagFilter] (includes "any" and "none").
+class SetGiftTagFilterEvent extends GiftsEvent {
+  SetGiftTagFilterEvent(this.tag);
+  final GiftTagFilter tag;
+}
+
+/// Filter by [GiftSize]. Pass null to clear (show all sizes).
+class SetGiftSizeFilterEvent extends GiftsEvent {
+  SetGiftSizeFilterEvent(this.size);
+  final GiftSize? size;
+}
+
+/// Filter by publish status.
+class SetGiftPublishedFilterEvent extends GiftsEvent {
+  SetGiftPublishedFilterEvent(this.published);
+  final GiftPublishedFilter published;
+}
+
+/// Batch-apply every catalog filter/sort at once (used by the filter popup's
+/// Apply button so only a single state transition + rebuild happens).
+class ApplyGiftsFiltersEvent extends GiftsEvent {
+  ApplyGiftsFiltersEvent({
+    this.status,
+    this.sort,
+    this.setTypeFilter = false,
+    this.typeFilter,
+    this.tagFilter,
+    this.setSizeFilter = false,
+    this.sizeFilter,
+    this.publishedFilter,
+    this.setPriceRange = false,
+    this.minPrice,
+    this.maxPrice,
+    this.setDateRange = false,
+    this.fromDate,
+    this.toDate,
+  });
+
+  final GiftFilterTab? status;
+  final GiftSortType? sort;
+  final bool setTypeFilter;
+  final GiftType? typeFilter;
+  final GiftTagFilter? tagFilter;
+  final bool setSizeFilter;
+  final GiftSize? sizeFilter;
+  final GiftPublishedFilter? publishedFilter;
+  final bool setPriceRange;
+  final double? minPrice;
+  final double? maxPrice;
+  final bool setDateRange;
+  final DateTime? fromDate;
+  final DateTime? toDate;
+}
+
+/// Persists a new drag-and-drop / manual sort order for the given gifts.
+class ReorderCatalogGiftsEvent extends GiftsEvent {
+  ReorderCatalogGiftsEvent(this.items);
+
+  /// Convenience constructor from an ordered list of gift ids — sort order
+  /// is derived from list position (0, 1, 2, …).
+  factory ReorderCatalogGiftsEvent.fromOrderedIds(List<String> orderedIds) {
+    return ReorderCatalogGiftsEvent([
+      for (var i = 0; i < orderedIds.length; i++)
+        GiftReorderItem(id: orderedIds[i], sortOrder: i),
+    ]);
+  }
+
+  final List<GiftReorderItem> items;
 }
 
 /// Hold image bytes in BLoC state so the create dialog can preview it.
@@ -150,6 +237,10 @@ class GiftsLoaded extends GiftsState {
     this.toDate,
     this.minPriceFilter,
     this.maxPriceFilter,
+    this.typeFilter,
+    this.tagFilter = GiftTagFilter.any,
+    this.sizeFilter,
+    this.publishedFilter = GiftPublishedFilter.any,
     this.pendingImageBytes,
     this.pendingImageName,
     this.isActioning = false,
@@ -177,6 +268,14 @@ class GiftsLoaded extends GiftsState {
   /// Inclusive USD price-range filter on [GiftEntity.priceCoins].
   final double? minPriceFilter;
   final double? maxPriceFilter;
+
+  /// `null` = all types.
+  final GiftType? typeFilter;
+  final GiftTagFilter tagFilter;
+
+  /// `null` = all sizes.
+  final GiftSize? sizeFilter;
+  final GiftPublishedFilter publishedFilter;
 
   /// Image selected by the admin before submitting the create form.
   final Uint8List? pendingImageBytes;
@@ -255,10 +354,13 @@ class GiftsLoaded extends GiftsState {
         break;
     }
 
-    // 2. Name search (case-insensitive, partial match)
+    // 2. Name / type / tag search (case-insensitive, partial match)
     if (searchQuery.isNotEmpty) {
       final q = searchQuery.toLowerCase().trim();
-      list = list.where((g) => g.name.toLowerCase().contains(q));
+      list = list.where((g) =>
+          g.name.toLowerCase().contains(q) ||
+          g.type.apiValue.toLowerCase().contains(q) ||
+          (g.tag?.toLowerCase().contains(q) ?? false));
     }
 
     // 3. Date-range filter on publishedAt (inclusive, day precision)
@@ -283,7 +385,38 @@ class GiftsLoaded extends GiftsState {
     // 4. Price-range filter
     list = _applyPriceFilter(list, minPriceFilter, maxPriceFilter);
 
-    // 5. Sort
+    // 5. Type / tag / size / published filters
+    if (typeFilter != null) {
+      list = list.where((g) => g.type == typeFilter);
+    }
+    switch (tagFilter) {
+      case GiftTagFilter.any:
+        break;
+      case GiftTagFilter.hasTag:
+        list = list.where((g) => g.tag != null && g.tag!.trim().isNotEmpty);
+        break;
+      case GiftTagFilter.none:
+        list = list.where((g) => g.tag == null || g.tag!.trim().isEmpty);
+        break;
+    }
+    if (sizeFilter != null) {
+      list = list.where((g) => g.size == sizeFilter);
+    }
+    switch (publishedFilter) {
+      case GiftPublishedFilter.any:
+        break;
+      case GiftPublishedFilter.published:
+        list = list.where((g) => g.isPublishedNow);
+        break;
+      case GiftPublishedFilter.scheduled:
+        list = list.where((g) => g.isScheduled);
+        break;
+      case GiftPublishedFilter.unpublished:
+        list = list.where((g) => g.publishedAt == null);
+        break;
+    }
+
+    // 6. Sort
     final sorted = list.toList();
     switch (selectedSort) {
       case GiftSortType.priceLowToHigh:
@@ -305,6 +438,14 @@ class GiftsLoaded extends GiftsState {
           final bD = b.publishedAt ?? DateTime(0);
           return bD.compareTo(aD);
         });
+        break;
+      case GiftSortType.sortOrderAsc:
+        sorted.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        break;
+      case GiftSortType.nameAsc:
+        sorted.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
         break;
     }
     return sorted;
@@ -337,7 +478,11 @@ class GiftsLoaded extends GiftsState {
       fromDate != null ||
       toDate != null ||
       minPriceFilter != null ||
-      maxPriceFilter != null;
+      maxPriceFilter != null ||
+      typeFilter != null ||
+      tagFilter != GiftTagFilter.any ||
+      sizeFilter != null ||
+      publishedFilter != GiftPublishedFilter.any;
 
   GiftsLoaded copyWith({
     List<GiftEntity>? gifts,
@@ -353,6 +498,12 @@ class GiftsLoaded extends GiftsState {
     bool setPriceRange = false,
     double? minPriceFilter,
     double? maxPriceFilter,
+    bool setTypeFilter = false,
+    GiftType? typeFilter,
+    GiftTagFilter? tagFilter,
+    bool setSizeFilter = false,
+    GiftSize? sizeFilter,
+    GiftPublishedFilter? publishedFilter,
     Uint8List? pendingImageBytes,
     String? pendingImageName,
     bool clearPendingImage = false,
@@ -381,6 +532,10 @@ class GiftsLoaded extends GiftsState {
       maxPriceFilter: setPriceRange
           ? maxPriceFilter
           : (maxPriceFilter ?? this.maxPriceFilter),
+      typeFilter: setTypeFilter ? typeFilter : (typeFilter ?? this.typeFilter),
+      tagFilter: tagFilter ?? this.tagFilter,
+      sizeFilter: setSizeFilter ? sizeFilter : (sizeFilter ?? this.sizeFilter),
+      publishedFilter: publishedFilter ?? this.publishedFilter,
       pendingImageBytes: clearPendingImage
           ? null
           : (pendingImageBytes ?? this.pendingImageBytes),
@@ -420,6 +575,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     required BulkGiftActionUseCase bulkGiftAction,
     required GetGiftGroupsUseCase getGiftGroups,
     required ReplaceGroupGiftsUseCase replaceGroupGifts,
+    required ReorderGiftsUseCase reorderGifts,
   })  : _getAdminGifts = getAdminGifts,
         _createGift = createGift,
         _updateGift = updateGift,
@@ -427,6 +583,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         _bulkGiftAction = bulkGiftAction,
         _getGiftGroups = getGiftGroups,
         _replaceGroupGifts = replaceGroupGifts,
+        _reorderGifts = reorderGifts,
         super(GiftsInitial()) {
     on<LoadAdminGiftsEvent>(_onLoad);
     on<ChangeGiftTabFilterEvent>(_onChangeTab);
@@ -434,6 +591,12 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     on<SearchGiftsEvent>(_onSearch);
     on<SetDateRangeFilterEvent>(_onSetDateRange);
     on<UpdatePriceRangeFilterEvent>(_onUpdatePriceRange);
+    on<SetGiftTypeFilterEvent>(_onSetTypeFilter);
+    on<SetGiftTagFilterEvent>(_onSetTagFilter);
+    on<SetGiftSizeFilterEvent>(_onSetSizeFilter);
+    on<SetGiftPublishedFilterEvent>(_onSetPublishedFilter);
+    on<ApplyGiftsFiltersEvent>(_onApplyFilters);
+    on<ReorderCatalogGiftsEvent>(_onReorderGifts);
     on<SetGiftImageEvent>(_onSetImage);
     on<ClearGiftImageEvent>(_onClearImage);
     on<CreateGiftEvent>(_onCreate);
@@ -460,6 +623,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   final BulkGiftActionUseCase _bulkGiftAction;
   final GetGiftGroupsUseCase _getGiftGroups;
   final ReplaceGroupGiftsUseCase _replaceGroupGifts;
+  final ReorderGiftsUseCase _reorderGifts;
 
   static const pageLimit = 20;
 
@@ -622,16 +786,29 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     BulkGiftActionType action,
     BulkGiftActionResult result,
   ) {
-    return switch (action) {
-      BulkGiftActionType.delete => result.deactivatedCount > 0
-          ? 'Deleted ${result.successCount} gift(s); '
-              '${result.deactivatedCount} deactivated (in use)'
-          : '${result.successCount} gift(s) deleted',
-      BulkGiftActionType.activate =>
-        '${result.successCount} gift(s) activated',
-      BulkGiftActionType.deactivate =>
-        '${result.successCount} gift(s) deactivated',
-    };
+    switch (action) {
+      case BulkGiftActionType.delete:
+        final parts = <String>['${result.successCount} deleted'];
+        if (result.deactivatedCount > 0) {
+          parts.add('${result.deactivatedCount} deactivated (in use)');
+        }
+        if (result.notFoundCount > 0) {
+          parts.add('${result.notFoundCount} not found');
+        }
+        return parts.join('; ');
+      case BulkGiftActionType.activate:
+        final parts = <String>['${result.successCount} gift(s) activated'];
+        if (result.notFoundCount > 0) {
+          parts.add('${result.notFoundCount} not found');
+        }
+        return parts.join('; ');
+      case BulkGiftActionType.deactivate:
+        final parts = <String>['${result.successCount} gift(s) deactivated'];
+        if (result.notFoundCount > 0) {
+          parts.add('${result.notFoundCount} not found');
+        }
+        return parts.join('; ');
+    }
   }
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -752,6 +929,137 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
       return (max, min);
     }
     return (min, max);
+  }
+
+  void _onSetTypeFilter(
+    SetGiftTypeFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(
+        setTypeFilter: true,
+        typeFilter: event.type,
+        currentPage: 1,
+        clearMessages: true,
+      ));
+    }
+  }
+
+  void _onSetTagFilter(
+    SetGiftTagFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(
+        tagFilter: event.tag,
+        currentPage: 1,
+        clearMessages: true,
+      ));
+    }
+  }
+
+  void _onSetSizeFilter(
+    SetGiftSizeFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(
+        setSizeFilter: true,
+        sizeFilter: event.size,
+        currentPage: 1,
+        clearMessages: true,
+      ));
+    }
+  }
+
+  void _onSetPublishedFilter(
+    SetGiftPublishedFilterEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is GiftsLoaded) {
+      emit(c.copyWith(
+        publishedFilter: event.published,
+        currentPage: 1,
+        clearMessages: true,
+      ));
+    }
+  }
+
+  void _onApplyFilters(
+    ApplyGiftsFiltersEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final c = state;
+    if (c is! GiftsLoaded) return;
+
+    var minPrice = event.minPrice;
+    var maxPrice = event.maxPrice;
+    if (event.setPriceRange) {
+      final normalized = _normalizePriceRange(minPrice, maxPrice);
+      minPrice = normalized.$1;
+      maxPrice = normalized.$2;
+    }
+
+    var fromDate = event.fromDate;
+    var toDate = event.toDate;
+    if (event.setDateRange && fromDate != null && toDate != null &&
+        fromDate.isAfter(toDate)) {
+      final temp = fromDate;
+      fromDate = toDate;
+      toDate = temp;
+    }
+
+    emit(c.copyWith(
+      selectedTab: event.status,
+      selectedSort: event.sort,
+      setTypeFilter: event.setTypeFilter,
+      typeFilter: event.typeFilter,
+      tagFilter: event.tagFilter,
+      setSizeFilter: event.setSizeFilter,
+      sizeFilter: event.sizeFilter,
+      publishedFilter: event.publishedFilter,
+      setPriceRange: event.setPriceRange,
+      minPriceFilter: minPrice,
+      maxPriceFilter: maxPrice,
+      setDateRange: event.setDateRange,
+      fromDate: fromDate,
+      toDate: toDate,
+      currentPage: 1,
+      clearMessages: true,
+    ));
+  }
+
+  // ── Reorder ───────────────────────────────────────────────────────────────
+
+  Future<void> _onReorderGifts(
+    ReorderCatalogGiftsEvent event,
+    Emitter<GiftsState> emit,
+  ) async {
+    final c = state;
+    if (c is! GiftsLoaded || event.items.isEmpty) return;
+
+    emit(c.copyWith(isActioning: true, clearMessages: true));
+    try {
+      final updated = await _reorderGifts(event.items);
+      final updatedById = {for (final g in updated) g.id: g};
+      final gifts = c.gifts
+          .map((g) => updatedById[g.id] ?? g)
+          .toList(growable: false);
+      emit(_withUiState(c.copyWith(
+        gifts: gifts,
+        isActioning: false,
+        successMessage: 'Gift order updated',
+      )));
+    } catch (e) {
+      emit(c.copyWith(
+        isActioning: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      ));
+    }
   }
 
   // ── Pending image ─────────────────────────────────────────────────────────

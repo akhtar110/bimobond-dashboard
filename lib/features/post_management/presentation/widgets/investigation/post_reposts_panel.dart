@@ -1,114 +1,182 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../core/localization/localization.dart';
 import '../../../../../core/routing/app_router.dart';
 import '../../../../users/domain/entities/user_entity.dart';
-import '../../../domain/entities/managed_post_entity.dart';
+import '../../../domain/entities/post_engagement_user_item.dart';
+import '../../bloc/post_management_bloc.dart';
 import 'investigation_theme.dart';
 
-/// Displays reposters from [ManagedPostEntity.recentReposts] when available.
-class PostRepostsPanel extends StatelessWidget {
-  const PostRepostsPanel({super.key, required this.post});
+/// Displays reposters from the post engagement API (with seed from recentReposts).
+class PostRepostsPanel extends StatefulWidget {
+  const PostRepostsPanel({
+    super.key,
+    required this.totalCount,
+  });
 
-  final ManagedPostEntity post;
+  final int totalCount;
+
+  @override
+  State<PostRepostsPanel> createState() => _PostRepostsPanelState();
+}
+
+class _PostRepostsPanelState extends State<PostRepostsPanel>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  void _reload() {
+    context.read<PostManagementBloc>().add(
+          LoadPostEngagementUsersEvent(PostEngagementKind.reposts),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final reposts = post.recentReposts;
-    final total = post.repostCount > 0 ? post.repostCount : reposts.length;
-
-    if (reposts.isEmpty) {
-      return _EmptyState(
-        icon: Icons.repeat_rounded,
-        message: l10n.tOr(
-          'noPostRepostsYet',
-          "This post hasn't been reposted yet",
-        ),
-        subtitle: total > 0
-            ? context.tr('repostsCountSummary', {'count': '$total'})
-            : null,
-      );
-    }
-
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: InvestigationTheme.s12),
-          child: Row(
-            children: [
-              Text(
-                l10n.t('reposts'),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                context.tr('repostsCountSummary', {'count': '$total'}),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-        ...reposts.map((raw) {
-          final user = raw['user'] as Map<String, dynamic>? ?? {};
-          final username = user['username']?.toString() ?? '—';
-          final fullName = user['fullName']?.toString();
-          final avatarUrl = user['avatarUrl']?.toString();
-          final isBanned = user['isBanned'] as bool? ?? false;
-          final isVerified = user['isVerified'] as bool? ?? false;
-          final createdAt = DateTime.tryParse(raw['createdAt']?.toString() ?? '') ??
-              DateTime.now();
-          final userId = user['id']?.toString() ?? '';
+    return BlocSelector<PostManagementBloc, PostManagementState,
+        PostEngagementListState?>(
+      selector: (s) =>
+          s is PostManagementLoaded ? s.engagementFor(PostEngagementKind.reposts) : null,
+      builder: (context, engagement) {
+        if (engagement == null) return const SizedBox.shrink();
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: InvestigationTheme.s8),
-            child: _RepostRow(
-              username: username,
-              fullName: fullName,
-              avatarUrl: avatarUrl,
-              isBanned: isBanned,
-              isVerified: isVerified,
-              repostedAt: dateFormat.format(createdAt),
-              onViewProfile: userId.isNotEmpty
-                  ? () => Navigator.pushNamed(
-                        context,
-                        AppRoutes.userDetail,
-                        arguments: UserEntity(
-                          id: userId,
-                          username: username,
-                          fullName: fullName,
-                          avatarUrl: avatarUrl,
-                          isVerified: isVerified,
-                          isPrivate: false,
-                          allowComments: true,
-                          allowDirectMsgs: true,
-                          language: 'en',
-                          theme: 'light',
-                          followerCount: 0,
-                          followingCount: 0,
-                          postCount: 0,
-                          totalLikes: 0,
-                          isBanned: isBanned,
-                          roles: const [],
-                        ),
-                      )
-                  : null,
+        if (engagement.isLoading && engagement.items.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: CircularProgressIndicator(),
             ),
           );
-        }),
-      ],
+        }
+
+        final reposts = engagement.items;
+        final total =
+            widget.totalCount > 0 ? widget.totalCount : reposts.length;
+
+        if (reposts.isEmpty) {
+          return _EmptyState(
+            icon: Icons.repeat_rounded,
+            message: engagement.error ??
+                l10n.tOr(
+                  'noPostRepostsYet',
+                  "This post hasn't been reposted yet",
+                ),
+            subtitle: total > 0
+                ? context.tr('repostsCountSummary', {'count': '$total'})
+                : null,
+            onRetry: engagement.error != null ? _reload : null,
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: InvestigationTheme.s12),
+              child: Row(
+                children: [
+                  Text(
+                    l10n.t('reposts'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    context.tr('repostsCountSummary', {
+                      'count':
+                          '${reposts.length}${total > reposts.length ? ' / $total' : ''}',
+                    }),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...reposts.map((item) {
+              final username = item.username ?? '—';
+              final display = item.fullName?.isNotEmpty == true
+                  ? item.fullName!
+                  : '@$username';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: InvestigationTheme.s8),
+                child: _RepostRow(
+                  username: username,
+                  fullName: item.fullName,
+                  displayName: display,
+                  avatarUrl: item.avatarUrl,
+                  isBanned: item.isBanned,
+                  isVerified: item.isVerified,
+                  repostedAt: dateFormat.format(item.createdAt),
+                  onViewProfile: item.userId.isNotEmpty
+                      ? () => Navigator.pushNamed(
+                            context,
+                            AppRoutes.userDetail,
+                            arguments: UserEntity(
+                              id: item.userId,
+                              username: username,
+                              fullName: item.fullName,
+                              avatarUrl: item.avatarUrl,
+                              isVerified: item.isVerified,
+                              isPrivate: false,
+                              allowComments: true,
+                              allowDirectMsgs: true,
+                              language: 'en',
+                              theme: 'light',
+                              followerCount: 0,
+                              followingCount: 0,
+                              postCount: 0,
+                              totalLikes: 0,
+                              isBanned: item.isBanned,
+                              roles: const [],
+                            ),
+                          )
+                      : null,
+                ),
+              );
+            }),
+            if (engagement.error != null) ...[
+              const SizedBox(height: InvestigationTheme.s8),
+              Text(
+                engagement.error!,
+                style: TextStyle(fontSize: 12, color: scheme.error),
+              ),
+            ],
+            if (engagement.hasMore) ...[
+              const SizedBox(height: InvestigationTheme.s8),
+              OutlinedButton.icon(
+                onPressed: engagement.isLoadingMore
+                    ? null
+                    : () => context.read<PostManagementBloc>().add(
+                          LoadMorePostEngagementUsersEvent(
+                            PostEngagementKind.reposts,
+                          ),
+                        ),
+                icon: engagement.isLoadingMore
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.expand_more_rounded, size: 18),
+                label: Text(l10n.t('loadMoreComments')),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -117,6 +185,7 @@ class _RepostRow extends StatefulWidget {
   const _RepostRow({
     required this.username,
     this.fullName,
+    required this.displayName,
     this.avatarUrl,
     required this.isBanned,
     required this.isVerified,
@@ -126,6 +195,7 @@ class _RepostRow extends StatefulWidget {
 
   final String username;
   final String? fullName;
+  final String displayName;
   final String? avatarUrl;
   final bool isBanned;
   final bool isVerified;
@@ -143,9 +213,7 @@ class _RepostRowState extends State<_RepostRow> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final display = widget.fullName?.isNotEmpty == true
-        ? widget.fullName!
-        : '@${widget.username}';
+    final display = widget.displayName;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -248,11 +316,13 @@ class _EmptyState extends StatelessWidget {
     required this.icon,
     required this.message,
     this.subtitle,
+    this.onRetry,
   });
 
   final IconData icon;
   final String message;
   final String? subtitle;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +346,13 @@ class _EmptyState extends StatelessWidget {
             Text(
               subtitle!,
               style: TextStyle(fontSize: 12, color: scheme.primary),
+            ),
+          ],
+          if (onRetry != null) ...[
+            const SizedBox(height: 12),
+            FilledButton.tonal(
+              onPressed: onRetry,
+              child: Text(context.l10n.t('tryAgain')),
             ),
           ],
         ],

@@ -34,4 +34,4 @@ class PostEngagementUsersPageEntity {
   final bool hasMore;
 }
 
-enum PostEngagementKind { likes, views, mentions }
+enum PostEngagementKind { likes, views, mentions, reposts }

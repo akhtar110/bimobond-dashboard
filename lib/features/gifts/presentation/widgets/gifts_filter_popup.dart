@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../domain/enums/gift_size.dart';
+import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 import 'gifts_active_filters.dart';
 import 'gifts_filter_chip.dart';
@@ -217,10 +219,24 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
 
     final bloc = widget.giftsBloc;
     widget.onStatusFilterSelected?.call(_draft.status);
-    bloc.add(ChangeGiftTabFilterEvent(_draft.status));
-    bloc.add(ChangeGiftSortEvent(_draft.sort));
-    bloc.add(UpdatePriceRangeFilterEvent(minPrice: min, maxPrice: max));
-    bloc.add(SetDateRangeFilterEvent(fromDate: from, toDate: to));
+    bloc.add(
+      ApplyGiftsFiltersEvent(
+        status: _draft.status,
+        sort: _draft.sort,
+        setTypeFilter: true,
+        typeFilter: _draft.typeFilter,
+        tagFilter: _draft.tagFilter,
+        setSizeFilter: true,
+        sizeFilter: _draft.sizeFilter,
+        publishedFilter: _draft.publishedFilter,
+        setPriceRange: true,
+        minPrice: min,
+        maxPrice: max,
+        setDateRange: true,
+        fromDate: from,
+        toDate: to,
+      ),
+    );
     _close();
   }
 
@@ -318,6 +334,80 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                             label: giftsFilterSortLabel(l10n, sort),
                             selected: _draft.sort == sort,
                             onTap: () => setState(() => _draft.sort = sort),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n.tOr('giftFilterType', 'Type').toUpperCase(),
+                    initiallyExpanded: false,
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: giftsFilterTypeLabel(l10n, null),
+                          selected: _draft.typeFilter == null,
+                          onTap: () =>
+                              setState(() => _draft.typeFilter = null),
+                        ),
+                        for (final type in GiftType.values)
+                          GiftsFilterChoiceChip(
+                            label: giftsFilterTypeLabel(l10n, type),
+                            selected: _draft.typeFilter == type,
+                            onTap: () =>
+                                setState(() => _draft.typeFilter = type),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n.tOr('giftFilterTag', 'Tag').toUpperCase(),
+                    initiallyExpanded: false,
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        for (final tag in GiftTagFilter.values)
+                          GiftsFilterChoiceChip(
+                            label: giftsFilterTagLabel(l10n, tag),
+                            selected: _draft.tagFilter == tag,
+                            onTap: () => setState(() => _draft.tagFilter = tag),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n.tOr('giftFilterSize', 'Size').toUpperCase(),
+                    initiallyExpanded: false,
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: giftsFilterSizeLabel(l10n, null),
+                          selected: _draft.sizeFilter == null,
+                          onTap: () =>
+                              setState(() => _draft.sizeFilter = null),
+                        ),
+                        for (final size in GiftSize.values)
+                          GiftsFilterChoiceChip(
+                            label: giftsFilterSizeLabel(l10n, size),
+                            selected: _draft.sizeFilter == size,
+                            onTap: () =>
+                                setState(() => _draft.sizeFilter = size),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n
+                        .tOr('giftFilterPublished', 'Published')
+                        .toUpperCase(),
+                    initiallyExpanded: false,
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        for (final published in GiftPublishedFilter.values)
+                          GiftsFilterChoiceChip(
+                            label: giftsFilterPublishedLabel(l10n, published),
+                            selected: _draft.publishedFilter == published,
+                            onTap: () => setState(
+                              () => _draft.publishedFilter = published,
+                            ),
                           ),
                       ],
                     ),

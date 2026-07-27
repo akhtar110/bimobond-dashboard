@@ -244,6 +244,10 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                       prev.toDate != next.toDate ||
                       prev.minPriceFilter != next.minPriceFilter ||
                       prev.maxPriceFilter != next.maxPriceFilter ||
+                      prev.typeFilter != next.typeFilter ||
+                      prev.tagFilter != next.tagFilter ||
+                      prev.sizeFilter != next.sizeFilter ||
+                      prev.publishedFilter != next.publishedFilter ||
                       prev.selectedGiftIds != next.selectedGiftIds ||
                       prev.isPerformingBulkAction !=
                           next.isPerformingBulkAction ||

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
@@ -31,6 +31,10 @@ class GiftsContentSliver extends StatelessWidget {
             prev.toDate != curr.toDate ||
             prev.minPriceFilter != curr.minPriceFilter ||
             prev.maxPriceFilter != curr.maxPriceFilter ||
+            prev.typeFilter != curr.typeFilter ||
+            prev.tagFilter != curr.tagFilter ||
+            prev.sizeFilter != curr.sizeFilter ||
+            prev.publishedFilter != curr.publishedFilter ||
             prev.currentPage != curr.currentPage;
       },
       builder: (context, state) {
@@ -78,6 +82,10 @@ class GiftsGridSliver extends GiftsContentSliver {
             prev.toDate != curr.toDate ||
             prev.minPriceFilter != curr.minPriceFilter ||
             prev.maxPriceFilter != curr.maxPriceFilter ||
+            prev.typeFilter != curr.typeFilter ||
+            prev.tagFilter != curr.tagFilter ||
+            prev.sizeFilter != curr.sizeFilter ||
+            prev.publishedFilter != curr.publishedFilter ||
             prev.currentPage != curr.currentPage;
       },
       builder: (context, state) {

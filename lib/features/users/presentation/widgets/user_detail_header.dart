@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
+import '../utils/user_detail_layout_metrics.dart';
 import 'user_privacy_badges.dart';
 
 class UserDetailRoleChip extends StatelessWidget {
-  const UserDetailRoleChip({super.key, required this.user});
+  const UserDetailRoleChip({super.key, required this.user, this.compact = false});
   final UserEntity user;
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -33,10 +36,13 @@ class UserDetailRoleChip extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 2 : 4,
+      ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(compact ? 10 : 12),
         border: Border.all(color: border.withValues(alpha: 0.3)),
       ),
       child: Text(
@@ -45,7 +51,7 @@ class UserDetailRoleChip extends StatelessWidget {
             : (isMod ? l10n.t('roleBadgeModerator') : l10n.t('roleBadgeUser')),
         style: TextStyle(
           color: foreground,
-          fontSize: 12,
+          fontSize: compact ? 11 : 12,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -72,7 +78,10 @@ class UserDetailHeader extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 600;
+        final metrics = userDetailLayoutMetrics(constraints.maxWidth);
+        final isCompact = metrics.headerStacked;
+        final avatarRadius = metrics.avatarRadius;
+        final verifiedSize = metrics.verifiedBadgeSize;
 
         final avatar = Material(
           color: Colors.transparent,
@@ -82,7 +91,7 @@ class UserDetailHeader extends StatelessWidget {
             child: Stack(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: EdgeInsets.all(isCompact ? 2.5 : 3),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
@@ -93,7 +102,7 @@ class UserDetailHeader extends StatelessWidget {
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: isCompact ? 40 : 60,
+                    radius: avatarRadius,
                     backgroundColor: scheme.surfaceContainerHighest,
                     backgroundImage: user.avatarUrl != null
                         ? CachedNetworkImageProvider(user.avatarUrl!)
@@ -101,7 +110,7 @@ class UserDetailHeader extends StatelessWidget {
                     child: user.avatarUrl == null
                         ? Icon(
                             Icons.person,
-                            size: isCompact ? 40 : 60,
+                            size: metrics.avatarIconSize,
                             color: scheme.onSurfaceVariant,
                           )
                         : null,
@@ -109,10 +118,10 @@ class UserDetailHeader extends StatelessWidget {
                 ),
                 if (user.isVerified)
                   Positioned(
-                    bottom: isCompact ? 2 : 4,
-                    right: isCompact ? 2 : 4,
+                    bottom: isCompact ? 1 : 2,
+                    right: isCompact ? 1 : 2,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: EdgeInsets.all(isCompact ? 2.5 : 3),
                       decoration: BoxDecoration(
                         color: scheme.primary,
                         shape: BoxShape.circle,
@@ -120,7 +129,7 @@ class UserDetailHeader extends StatelessWidget {
                       child: Icon(
                         Icons.check,
                         color: scheme.onPrimary,
-                        size: isCompact ? 12 : 16,
+                        size: verifiedSize,
                       ),
                     ),
                   ),
@@ -135,46 +144,46 @@ class UserDetailHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Wrap(
-                spacing: 12,
-                runSpacing: 8,
+                spacing: 8,
+                runSpacing: 6,
                 alignment: wrapAlign,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     user.fullName ?? user.username,
                     style: (isCompact
-                            ? theme.textTheme.headlineSmall
-                            : theme.textTheme.displaySmall)
+                            ? theme.textTheme.titleLarge
+                            : theme.textTheme.headlineSmall)
                         ?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: scheme.onSurface,
                         ),
                   ),
-                  UserDetailRoleChip(user: user),
+                  UserDetailRoleChip(user: user, compact: true),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 '@${user.username}',
-                style: theme.textTheme.titleMedium?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               if (user.bio != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   user.bio!,
                   textAlign: isCompact ? TextAlign.center : TextAlign.start,
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
-                    height: 1.5,
+                    height: 1.4,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -190,15 +199,15 @@ class UserDetailHeader extends StatelessWidget {
 
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(metrics.sectionPadding),
           decoration: BoxDecoration(
             color: scheme.surface,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(metrics.headerRadius),
             boxShadow: [
               BoxShadow(
                 color: scheme.shadow.withValues(alpha: 0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
+                blurRadius: 16,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -210,12 +219,12 @@ class UserDetailHeader extends StatelessWidget {
                   alignment: Alignment.topRight,
                   child: adminActions!,
                 ),
-              if (adminActions != null) const SizedBox(height: 8),
+              if (adminActions != null) SizedBox(height: metrics.sectionSpacing * 0.5),
               isCompact
                   ? Column(
                       children: [
                         avatar,
-                        const SizedBox(height: 16),
+                        SizedBox(height: metrics.sectionSpacing),
                         contentColumn(
                           CrossAxisAlignment.center,
                           WrapAlignment.center,
@@ -226,7 +235,7 @@ class UserDetailHeader extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         avatar,
-                        const SizedBox(width: 20),
+                        SizedBox(width: metrics.sectionSpacing + 4),
                         Expanded(
                           child: contentColumn(
                             CrossAxisAlignment.start,

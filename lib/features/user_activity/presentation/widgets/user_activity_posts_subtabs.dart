@@ -38,7 +38,7 @@ class _UserActivityPostsSubtabsState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
           child: ActivityFilterChips(
             isDark: widget.isDark,
             selected: _selected,

@@ -270,6 +270,7 @@ import 'features/gifts/domain/usecases/bulk_gift_action_usecase.dart';
 import 'features/gifts/domain/usecases/create_gift_usecase.dart';
 import 'features/gifts/domain/usecases/delete_gift_usecase.dart';
 import 'features/gifts/domain/usecases/get_admin_gifts_usecase.dart';
+import 'features/gifts/domain/usecases/reorder_gifts_usecase.dart';
 import 'features/gifts/domain/usecases/update_gift_usecase.dart';
 import 'features/gifts/domain/usecases/gift_group_usecases.dart';
 import 'features/gifts/presentation/bloc/gift_groups_bloc.dart';
@@ -1424,6 +1425,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteGiftGroupUseCase(sl<GiftsRepository>()));
   sl.registerLazySingleton(() => ReorderGiftGroupsUseCase(sl<GiftsRepository>()));
   sl.registerLazySingleton(() => ReplaceGroupGiftsUseCase(sl<GiftsRepository>()));
+  sl.registerLazySingleton(() => ReorderGiftsUseCase(sl<GiftsRepository>()));
 
   sl.registerFactory(
     () => GiftsBloc(
@@ -1434,6 +1436,7 @@ Future<void> init() async {
       bulkGiftAction: sl<BulkGiftActionUseCase>(),
       getGiftGroups: sl<GetGiftGroupsUseCase>(),
       replaceGroupGifts: sl<ReplaceGroupGiftsUseCase>(),
+      reorderGifts: sl<ReorderGiftsUseCase>(),
     ),
   );
   sl.registerFactory(

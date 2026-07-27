@@ -141,6 +141,7 @@ class _PostEngagementUsersPanelState extends State<PostEngagementUsersPanel>
       PostEngagementKind.likes => l10n.t('likes'),
       PostEngagementKind.views => l10n.tOr('postViews', 'Post Views'),
       PostEngagementKind.mentions => l10n.t('mentions'),
+      PostEngagementKind.reposts => l10n.t('reposts'),
     };
   }
 }
