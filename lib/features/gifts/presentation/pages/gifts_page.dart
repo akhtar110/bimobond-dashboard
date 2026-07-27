@@ -11,6 +11,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/gift_group_entities.dart';
 import '../bloc/gift_groups_bloc.dart';
 import '../bloc/gifts_bloc.dart';
+import '../bloc/gifts_catalog_selection_cubit.dart';
 import '../utils/gifts_page_layout.dart';
 import '../utils/gifts_responsive.dart';
 import '../widgets/create_gift_dialog.dart';
@@ -39,7 +40,10 @@ class GiftsPage extends StatelessWidget {
       child: BlocProvider(
         create: (_) =>
             di.sl<GiftGroupsBloc>()..add(const LoadGiftGroupsEvent()),
-        child: const _GiftsPageView(),
+        child: BlocProvider(
+          create: (_) => GiftsCatalogSelectionCubit(),
+          child: const _GiftsPageView(),
+        ),
       ),
     );
   }
@@ -54,7 +58,6 @@ class _GiftsPageView extends StatefulWidget {
 
 class _GiftsPageViewState extends State<_GiftsPageView> {
   final _scrollController = ScrollController();
-  String? _selectedGroupId;
 
   static const _maxContentWidth = 1680.0;
 
@@ -273,7 +276,6 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                           state: state,
                           radius: _panelRadius(width),
                           scrollController: _scrollController,
-                          selectedGroupId: _selectedGroupId,
                         );
                       }
 
@@ -300,33 +302,45 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                               loaded: loaded,
                               screenWidth: width,
                               onStatusFilterSelected: (_) {
-                                setState(
-                                  () => _selectedGroupId = null,
-                                );
+                                context
+                                    .read<GiftsCatalogSelectionCubit>()
+                                    .clear();
                               },
                             )
                           : null;
 
                       final catalogTabsWidget = loaded != null
-                          ? GiftsCatalogTabsBar(
-                              selectedGroupId: _selectedGroupId,
-                              onGroupSelected: (group) {
-                                setState(
-                                  () => _selectedGroupId = group?.id,
+                          ? BlocSelector<GiftsCatalogSelectionCubit, String?,
+                              String?>(
+                              selector: (id) => id,
+                              builder: (context, selectedGroupId) {
+                                return GiftsCatalogTabsBar(
+                                  selectedGroupId: selectedGroupId,
+                                  onGroupSelected: (group) {
+                                    context
+                                        .read<GiftsCatalogSelectionCubit>()
+                                        .selectGroup(group?.id);
+                                    if (group != null) {
+                                      ctx.read<GiftsBloc>().add(
+                                            GoToGiftsPageEvent(1),
+                                          );
+                                    }
+                                  },
                                 );
-                                if (group != null) {
-                                  ctx.read<GiftsBloc>().add(
-                                        GoToGiftsPageEvent(1),
-                                      );
-                                }
                               },
                             )
                           : null;
 
                       final paginationWidget = showDesktopPagination
-                          ? _CatalogPagination(
-                              loaded: loaded,
-                              selectedGroupId: _selectedGroupId,
+                          ? BlocSelector<GiftsCatalogSelectionCubit, String?,
+                              String?>(
+                              selector: (id) => id,
+                              builder: (context, selectedGroupId) {
+                                return _CatalogPagination(
+                                  loaded: loaded,
+                                  selectedGroupId: selectedGroupId,
+                                );
+                              },
                             )
                           : null;
 
@@ -398,13 +412,11 @@ class _CatalogBodyPanel extends StatelessWidget {
     required this.state,
     required this.radius,
     required this.scrollController,
-    this.selectedGroupId,
   });
 
   final GiftsState state;
   final double radius;
   final ScrollController scrollController;
-  final String? selectedGroupId;
 
   @override
   Widget build(BuildContext context) {
@@ -440,9 +452,14 @@ class _CatalogBodyPanel extends StatelessWidget {
       );
     }
     if (state is GiftsLoaded) {
-      return _CatalogLoadedScroll(
-        scrollController: scrollController,
-        selectedGroupId: selectedGroupId,
+      return BlocSelector<GiftsCatalogSelectionCubit, String?, String?>(
+        selector: (id) => id,
+        builder: (context, selectedGroupId) {
+          return _CatalogLoadedScroll(
+            scrollController: scrollController,
+            selectedGroupId: selectedGroupId,
+          );
+        },
       );
     }
     return const SizedBox.shrink();

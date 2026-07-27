@@ -19,16 +19,19 @@ class SoundFiltersPanel extends StatelessWidget {
     super.key,
     required this.query,
     this.onStatusChanged,
+    this.compact = false,
   });
 
   final SoundsQuery query;
   final VoidCallback? onStatusChanged;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final activeCount = soundsAppliedFilterCount(query);
-    const height = 48.0;
+    final height = compact ? 36.0 : 40.0;
+    final gap = compact ? 8.0 : 10.0;
 
     return SizedBox(
       height: height,
@@ -43,7 +46,7 @@ class SoundFiltersPanel extends StatelessWidget {
                   context.read<SoundsBloc>().add(SearchSoundsEvent(q)),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: gap),
           Builder(
             builder: (buttonContext) {
               return GiftsFilterButton(
@@ -128,22 +131,23 @@ class _SoundSearchFieldState extends State<_SoundSearchField> {
         onChanged: widget.onChanged,
         decoration: InputDecoration(
           hintText: widget.hint,
+          isDense: true,
           prefixIcon: const Icon(Icons.search_rounded, size: 20),
           filled: true,
           fillColor: scheme.surfaceContainerLow,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: scheme.outlineVariant),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
               color: scheme.outline.withValues(alpha: 0.18),
             ),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: scheme.primary, width: 1.5),
           ),
         ),

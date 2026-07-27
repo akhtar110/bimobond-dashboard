@@ -133,20 +133,11 @@ class _UserLocationIntelligencePanelState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!widget.embedded) ...[
-                  LocationHeaderSection(
+                  _LocationPageTopBar(
                     isUserDetail: isUserDetail,
                     metrics: metrics,
-                    compact: !widget.showLimitFilter,
-                  ),
-                  SizedBox(
-                    height: widget.showLimitFilter
-                        ? metrics.sectionGap
-                        : metrics.toolbarSectionGap,
-                  ),
-                  LocationToolbar(
                     state: state,
                     fixedUser: widget.fixedUser,
-                    metrics: metrics,
                     showLimitFilter: widget.showLimitFilter,
                   ),
                 ],
@@ -183,6 +174,70 @@ class _UserLocationIntelligencePanelState
               child: content,
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// Compact top bar: title + search/filters on one responsive row when possible.
+class _LocationPageTopBar extends StatelessWidget {
+  const _LocationPageTopBar({
+    required this.isUserDetail,
+    required this.metrics,
+    required this.state,
+    required this.showLimitFilter,
+    this.fixedUser,
+  });
+
+  final bool isUserDetail;
+  final LocationLayoutMetrics metrics;
+  final LocationIntelligenceState state;
+  final bool showLimitFilter;
+  final UserEntity? fixedUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = LocationHeaderSection(
+      isUserDetail: isUserDetail,
+      metrics: metrics,
+      compact: !showLimitFilter,
+    );
+    final toolbar = LocationToolbar(
+      state: state,
+      fixedUser: fixedUser,
+      metrics: metrics,
+      showLimitFilter: showLimitFilter,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final inline = constraints.maxWidth >= 880 && !showLimitFilter;
+
+        if (inline) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: metrics.isMobile ? 2 : 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                title,
+                SizedBox(width: metrics.toolbarFilterGap + 4),
+                Expanded(child: toolbar),
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: metrics.isMobile ? 2 : 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              title,
+              SizedBox(height: metrics.toolbarFilterGap),
+              toolbar,
+            ],
+          ),
         );
       },
     );

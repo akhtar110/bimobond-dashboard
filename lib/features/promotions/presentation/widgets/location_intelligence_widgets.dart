@@ -130,34 +130,19 @@ class LocationHeaderSection extends StatelessWidget {
         compact || device != LocationDeviceType.desktop;
     final titleStyle = (compactHeader
             ? Theme.of(context).textTheme.titleMedium
-            : Theme.of(context).textTheme.headlineSmall)
-        ?.copyWith(fontWeight: FontWeight.w800);
+            : Theme.of(context).textTheme.titleLarge)
+        ?.copyWith(
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.45,
+      height: 1.05,
+    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          l10n.t('promoLocationTitle'),
-          style: titleStyle,
-        ),
-        SizedBox(
-          height: compactHeader
-              ? (metrics?.toolbarFilterGap ?? 4)
-              : (metrics?.sectionGap ?? LocationSpace.sm),
-        ),
-        Text(
-          isUserDetail
-              ? l10n.t('promoLocationLog')
-              : l10n.t('promoLocationOverviewHint'),
-          maxLines: compactHeader ? 2 : 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: compactHeader ? 12 : null,
-                height: compactHeader ? 1.3 : null,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      ],
+    // Title only — subtitle removed so search/filters keep the top bar dense.
+    return Text(
+      l10n.t('promoLocationTitle'),
+      style: titleStyle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -201,7 +186,9 @@ class LocationToolbar extends StatelessWidget {
               getLocationDeviceType(constraints.maxWidth),
             );
         final gap = showLimitFilter ? m.filterGap : m.toolbarFilterGap;
-        final controlHeight = m.toolbarControlHeight;
+        final controlHeight = showLimitFilter
+            ? m.toolbarControlHeight
+            : m.compactToolbarControlHeight;
         final veryNarrow = constraints.maxWidth < 520;
         final narrow = constraints.maxWidth < 760;
         final medium = constraints.maxWidth < 1120;
@@ -212,6 +199,7 @@ class LocationToolbar extends StatelessWidget {
             : AdminUserSearchField(
                 compact: true,
                 compactFilterStyle: true,
+                height: controlHeight,
                 hintText: l10n.tOr('promoSearchUserHintShort', 'Search user'),
                 selectedUser: loaded?.selectedUser,
                 onUserSelected: (user) {
@@ -347,24 +335,24 @@ class LocationToolbar extends StatelessWidget {
         ];
 
         if (!showLimitFilter) {
-          if (veryNarrow || narrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (topSection != null) ...[
-                  topSection,
-                  SizedBox(height: gap),
-                ],
-                filterRow(
-                  filters: [sourceFilter, dateFilter],
-                  inlineClear: true,
-                ),
+          // Admin user-locations page: always one horizontal row.
+          // Filters scroll horizontally on narrow widths so search stays visible.
+          final filterControls = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              sizedFilter(sourceFilter, width: _sourceWidth),
+              SizedBox(width: gap),
+              sizedFilter(dateFilter, width: _dateWidth),
+              if (clearButton != null) ...[
+                SizedBox(width: gap),
+                clearButton,
               ],
-            );
-          }
+            ],
+          );
 
-          if (medium) {
-            return Row(
+          return SizedBox(
+            height: controlHeight,
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 if (userSearch != null) ...[
@@ -375,33 +363,19 @@ class LocationToolbar extends StatelessWidget {
                   lockedUserChip,
                   SizedBox(width: gap),
                 ],
-                Expanded(child: sizedFilter(sourceFilter)),
-                SizedBox(width: gap),
-                Expanded(
-                  flex: 2,
-                  child: sizedFilter(dateFilter),
+                Flexible(
+                  flex: 4,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      child: filterControls,
+                    ),
+                  ),
                 ),
-                if (clearButton != null) clearButton,
               ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (userSearch != null) ...[
-                Expanded(flex: 3, child: userSearch),
-                SizedBox(width: gap),
-              ],
-              if (lockedUserChip != null) ...[
-                lockedUserChip,
-                SizedBox(width: gap),
-              ],
-              sizedFilter(sourceFilter, width: _sourceWidth),
-              SizedBox(width: gap),
-              sizedFilter(dateFilter, width: _dateWidth),
-              if (clearButton != null) clearButton,
-            ],
+            ),
           );
         }
 
@@ -512,8 +486,6 @@ class LocationDateRangeFilter extends StatelessWidget {
   final ValueChanged<DateTimeRange?> onPresetSelected;
   final double? width;
 
-  static const _controlHeight = ToolbarFilterStyle.controlHeight;
-
   _DateRangePreset _activePreset() {
     if (dateRange == null) return _DateRangePreset.all;
     final now = DateTime.now();
@@ -601,20 +573,27 @@ class LocationDateRangeFilter extends StatelessWidget {
 
     final isActive = preset != _DateRangePreset.all;
 
-    return SizedBox(
-      height: _controlHeight,
-      width: width,
-      child: Material(
-        color: scheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: ToolbarFilterStyle.radius,
-          side: BorderSide(color: scheme.outlineVariant),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: PopupMenuButton<_DateRangePreset>(
-          tooltip: l10n.tOr('promoFilterDate', 'Date'),
-          offset: const Offset(0, _controlHeight),
-          padding: EdgeInsets.zero,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final controlHeight = constraints.hasBoundedHeight &&
+                constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : ToolbarFilterStyle.controlHeight;
+
+        return SizedBox(
+          height: controlHeight,
+          width: width,
+          child: Material(
+            color: scheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: ToolbarFilterStyle.radius,
+              side: BorderSide(color: scheme.outlineVariant),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: PopupMenuButton<_DateRangePreset>(
+              tooltip: l10n.tOr('promoFilterDate', 'Date'),
+              offset: Offset(0, controlHeight),
+              padding: EdgeInsets.zero,
           onSelected: (value) {
             final now = DateTime.now();
             switch (value) {
@@ -699,8 +678,10 @@ class LocationDateRangeFilter extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -726,48 +707,57 @@ class _FilterDropdown<T> extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final safeValue = items.contains(value) ? value : null;
 
-    return Container(
-      height: ToolbarFilterStyle.controlHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.center,
-      decoration: ToolbarFilterStyle.boxDecoration(scheme),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: safeValue,
-          isExpanded: true,
-          isDense: true,
-          borderRadius: ToolbarFilterStyle.radius,
-          dropdownColor: scheme.surface,
-          style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
-          hint: Text(
-            hint,
-            style: textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          icon: Icon(
-            Icons.expand_more_rounded,
-            size: 18,
-            color: scheme.onSurfaceVariant,
-          ),
-          items: items
-              .map(
-                (v) => DropdownMenuItem(
-                  value: v,
-                  child: Text(
-                    itemLabel(v),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.hasBoundedHeight &&
+                constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : ToolbarFilterStyle.controlHeight;
+
+        return Container(
+          height: height,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          alignment: Alignment.center,
+          decoration: ToolbarFilterStyle.boxDecoration(scheme),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: safeValue,
+              isExpanded: true,
+              isDense: true,
+              borderRadius: ToolbarFilterStyle.radius,
+              dropdownColor: scheme.surface,
+              style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
+              hint: Text(
+                hint,
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
                 ),
-              )
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              icon: Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+              items: items
+                  .map(
+                    (v) => DropdownMenuItem(
+                      value: v,
+                      child: Text(
+                        itemLabel(v),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        );
+      },
     );
   }
 }

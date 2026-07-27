@@ -16,7 +16,7 @@ class SearchManagementOverviewCards extends StatelessWidget {
   final SearchManagementOverviewEntity overview;
   final SearchManagementLayoutMetrics? metrics;
 
-  static const stripHeight = 44.0;
+  static const stripHeight = 38.0;
   static const _defaultMaxTileWidth = 140.0;
   static const _wideMaxTileWidth = 176.0;
   static const _minTileWidth = 96.0;

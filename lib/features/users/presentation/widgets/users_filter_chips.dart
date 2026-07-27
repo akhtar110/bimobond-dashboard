@@ -6,6 +6,7 @@ import '../bloc/users_bloc.dart';
 import '../users_ui_filter.dart';
 import '../utils/responsive.dart';
 
+/// Compact filter chips — always a single horizontal row (scrolls if needed).
 class UsersFilterChips extends StatelessWidget {
   const UsersFilterChips({
     super.key,
@@ -19,7 +20,6 @@ class UsersFilterChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
 
     final labels = <UsersUiFilter, String>{
       UsersUiFilter.all: l10n.t('all'),
@@ -31,34 +31,34 @@ class UsersFilterChips extends StatelessWidget {
       selector: (state) => state is UsersLoaded ? state.filter : null,
       builder: (context, loadedFilter) {
         final current = loadedFilter ?? context.read<UsersBloc>().activeFilter;
-        final chips = labels.entries.map((entry) {
-          final selected = current == entry.key;
-          return _FilterChip(
-            label: entry.value,
-            selected: selected,
-            metrics: metrics,
-            onTap: () => onChanged(entry.key),
+        final chips = <Widget>[];
+        for (final entry in labels.entries) {
+          if (chips.isNotEmpty) {
+            chips.add(SizedBox(width: metrics.chipSpacing));
+          }
+          chips.add(
+            _FilterChip(
+              label: entry.value,
+              selected: current == entry.key,
+              metrics: metrics,
+              onTap: () => onChanged(entry.key),
+            ),
           );
-        }).toList();
+        }
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final useWrap = metrics.isMobile || constraints.maxWidth < 520;
-
-            if (useWrap) {
-              return Wrap(
-                spacing: metrics.chipSpacing,
-                runSpacing: metrics.chipSpacing,
-                children: chips,
-              );
-            }
-
-            return SingleChildScrollView(
+        return SizedBox(
+          height: metrics.searchFieldHeight,
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const ClampingScrollPhysics(),
-              child: Row(children: chips),
-            );
-          },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: chips,
+              ),
+            ),
+          ),
         );
       },
     );
@@ -84,46 +84,33 @@ class _FilterChip extends StatelessWidget {
     final scheme = theme.colorScheme;
     final compact = metrics.isMobile;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
+          duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           padding: EdgeInsets.symmetric(
             horizontal: metrics.chipHorizontalPadding,
             vertical: metrics.chipVerticalPadding,
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: selected
-                ? LinearGradient(
-                    colors: [
-                      scheme.primary,
-                      scheme.primary.withValues(alpha: 0.75),
-                    ],
-                  )
-                : null,
-            color: selected ? null : scheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            color: selected ? scheme.primary : scheme.surfaceContainerLow,
             border: Border.all(
-              color: selected ? Colors.transparent : scheme.outlineVariant,
+              color: selected
+                  ? Colors.transparent
+                  : scheme.outlineVariant.withValues(alpha: 0.8),
             ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: scheme.primary.withValues(alpha: 0.35),
-                      blurRadius: compact ? 8 : 12,
-                      offset: Offset(0, compact ? 2 : 4),
-                    ),
-                  ]
-                : null,
           ),
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
-              fontSize: compact ? 12.5 : null,
+              fontSize: compact ? 12 : 12.5,
               fontWeight: FontWeight.w600,
+              height: 1.1,
               color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
             ),
           ),

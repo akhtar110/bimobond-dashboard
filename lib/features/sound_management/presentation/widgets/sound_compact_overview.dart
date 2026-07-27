@@ -18,7 +18,7 @@ class SoundCompactOverview extends StatelessWidget {
   final SoundUsageStatsEntity usage;
   final SoundSegmentStatsEntity segments;
 
-  static const _stripHeight = 44.0;
+  static const _stripHeight = 38.0;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +136,7 @@ class _CompactKpiTile extends StatelessWidget {
         constraints: const BoxConstraints(
           minHeight: SoundCompactOverview._stripHeight,
         ),
-        padding: const EdgeInsetsDirectional.fromSTEB(10, 5, 12, 5),
+        padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 10, 4),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(10),

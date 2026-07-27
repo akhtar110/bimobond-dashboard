@@ -69,21 +69,19 @@ class _NotificationsPageViewState extends State<_NotificationsPageView> {
               final width = constraints.maxWidth;
               final isDesktop = width >= 1200;
               final isTablet = width >= 768 && width < 1200;
+              final compact = width < 720;
 
               if (isDesktop) {
-                return _DesktopNotificationsLayout(isDark: isDark);
+                return _DesktopNotificationsLayout(
+                  isDark: isDark,
+                  compact: compact,
+                );
               }
 
               return CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: _pagePadding(context, bottom: 0),
-                      child: const _NotificationsHeader(),
-                    ),
-                  ),
                   SliverPadding(
-                    padding: _pagePadding(context, top: 16, bottom: 16),
+                    padding: _pagePadding(context, top: 8, bottom: 12),
                     sliver: SliverToBoxAdapter(
                       child: Align(
                         alignment: Alignment.topCenter,
@@ -92,10 +90,10 @@ class _NotificationsPageViewState extends State<_NotificationsPageView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const _StatsRow(),
-                              const SizedBox(height: 24),
+                              _NotificationsHeader(compact: compact),
+                              SizedBox(height: compact ? 8 : 12),
                               const NotificationComposer(),
-                              const SizedBox(height: 24),
+                              SizedBox(height: compact ? 12 : 16),
                               NotificationFeedPanel(
                                 isDark: isDark,
                                 expandVertically: false,
@@ -119,14 +117,18 @@ class _NotificationsPageViewState extends State<_NotificationsPageView> {
 }
 
 class _DesktopNotificationsLayout extends StatelessWidget {
-  const _DesktopNotificationsLayout({required this.isDark});
+  const _DesktopNotificationsLayout({
+    required this.isDark,
+    this.compact = false,
+  });
 
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: _pagePadding(context, top: 12, bottom: 24),
+      padding: _pagePadding(context, top: 8, bottom: 16),
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
@@ -134,10 +136,8 @@ class _DesktopNotificationsLayout extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _NotificationsHeader(),
-              const SizedBox(height: 24),
-              const _StatsRow(),
-              const SizedBox(height: 24),
+              _NotificationsHeader(compact: compact),
+              SizedBox(height: compact ? 8 : 12),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,191 +168,43 @@ class _DesktopNotificationsLayout extends StatelessWidget {
 
 EdgeInsetsDirectional _pagePadding(
   BuildContext context, {
-  double top = 12,
-  double bottom = 16,
+  double top = 8,
+  double bottom = 12,
 }) {
-  final horizontal = MediaQuery.sizeOf(context).width < 600 ? 12.0 : 24.0;
+  final width = MediaQuery.sizeOf(context).width;
+  final horizontal = width < 600
+      ? 10.0
+      : width < 900
+          ? 16.0
+          : 20.0;
   return EdgeInsetsDirectional.fromSTEB(horizontal, top, horizontal, bottom);
 }
 
+/// Compact title-only top bar — no subtitle or stat cards.
 class _NotificationsHeader extends StatelessWidget {
-  const _NotificationsHeader();
+  const _NotificationsHeader({this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.t('notificationsPageTitle'),
-          style: textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+      child: Text(
+        l10n.t('notificationsPageTitle'),
+        style: (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+            ?.copyWith(
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.45,
+          color: scheme.onSurface,
+          height: 1.05,
         ),
-        const SizedBox(height: 4),
-        Text(
-          l10n.t('notificationsPageSubtitle'),
-          style: textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatsRow extends StatelessWidget {
-  const _StatsRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
-    return BlocBuilder<NotificationsBloc, NotificationsState>(
-      buildWhen: (a, b) => a.activityLog != b.activityLog,
-      builder: (context, state) {
-        final totalSent = state.activityLog.fold<int>(
-          0,
-          (sum, e) => sum + e.sentCount,
-        );
-        final broadcasts = state.activityLog
-            .where((e) => !(e.scope?.contains('admin') ?? false))
-            .length;
-        final adminBroadcasts = state.activityLog
-            .where((e) => e.scope?.contains('admin') ?? false)
-            .length;
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            const gap = 12.0;
-
-            final cards = [
-              _StatChip(
-                label: l10n.t('notificationStatSentSession'),
-                value: '$totalSent',
-                icon: Icons.send_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              _StatChip(
-                label: l10n.t('notificationStatBroadcastEvents'),
-                value: '$broadcasts',
-                icon: Icons.campaign_rounded,
-                color: Colors.orange,
-              ),
-              _StatChip(
-                label: l10n.t('notificationStatAdminBroadcasts'),
-                value: '$adminBroadcasts',
-                icon: Icons.admin_panel_settings_rounded,
-                color: Colors.teal,
-              ),
-            ];
-
-            if (width >= 900) {
-              return Row(
-                children: [
-                  for (var i = 0; i < cards.length; i++) ...[
-                    if (i > 0) const SizedBox(width: gap),
-                    Expanded(child: cards[i]),
-                  ],
-                ],
-              );
-            }
-
-            final columns = width >= 640 ? 2 : 1;
-            final itemWidth = columns == 1
-                ? width
-                : (width - gap) / columns;
-
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: cards
-                  .map((card) => SizedBox(width: itemWidth, child: card))
-                  .toList(growable: false),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.55),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 15, color: color),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../bloc/users_bloc.dart';
 import '../utils/responsive.dart';
 
+/// Compact users top bar — title + search + filters on one responsive row.
+/// No subtitle; filter state stays on [UsersBloc] via the provided widgets.
 class UsersPageHeader extends StatelessWidget {
   const UsersPageHeader({
     super.key,
     required this.onRefresh,
     required this.metrics,
+    required this.searchBar,
+    required this.filters,
   });
 
   final VoidCallback onRefresh;
   final UsersLayoutMetrics metrics;
+  final Widget searchBar;
+  final Widget filters;
 
   @override
   Widget build(BuildContext context) {
@@ -22,85 +26,102 @@ class UsersPageHeader extends StatelessWidget {
     final scheme = theme.colorScheme;
     final compact = metrics.isMobile;
 
-    return BlocSelector<UsersBloc, UsersState, int?>(
-      selector: (state) => state is UsersLoaded ? state.total : null,
-      builder: (context, total) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final title = Text(
+      l10n.t('users'),
+      style: (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+          ?.copyWith(
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.45,
+        color: scheme.onSurface,
+        height: 1.05,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    final refreshBtn = IconButton.filledTonal(
+      onPressed: onRefresh,
+      tooltip: l10n.t('retry'),
+      icon: Icon(Icons.refresh_rounded, size: compact ? 18 : 20),
+      style: IconButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        minimumSize: Size(compact ? 34 : 36, compact ? 34 : 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        // Keep search + filters on one horizontal line whenever possible.
+        final inlineAll = width >= 900;
+        final titleAbove = width < 640;
+
+        final searchFilters = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              padding: EdgeInsets.all(metrics.headerIconPadding),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(compact ? 12 : 14),
-                gradient: LinearGradient(
-                  colors: [
-                    scheme.primary,
-                    scheme.primary.withValues(alpha: 0.55),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.35),
-                    blurRadius: compact ? 12 : 16,
-                    offset: Offset(0, compact ? 4 : 6),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.people_alt_rounded,
-                color: scheme.onPrimary,
-                size: metrics.headerIconSize,
-              ),
-            ),
-            SizedBox(width: metrics.headerTitleGap),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.t('users'),
-                    style: (compact
-                            ? theme.textTheme.titleLarge
-                            : theme.textTheme.headlineSmall)
-                        ?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  SizedBox(height: compact ? 2 : 4),
-                  Text(
-                    total != null
-                        ? '${l10n.t('users')} · $total ${l10n.t('users').toLowerCase()}'
-                        : l10n.t('manageAccountsSubtitle'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: compact ? 13 : null,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton.filledTonal(
-              onPressed: onRefresh,
-              tooltip: l10n.t('retry'),
-              icon: Icon(
-                Icons.refresh_rounded,
-                size: compact ? 20 : 24,
-              ),
-              style: IconButton.styleFrom(
-                visualDensity:
-                    compact ? VisualDensity.compact : VisualDensity.standard,
-                minimumSize: Size(compact ? 36 : 40, compact ? 36 : 40),
-                tapTargetSize: compact
-                    ? MaterialTapTargetSize.shrinkWrap
-                    : MaterialTapTargetSize.padded,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(compact ? 10 : 12),
-                ),
+            Expanded(flex: 5, child: searchBar),
+            SizedBox(width: metrics.chipSpacing + 2),
+            Flexible(
+              flex: 4,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: filters,
               ),
             ),
           ],
+        );
+
+        if (inlineAll) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                title,
+                SizedBox(width: metrics.headerTitleGap),
+                Expanded(child: searchFilters),
+                SizedBox(width: metrics.chipSpacing),
+                refreshBtn,
+              ],
+            ),
+          );
+        }
+
+        if (titleAbove) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: title),
+                    refreshBtn,
+                  ],
+                ),
+                SizedBox(height: metrics.chipSpacing),
+                searchFilters,
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              title,
+              SizedBox(width: metrics.headerTitleGap),
+              Expanded(child: searchFilters),
+              SizedBox(width: metrics.chipSpacing),
+              refreshBtn,
+            ],
+          ),
         );
       },
     );

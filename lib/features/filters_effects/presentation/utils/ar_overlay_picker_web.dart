@@ -4,8 +4,14 @@ import 'dart:html' as html;
 import 'dart:typed_data';
 
 Future<({String name, Uint8List bytes})?> pickArOverlayJsonFile() async {
+  return pickArOverlayAnimationFile();
+}
+
+/// Picks a Lottie JSON or MP4 video file for an AR overlay animation asset.
+Future<({String name, Uint8List bytes})?> pickArOverlayAnimationFile() async {
   return _pickFile(
-    accept: '.json,application/json,text/json',
+    accept:
+        '.json,.lottie,.mp4,application/json,text/json,video/mp4,video/*',
     preferTextFallback: true,
   );
 }
@@ -40,7 +46,12 @@ Future<({String name, Uint8List bytes})?> _pickFile({
       }
       final file = files[0];
       var bytes = await _readBytes(file);
-      if (bytes.isEmpty && preferTextFallback) {
+      final lowerName = file.name.toLowerCase();
+      final likelyText = preferTextFallback &&
+          (lowerName.endsWith('.json') ||
+              lowerName.endsWith('.lottie') ||
+              lowerName.contains('.json'));
+      if (bytes.isEmpty && likelyText) {
         bytes = await _readTextAsBytes(file);
       }
       if (bytes.isEmpty) {

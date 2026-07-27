@@ -20,6 +20,7 @@ class AdminUserSearchField extends StatefulWidget {
     this.getUsers,
     this.compact = false,
     this.compactFilterStyle = false,
+    this.height,
   });
 
   final ValueChanged<UserEntity?> onUserSelected;
@@ -30,6 +31,10 @@ class AdminUserSearchField extends StatefulWidget {
   final bool compact;
   final bool compactFilterStyle;
 
+  /// When set (or when the parent constrains height), the compact field fills
+  /// that height instead of a fixed 40px — avoids toolbar overflow.
+  final double? height;
+
   @override
   State<AdminUserSearchField> createState() => _AdminUserSearchFieldState();
 }
@@ -37,6 +42,9 @@ class AdminUserSearchField extends StatefulWidget {
 class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _fieldKey = GlobalKey();
+  final _layerLink = LayerLink();
+  final _overlayController = OverlayPortalController();
   Timer? _debounce;
   bool _showDropdown = false;
   bool _loading = false;
@@ -44,10 +52,17 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
 
   GetUsers get _getUsers => widget.getUsers ?? sl<GetUsers>();
 
+  bool get _shouldShowOverlay =>
+      widget.compact &&
+      _showDropdown &&
+      _results.isNotEmpty &&
+      widget.selectedUser == null;
+
   @override
   void initState() {
     super.initState();
     _syncSelectedUserText();
+    _focusNode.addListener(_onFocusChanged);
   }
 
   @override
@@ -68,10 +83,12 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
           _results = [];
           _loading = false;
         });
+        _syncOverlay();
       } else {
         _showDropdown = false;
         _results = [];
         _loading = false;
+        _syncOverlay();
       }
       return;
     }
@@ -79,9 +96,33 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
         '@${user.username}${user.fullName != null ? ' – ${user.fullName}' : ''}';
   }
 
+  void _onFocusChanged() {
+    if (!_focusNode.hasFocus && _showDropdown) {
+      // Allow list-item taps in the overlay to register first.
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        if (!mounted || _focusNode.hasFocus) return;
+        setState(() => _showDropdown = false);
+        _syncOverlay();
+      });
+    }
+  }
+
+  void _syncOverlay() {
+    if (!widget.compact) return;
+    if (_shouldShowOverlay) {
+      if (!_overlayController.isShowing) _overlayController.show();
+    } else if (_overlayController.isShowing) {
+      _overlayController.hide();
+    }
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
+    _focusNode.removeListener(_onFocusChanged);
+    if (_overlayController.isShowing) {
+      _overlayController.hide();
+    }
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -100,6 +141,7 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
         _loading = false;
         _results = [];
       });
+      _syncOverlay();
       return;
     }
 
@@ -107,6 +149,7 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
       _showDropdown = true;
       _loading = true;
     });
+    _syncOverlay();
 
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       try {
@@ -116,12 +159,14 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
           _results = page.users;
           _loading = false;
         });
+        _syncOverlay();
       } catch (_) {
         if (!mounted) return;
         setState(() {
           _results = [];
           _loading = false;
         });
+        _syncOverlay();
       }
     });
   }
@@ -134,6 +179,7 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
       _results = [];
       _loading = false;
     });
+    _syncOverlay();
     _focusNode.unfocus();
     widget.onUserSelected(user);
   }
@@ -145,7 +191,18 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
       _results = [];
       _loading = false;
     });
+    _syncOverlay();
     widget.onUserSelected(null);
+  }
+
+  double _resolveFieldHeight(BoxConstraints constraints) {
+    if (widget.height != null) return widget.height!;
+    if (constraints.hasBoundedHeight &&
+        constraints.maxHeight.isFinite &&
+        constraints.maxHeight < double.infinity) {
+      return constraints.maxHeight;
+    }
+    return ToolbarFilterStyle.controlHeight;
   }
 
   @override
@@ -159,30 +216,41 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
           'Search by username or name…',
         );
 
-    final dropdown = _buildDropdown(context, scheme);
-
     if (widget.compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 40,
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              style: Theme.of(context).textTheme.bodySmall,
-              decoration: _buildDecoration(
-                scheme: scheme,
-                label: label,
-                hint: hint,
-                compact: true,
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final fieldHeight = _resolveFieldHeight(constraints);
+          return OverlayPortal(
+            controller: _overlayController,
+            overlayChildBuilder: (context) =>
+                _buildOverlayDropdown(context, scheme),
+            child: CompositedTransformTarget(
+              link: _layerLink,
+              child: SizedBox(
+                key: _fieldKey,
+                height: fieldHeight,
+                width: double.infinity,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  decoration: _buildDecoration(
+                    scheme: scheme,
+                    label: label,
+                    hint: hint,
+                    compact: true,
+                    fieldHeight: fieldHeight,
+                  ),
+                  onChanged: _onChanged,
+                  onTap: () {
+                    setState(() => _showDropdown = true);
+                    _syncOverlay();
+                  },
+                ),
               ),
-              onChanged: _onChanged,
-              onTap: () => setState(() => _showDropdown = true),
             ),
-          ),
-          dropdown,
-        ],
+          );
+        },
       );
     }
 
@@ -201,7 +269,7 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
           onChanged: _onChanged,
           onTap: () => setState(() => _showDropdown = true),
         ),
-        dropdown,
+        _buildInlineDropdown(context, scheme),
       ],
     );
   }
@@ -211,16 +279,25 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
     required String label,
     required String hint,
     required bool compact,
+    double? fieldHeight,
   }) {
     final useToolbarStyle = widget.compactFilterStyle && compact;
+    final h = fieldHeight ?? ToolbarFilterStyle.controlHeight;
+    final iconBox = h.clamp(28.0, 40.0);
 
     final prefix = widget.selectedUser != null
-        ? _avatarPrefix(widget.selectedUser!, scheme, compact: compact)
-        : Padding(
-            padding: EdgeInsets.all(compact ? 10 : 10),
+        ? _avatarPrefix(
+            widget.selectedUser!,
+            scheme,
+            compact: compact,
+            boxSize: iconBox,
+          )
+        : SizedBox(
+            width: iconBox,
+            height: iconBox,
             child: Icon(
               Icons.person_search_outlined,
-              size: compact ? 18 : 24,
+              size: compact ? 16 : 24,
               color: scheme.onSurfaceVariant,
             ),
           );
@@ -230,23 +307,34 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
       children: [
         if (_loading)
           Padding(
-            padding: EdgeInsets.only(right: compact ? 8 : 12),
+            padding: EdgeInsets.only(right: compact ? 6 : 12),
             child: SizedBox(
-              width: compact ? 14 : 16,
-              height: compact ? 14 : 16,
+              width: compact ? 12 : 16,
+              height: compact ? 12 : 16,
               child: const CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
         if (widget.selectedUser != null)
           IconButton(
-            padding: compact ? EdgeInsets.zero : null,
-            visualDensity: compact ? VisualDensity.compact : null,
+            style: IconButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size(iconBox - 2, iconBox - 2),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
             icon: Icon(Icons.close, size: compact ? 16 : 24),
             color: scheme.onSurfaceVariant,
             onPressed: _clearSelection,
             tooltip: context.l10n.t('cancel'),
           ),
       ],
+    );
+
+    final iconConstraints = BoxConstraints(
+      minWidth: iconBox,
+      maxWidth: compact ? iconBox + 8 : 48,
+      minHeight: h,
+      maxHeight: h,
     );
 
     if (useToolbarStyle) {
@@ -256,6 +344,12 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
         hintStyle: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
         prefixIcon: prefix,
         suffixIcon: suffix,
+      ).copyWith(
+        prefixIconConstraints: iconConstraints,
+        suffixIconConstraints: BoxConstraints(
+          minHeight: h,
+          maxHeight: h,
+        ),
       );
     }
 
@@ -273,7 +367,11 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
         alpha: compact ? 0.35 : 0.4,
       ),
       contentPadding: compact
-          ? const EdgeInsets.symmetric(horizontal: 8)
+          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 0)
+          : null,
+      prefixIconConstraints: compact ? iconConstraints : null,
+      suffixIconConstraints: compact
+          ? BoxConstraints(minHeight: h, maxHeight: h)
           : null,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -294,7 +392,47 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
     );
   }
 
-  Widget _buildDropdown(BuildContext context, ColorScheme scheme) {
+  Widget _buildOverlayDropdown(
+    BuildContext context,
+    ColorScheme scheme,
+  ) {
+    final box = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+    final width = box?.size.width ?? 280.0;
+
+    return CompositedTransformFollower(
+      link: _layerLink,
+      showWhenUnlinked: false,
+      targetAnchor: Alignment.bottomLeft,
+      followerAnchor: Alignment.topLeft,
+      offset: const Offset(0, 4),
+      child: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(10),
+        color: scheme.surface,
+        child: SizedBox(
+          width: width,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              shrinkWrap: true,
+              itemCount: _results.length,
+              separatorBuilder: (_, _) => Divider(
+                height: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+              itemBuilder: (context, i) => _UserSearchTile(
+                user: _results[i],
+                onTap: () => _selectUser(_results[i]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInlineDropdown(BuildContext context, ColorScheme scheme) {
     if (!_showDropdown ||
         _results.isEmpty ||
         widget.selectedUser != null) {
@@ -315,7 +453,7 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               shrinkWrap: true,
               itemCount: _results.length,
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 color: scheme.outlineVariant.withValues(alpha: 0.4),
               ),
@@ -334,21 +472,26 @@ class _AdminUserSearchFieldState extends State<AdminUserSearchField> {
     UserEntity user,
     ColorScheme scheme, {
     bool compact = false,
+    double boxSize = 40,
   }) {
     final url = resolveMediaUrl(user.avatarUrl);
-    return Padding(
-      padding: EdgeInsets.all(compact ? 8 : 8),
-      child: CircleAvatar(
-        radius: compact ? 12 : 14,
-        backgroundColor: scheme.primaryContainer,
-        backgroundImage: url != null ? NetworkImage(url) : null,
-        child: url == null
-            ? Text(
-                (user.username.isNotEmpty ? user.username[0] : '?')
-                    .toUpperCase(),
-                style: TextStyle(fontSize: compact ? 10 : 12),
-              )
-            : null,
+    final radius = compact ? 11.0 : 14.0;
+    return SizedBox(
+      width: boxSize,
+      height: boxSize,
+      child: Center(
+        child: CircleAvatar(
+          radius: radius,
+          backgroundColor: scheme.primaryContainer,
+          backgroundImage: url != null ? NetworkImage(url) : null,
+          child: url == null
+              ? Text(
+                  (user.username.isNotEmpty ? user.username[0] : '?')
+                      .toUpperCase(),
+                  style: TextStyle(fontSize: compact ? 10 : 12),
+                )
+              : null,
+        ),
       ),
     );
   }

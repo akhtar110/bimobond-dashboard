@@ -48,89 +48,90 @@ class UsersLayoutMetrics {
       };
 
   double get pageTopPadding => switch (deviceType) {
-        DeviceType.mobileSmall => 8,
-        DeviceType.mobileLarge => 10,
-        DeviceType.tablet => 12,
-        DeviceType.desktop => 12,
+        DeviceType.mobileSmall => 6,
+        DeviceType.mobileLarge => 6,
+        DeviceType.tablet => 8,
+        DeviceType.desktop => 8,
       };
 
   double get pageBottomPadding => switch (deviceType) {
-        DeviceType.mobileSmall => 12,
-        DeviceType.mobileLarge => 14,
-        DeviceType.tablet => 16,
-        DeviceType.desktop => 16,
-      };
-
-  double get sectionSpacing => switch (deviceType) {
         DeviceType.mobileSmall => 10,
-        DeviceType.mobileLarge => 12,
-        DeviceType.tablet => 14,
-        DeviceType.desktop => 16,
-      };
-
-  double get filterSectionPadding => switch (deviceType) {
-        DeviceType.mobileSmall => 8,
         DeviceType.mobileLarge => 10,
-        DeviceType.tablet => 11,
+        DeviceType.tablet => 12,
         DeviceType.desktop => 12,
       };
 
-  double get searchFilterGap => switch (deviceType) {
-        DeviceType.mobileSmall => 8,
-        DeviceType.mobileLarge => 10,
-        DeviceType.tablet => 12,
+  double get sectionSpacing => switch (deviceType) {
+        DeviceType.mobileSmall => 6,
+        DeviceType.mobileLarge => 6,
+        DeviceType.tablet => 8,
+        DeviceType.desktop => 8,
+      };
+
+  double get filterSectionPadding => switch (deviceType) {
+        DeviceType.mobileSmall => 0,
+        DeviceType.mobileLarge => 0,
+        DeviceType.tablet => 0,
         DeviceType.desktop => 0,
       };
 
-  bool get searchFiltersInRow => deviceType == DeviceType.desktop;
+  double get searchFilterGap => switch (deviceType) {
+        DeviceType.mobileSmall => 6,
+        DeviceType.mobileLarge => 6,
+        DeviceType.tablet => 8,
+        DeviceType.desktop => 8,
+      };
+
+  /// Search + filter chips stay on one horizontal row at all breakpoints.
+  bool get searchFiltersInRow => true;
 
   double get headerIconSize => switch (deviceType) {
-        DeviceType.mobileSmall => 20,
-        DeviceType.mobileLarge => 22,
-        DeviceType.tablet => 24,
-        DeviceType.desktop => 26,
+        DeviceType.mobileSmall => 18,
+        DeviceType.mobileLarge => 18,
+        DeviceType.tablet => 20,
+        DeviceType.desktop => 20,
       };
 
   double get headerIconPadding => switch (deviceType) {
+        DeviceType.mobileSmall => 6,
+        DeviceType.mobileLarge => 6,
+        DeviceType.tablet => 8,
+        DeviceType.desktop => 8,
+      };
+
+  double get headerTitleGap => switch (deviceType) {
         DeviceType.mobileSmall => 8,
-        DeviceType.mobileLarge => 9,
+        DeviceType.mobileLarge => 8,
         DeviceType.tablet => 10,
         DeviceType.desktop => 12,
       };
 
-  double get headerTitleGap => switch (deviceType) {
-        DeviceType.mobileSmall => 10,
-        DeviceType.mobileLarge => 12,
-        DeviceType.tablet => 14,
-        DeviceType.desktop => 16,
-      };
-
   double get searchFieldHeight => switch (deviceType) {
-        DeviceType.mobileSmall => 44,
-        DeviceType.mobileLarge => 46,
-        DeviceType.tablet => 48,
-        DeviceType.desktop => 52,
+        DeviceType.mobileSmall => 36,
+        DeviceType.mobileLarge => 36,
+        DeviceType.tablet => 38,
+        DeviceType.desktop => 40,
       };
 
   double get chipVerticalPadding => switch (deviceType) {
         DeviceType.mobileSmall => 6,
-        DeviceType.mobileLarge => 7,
-        DeviceType.tablet => 8,
-        DeviceType.desktop => 10,
+        DeviceType.mobileLarge => 6,
+        DeviceType.tablet => 7,
+        DeviceType.desktop => 8,
       };
 
   double get chipHorizontalPadding => switch (deviceType) {
-        DeviceType.mobileSmall => 12,
-        DeviceType.mobileLarge => 14,
-        DeviceType.tablet => 16,
-        DeviceType.desktop => 18,
+        DeviceType.mobileSmall => 10,
+        DeviceType.mobileLarge => 10,
+        DeviceType.tablet => 12,
+        DeviceType.desktop => 14,
       };
 
   double get chipSpacing => switch (deviceType) {
         DeviceType.mobileSmall => 6,
-        DeviceType.mobileLarge => 8,
+        DeviceType.mobileLarge => 6,
         DeviceType.tablet => 8,
-        DeviceType.desktop => 10,
+        DeviceType.desktop => 8,
       };
 
   bool get compactSelectionBar => deviceType != DeviceType.desktop;
