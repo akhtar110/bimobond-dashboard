@@ -12,38 +12,32 @@ class GiftsSliverSkeletons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverLayoutBuilder(
-      builder: (ctx, constraints) {
-        final columns = giftsGridColumnCount(constraints.crossAxisExtent);
-        final metrics = GiftsLayoutMetrics(
-          getGiftsDeviceType(constraints.crossAxisExtent),
-        );
-        final gap = metrics.gridGap;
-        const rows = 2;
-        final pad = metrics.pageHorizontalPadding;
+    final crossAxisExtent = GiftsViewportWidth.of(context);
+    final columns = giftsGridColumnCount(crossAxisExtent);
+    final metrics = GiftsLayoutMetrics(getGiftsDeviceType(crossAxisExtent));
+    final gap = metrics.gridGap;
+    const rows = 2;
+    final pad = metrics.pageHorizontalPadding;
 
-        return SliverPadding(
-          padding: EdgeInsets.fromLTRB(pad, metrics.gridTopPadding, pad, 0),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (_, rowIndex) => Padding(
-                padding:
-                    EdgeInsets.only(bottom: rowIndex < rows - 1 ? gap : 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < columns; i++) ...[
-                      if (i > 0) SizedBox(width: gap),
-                      const Expanded(child: GiftCardSkeleton()),
-                    ],
-                  ],
-                ),
-              ),
-              childCount: rows,
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(pad, metrics.gridTopPadding, pad, 0),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (_, rowIndex) => Padding(
+            padding: EdgeInsets.only(bottom: rowIndex < rows - 1 ? gap : 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < columns; i++) ...[
+                  if (i > 0) SizedBox(width: gap),
+                  const Expanded(child: GiftCardSkeleton()),
+                ],
+              ],
             ),
           ),
-        );
-      },
+          childCount: rows,
+        ),
+      ),
     );
   }
 }

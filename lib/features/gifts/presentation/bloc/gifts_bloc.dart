@@ -193,12 +193,18 @@ class GiftsLoaded extends GiftsState {
   /// 1-based page for desktop paging / infinite-scroll accumulation.
   final int currentPage;
 
+  /// Cached filter+sort result; invalidated automatically on [copyWith]
+  /// because a new [GiftsLoaded] instance is created.
+  List<GiftEntity>? _displayedCache;
+
   bool get isSelectionMode => selectedGiftIds.isNotEmpty;
   int get selectedCount => selectedGiftIds.length;
 
-  bool get allVisibleSelected =>
-      displayed.isNotEmpty &&
-      displayed.every((g) => selectedGiftIds.contains(g.id));
+  bool get allVisibleSelected {
+    final items = displayed;
+    return items.isNotEmpty &&
+        items.every((g) => selectedGiftIds.contains(g.id));
+  }
 
   bool get someVisibleSelected =>
       displayed.any((g) => selectedGiftIds.contains(g.id));
@@ -213,15 +219,15 @@ class GiftsLoaded extends GiftsState {
 
   bool get hasReachedMaxGifts => currentPage >= lastPage;
 
-  /// Desktop: one page slice. Infinite scroll: first N pages accumulated.
+  /// Desktop: one page slice. Mobile/tablet: full filtered list (catalog is
+  /// already loaded client-side; slivers only build visible children).
   List<GiftEntity> pagedDisplayed({required bool infiniteScroll}) {
     final items = displayed;
     if (items.isEmpty) return const [];
 
     final pageSize = GiftsBloc.pageLimit;
     if (infiniteScroll) {
-      final end = (currentPage * pageSize).clamp(0, items.length);
-      return items.sublist(0, end);
+      return items;
     }
 
     final start = (currentPage - 1) * pageSize;
@@ -232,7 +238,9 @@ class GiftsLoaded extends GiftsState {
 
   // ── All filters + sort applied here, never in the UI ─────────────────────
 
-  List<GiftEntity> get displayed {
+  List<GiftEntity> get displayed => _displayedCache ??= _computeDisplayed();
+
+  List<GiftEntity> _computeDisplayed() {
     Iterable<GiftEntity> list = gifts;
 
     // 1. Tab filter (active / inactive / all)

@@ -34,30 +34,29 @@ class _CategoriesPageBody extends StatelessWidget {
   static const _maxContentWidth = 1680.0;
 
   double _horizontalPadding(double width) {
-    if (width < 360) return 8;
-    if (width < 400) return 10;
-    if (width < 600) return 14;
+    if (width < 360) return 6;
+    if (width < 400) return 8;
+    if (width < 600) return 10;
+    if (width < 960) return 14;
     return categoriesPageHorizontalPadding(width);
   }
 
   double _verticalPadding(double width, bool hasTree) {
-    if (width < 360) return hasTree ? 6 : 10;
-    if (width < 400) return hasTree ? 8 : 12;
-    if (width < 720) return hasTree ? 10 : 14;
-    return hasTree ? 12 : 20;
+    if (width < 400) return 4;
+    if (width < 720) return 6;
+    return hasTree ? 8 : 12;
   }
 
   double _sectionSpacing(double width, bool hasTree) {
-    if (width < 360) return hasTree ? 6 : 8;
-    if (width < 400) return hasTree ? 8 : 10;
-    if (width < 720) return hasTree ? 10 : 12;
-    return hasTree ? 12 : 16;
+    if (width < 400) return 4;
+    if (width < 720) return 6;
+    return 8;
   }
 
   double _panelRadius(double width) {
     if (width < 360) return 8;
-    if (width < 520) return 12;
-    return 16;
+    if (width < 520) return 10;
+    return 14;
   }
 
   @override
@@ -105,8 +104,6 @@ class _CategoriesPageBody extends StatelessWidget {
         return LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            final height = constraints.maxHeight;
-            final hasBoundedHeight = constraints.hasBoundedHeight;
             final loaded = state is CategoriesLoaded ? state : null;
             final hasTree = loaded != null &&
                 (loaded.catalogCategories.isNotEmpty ||
@@ -120,8 +117,9 @@ class _CategoriesPageBody extends StatelessWidget {
             final showDesktopPagination = metrics.useDesktopPagination &&
                 loaded != null &&
                 loaded.rootsTotalCount > 0;
-
-            final isLowHeight = !hasBoundedHeight || height < 550;
+            final isSelectionMode =
+                loaded != null && loaded.isSelectionMode;
+            final tightGap = width < 520 ? 4.0 : 6.0;
 
             Widget buildBodyContainer() {
               final bodyChild = _buildBody(context, state, isDark);
@@ -156,57 +154,30 @@ class _CategoriesPageBody extends StatelessWidget {
               compact: compactHeader,
             );
 
-            final selectionHeaderWidget = const CategoriesSelectionHeader();
-
             final paginationWidget = showDesktopPagination
                 ? _CategoriesDesktopPagination(state: loaded)
                 : null;
 
-            Widget content;
-
-            if (!isLowHeight) {
-              content = Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  headerWidget,
-                  SizedBox(height: sectionGap),
-                  selectionHeaderWidget,
-                  if (hasTree) SizedBox(height: width < 520 ? 8 : 10),
-                  Expanded(
-                    child: buildBodyContainer(),
-                  ),
-                  if (paginationWidget != null) ...[
-                    SizedBox(height: width < 720 ? 8 : 10),
-                    paginationWidget,
-                  ],
+            // Single column layout (no nested scroll) so the tree gets
+            // maximum vertical room on phones, tablets, and desktop.
+            final content = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                headerWidget,
+                SizedBox(height: sectionGap),
+                if (isSelectionMode) ...[
+                  const CategoriesSelectionHeader(),
+                  SizedBox(height: tightGap),
                 ],
-              );
-            } else {
-              final fallbackBodyHeight = hasBoundedHeight
-                  ? (height - 180).clamp(380.0, 700.0)
-                  : 480.0;
-
-              content = SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    headerWidget,
-                    SizedBox(height: sectionGap),
-                    selectionHeaderWidget,
-                    if (hasTree) SizedBox(height: width < 520 ? 8 : 10),
-                    SizedBox(
-                      height: fallbackBodyHeight,
-                      child: buildBodyContainer(),
-                    ),
-                    if (paginationWidget != null) ...[
-                      SizedBox(height: width < 720 ? 8 : 10),
-                      paginationWidget,
-                    ],
-                  ],
+                Expanded(
+                  child: buildBodyContainer(),
                 ),
-              );
-            }
+                if (paginationWidget != null) ...[
+                  SizedBox(height: tightGap),
+                  paginationWidget,
+                ],
+              ],
+            );
 
             return ColoredBox(
               color: scheme.surfaceContainerLowest,
@@ -221,7 +192,7 @@ class _CategoriesPageBody extends StatelessWidget {
                       hPad,
                       vPad,
                       hPad,
-                      vPad,
+                      width < 720 ? 4 : vPad,
                     ),
                     child: content,
                   ),

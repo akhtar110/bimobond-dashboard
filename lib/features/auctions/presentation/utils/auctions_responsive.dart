@@ -32,38 +32,38 @@ class AuctionsLayoutMetrics {
   bool get useInfiniteScroll => !useDesktopPagination;
 
   double get pageHorizontalPadding => switch (deviceType) {
-        AuctionsDeviceType.mobileSmall => 10,
-        AuctionsDeviceType.mobileLarge => 12,
-        AuctionsDeviceType.tablet => 16,
+        AuctionsDeviceType.mobileSmall => 8,
+        AuctionsDeviceType.mobileLarge => 10,
+        AuctionsDeviceType.tablet => 14,
         AuctionsDeviceType.desktop => 20,
       };
 
   double get pageTopPadding => switch (deviceType) {
-        AuctionsDeviceType.mobileSmall => 10,
-        AuctionsDeviceType.mobileLarge => 12,
-        AuctionsDeviceType.tablet => 14,
-        AuctionsDeviceType.desktop => 16,
+        AuctionsDeviceType.mobileSmall => 4,
+        AuctionsDeviceType.mobileLarge => 6,
+        AuctionsDeviceType.tablet => 8,
+        AuctionsDeviceType.desktop => 10,
       };
 
   double get sectionGap => switch (deviceType) {
-        AuctionsDeviceType.mobileSmall => 8,
+        AuctionsDeviceType.mobileSmall => 4,
+        AuctionsDeviceType.mobileLarge => 6,
+        AuctionsDeviceType.tablet => 8,
+        AuctionsDeviceType.desktop => 10,
+      };
+
+  double get panelRadius => switch (deviceType) {
+        AuctionsDeviceType.mobileSmall => 10,
         AuctionsDeviceType.mobileLarge => 10,
         AuctionsDeviceType.tablet => 12,
         AuctionsDeviceType.desktop => 14,
       };
 
-  double get panelRadius => switch (deviceType) {
-        AuctionsDeviceType.mobileSmall => 12,
-        AuctionsDeviceType.mobileLarge => 12,
-        AuctionsDeviceType.tablet => 14,
-        AuctionsDeviceType.desktop => 16,
-      };
-
   double get panelPadding => switch (deviceType) {
-        AuctionsDeviceType.mobileSmall => 12,
-        AuctionsDeviceType.mobileLarge => 12,
-        AuctionsDeviceType.tablet => 14,
-        AuctionsDeviceType.desktop => 16,
+        AuctionsDeviceType.mobileSmall => 10,
+        AuctionsDeviceType.mobileLarge => 10,
+        AuctionsDeviceType.tablet => 12,
+        AuctionsDeviceType.desktop => 14,
       };
 
   double get filterGap => switch (deviceType) {
@@ -95,10 +95,10 @@ class AuctionsLayoutMetrics {
       };
 
   double get gridTopPadding => switch (deviceType) {
-        AuctionsDeviceType.mobileSmall => 10,
-        AuctionsDeviceType.mobileLarge => 12,
-        AuctionsDeviceType.tablet => 14,
-        AuctionsDeviceType.desktop => 16,
+        AuctionsDeviceType.mobileSmall => 6,
+        AuctionsDeviceType.mobileLarge => 8,
+        AuctionsDeviceType.tablet => 10,
+        AuctionsDeviceType.desktop => 12,
       };
 }
 

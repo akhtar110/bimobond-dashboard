@@ -11,6 +11,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/gift_group_entities.dart';
 import '../bloc/gift_groups_bloc.dart';
 import '../bloc/gifts_bloc.dart';
+import '../utils/gifts_page_layout.dart';
 import '../utils/gifts_responsive.dart';
 import '../widgets/create_gift_dialog.dart';
 import '../widgets/edit_gift_dialog.dart';
@@ -58,36 +59,9 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
   static const _maxContentWidth = 1680.0;
 
   @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (!mounted || !_scrollController.hasClients) return;
-
-    final width = MediaQuery.sizeOf(context).width;
-    final metrics = GiftsLayoutMetrics(getGiftsDeviceType(width));
-    if (!metrics.useInfiniteScroll) return;
-
-    final position = _scrollController.position;
-    if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
-      return;
-    }
-    if (position.pixels >= position.maxScrollExtent - 300) {
-      final bloc = context.read<GiftsBloc>();
-      final state = bloc.state;
-      if (state is GiftsLoaded && !state.hasReachedMaxGifts && !state.isActioning) {
-        bloc.add(LoadMoreGiftsEvent());
-      }
-    }
   }
 
   double _horizontalPadding(double width) {
@@ -251,6 +225,28 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                 ),
               ],
               child: BlocBuilder<GiftsBloc, GiftsState>(
+                buildWhen: (prev, next) {
+                  if (prev.runtimeType != next.runtimeType) return true;
+                  if (prev is! GiftsLoaded || next is! GiftsLoaded) {
+                    return true;
+                  }
+                  // Skip snackbar / pending-image-only updates so the catalog
+                  // scroll view is not rebuilt while the user is scrolling.
+                  return prev.gifts != next.gifts ||
+                      prev.selectedTab != next.selectedTab ||
+                      prev.selectedSort != next.selectedSort ||
+                      prev.viewType != next.viewType ||
+                      prev.searchQuery != next.searchQuery ||
+                      prev.fromDate != next.fromDate ||
+                      prev.toDate != next.toDate ||
+                      prev.minPriceFilter != next.minPriceFilter ||
+                      prev.maxPriceFilter != next.maxPriceFilter ||
+                      prev.selectedGiftIds != next.selectedGiftIds ||
+                      prev.isPerformingBulkAction !=
+                          next.isPerformingBulkAction ||
+                      prev.isActioning != next.isActioning ||
+                      prev.currentPage != next.currentPage;
+                },
                 builder: (ctx, state) {
                   return LayoutBuilder(
                     builder: (context, constraints) {
@@ -352,7 +348,14 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                             SizedBox(height: tightGap),
                           ],
                           Expanded(
-                            child: buildBodyPanel(),
+                            child: LayoutBuilder(
+                              builder: (context, bodyConstraints) {
+                                return GiftsViewportWidth(
+                                  width: bodyConstraints.maxWidth,
+                                  child: buildBodyPanel(),
+                                );
+                              },
+                            ),
                           ),
                           if (paginationWidget != null) ...[
                             SizedBox(height: tightGap),
@@ -407,23 +410,15 @@ class _CatalogBodyPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: scheme.outlineVariant),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.shadow.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: _buildContent(context),
+    // Avoid ClipRRect around the scroll surface — clipping the full catalog
+    // every frame is expensive with many shadowed gift cards. Keep the same
+    // surface color; corner radius remains on the surrounding chrome.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(radius),
       ),
+      child: _buildContent(context),
     );
   }
 
@@ -463,42 +458,61 @@ class _CatalogLoadedScroll extends StatelessWidget {
   final ScrollController scrollController;
   final String? selectedGroupId;
 
-  GiftGroupEntity? _resolveGroup(GiftGroupsState groupsState) {
-    if (selectedGroupId == null || groupsState is! GiftGroupsLoaded) {
-      return null;
-    }
-    for (final group in groupsState.groups) {
-      if (group.id == selectedGroupId) return group;
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final groupsState = context.watch<GiftGroupsBloc>().state;
-    final selectedGroup = _resolveGroup(groupsState);
-    final giftIdFilter =
-        selectedGroup?.gifts.map((m) => m.gift.id).toSet();
-    final preferOrder =
-        selectedGroup?.gifts.map((m) => m.gift.id).toList();
-
-    return CustomScrollView(
-      controller: scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      cacheExtent: 480,
-      slivers: [
-        if (selectedGroup != null)
-          SliverToBoxAdapter(
-            child: _SelectedGroupBanner(group: selectedGroup),
-          ),
-        GiftsGridSliver(
-          key: ValueKey('gifts-grid-${selectedGroupId ?? 'all'}'),
-          onPreviewGift: showGiftPreviewDialog,
-          giftIdFilter: giftIdFilter,
-          preferGiftIdOrder: preferOrder,
+    final selectedGroupId = this.selectedGroupId;
+    if (selectedGroupId == null) {
+      return CustomScrollView(
+        controller: scrollController,
+        physics: const ClampingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 12)),
-      ],
+        cacheExtent: 800,
+        slivers: [
+          GiftsGridSliver(
+            key: const ValueKey('gifts-grid-all'),
+            onPreviewGift: showGiftPreviewDialog,
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+        ],
+      );
+    }
+
+    return BlocSelector<GiftGroupsBloc, GiftGroupsState, GiftGroupEntity?>(
+      selector: (groupsState) {
+        if (groupsState is! GiftGroupsLoaded) return null;
+        for (final group in groupsState.groups) {
+          if (group.id == selectedGroupId) return group;
+        }
+        return null;
+      },
+      builder: (context, selectedGroup) {
+        final giftIdFilter =
+            selectedGroup?.gifts.map((m) => m.gift.id).toSet();
+        final preferOrder =
+            selectedGroup?.gifts.map((m) => m.gift.id).toList();
+
+        return CustomScrollView(
+          controller: scrollController,
+          physics: const ClampingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          cacheExtent: 800,
+          slivers: [
+            if (selectedGroup != null)
+              SliverToBoxAdapter(
+                child: _SelectedGroupBanner(group: selectedGroup),
+              ),
+            GiftsGridSliver(
+              key: ValueKey('gifts-grid-$selectedGroupId'),
+              onPreviewGift: showGiftPreviewDialog,
+              giftIdFilter: giftIdFilter,
+              preferGiftIdOrder: preferOrder,
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          ],
+        );
+      },
     );
   }
 }

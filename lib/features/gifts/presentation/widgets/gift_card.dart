@@ -17,6 +17,9 @@ class GiftCard extends StatelessWidget {
     this.onEdit,
     this.onPreview,
     this.onDelete,
+    this.compact,
+    this.dense,
+    this.cacheWidth,
   });
 
   final GiftEntity gift;
@@ -24,113 +27,150 @@ class GiftCard extends StatelessWidget {
   final VoidCallback? onPreview;
   final VoidCallback? onDelete;
 
+  /// When provided by the grid, skips [LayoutBuilder] (cheaper during scroll).
+  final bool? compact;
+  final bool? dense;
+  final int? cacheWidth;
+
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final knownCompact = compact;
+    final knownDense = dense;
+    final knownCacheWidth = cacheWidth;
+    if (knownCompact != null &&
+        knownDense != null &&
+        knownCacheWidth != null) {
+      return _buildCard(
+        context,
+        compact: knownCompact,
+        dense: knownDense,
+        cacheWidth: knownCacheWidth,
+      );
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final compact = width < 170;
-        final dense = width < 210;
-        final bodyPadding = EdgeInsets.fromLTRB(
-          compact ? 8 : 10,
-          compact ? 6 : 8,
-          compact ? 8 : 10,
-          compact ? 6 : 8,
+        return _buildCard(
+          context,
+          compact: knownCompact ?? width < 170,
+          dense: knownDense ?? width < 210,
+          cacheWidth: knownCacheWidth ??
+              (width * MediaQuery.devicePixelRatioOf(context))
+                  .round()
+                  .clamp(80, 480),
         );
-        final gap = compact ? 4.0 : 5.0;
-        final borderRadius = compact ? 10.0 : 12.0;
-        final actionSize = compact ? 26.0 : 28.0;
-        final actionGap = compact ? 4.0 : 5.0;
+      },
+    );
+  }
 
-        return Container(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.8),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: scheme.shadow.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+  Widget _buildCard(
+    BuildContext context, {
+    required bool compact,
+    required bool dense,
+    required int cacheWidth,
+  }) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final bodyPadding = EdgeInsets.fromLTRB(
+      compact ? 8 : 10,
+      compact ? 6 : 8,
+      compact ? 8 : 10,
+      compact ? 6 : 8,
+    );
+    final gap = compact ? 4.0 : 5.0;
+    final borderRadius = compact ? 10.0 : 12.0;
+    final actionSize = compact ? 26.0 : 28.0;
+    final actionGap = compact ? 4.0 : 5.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.8),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _GiftThumbnail(gift: gift, compact: compact),
-              Padding(
-                padding: bodyPadding,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _GiftThumbnail(
+            gift: gift,
+            compact: compact,
+            cacheWidth: cacheWidth,
+          ),
+          Padding(
+            padding: bodyPadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  gift.name,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
+                    fontSize: compact ? 12 : 12.5,
+                    letterSpacing: -0.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: gap),
+                Row(
                   children: [
-                    Text(
-                      gift.name,
-                      style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.15,
-                        fontSize: compact ? 12 : 12.5,
-                        letterSpacing: -0.1,
+                    _PriceChip(
+                      priceCoins: gift.priceCoins,
+                      compact: compact,
+                    ),
+                    if (gift.animationUrl != null &&
+                        gift.animationUrl!.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.animation_rounded,
+                        size: 13,
+                        color: scheme.onSurfaceVariant,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: gap),
-                    Row(
-                      children: [
-                        _PriceChip(
-                          priceCoins: gift.priceCoins,
-                          compact: compact,
+                    ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: _PublishedDate(
+                          gift: gift,
+                          compact: true,
                         ),
-                        if (gift.animationUrl != null &&
-                            gift.animationUrl!.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.animation_rounded,
-                            size: 13,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ],
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: _PublishedDate(
-                              gift: gift,
-                              compact: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: dense ? 6 : 8),
-                    _GiftActionBar(
-                      gift: gift,
-                      actionSize: actionSize,
-                      actionGap: actionGap,
-                      onPreview: onPreview,
-                      onEdit: onEdit,
-                      onDelete: onDelete,
-                      previewTooltip: l10n.tOr('previewGift', 'Preview gift'),
-                      editTooltip: l10n.t('edit'),
-                      deleteTooltip: l10n.t('delete'),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                SizedBox(height: dense ? 6 : 8),
+                _GiftActionBar(
+                  gift: gift,
+                  actionSize: actionSize,
+                  actionGap: actionGap,
+                  onPreview: onPreview,
+                  onEdit: onEdit,
+                  onDelete: onDelete,
+                  previewTooltip: l10n.tOr('previewGift', 'Preview gift'),
+                  editTooltip: l10n.t('edit'),
+                  deleteTooltip: l10n.t('delete'),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -297,9 +337,11 @@ class _GiftThumbnail extends StatelessWidget {
   const _GiftThumbnail({
     required this.gift,
     this.compact = false,
+    this.cacheWidth,
   });
   final GiftEntity gift;
   final bool compact;
+  final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -316,6 +358,9 @@ class _GiftThumbnail extends StatelessWidget {
                 ? CachedNetworkImage(
                     imageUrl: gift.thumbnailUrl,
                     fit: BoxFit.contain,
+                    memCacheWidth: cacheWidth,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
                     placeholder: (context, url) =>
                         _placeholder(scheme, compact),
                     errorWidget: (context, url, error) =>

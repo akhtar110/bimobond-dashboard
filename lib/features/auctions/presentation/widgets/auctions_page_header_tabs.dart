@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import '../utils/auctions_page_tab.dart';
 
+/// Segmented Auctions / Seller verification control — responsive labels.
 class AuctionsPageHeaderTabs extends StatelessWidget {
   const AuctionsPageHeaderTabs({
     super.key,
@@ -25,16 +26,15 @@ class AuctionsPageHeaderTabs extends StatelessWidget {
     final tabs = DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.7),
-        ),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(3),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final iconOnly = !fullWidth && constraints.maxWidth < 280;
+            final w = constraints.maxWidth;
+            final iconOnly = w < 220;
+            final shortLabels = w < 340;
 
             return Row(
               children: [
@@ -44,12 +44,14 @@ class AuctionsPageHeaderTabs extends StatelessWidget {
                     icon: Icons.gavel_outlined,
                     selectedIcon: Icons.gavel_rounded,
                     label: l10n.t('auctions'),
+                    shortLabel: l10n.t('auctions'),
                     iconOnly: iconOnly,
+                    useShortLabel: shortLabels,
                     compact: compact,
                     onTap: () => onTabChanged(AuctionsPageTab.auctions),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 3),
                 Expanded(
                   child: _TabSegment(
                     selected: activeTab == AuctionsPageTab.sellerVerification,
@@ -59,7 +61,9 @@ class AuctionsPageHeaderTabs extends StatelessWidget {
                       'sellerVerificationTab',
                       'Seller verification',
                     ),
+                    shortLabel: l10n.tOr('sellerVerificationShort', 'Sellers'),
                     iconOnly: iconOnly,
+                    useShortLabel: shortLabels,
                     compact: compact,
                     onTap: () =>
                         onTabChanged(AuctionsPageTab.sellerVerification),
@@ -75,9 +79,12 @@ class AuctionsPageHeaderTabs extends StatelessWidget {
     if (fullWidth) return tabs;
 
     return Align(
-      alignment: AlignmentDirectional.centerStart,
+      alignment: AlignmentDirectional.centerEnd,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420, minWidth: 240),
+        constraints: BoxConstraints(
+          maxWidth: compact ? 320 : 380,
+          minWidth: compact ? 180 : 220,
+        ),
         child: tabs,
       ),
     );
@@ -90,7 +97,9 @@ class _TabSegment extends StatelessWidget {
     required this.icon,
     required this.selectedIcon,
     required this.label,
+    required this.shortLabel,
     required this.iconOnly,
+    required this.useShortLabel,
     required this.compact,
     required this.onTap,
   });
@@ -99,7 +108,9 @@ class _TabSegment extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
+  final String shortLabel;
   final bool iconOnly;
+  final bool useShortLabel;
   final bool compact;
   final VoidCallback onTap;
 
@@ -107,6 +118,7 @@ class _TabSegment extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    final displayLabel = useShortLabel ? shortLabel : label;
 
     return Semantics(
       button: true,
@@ -116,48 +128,39 @@ class _TabSegment extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(8),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
+            height: compact ? 34 : 38,
             padding: EdgeInsets.symmetric(
-              horizontal: iconOnly ? 8 : (compact ? 10 : 14),
-              vertical: compact ? 8 : 10,
+              horizontal: iconOnly ? 6 : (compact ? 8 : 10),
             ),
             decoration: BoxDecoration(
               color: selected ? scheme.primaryContainer : Colors.transparent,
-              borderRadius: BorderRadius.circular(9),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(alpha: 0.06),
-                        blurRadius: 6,
-                        offset: const Offset(0, 1),
-                      ),
-                    ]
-                  : null,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   selected ? selectedIcon : icon,
-                  size: compact ? 16 : 18,
+                  size: compact ? 15 : 17,
                   color: fg,
                 ),
                 if (!iconOnly) ...[
-                  SizedBox(width: compact ? 6 : 8),
+                  SizedBox(width: compact ? 5 : 6),
                   Flexible(
                     child: Text(
-                      label,
+                      displayLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             fontWeight:
                                 selected ? FontWeight.w700 : FontWeight.w600,
-                            fontSize: compact ? 12 : 13,
+                            fontSize: compact ? 11.5 : 12.5,
+                            height: 1.1,
                             color: fg,
                           ),
                     ),

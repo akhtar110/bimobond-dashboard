@@ -139,8 +139,6 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
                     slivers: [
                       _SliverHeader(
                         theme: theme,
-                        auctionsState: state,
-                        sellerState: sellerState,
                         metrics: metrics,
                         activeTab: _activeTab,
                         isLoading: isHeaderLoading,
@@ -233,8 +231,6 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
 class _SliverHeader extends StatelessWidget {
   const _SliverHeader({
     required this.theme,
-    required this.auctionsState,
-    required this.sellerState,
     required this.metrics,
     required this.activeTab,
     required this.isLoading,
@@ -243,8 +239,6 @@ class _SliverHeader extends StatelessWidget {
   });
 
   final ThemeData theme;
-  final AuctionsState auctionsState;
-  final SellerVerificationState sellerState;
   final AuctionsLayoutMetrics metrics;
   final AuctionsPageTab activeTab;
   final bool isLoading;
@@ -255,104 +249,24 @@ class _SliverHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = theme.colorScheme;
-    final loaded = auctionsState is AuctionsLoaded
-        ? auctionsState as AuctionsLoaded
-        : null;
-    final sellerLoaded = sellerState is SellerVerificationLoaded
-        ? sellerState as SellerVerificationLoaded
-        : null;
     final showAuctionStats = activeTab == AuctionsPageTab.auctions;
     final compact = metrics.isCompact;
-    final radius = metrics.panelRadius;
-    final pad = metrics.panelPadding;
-
-    Widget statChips() {
-      if (showAuctionStats && loaded != null) {
-        return Wrap(
-          spacing: compact ? 6 : 8,
-          runSpacing: compact ? 6 : 8,
-          alignment: WrapAlignment.start,
-          children: [
-            _StatChip(
-              label: l10n.t('total'),
-              value: loaded.total.toString(),
-              icon: Icons.gavel_rounded,
-              color: scheme.primary,
-              compact: compact,
-            ),
-            _StatChip(
-              label: l10n.t('active'),
-              value: loaded.activeCount.toString(),
-              icon: Icons.play_circle_rounded,
-              color: scheme.primary,
-              compact: compact,
-            ),
-            _StatChip(
-              label: l10n.t('completed'),
-              value: loaded.completedCount.toString(),
-              icon: Icons.check_circle_rounded,
-              color: scheme.secondary,
-              compact: compact,
-            ),
-            _StatChip(
-              label: l10n.t('cancelled'),
-              value: loaded.cancelledCount.toString(),
-              icon: Icons.cancel_rounded,
-              color: scheme.error,
-              compact: compact,
-            ),
-            if (loaded.bannedCount > 0)
-              _StatChip(
-                label: l10n.tOr('banned', 'Banned'),
-                value: loaded.bannedCount.toString(),
-                icon: Icons.block_rounded,
-                color: scheme.error,
-                compact: compact,
-              ),
-          ],
-        );
-      }
-
-      if (!showAuctionStats && sellerLoaded != null) {
-        return Wrap(
-          spacing: compact ? 6 : 8,
-          runSpacing: compact ? 6 : 8,
-          children: [
-            _StatChip(
-              label: l10n.t('total'),
-              value: sellerLoaded.total.toString(),
-              icon: Icons.inbox_rounded,
-              color: scheme.primary,
-              compact: compact,
-            ),
-            _StatChip(
-              label: l10n.tOr('pending', 'Pending'),
-              value: sellerLoaded.pendingCount.toString(),
-              icon: Icons.hourglass_top_rounded,
-              color: scheme.tertiary,
-              compact: compact,
-            ),
-          ],
-        );
-      }
-
-      return const SizedBox.shrink();
-    }
+    final controlSize = compact ? 36.0 : 40.0;
 
     final refreshBtn = Material(
       color: scheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: isLoading ? null : onRefresh,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: controlSize,
+          height: controlSize,
           child: Center(
             child: isLoading
                 ? SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: scheme.onSurfaceVariant,
@@ -360,7 +274,7 @@ class _SliverHeader extends StatelessWidget {
                   )
                 : Icon(
                     Icons.refresh_rounded,
-                    size: 20,
+                    size: compact ? 18 : 20,
                     color: scheme.onSurfaceVariant,
                   ),
           ),
@@ -371,40 +285,6 @@ class _SliverHeader extends StatelessWidget {
     final title = showAuctionStats
         ? l10n.t('auctions')
         : l10n.tOr('sellerVerificationTab', 'Seller verification');
-    final subtitle = showAuctionStats
-        ? l10n.tOr(
-            'auctionsSubtitle',
-            'Monitor and manage all auction activities',
-          )
-        : l10n.tOr(
-            'sellerVerificationSubtitle',
-            'Review seller applications before they can host auctions.',
-          );
-
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-            color: scheme.onSurface,
-            height: 1.15,
-            fontSize: compact ? 22 : null,
-          ),
-        ),
-        SizedBox(height: compact ? 6 : 8),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontSize: compact ? 13 : 14,
-            height: 1.45,
-          ),
-        ),
-      ],
-    );
 
     return SliverToBoxAdapter(
       child: Center(
@@ -419,147 +299,78 @@ class _SliverHeader extends StatelessWidget {
               metrics.pageHorizontalPadding,
               0,
             ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: BorderRadius.circular(radius),
-                border: Border.all(color: scheme.outlineVariant),
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.shadow.withValues(alpha: 0.04),
-                    blurRadius: 14,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(pad),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 960;
-                    final medium = constraints.maxWidth >= 640;
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 720;
+                  final medium = constraints.maxWidth >= 520;
 
-                    final tabs = AuctionsPageHeaderTabs(
-                      activeTab: activeTab,
-                      onTabChanged: onTabChanged,
-                      compact: compact,
-                      fullWidth: !wide,
-                    );
+                  final tabs = AuctionsPageHeaderTabs(
+                    activeTab: activeTab,
+                    onTabChanged: onTabChanged,
+                    compact: compact,
+                    fullWidth: !wide,
+                  );
 
-                    final stats = (loaded != null || sellerLoaded != null)
-                        ? Padding(
-                            padding: EdgeInsets.only(top: compact ? 12 : 14),
-                            child: statChips(),
-                          )
-                        : const SizedBox.shrink();
+                  final titleText = Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: (compact
+                            ? theme.textTheme.titleLarge
+                            : theme.textTheme.headlineSmall)
+                        ?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                      color: scheme.onSurface,
+                      height: 1.1,
+                    ),
+                  );
 
-                    if (wide) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(child: titleBlock),
-                              const SizedBox(width: 16),
-                              SizedBox(width: 380, child: tabs),
-                              const SizedBox(width: 12),
-                              refreshBtn,
-                            ],
-                          ),
-                          stats,
-                        ],
-                      );
-                    }
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: titleBlock),
-                            if (medium) ...[
-                              const SizedBox(width: 12),
-                              refreshBtn,
-                            ],
-                          ],
-                        ),
-                        SizedBox(height: compact ? 12 : 14),
-                        tabs,
-                        if (!medium) ...[
-                          const SizedBox(height: 10),
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: refreshBtn,
-                          ),
-                        ],
-                        stats,
+                        Expanded(flex: 3, child: titleText),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 4, child: tabs),
+                        const SizedBox(width: 8),
+                        refreshBtn,
                       ],
                     );
-                  },
-                ),
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(child: titleText),
+                          if (medium) ...[
+                            const SizedBox(width: 8),
+                            refreshBtn,
+                          ],
+                        ],
+                      ),
+                      SizedBox(height: compact ? 6 : 8),
+                      Row(
+                        children: [
+                          Expanded(child: tabs),
+                          if (!medium) ...[
+                            const SizedBox(width: 8),
+                            refreshBtn,
+                          ],
+                        ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.compact = false,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 10,
-        vertical: compact ? 5 : 7,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(compact ? 10 : 12),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: compact ? 13 : 15, color: color),
-          SizedBox(width: compact ? 4 : 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: compact ? 12 : 13,
-              color: color,
-            ),
-          ),
-          SizedBox(width: compact ? 3 : 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: compact ? 10 : 11,
-              fontWeight: FontWeight.w500,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -806,109 +617,97 @@ class _SliverFiltersState extends State<_SliverFilters> {
                   metrics.pageHorizontalPadding,
                   0,
                 ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(metrics.panelRadius),
-                    border: Border.all(color: scheme.outlineVariant),
-                    boxShadow: [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(alpha: 0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    vertical: metrics.isMobile ? 2 : 4,
                   ),
-                  child: Padding(
-                    padding: EdgeInsets.all(metrics.panelPadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                          controller: _searchCtrl,
-                          focusNode: _searchFocus,
-                          onChanged: _onSearchChanged,
-                          style: TextStyle(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _searchCtrl,
+                        focusNode: _searchFocus,
+                        onChanged: _onSearchChanged,
+                        style: TextStyle(
+                          fontSize: metrics.isMobile ? 13 : 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: l10n.tOr(
+                            'searchAuctions',
+                            'Search auctions…',
+                          ),
+                          hintStyle: TextStyle(
                             fontSize: metrics.isMobile ? 13 : 14,
                           ),
-                          decoration: InputDecoration(
-                            hintText: l10n.tOr(
-                              'searchAuctions',
-                              'Search auctions…',
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            size: metrics.isMobile ? 18 : 20,
+                          ),
+                          suffixIcon: _searchCtrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.close_rounded,
+                                    size: metrics.isMobile ? 16 : 18,
+                                  ),
+                                  onPressed: _clearSearch,
+                                )
+                              : null,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: metrics.isMobile ? 12 : 14,
+                            vertical: metrics.isMobile ? 10 : 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: fieldRadius,
+                            borderSide:
+                                BorderSide(color: scheme.outlineVariant),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: fieldRadius,
+                            borderSide:
+                                BorderSide(color: scheme.outlineVariant),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: fieldRadius,
+                            borderSide: BorderSide(
+                              color: scheme.primary,
+                              width: 1.4,
                             ),
-                            hintStyle: TextStyle(
-                              fontSize: metrics.isMobile ? 13 : 14,
+                          ),
+                          filled: true,
+                          fillColor: scheme.surfaceContainerLowest,
+                        ),
+                      ),
+                      SizedBox(height: metrics.filterGap),
+                      filterToolbar(),
+                      SizedBox(height: metrics.toolbarFilterGap + 2),
+                      if (loaded.isFetching)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: metrics.toolbarFilterGap,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              minHeight: 2,
+                              color: scheme.primary,
+                              backgroundColor:
+                                  scheme.surfaceContainerHighest,
                             ),
-                            prefixIcon: Icon(
-                              Icons.search_rounded,
-                              size: metrics.isMobile ? 18 : 20,
-                            ),
-                            suffixIcon: _searchCtrl.text.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(
-                                      Icons.close_rounded,
-                                      size: metrics.isMobile ? 16 : 18,
-                                    ),
-                                    onPressed: _clearSearch,
-                                  )
-                                : null,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: metrics.isMobile ? 12 : 14,
-                              vertical: metrics.isMobile ? 10 : 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: fieldRadius,
-                              borderSide:
-                                  BorderSide(color: scheme.outlineVariant),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: fieldRadius,
-                              borderSide:
-                                  BorderSide(color: scheme.outlineVariant),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: fieldRadius,
-                              borderSide: BorderSide(
-                                color: scheme.primary,
-                                width: 1.4,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: scheme.surfaceContainerLowest,
                           ),
                         ),
-                        SizedBox(height: metrics.filterGap),
-                        filterToolbar(),
-                        SizedBox(height: metrics.toolbarFilterGap + 2),
-                        if (loaded.isFetching)
-                          Padding(
-                            padding: EdgeInsets.only(
-                              bottom: metrics.toolbarFilterGap,
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: LinearProgressIndicator(
-                                minHeight: 2,
-                                color: scheme.primary,
-                                backgroundColor:
-                                    scheme.surfaceContainerHighest,
-                              ),
-                            ),
-                          ),
-                        Text(
-                          _resultsCountLabel(
-                            l10n,
-                            loaded.displayedCount,
-                            loaded.totalCount,
-                          ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: metrics.isMobile ? 11 : 12,
-                            color: scheme.onSurfaceVariant,
-                          ),
+                      Text(
+                        _resultsCountLabel(
+                          l10n,
+                          loaded.displayedCount,
+                          loaded.totalCount,
                         ),
-                      ],
-                    ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: metrics.isMobile ? 11 : 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
