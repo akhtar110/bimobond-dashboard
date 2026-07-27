@@ -6,6 +6,41 @@ import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/admin_settings_bloc.dart';
 import 'create_setting_dialog.dart';
 
+/// Confirms and runs `POST /settings/admin/seed`.
+Future<void> confirmAndSeedAdminSettings(BuildContext context) async {
+  final l10n = context.l10n;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Text(
+        l10n.tOr('seedSettingsTitle', 'Seed settings?'),
+      ),
+      content: Text(
+        l10n.tOr(
+          'seedSettingsMessage',
+          'This upserts missing default settings (economy, notifications, uploads) without overwriting existing values. Continue?',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(l10n.tOr('cancel', 'Cancel')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(l10n.tOr('seedSettings', 'Seed defaults')),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    context.read<AdminSettingsBloc>().add(const SeedAdminSettingsEvent());
+  }
+}
+
 /// Admin settings page header with refresh, seed, and create actions.
 class SettingsHeader extends StatelessWidget {
   const SettingsHeader({
@@ -38,45 +73,12 @@ class SettingsHeader extends StatelessWidget {
                   .add(const LoadAdminSettingsEvent(refresh: true)),
         );
 
-        Future<void> confirmSeed() async {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                l10n.tOr('seedSettingsTitle', 'Seed settings?'),
-              ),
-              content: Text(
-                l10n.tOr(
-                  'seedSettingsMessage',
-                  'This upserts missing default settings (economy, notifications, uploads) without overwriting existing values. Continue?',
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(l10n.tOr('cancel', 'Cancel')),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(l10n.tOr('seedSettings', 'Seed defaults')),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true && context.mounted) {
-            context
-                .read<AdminSettingsBloc>()
-                .add(const SeedAdminSettingsEvent());
-          }
-        }
-
         final seedBtn = canWrite
             ? (compact
                 ? FilledButton.tonal(
-                    onPressed: state.isSeeding ? null : confirmSeed,
+                    onPressed: state.isSeeding
+                        ? null
+                        : () => confirmAndSeedAdminSettings(context),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(44, 40),
                       padding: EdgeInsets.zero,
@@ -93,7 +95,9 @@ class SettingsHeader extends StatelessWidget {
                         : const Icon(Icons.grass_outlined, size: 18),
                   )
                 : FilledButton.tonalIcon(
-                    onPressed: state.isSeeding ? null : confirmSeed,
+                    onPressed: state.isSeeding
+                        ? null
+                        : () => confirmAndSeedAdminSettings(context),
                     icon: state.isSeeding
                         ? const SizedBox(
                             width: 18,

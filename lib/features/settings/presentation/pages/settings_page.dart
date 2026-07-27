@@ -12,9 +12,7 @@ import '../widgets/language_selector_card.dart';
 import '../widgets/logout_section.dart';
 import '../widgets/profile_card.dart';
 import '../widgets/settings_header.dart';
-import '../widgets/settings_overview_cards.dart';
 import '../widgets/settings_platform_tabs.dart';
-import '../widgets/settings_search_bar.dart';
 import '../widgets/theme_selector_card.dart';
 
 /// Settings screen with admin module, profile, appearance, and logout.
@@ -197,6 +195,8 @@ class _SettingsScrollBody extends StatelessWidget {
     final sectionGap = metrics.sectionGap;
     final canReadAdmin = PermissionManager.canReadSettings(context);
     final canManage = PermissionManager.canWriteSettings(context);
+    final canManageCurrencies = PermissionManager.canManageCurrencies(context);
+    final showAdmin = canReadAdmin || canManageCurrencies;
 
     return Center(
       child: ConstrainedBox(
@@ -220,16 +220,13 @@ class _SettingsScrollBody extends StatelessWidget {
               const RepaintBoundary(child: ProfileCard()),
               SizedBox(height: sectionGap + 8),
               const RepaintBoundary(child: _AppearanceSection()),
-              if (canReadAdmin) ...[
+              if (showAdmin) ...[
                 SizedBox(height: sectionGap + 8),
-                const RepaintBoundary(child: SettingsOverviewCards()),
-                SizedBox(height: sectionGap),
-                const RepaintBoundary(child: SettingsSearchBar()),
-                SizedBox(height: sectionGap),
                 RepaintBoundary(
                   child: SettingsPlatformTabs(
                     canManage: canManage,
                     canReadAdmin: canReadAdmin,
+                    canManageCurrencies: canManageCurrencies,
                   ),
                 ),
               ],

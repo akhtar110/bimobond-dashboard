@@ -7,9 +7,16 @@ import '../utils/settings_responsive.dart';
 
 /// Horizontally scrollable Material 3 chips for admin settings tabs.
 class SettingsAdminTabs extends StatelessWidget {
-  const SettingsAdminTabs({super.key});
+  const SettingsAdminTabs({
+    super.key,
+    this.canReadAdmin = true,
+    this.canManageCurrencies = false,
+  });
 
-  static const _visibleTabs = <AdminSettingsTab>[
+  final bool canReadAdmin;
+  final bool canManageCurrencies;
+
+  static const _allTabs = <AdminSettingsTab>[
     AdminSettingsTab.economy,
     AdminSettingsTab.appSettings,
     AdminSettingsTab.general,
@@ -23,6 +30,12 @@ class SettingsAdminTabs extends StatelessWidget {
     AdminSettingsTab.uploads,
     AdminSettingsTab.defaults,
   ];
+
+  List<AdminSettingsTab> get _visibleTabs {
+    if (canReadAdmin) return _allTabs;
+    if (canManageCurrencies) return const [AdminSettingsTab.currencies];
+    return const [];
+  }
 
   static String tabLabel(BuildContext context, AdminSettingsTab tab) {
     final l10n = context.l10n;
@@ -70,12 +83,26 @@ class SettingsAdminTabs extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
 
+    final tabs = _visibleTabs;
+    if (tabs.isEmpty) return const SizedBox.shrink();
+
     return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
       buildWhen: (prev, next) => prev.tab != next.tab,
       builder: (context, state) {
-        final effectiveTab = state.tab == AdminSettingsTab.overview
+        var effectiveTab = state.tab == AdminSettingsTab.overview
             ? AdminSettingsTab.economy
             : state.tab;
+        if (!tabs.contains(effectiveTab)) {
+          effectiveTab = tabs.first;
+          if (state.tab != effectiveTab) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              context
+                  .read<AdminSettingsBloc>()
+                  .add(ChangeAdminSettingsTabEvent(effectiveTab));
+            });
+          }
+        }
 
         return DecoratedBox(
           decoration: BoxDecoration(
@@ -90,14 +117,14 @@ class SettingsAdminTabs extends StatelessWidget {
               padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 8),
               child: Row(
                 children: [
-                  for (var i = 0; i < _visibleTabs.length; i++) ...[
+                  for (var i = 0; i < tabs.length; i++) ...[
                     if (i > 0) const SizedBox(width: 6),
                     _AdminTabChip(
-                      label: tabLabel(context, _visibleTabs[i]),
-                      icon: tabIcon(_visibleTabs[i]),
-                      selected: effectiveTab == _visibleTabs[i],
+                      label: tabLabel(context, tabs[i]),
+                      icon: tabIcon(tabs[i]),
+                      selected: effectiveTab == tabs[i],
                       onTap: () => context.read<AdminSettingsBloc>().add(
-                            ChangeAdminSettingsTabEvent(_visibleTabs[i]),
+                            ChangeAdminSettingsTabEvent(tabs[i]),
                           ),
                     ),
                   ],

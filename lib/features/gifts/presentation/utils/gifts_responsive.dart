@@ -28,8 +28,8 @@ class GiftsLayoutMetrics {
   bool get useInfiniteScroll => !useDesktopPagination;
 
   double get pageHorizontalPadding => switch (deviceType) {
-        GiftsDeviceType.mobileSmall => 8,
-        GiftsDeviceType.mobileLarge => 10,
+        GiftsDeviceType.mobileSmall => 6,
+        GiftsDeviceType.mobileLarge => 8,
         GiftsDeviceType.tablet => 14,
         GiftsDeviceType.desktop => 20,
       };
@@ -49,17 +49,17 @@ class GiftsLayoutMetrics {
       };
 
   double get filterControlHeight => switch (deviceType) {
-        GiftsDeviceType.mobileSmall => 38,
-        GiftsDeviceType.mobileLarge => 40,
-        GiftsDeviceType.tablet => 44,
-        GiftsDeviceType.desktop => 48,
+        GiftsDeviceType.mobileSmall => 36,
+        GiftsDeviceType.mobileLarge => 38,
+        GiftsDeviceType.tablet => 42,
+        GiftsDeviceType.desktop => 44,
       };
 
   double get tabStripHeight => switch (deviceType) {
-        GiftsDeviceType.mobileSmall => 32,
-        GiftsDeviceType.mobileLarge => 36,
-        GiftsDeviceType.tablet => 40,
-        GiftsDeviceType.desktop => 44,
+        GiftsDeviceType.mobileSmall => 30,
+        GiftsDeviceType.mobileLarge => 32,
+        GiftsDeviceType.tablet => 36,
+        GiftsDeviceType.desktop => 40,
       };
 
   double get filterBarTopPadding => switch (deviceType) {
@@ -84,9 +84,9 @@ class GiftsLayoutMetrics {
       };
 
   double get gridTopPadding => switch (deviceType) {
-        GiftsDeviceType.mobileSmall => 8,
-        GiftsDeviceType.mobileLarge => 10,
-        GiftsDeviceType.tablet => 12,
+        GiftsDeviceType.mobileSmall => 4,
+        GiftsDeviceType.mobileLarge => 6,
+        GiftsDeviceType.tablet => 10,
         GiftsDeviceType.desktop => 14,
       };
 

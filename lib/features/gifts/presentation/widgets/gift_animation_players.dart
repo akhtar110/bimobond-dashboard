@@ -306,7 +306,7 @@ class _LocalVideoPreviewState extends State<_LocalVideoPreview> {
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(0);
+      await controller.setVolume(1);
       await controller.play();
       if (!mounted) return;
       setState(() => _ready = true);
@@ -380,7 +380,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(0);
+      await controller.setVolume(1);
       await controller.play();
       if (!mounted) return;
       setState(() => _ready = true);
@@ -552,36 +552,49 @@ class _GiftVideoSurface extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                            ),
                           ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Muted · Loop',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Sound · Loop',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),

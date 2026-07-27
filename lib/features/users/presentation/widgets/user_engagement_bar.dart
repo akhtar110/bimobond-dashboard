@@ -33,8 +33,6 @@ class UserEngagementBar extends StatelessWidget {
             _metric(Icons.people_outline, formatCount(user.followerCount), style),
             const SizedBox(width: 8),
             _metric(Icons.grid_view_rounded, formatCount(user.postCount), style),
-            const SizedBox(width: 8),
-            _metric(Icons.favorite_border, formatCount(user.totalLikes), style),
           ],
         ),
       );
@@ -51,8 +49,6 @@ class UserEngagementBar extends StatelessWidget {
           _metric(Icons.person_add_outlined, formatCount(user.followingCount), style),
           const SizedBox(width: 8),
           _metric(Icons.grid_view_rounded, formatCount(user.postCount), style),
-          const SizedBox(width: 8),
-          _metric(Icons.favorite_border, formatCount(user.totalLikes), style),
         ],
       ),
     );

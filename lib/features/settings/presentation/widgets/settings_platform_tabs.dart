@@ -17,14 +17,18 @@ class SettingsPlatformTabs extends StatelessWidget {
     super.key,
     required this.canManage,
     required this.canReadAdmin,
+    this.canManageCurrencies = false,
   });
 
   final bool canManage;
   final bool canReadAdmin;
+  final bool canManageCurrencies;
 
   @override
   Widget build(BuildContext context) {
-    if (!canReadAdmin) return const SizedBox.shrink();
+    if (!canReadAdmin && !canManageCurrencies) {
+      return const SizedBox.shrink();
+    }
 
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final l10n = context.l10n;
@@ -45,7 +49,10 @@ class SettingsPlatformTabs extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SettingsAdminTabs(),
+            SettingsAdminTabs(
+              canReadAdmin: canReadAdmin,
+              canManageCurrencies: canManageCurrencies,
+            ),
             SizedBox(height: metrics.sectionGap),
             SettingsAdminBody(canManage: canManage),
           ],

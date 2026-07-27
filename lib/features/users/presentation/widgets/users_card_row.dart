@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
 import 'user_action_buttons.dart';
+import 'user_engagement_bar.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 
@@ -98,6 +99,8 @@ class UsersCardRow extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    UserEngagementBar(user: user, compact: true),
                   ],
                 ),
               ),

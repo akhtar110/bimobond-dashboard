@@ -6,6 +6,9 @@ import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart';
 import '../../../post_management/data/mappers/managed_post_mapper.dart';
 import '../../../post_management/domain/entities/activity_context.dart';
+import '../../../post_management/domain/usecases/delete_comment_admin.dart';
+import '../../../post_management/presentation/utils/moderation_confirm_dialog.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/activity_user_entity.dart';
 import '../../domain/entities/user_comment_entity.dart';
@@ -48,6 +51,7 @@ class UserActivityCommentsTab extends StatefulWidget {
 class _UserActivityCommentsTabState extends State<UserActivityCommentsTab> {
   late final UserCommentsBloc _bloc;
   final ScrollController _scrollController = ScrollController();
+  String? _deletingCommentId;
 
   @override
   void initState() {
@@ -83,9 +87,45 @@ class _UserActivityCommentsTabState extends State<UserActivityCommentsTab> {
     await _bloc.stream.firstWhere((s) => !s.isLoading);
   }
 
+  Future<void> _confirmDeleteComment(UserCommentEntity comment) async {
+    final confirmed = await showDeleteCommentConfirmDialog(context);
+    if (!confirmed || !mounted) return;
+
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _deletingCommentId = comment.id);
+    try {
+      await sl<DeleteCommentAdmin>()(comment.id);
+      if (!mounted) return;
+      _bloc.add(RemoveUserCommentEvent(comment.id));
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.t('commentDeleted')),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: scheme.errorContainer,
+          content: Text(
+            e.toString(),
+            style: TextStyle(color: scheme.onErrorContainer),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _deletingCommentId = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final canDeleteComments = PermissionManager.canAccessStaffDashboard(context);
 
     return BlocProvider.value(
       value: _bloc,
@@ -126,12 +166,16 @@ class _UserActivityCommentsTabState extends State<UserActivityCommentsTab> {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
+                final comment = state.items[index];
                 return _CommentCard(
-                  comment: state.items[index],
+                  comment: comment,
                   isDark: widget.isDark,
                   type: widget.type,
+                  canDelete: canDeleteComments,
+                  isDeleting: _deletingCommentId == comment.id,
+                  onDelete: () => _confirmDeleteComment(comment),
                   onOpenPost: () {
-                    final c = state.items[index];
+                    final c = comment;
                     final owner = c.post.user?.displayName;
                     openPostInvestigation(
                       context,
@@ -170,12 +214,18 @@ class _CommentCard extends StatelessWidget {
     required this.isDark,
     required this.type,
     required this.onOpenPost,
+    this.canDelete = false,
+    this.isDeleting = false,
+    this.onDelete,
   });
 
   final UserCommentEntity comment;
   final bool isDark;
   final String type;
   final VoidCallback onOpenPost;
+  final bool canDelete;
+  final bool isDeleting;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -260,9 +310,39 @@ class _CommentCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                dateStr,
-                style: _meta(scheme),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    dateStr,
+                    style: _meta(scheme),
+                  ),
+                  if (canDelete) ...[
+                    const SizedBox(height: 4),
+                    if (isDeleting)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      IconButton(
+                        tooltip: l10n.t('delete'),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: scheme.error,
+                        ),
+                        onPressed: onDelete,
+                      ),
+                  ],
+                ],
               ),
             ],
           ),

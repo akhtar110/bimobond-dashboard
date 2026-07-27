@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import 'gifts_view_toggle.dart';
 
-/// Page header matching [CategoriesPageHeader] spacing/structure.
+/// Compact page header — title + actions in one row, no border chrome.
 class GiftsPageHeader extends StatelessWidget {
   const GiftsPageHeader({
     super.key,
@@ -27,21 +27,22 @@ class GiftsPageHeader extends StatelessWidget {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final controlSize = compact ? 36.0 : 40.0;
 
     final refreshBtn = Material(
       color: scheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: isLoading ? null : onRefresh,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: controlSize,
+          height: controlSize,
           child: Center(
             child: isLoading
                 ? SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: scheme.onSurfaceVariant,
@@ -49,7 +50,7 @@ class GiftsPageHeader extends StatelessWidget {
                   )
                 : Icon(
                     Icons.refresh_rounded,
-                    size: 20,
+                    size: compact ? 18 : 20,
                     color: scheme.onSurfaceVariant,
                   ),
           ),
@@ -61,8 +62,9 @@ class GiftsPageHeader extends StatelessWidget {
         ? FilledButton(
             onPressed: canAdd ? onAdd : null,
             style: FilledButton.styleFrom(
-              minimumSize: const Size(44, 40),
+              minimumSize: Size(controlSize, controlSize),
               padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -74,8 +76,9 @@ class GiftsPageHeader extends StatelessWidget {
             icon: const Icon(Icons.add_rounded, size: 18),
             label: Text(l10n.t('addGift')),
             style: FilledButton.styleFrom(
-              minimumSize: const Size(120, 40),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              visualDensity: VisualDensity.compact,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -84,98 +87,35 @@ class GiftsPageHeader extends StatelessWidget {
 
     final viewToggle = showViewToggle ? const GiftsViewToggle() : null;
 
-    final actionRow = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (viewToggle != null && !compact) ...[
-          viewToggle,
-          const SizedBox(width: 8),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              l10n.t('gifts'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: (compact
+                      ? theme.textTheme.titleLarge
+                      : theme.textTheme.headlineSmall)
+                  ?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: scheme.onSurface,
+                height: 1.1,
+              ),
+            ),
+          ),
+          if (viewToggle != null) ...[
+            viewToggle,
+            SizedBox(width: compact ? 6 : 8),
+          ],
+          addBtn,
+          SizedBox(width: compact ? 6 : 8),
+          refreshBtn,
         ],
-        addBtn,
-        const SizedBox(width: 8),
-        refreshBtn,
-      ],
-    );
-
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.t('gifts'),
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-            color: scheme.onSurface,
-            height: 1.15,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          l10n.t('giftsSubtitle'),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontSize: 14,
-            height: 1.45,
-          ),
-        ),
-      ],
-    );
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(compact ? 12 : 16),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(compact ? 12 : 16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final inline = constraints.maxWidth >= 720;
-            if (inline) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: titleBlock),
-                  const SizedBox(width: 16),
-                  actionRow,
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: titleBlock),
-                    if (!compact) actionRow,
-                  ],
-                ),
-                if (compact) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      ?viewToggle,
-                      const Spacer(),
-                      addBtn,
-                      const SizedBox(width: 8),
-                      refreshBtn,
-                    ],
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
       ),
     );
   }

@@ -118,23 +118,62 @@ class DeleteCurrencyUseCase {
 }
 
 /// Parallel bootstrap used by the admin settings module.
+///
+/// Each request is isolated so a currencies-only (or partial) permission
+/// set can still load what the caller is allowed to see.
 class LoadAdminSettingsBundleUseCase {
   const LoadAdminSettingsBundleUseCase(this._repository);
   final AppSettingsRepository _repository;
 
   Future<AdminSettingsBundle> call() async {
-    final results = await Future.wait([
-      _repository.getGroupedSettings(),
-      _repository.getDefaults(),
-      _repository.getBranding(),
-      _repository.listCurrencies(),
+    SettingsGroupedResultEntity? grouped;
+    SettingsDefaultsEntity? defaults;
+    AppBrandingEntity? branding;
+    List<AppCurrencyEntity> currencies = const [];
+    var currenciesLoaded = false;
+    Object? firstError;
+
+    Future<void> run(Future<void> Function() fn) async {
+      try {
+        await fn();
+      } catch (e) {
+        firstError ??= e;
+      }
+    }
+
+    await Future.wait([
+      run(() async {
+        grouped = await _repository.getGroupedSettings();
+      }),
+      run(() async {
+        defaults = await _repository.getDefaults();
+      }),
+      run(() async {
+        branding = await _repository.getBranding();
+      }),
+      run(() async {
+        currencies = await _repository.listCurrencies();
+        currenciesLoaded = true;
+      }),
     ]);
 
+    final hasAny = grouped != null ||
+        defaults != null ||
+        branding != null ||
+        currenciesLoaded;
+    if (!hasAny && firstError != null) {
+      throw firstError!;
+    }
+
     return AdminSettingsBundle(
-      grouped: results[0] as SettingsGroupedResultEntity,
-      defaults: results[1] as SettingsDefaultsEntity,
-      branding: results[2] as AppBrandingEntity,
-      currencies: results[3] as List<AppCurrencyEntity>,
+      grouped: grouped ?? const SettingsGroupedResultEntity(),
+      defaults: defaults ?? const SettingsDefaultsEntity(),
+      branding: branding ??
+          const AppBrandingEntity(
+            id: '',
+            appName: 'DCC',
+          ),
+      currencies: currencies,
     );
   }
 }

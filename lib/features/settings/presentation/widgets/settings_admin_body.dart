@@ -42,6 +42,7 @@ class SettingsAdminBody extends StatelessWidget {
       builder: (context, state) {
         if (state.error != null &&
             state.settings.isEmpty &&
+            state.currencies.isEmpty &&
             !state.isLoading) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,7 +105,9 @@ class SettingsAdminBody extends StatelessWidget {
           ),
           child: Padding(
             padding: EdgeInsets.all(metrics.panelPadding),
-            child: state.isLoading && state.settings.isEmpty
+            child: state.isLoading &&
+                    state.settings.isEmpty &&
+                    state.currencies.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : content,
           ),

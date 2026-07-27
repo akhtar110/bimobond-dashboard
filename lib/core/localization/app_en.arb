@@ -698,6 +698,8 @@
   "publishedPosts": "Published Posts",
   "noPostsYet": "No posts yet",
   "noRepostsYet": "This user hasn't reposted anything yet",
+  "noPostRepostsYet": "This post hasn't been reposted yet",
+  "userBalance": "Balance",
   "repostDetails": "Repost Details",
   "repostedByUser": "Reposted by",
   "viewOriginalPost": "View Original Post",

@@ -5,44 +5,30 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../bloc/admin_settings_bloc.dart';
 
-/// Opens the settings filter panel (bottom sheet on mobile, dialog on desktop).
+/// Opens the settings filter panel as a centered popup dialog.
 Future<void> showSettingsFilterPanel(BuildContext context) {
   final bloc = context.read<AdminSettingsBloc>();
-  final width = MediaQuery.sizeOf(context).width;
 
   Widget wrap(Widget child) => BlocProvider<AdminSettingsBloc>.value(
         value: bloc,
         child: child,
       );
 
-  if (width < 600) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => wrap(
-        Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-          child: SettingsFilterPanel(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          ),
-        ),
-      ),
-    );
-  }
-
   return showDialog<void>(
     context: context,
-    builder: (ctx) => Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: wrap(const SettingsFilterPanel()),
-      ),
-    ),
+    builder: (ctx) {
+      final maxHeight = MediaQuery.sizeOf(ctx).height * 0.85;
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 480, maxHeight: maxHeight),
+          child: wrap(
+            SettingsFilterPanel(maxHeight: maxHeight),
+          ),
+        ),
+      );
+    },
   );
 }
 

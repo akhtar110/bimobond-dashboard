@@ -684,6 +684,8 @@
   "publishedPosts": "المنشورات المنشورة",
   "noPostsYet": "لا توجد منشورات بعد",
   "noRepostsYet": "لم يقم هذا المستخدم بإعادة نشر أي شيء بعد",
+  "noPostRepostsYet": "لم تتم إعادة نشر هذا المنشور بعد",
+  "userBalance": "الرصيد",
   "repostDetails": "تفاصيل إعادة النشر",
   "repostedByUser": "أعاد النشر",
   "viewOriginalPost": "عرض المنشور الأصلي",
