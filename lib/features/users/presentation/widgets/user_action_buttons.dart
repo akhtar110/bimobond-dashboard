@@ -21,46 +21,57 @@ class UserActionButtons extends StatelessWidget {
     final l10n = context.l10n;
     final bloc = context.read<UsersBloc>();
 
-    if (compact) {
-      return _CompactActionsMenu(
-        user: user,
-        onDetails: () => _openDetails(context),
-        onBan: () => _confirmBanToggle(context, bloc),
-        onSetRole: (role) => bloc.add(
-          SetUserRoleEvent(userId: user.id, role: role),
-        ),
-        onDelete: () => UserDeleteDialog.show(context, user.id),
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fall back to overflow menu when the actions cell is too narrow for
+        // Details / Ban / Promote / Delete chips (common on laptop widths).
+        final useCompact = compact ||
+            !constraints.hasBoundedWidth ||
+            constraints.maxWidth < 300;
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      alignment: WrapAlignment.end,
-      children: [
-        _ActionChip(
-          label: l10n.t('details'),
-          icon: Icons.open_in_new_rounded,
-          onPressed: () => _openDetails(context),
-        ),
-        _ActionChip(
-          label: user.isBanned ? l10n.t('unban') : l10n.t('ban'),
-          icon: user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
-          onPressed: () => _confirmBanToggle(context, bloc),
-        ),
-        _RoleActionButton(
-          user: user,
-          onSetRole: (role) => bloc.add(
-            SetUserRoleEvent(userId: user.id, role: role),
-          ),
-        ),
-        _ActionChip(
-          label: l10n.t('delete'),
-          icon: Icons.delete_outline_rounded,
-          isDestructive: true,
-          onPressed: () => UserDeleteDialog.show(context, user.id),
-        ),
-      ],
+        if (useCompact) {
+          return _CompactActionsMenu(
+            user: user,
+            onDetails: () => _openDetails(context),
+            onBan: () => _confirmBanToggle(context, bloc),
+            onSetRole: (role) => bloc.add(
+              SetUserRoleEvent(userId: user.id, role: role),
+            ),
+            onDelete: () => UserDeleteDialog.show(context, user.id),
+          );
+        }
+
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          alignment: WrapAlignment.end,
+          children: [
+            _ActionChip(
+              label: l10n.t('details'),
+              icon: Icons.open_in_new_rounded,
+              onPressed: () => _openDetails(context),
+            ),
+            _ActionChip(
+              label: user.isBanned ? l10n.t('unban') : l10n.t('ban'),
+              icon:
+                  user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
+              onPressed: () => _confirmBanToggle(context, bloc),
+            ),
+            _RoleActionButton(
+              user: user,
+              onSetRole: (role) => bloc.add(
+                SetUserRoleEvent(userId: user.id, role: role),
+              ),
+            ),
+            _ActionChip(
+              label: l10n.t('delete'),
+              icon: Icons.delete_outline_rounded,
+              isDestructive: true,
+              onPressed: () => UserDeleteDialog.show(context, user.id),
+            ),
+          ],
+        );
+      },
     );
   }
 
