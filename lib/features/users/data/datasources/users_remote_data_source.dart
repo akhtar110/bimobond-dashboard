@@ -128,12 +128,97 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
 
     print("Data Response $data");
 
+    var users = (data['users'] as List).map((e) {
+      final map = Map<String, dynamic>.from(e as Map);
+      final rawCounts = map['_count'] ?? map['counts'];
+      final counts = rawCounts is Map
+          ? Map<String, dynamic>.from(rawCounts)
+          : null;
+      return UserModel.fromJson(map, counts: counts);
+    }).toList();
+
+    // `/users` often returns denormalized totalLikes as 0. Backfill from
+    // user-reports when available (uses counts.postLikes / totalLikes).
+    if (users.any((u) => u.totalLikes <= 0 && u.postCount > 0)) {
+      users = await _backfillTotalLikes(
+        users,
+        page: page,
+        limit: limit,
+        search: search,
+        isVerified: isVerified,
+        isBanned: isBanned,
+      );
+    }
+
     return UsersPageModel(
-      users: (data['users'] as List).map((e) => UserModel.fromJson(e)).toList(),
+      users: users,
       total: data['meta']['total'],
       page: data['meta']['page'],
       lastPage: data['meta']['lastPage'],
     );
+  }
+
+  Future<List<UserModel>> _backfillTotalLikes(
+    List<UserModel> users, {
+    required int page,
+    required int limit,
+    String? search,
+    bool? isVerified,
+    bool? isBanned,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/user-reports/admin/users',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (isVerified != null) 'isVerified': isVerified,
+          if (isBanned != null) 'isBanned': isBanned,
+        },
+      );
+
+      final raw = response.data;
+      final list = raw is Map
+          ? (raw['data'] ?? raw['users'] ?? raw['items'])
+          : raw;
+      if (list is! List) return users;
+
+      final likesById = <String, int>{};
+      for (final item in list) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final id = map['id']?.toString();
+        if (id == null || id.isEmpty) continue;
+
+        final counts = map['counts'] ?? map['_count'];
+        final countsMap =
+            counts is Map ? Map<String, dynamic>.from(counts) : null;
+        final likes = UserModel.readInt(
+              map['totalLikes'] ??
+                  map['likesCount'] ??
+                  map['postLikes'] ??
+                  countsMap?['postLikes'] ??
+                  countsMap?['totalLikes'] ??
+                  countsMap?['likes'],
+            ) ??
+            0;
+        if (likes > 0) likesById[id] = likes;
+      }
+
+      if (likesById.isEmpty) return users;
+
+      return users
+          .map(
+            (u) => likesById.containsKey(u.id) && likesById[u.id]! > u.totalLikes
+                ? u.copyWith(totalLikes: likesById[u.id])
+                : u,
+          )
+          .toList();
+    } catch (_) {
+      // Reports endpoint may be unavailable for some roles; keep /users values.
+      return users;
+    }
   }
 
   @override

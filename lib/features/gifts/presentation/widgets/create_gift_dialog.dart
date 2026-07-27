@@ -14,6 +14,7 @@ import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
 import 'gift_animation_preview.dart';
+import 'gift_dialog_layout.dart';
 import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
 
@@ -179,8 +180,7 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final screenW = MediaQuery.sizeOf(context).width;
-    final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
+    final layout = GiftDialogLayout(MediaQuery.sizeOf(context));
     final hasAnimation = (_animationBytes != null &&
             _animationBytes!.isNotEmpty) ||
         (_animationUrl != null && _animationUrl!.trim().isNotEmpty);
@@ -199,203 +199,287 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
         final canCreate =
             hasImage && !state.isActioning && !_uploadingAnimation;
 
+        final mediaColumn = _buildMediaColumn(
+          context: context,
+          layout: layout,
+          l10n: l10n,
+          state: state,
+          hasImage: hasImage,
+          hasAnimation: hasAnimation,
+        );
+        final fieldsColumn = _buildFieldsColumn(
+          context: context,
+          layout: layout,
+          l10n: l10n,
+          state: state,
+        );
+
         return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(
-            horizontal: screenW < 560 ? 16 : 24,
-            vertical: 24,
-          ),
+          insetPadding: layout.insetPadding,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(l10n.t('createNewGift')),
           content: SizedBox(
-            width: dialogW,
+            width: layout.dialogWidth,
             child: Form(
               key: _formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _nameCtrl,
-                      decoration: InputDecoration(
-                        labelText: l10n.t('giftNameLabel'),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      validator: (v) => v?.trim().isEmpty == true
-                          ? l10n.t('requiredField')
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      onPressed: state.isActioning ? null : _pickImage,
-                      icon: const Icon(Icons.upload_file_outlined, size: 18),
-                      label: Text(
-                        hasImage
-                            ? l10n.t('changeImage')
-                            : l10n.t('uploadImageRequired'),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    if (_imageError != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _imageError!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 12,
-                        ),
-                      ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: layout.maxBodyHeight),
+                child: SingleChildScrollView(
+                  primary: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      mediaColumn,
+                      SizedBox(height: layout.gap),
+                      fieldsColumn,
                     ],
-                    if (hasImage) ...[
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: AspectRatio(
-                          aspectRatio: 4 / 3,
-                          child: Image.memory(
-                            state.pendingImageBytes!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => ColoredBox(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
-                              child: Center(
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        state.pendingImageName ?? '',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      onPressed: (state.isActioning || _uploadingAnimation)
-                          ? null
-                          : _pickAnimation,
-                      icon: _uploadingAnimation
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.animation_rounded, size: 18),
-                      label: Text(
-                        _uploadingAnimation
-                            ? l10n.tOr('uploading', 'Uploading…')
-                            : hasAnimation
-                                ? l10n.tOr(
-                                    'changeAnimation',
-                                    'Change animation',
-                                  )
-                                : l10n.tOr(
-                                    'uploadAnimationOptional',
-                                    'Upload animation (MP4 / PAG / JSON / Lottie / GIF / SWF, optional)',
-                                  ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: canCreate ? () => _submit(state) : null,
+              child: Text(l10n.t('createGift')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMediaColumn({
+    required BuildContext context,
+    required GiftDialogLayout layout,
+    required AppLocalizations l10n,
+    required GiftsLoaded state,
+    required bool hasImage,
+    required bool hasAnimation,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    final imageTile = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: state.isActioning ? null : _pickImage,
+          icon: const Icon(Icons.upload_file_outlined, size: 18),
+          label: Text(
+            hasImage ? l10n.t('changeImage') : l10n.t('uploadImageRequired'),
+          ),
+          style: layout.denseOutlinedButtonStyle(),
+        ),
+        if (_imageError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _imageError!,
+            style: TextStyle(color: scheme.error, fontSize: 12),
+          ),
+        ],
+        SizedBox(height: layout.fieldGap),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: AspectRatio(
+            aspectRatio: layout.mediaAspectRatio,
+            child: hasImage
+                ? Image.memory(
+                    state.pendingImageBytes!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ),
-                    if (_animationError != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _animationError!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 12,
-                        ),
+                  )
+                : ColoredBox(
+                    color: scheme.surfaceContainerHighest,
+                    child: Center(
+                      child: Icon(
+                        Icons.card_giftcard_rounded,
+                        size: 36,
+                        color: scheme.onSurfaceVariant,
                       ),
-                    ],
-                    if (hasAnimation) ...[
-                      const SizedBox(height: 12),
-                      GiftAnimationPreview(
-                        key: const ValueKey('create-gift-animation-preview'),
-                        bytes: _animationBytes,
-                        networkUrl: _animationUrl,
-                        fileName: _animationName ?? _animationUrl,
-                        onClear: (state.isActioning || _uploadingAnimation)
-                            ? null
-                            : () => setState(() {
-                                  _animationBytes = null;
-                                  _animationUrl = null;
-                                  _animationName = null;
-                                  _animationError = null;
-                                }),
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    GiftPublishedAtPicker(
-                      value: _publishedAt,
-                      onTap: state.isActioning ? null : _pickPublishedAt,
-                      onClear: _publishedAt != null
-                          ? () => setState(() => _publishedAt = null)
-                          : null,
                     ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<GiftSize>(
-                      value: _selectedSize,
-                      decoration: InputDecoration(
-                        labelText: l10n.tOr('giftSizeLabel', 'Size'),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                  ),
+          ),
+        ),
+        if (hasImage) ...[
+          const SizedBox(height: 4),
+          Text(
+            state.pendingImageName ?? '',
+            style: theme.textTheme.bodySmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+
+    final animationTile = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed:
+              (state.isActioning || _uploadingAnimation) ? null : _pickAnimation,
+          icon: _uploadingAnimation
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.animation_rounded, size: 18),
+          label: Text(
+            _uploadingAnimation
+                ? l10n.tOr('uploading', 'Uploading…')
+                : hasAnimation
+                    ? l10n.tOr('changeAnimation', 'Change animation')
+                    : l10n.tOr(
+                        'uploadAnimationOptional',
+                        'Upload animation (optional)',
                       ),
-                      items: GiftSize.values
-                          .map(
-                            (size) => DropdownMenuItem(
-                              value: size,
-                              child: Text(size.apiValue),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: state.isActioning
-                          ? null
-                          : (value) {
-                              if (value != null) {
-                                setState(() => _selectedSize = value);
-                              }
-                            },
+          ),
+          style: layout.denseOutlinedButtonStyle(),
+        ),
+        if (_animationError != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _animationError!,
+            style: TextStyle(color: scheme.error, fontSize: 12),
+          ),
+        ],
+        SizedBox(height: layout.fieldGap),
+        if (hasAnimation)
+          GiftAnimationPreview(
+            key: const ValueKey('create-gift-animation-preview'),
+            compact: true,
+            bytes: _animationBytes,
+            networkUrl: _animationUrl,
+            fileName: _animationName ?? _animationUrl,
+            onClear: (state.isActioning || _uploadingAnimation)
+                ? null
+                : () => setState(() {
+                      _animationBytes = null;
+                      _animationUrl = null;
+                      _animationName = null;
+                      _animationError = null;
+                    }),
+          )
+        else if (layout.useWideLayout)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: AspectRatio(
+              aspectRatio: layout.mediaAspectRatio,
+              child: ColoredBox(
+                color: scheme.surfaceContainerLow,
+                child: Center(
+                  child: Text(
+                    l10n.tOr('noAnimation', 'No animation'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 14),
-                    if (_loadingGroups)
-                      const LinearProgressIndicator()
-                    else
-                      DropdownButtonFormField<String?>(
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
+    if (layout.useWideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: imageTile),
+          SizedBox(width: layout.fieldGap),
+          Expanded(child: animationTile),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        imageTile,
+        SizedBox(height: layout.fieldGap),
+        animationTile,
+      ],
+    );
+  }
+
+  Widget _buildFieldsColumn({
+    required BuildContext context,
+    required GiftDialogLayout layout,
+    required AppLocalizations l10n,
+    required GiftsLoaded state,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          controller: _nameCtrl,
+          decoration: layout.denseDecoration(labelText: l10n.t('giftNameLabel')),
+          validator: (v) =>
+              v?.trim().isEmpty == true ? l10n.t('requiredField') : null,
+        ),
+        SizedBox(height: layout.fieldGap),
+        if (layout.useWideLayout)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<GiftSize>(
+                  value: _selectedSize,
+                  isDense: true,
+                  decoration: layout.denseDecoration(
+                    labelText: l10n.tOr('giftSizeLabel', 'Size'),
+                  ),
+                  items: GiftSize.values
+                      .map(
+                        (size) => DropdownMenuItem(
+                          value: size,
+                          child: Text(size.apiValue),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: state.isActioning
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            setState(() => _selectedSize = value);
+                          }
+                        },
+                ),
+              ),
+              SizedBox(width: layout.fieldGap),
+              Expanded(
+                child: _loadingGroups
+                    ? const Padding(
+                        padding: EdgeInsets.only(top: 18),
+                        child: LinearProgressIndicator(),
+                      )
+                    : DropdownButtonFormField<String?>(
                         value: _groups.any((g) => g.id == _selectedGroupId)
                             ? _selectedGroupId
                             : null,
-                        decoration: InputDecoration(
+                        isDense: true,
+                        decoration: layout.denseDecoration(
                           labelText: l10n.tOr('giftGroupName', 'Tab name'),
-                          helperText: l10n.tOr(
-                            'giftGroupNameHint',
-                            'Optional — add to a gift panel tab',
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
                         ),
                         items: [
                           DropdownMenuItem<String?>(
@@ -413,51 +497,131 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
                             : (value) =>
                                 setState(() => _selectedGroupId = value),
                       ),
-                    const SizedBox(height: 14),
-                    GiftPriceCoinsField(
-                      controller: _priceCtrl,
-                      enabled: !state.isActioning,
-                      validator: (v) {
-                        if (v?.trim().isEmpty == true) {
-                          return l10n.t('requiredField');
-                        }
-                        if (double.tryParse(v!.trim()) == null) {
-                          return l10n.t('requiredField');
-                        }
-                        return null;
-                      },
-                    ),
-                    if (state.isActioning) ...[
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(l10n.t('uploadingCreatingGift')),
-                        ],
-                      ),
-                    ],
-                  ],
+              ),
+            ],
+          )
+        else ...[
+          DropdownButtonFormField<GiftSize>(
+            value: _selectedSize,
+            isDense: true,
+            decoration: layout.denseDecoration(
+              labelText: l10n.tOr('giftSizeLabel', 'Size'),
+            ),
+            items: GiftSize.values
+                .map(
+                  (size) => DropdownMenuItem(
+                    value: size,
+                    child: Text(size.apiValue),
+                  ),
+                )
+                .toList(),
+            onChanged: state.isActioning
+                ? null
+                : (value) {
+                    if (value != null) {
+                      setState(() => _selectedSize = value);
+                    }
+                  },
+          ),
+          SizedBox(height: layout.fieldGap),
+          if (_loadingGroups)
+            const LinearProgressIndicator()
+          else
+            DropdownButtonFormField<String?>(
+              value: _groups.any((g) => g.id == _selectedGroupId)
+                  ? _selectedGroupId
+                  : null,
+              isDense: true,
+              decoration: layout.denseDecoration(
+                labelText: l10n.tOr('giftGroupName', 'Tab name'),
+              ),
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(l10n.tOr('giftAddNoneGroup', 'None')),
+                ),
+                for (final group in _groups)
+                  DropdownMenuItem<String?>(
+                    value: group.id,
+                    child: Text(group.name),
+                  ),
+              ],
+              onChanged: state.isActioning
+                  ? null
+                  : (value) => setState(() => _selectedGroupId = value),
+            ),
+        ],
+        SizedBox(height: layout.fieldGap),
+        if (layout.useWideLayout)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: GiftPriceCoinsField(
+                  controller: _priceCtrl,
+                  enabled: !state.isActioning,
+                  validator: (v) {
+                    if (v?.trim().isEmpty == true) {
+                      return l10n.t('requiredField');
+                    }
+                    if (double.tryParse(v!.trim()) == null) {
+                      return l10n.t('requiredField');
+                    }
+                    return null;
+                  },
                 ),
               ),
-            ),
+              SizedBox(width: layout.fieldGap),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: GiftPublishedAtPicker(
+                    value: _publishedAt,
+                    onTap: state.isActioning ? null : _pickPublishedAt,
+                    onClear: _publishedAt != null
+                        ? () => setState(() => _publishedAt = null)
+                        : null,
+                  ),
+                ),
+              ),
+            ],
+          )
+        else ...[
+          GiftPriceCoinsField(
+            controller: _priceCtrl,
+            enabled: !state.isActioning,
+            validator: (v) {
+              if (v?.trim().isEmpty == true) return l10n.t('requiredField');
+              if (double.tryParse(v!.trim()) == null) {
+                return l10n.t('requiredField');
+              }
+              return null;
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(l10n.t('cancel')),
-            ),
-            FilledButton(
-              onPressed: canCreate ? () => _submit(state) : null,
-              child: Text(l10n.t('createGift')),
-            ),
-          ],
-        );
-      },
+          SizedBox(height: layout.fieldGap),
+          GiftPublishedAtPicker(
+            value: _publishedAt,
+            onTap: state.isActioning ? null : _pickPublishedAt,
+            onClear: _publishedAt != null
+                ? () => setState(() => _publishedAt = null)
+                : null,
+          ),
+        ],
+        if (state.isActioning) ...[
+          SizedBox(height: layout.fieldGap),
+          Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(l10n.t('uploadingCreatingGift'))),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

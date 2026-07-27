@@ -24,7 +24,8 @@ class UsersTableConfig {
 
     return UsersTableConfig(
       showAccount: width >= (device == DeviceType.tablet ? 640 : 720),
-      showEngagement: width >= (device == DeviceType.tablet ? 780 : 900),
+      // Keep followers / posts / likes visible whenever the table is shown.
+      showEngagement: true,
       compactActions: width < 1100,
       minWidth: width,
       checkboxWidth: device == DeviceType.tablet ? 36 : 34,

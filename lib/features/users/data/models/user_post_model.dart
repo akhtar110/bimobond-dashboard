@@ -81,7 +81,10 @@ class UserPostModel extends UserPostEntity {
       viewCount: _int(json['viewCount']) ?? 0,
       shareCount: _int(json['shareCount']) ?? 0,
       downloadCount: _int(json['downloadCount']) ?? 0,
-      likeCount: _int(json['likeCount']) ?? 0,
+      likeCount: _int(json['likeCount']) ??
+          _int((json['_count'] as Map?)?['postLikes']) ??
+          _int((json['_count'] as Map?)?['likes']) ??
+          0,
       commentCount: _int(json['commentCount']) ?? 0,
       saveCount: _int(json['saveCount']) ?? 0,
       repostCount: _int(json['repostCount']) ?? 0,

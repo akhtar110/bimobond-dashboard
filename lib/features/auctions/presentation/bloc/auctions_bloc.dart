@@ -202,6 +202,8 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
   Timer? _searchDebounce;
   static const _searchDebounceMs = 300;
   bool _busy = false;
+  bool _pendingRefresh = false;
+  int _loadToken = 0;
 
   String? _statusFilter;
   String _searchQuery = '';
@@ -269,10 +271,16 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     bool showLoading = true,
     bool append = false,
   }) async {
-    if (_busy) return;
     if (page < 1) return;
+    if (_busy) {
+      // Keep the latest refresh (e.g. clearing search) instead of dropping it.
+      if (!append) _pendingRefresh = true;
+      return;
+    }
 
     _busy = true;
+    final token = ++_loadToken;
+    final query = _buildQuery();
     final previous = state;
     if (showLoading && previous is! AuctionsLoaded) {
       emit(AuctionsLoading());
@@ -289,8 +297,11 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
       final response = await _getAllAuctions(
         page: page,
         limit: _pageLimit,
-        query: _buildQuery(),
+        query: query,
       );
+
+      // Ignore stale responses after a newer search/filter refresh.
+      if (token != _loadToken) return;
 
       _currentPage = response.currentPage;
 
@@ -323,6 +334,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
         isLoadingMore: false,
       ));
     } catch (e) {
+      if (token != _loadToken) return;
       if (previous is AuctionsLoaded) {
         emit(
           previous.copyWith(isFetching: false, isLoadingMore: false),
@@ -332,6 +344,10 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
       }
     } finally {
       _busy = false;
+      if (_pendingRefresh) {
+        _pendingRefresh = false;
+        if (!isClosed) add(LoadAllAuctionsEvent(refresh: true));
+      }
     }
   }
 
@@ -390,7 +406,13 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
 
     final trimmed = event.query.trim();
     if (trimmed.isEmpty) {
-      add(LoadAllAuctionsEvent(refresh: true));
+      // Invalidate in-flight search results and always reload the full list.
+      _loadToken++;
+      if (_busy) {
+        _pendingRefresh = true;
+      } else {
+        add(LoadAllAuctionsEvent(refresh: true));
+      }
       return;
     }
 
@@ -398,7 +420,13 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
 
     _searchDebounce = Timer(
       const Duration(milliseconds: _searchDebounceMs),
-      () => add(LoadAllAuctionsEvent(refresh: true)),
+      () {
+        if (_busy) {
+          _pendingRefresh = true;
+          return;
+        }
+        add(LoadAllAuctionsEvent(refresh: true));
+      },
     );
   }
 

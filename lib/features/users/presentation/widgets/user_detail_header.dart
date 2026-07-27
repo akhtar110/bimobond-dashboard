@@ -58,10 +58,12 @@ class UserDetailHeader extends StatelessWidget {
     super.key,
     required this.user,
     this.adminActions,
+    this.onAvatarTap,
   });
 
   final UserEntity user;
   final Widget? adminActions;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -72,49 +74,59 @@ class UserDetailHeader extends StatelessWidget {
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 600;
 
-        final avatar = Stack(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [scheme.primary, scheme.primary.withValues(alpha: 0.5)],
-                ),
-              ),
-              child: CircleAvatar(
-                radius: isCompact ? 40 : 60,
-                backgroundColor: scheme.surfaceContainerHighest,
-                backgroundImage: user.avatarUrl != null
-                    ? CachedNetworkImageProvider(user.avatarUrl!)
-                    : null,
-                child: user.avatarUrl == null
-                    ? Icon(
-                        Icons.person,
-                        size: isCompact ? 40 : 60,
-                        color: scheme.onSurfaceVariant,
-                      )
-                    : null,
-              ),
-            ),
-            if (user.isVerified)
-              Positioned(
-                bottom: isCompact ? 2 : 4,
-                right: isCompact ? 2 : 4,
-                child: Container(
+        final avatar = Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onAvatarTap,
+            customBorder: const CircleBorder(),
+            child: Stack(
+              children: [
+                Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: scheme.primary,
                     shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        scheme.primary,
+                        scheme.primary.withValues(alpha: 0.5),
+                      ],
+                    ),
                   ),
-                  child: Icon(
-                    Icons.check,
-                    color: scheme.onPrimary,
-                    size: isCompact ? 12 : 16,
+                  child: CircleAvatar(
+                    radius: isCompact ? 40 : 60,
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    backgroundImage: user.avatarUrl != null
+                        ? CachedNetworkImageProvider(user.avatarUrl!)
+                        : null,
+                    child: user.avatarUrl == null
+                        ? Icon(
+                            Icons.person,
+                            size: isCompact ? 40 : 60,
+                            color: scheme.onSurfaceVariant,
+                          )
+                        : null,
                   ),
                 ),
-              ),
-          ],
+                if (user.isVerified)
+                  Positioned(
+                    bottom: isCompact ? 2 : 4,
+                    right: isCompact ? 2 : 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        color: scheme.onPrimary,
+                        size: isCompact ? 12 : 16,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         );
 
         Widget contentColumn(CrossAxisAlignment align, WrapAlignment wrapAlign) {

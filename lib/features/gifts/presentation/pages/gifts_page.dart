@@ -91,30 +91,29 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
   }
 
   double _horizontalPadding(double width) {
-    if (width < 360) return 8;
-    if (width < 400) return 10;
-    if (width < 600) return 14;
-    return GiftsLayoutMetrics(getGiftsDeviceType(width)).pageHorizontalPadding;
+    if (width < 360) return 6;
+    if (width < 400) return 8;
+    if (width < 600) return 10;
+    if (width < 960) return 14;
+    return 20;
   }
 
   double _verticalPadding(double width) {
-    if (width < 360) return 8;
-    if (width < 400) return 10;
-    if (width < 720) return 12;
-    return 16;
+    if (width < 400) return 4;
+    if (width < 720) return 6;
+    return 10;
   }
 
   double _sectionSpacing(double width) {
-    if (width < 360) return 6;
-    if (width < 400) return 8;
-    if (width < 720) return 10;
-    return 12;
+    if (width < 400) return 4;
+    if (width < 720) return 6;
+    return 8;
   }
 
   double _panelRadius(double width) {
     if (width < 360) return 8;
-    if (width < 520) return 12;
-    return 16;
+    if (width < 520) return 10;
+    return 14;
   }
 
   @override
@@ -256,8 +255,6 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final width = constraints.maxWidth;
-                      final height = constraints.maxHeight;
-                      final hasBoundedHeight = constraints.hasBoundedHeight;
                       final metrics =
                           GiftsLayoutMetrics(getGiftsDeviceType(width));
                       final hPad = _horizontalPadding(width);
@@ -271,7 +268,9 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                               loaded != null &&
                               loaded.giftsTotalCount > 0;
 
-                      final isLowHeight = !hasBoundedHeight || height < 550;
+                      final isSelectionMode =
+                          loaded != null && loaded.isSelectionMode;
+                      final tightGap = width < 520 ? 4.0 : 6.0;
 
                       Widget buildBodyPanel() {
                         return _CatalogBodyPanel(
@@ -328,10 +327,6 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                             )
                           : null;
 
-                      final bulkToolbarWidget = loaded != null
-                          ? const GiftsBulkSelectionToolbar()
-                          : null;
-
                       final paginationWidget = showDesktopPagination
                           ? _CatalogPagination(
                               loaded: loaded,
@@ -339,63 +334,32 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                             )
                           : null;
 
-                      Widget content;
-
-                      if (!isLowHeight) {
-                        content = Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            headerWidget,
+                      // Single scroll surface for gifts; chrome stays compact
+                      // so the grid gets maximum vertical room on all sizes.
+                      final content = Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          headerWidget,
+                          SizedBox(height: sectionGap),
+                          if (loaded != null) ...[
+                            filtersPanelWidget!,
                             SizedBox(height: sectionGap),
-                            if (loaded != null) ...[
-                              filtersPanelWidget!,
-                              SizedBox(height: sectionGap),
-                              catalogTabsWidget!,
-                              SizedBox(height: width < 520 ? 8 : 10),
-                              bulkToolbarWidget!,
-                              SizedBox(height: width < 520 ? 8 : 10),
+                            catalogTabsWidget!,
+                            if (isSelectionMode) ...[
+                              SizedBox(height: tightGap),
+                              const GiftsBulkSelectionToolbar(),
                             ],
-                            Expanded(
-                              child: buildBodyPanel(),
-                            ),
-                            if (paginationWidget != null) ...[
-                              SizedBox(height: width < 720 ? 8 : 10),
-                              paginationWidget,
-                            ],
+                            SizedBox(height: tightGap),
                           ],
-                        );
-                      } else {
-                        final fallbackBodyHeight = hasBoundedHeight
-                            ? (height - 200).clamp(380.0, 700.0)
-                            : 480.0;
-
-                        content = SingleChildScrollView(
-                          physics: const ClampingScrollPhysics(),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              headerWidget,
-                              SizedBox(height: sectionGap),
-                              if (loaded != null) ...[
-                                filtersPanelWidget!,
-                                SizedBox(height: sectionGap),
-                                catalogTabsWidget!,
-                                SizedBox(height: width < 520 ? 8 : 10),
-                                bulkToolbarWidget!,
-                                SizedBox(height: width < 520 ? 8 : 10),
-                              ],
-                              SizedBox(
-                                height: fallbackBodyHeight,
-                                child: buildBodyPanel(),
-                              ),
-                              if (paginationWidget != null) ...[
-                                SizedBox(height: width < 720 ? 8 : 10),
-                                paginationWidget,
-                              ],
-                            ],
+                          Expanded(
+                            child: buildBodyPanel(),
                           ),
-                        );
-                      }
+                          if (paginationWidget != null) ...[
+                            SizedBox(height: tightGap),
+                            paginationWidget,
+                          ],
+                        ],
+                      );
 
                       return Align(
                         alignment: Alignment.topCenter,
@@ -408,7 +372,7 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                               hPad,
                               vPad,
                               hPad,
-                              vPad,
+                              width < 720 ? 4 : vPad,
                             ),
                             child: content,
                           ),
@@ -467,12 +431,14 @@ class _CatalogBodyPanel extends StatelessWidget {
     if (state is GiftsLoading) {
       return CustomScrollView(
         controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: const [GiftsSliverSkeletons()],
       );
     }
     if (state is GiftsError) {
       return CustomScrollView(
         controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           GiftsSliverError(message: (state as GiftsError).message),
         ],
@@ -518,6 +484,8 @@ class _CatalogLoadedScroll extends StatelessWidget {
 
     return CustomScrollView(
       controller: scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      cacheExtent: 480,
       slivers: [
         if (selectedGroup != null)
           SliverToBoxAdapter(
@@ -529,7 +497,7 @@ class _CatalogLoadedScroll extends StatelessWidget {
           giftIdFilter: giftIdFilter,
           preferGiftIdOrder: preferOrder,
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        const SliverToBoxAdapter(child: SizedBox(height: 12)),
       ],
     );
   }
@@ -595,23 +563,23 @@ class _SelectedGroupBanner extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: scheme.primaryContainer.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
-              Icon(Icons.tab_rounded, size: 18, color: scheme.primary),
+              Icon(Icons.tab_rounded, size: 16, color: scheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${group.name} · ${group.giftCount} ${l10n.tOr('giftGroupGiftsCount', 'gifts')}',
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,

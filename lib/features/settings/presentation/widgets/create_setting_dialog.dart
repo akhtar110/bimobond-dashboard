@@ -118,16 +118,16 @@ class _CreateSettingDialogState extends State<CreateSettingDialog> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final compact = MediaQuery.sizeOf(context).width < 600;
     final state = context.watch<AdminSettingsBloc>().state;
     final categories = state.categories.isNotEmpty
         ? state.categories
         : AppSettingCategories.all;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
 
     final form = Form(
       key: _formKey,
       child: SingleChildScrollView(
-        padding: EdgeInsets.all(compact ? 16 : 20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -271,21 +271,12 @@ class _CreateSettingDialogState extends State<CreateSettingDialog> {
       ),
     );
 
-    if (compact) {
-      return Material(
-        color: scheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        clipBehavior: Clip.antiAlias,
-        child: form,
-      );
-    }
-
     return Material(
       color: scheme.surface,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: 520, maxHeight: maxHeight),
         child: form,
       ),
     );

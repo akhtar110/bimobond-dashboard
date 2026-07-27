@@ -78,27 +78,26 @@ class SettingsLayoutMetrics {
       };
 }
 
-/// Opens a form as bottom sheet on narrow screens, dialog on wider screens.
+/// Opens a settings form as a centered popup dialog (never a full-screen route).
+/// Matches the App settings tab pattern so add/edit stays on the settings page.
 Future<T?> showSettingsAdaptiveForm<T>({
   required BuildContext context,
   required Widget Function(BuildContext dialogContext) builder,
 }) {
-  final width = MediaQuery.sizeOf(context).width;
-  if (width < 600) {
-    return showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: builder(ctx),
-      ),
-    );
-  }
-
   return showDialog<T>(
     context: context,
-    builder: builder,
+    barrierDismissible: true,
+    builder: (ctx) {
+      final viewInsets = MediaQuery.viewInsetsOf(ctx);
+      return Padding(
+        padding: EdgeInsets.only(bottom: viewInsets.bottom),
+        child: Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: builder(ctx),
+        ),
+      );
+    },
   );
 }

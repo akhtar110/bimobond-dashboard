@@ -28,6 +28,12 @@ class LoadMoreUserComments extends UserCommentsEvent {}
 
 class RefreshUserComments extends UserCommentsEvent {}
 
+/// Removes a comment from the local list after a successful admin delete.
+class RemoveUserCommentEvent extends UserCommentsEvent {
+  RemoveUserCommentEvent(this.commentId);
+  final String commentId;
+}
+
 // ─── State alias ─────────────────────────────────────────────────────────────
 
 typedef UserCommentsState = PaginatedListState<UserCommentEntity>;
@@ -46,6 +52,7 @@ class UserCommentsBloc extends Bloc<UserCommentsEvent, UserCommentsState> {
     on<LoadUserComments>(_onLoad);
     on<RefreshUserComments>(_onLoad);
     on<LoadMoreUserComments>(_onLoadMore);
+    on<RemoveUserCommentEvent>(_onRemove);
   }
 
   final GetUserComments _getUserComments;
@@ -97,6 +104,18 @@ class UserCommentsBloc extends Bloc<UserCommentsEvent, UserCommentsState> {
       fetch: _fetch,
       limit: PaginatedListBlocHelper.defaultLimit,
     ));
+  }
+
+  void _onRemove(
+    RemoveUserCommentEvent event,
+    Emitter<UserCommentsState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        items: state.items.where((c) => c.id != event.commentId).toList(),
+        clearError: true,
+      ),
+    );
   }
 
   Future<PaginatedPage<UserCommentEntity>> Function(

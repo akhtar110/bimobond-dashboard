@@ -44,6 +44,13 @@ class UserModel extends UserEntity {
     Map<String, dynamic> json, {
     Map<String, dynamic>? counts,
   }) {
+    final resolvedCounts = counts ??
+        (json['_count'] is Map
+            ? Map<String, dynamic>.from(json['_count'] as Map)
+            : json['counts'] is Map
+                ? Map<String, dynamic>.from(json['counts'] as Map)
+                : null);
+
     return UserModel(
       id: json['id'],
       firebaseUid: json['firebaseUid'],
@@ -74,14 +81,33 @@ class UserModel extends UserEntity {
       country: json['country'],
       region: json['region'],
       city: json['city'],
-      followerCount:
-          json['followerCount'] ?? counts?['followers'] ?? counts?['follower'] ?? 0,
-      followingCount: json['followingCount'] ??
-          counts?['following'] ??
-          counts?['followings'] ??
+      followerCount: readInt(
+            json['followerCount'] ??
+                resolvedCounts?['followers'] ??
+                resolvedCounts?['follower']) ??
           0,
-      postCount: json['postCount'] ?? counts?['posts'] ?? counts?['post'] ?? 0,
-      totalLikes: json['totalLikes'] ?? 0,
+      followingCount: readInt(
+            json['followingCount'] ??
+                resolvedCounts?['following'] ??
+                resolvedCounts?['followings']) ??
+          0,
+      postCount: readInt(
+            json['postCount'] ??
+                resolvedCounts?['posts'] ??
+                resolvedCounts?['post']) ??
+          0,
+      // Denormalized totalLikes is often stale/0; also accept count aliases.
+      totalLikes: readInt(
+            json['totalLikes'] ??
+                json['likesCount'] ??
+                json['likesReceived'] ??
+                json['postLikes'] ??
+                json['likes'] ??
+                resolvedCounts?['postLikes'] ??
+                resolvedCounts?['likesReceived'] ??
+                resolvedCounts?['totalLikes'] ??
+                resolvedCounts?['likes']) ??
+          0,
       isBanned: json['isBanned'] ?? false,
       banReason: json['banReason'],
       bannedUntil: json['bannedUntil'] != null
@@ -104,6 +130,59 @@ class UserModel extends UserEntity {
                   return _mapRole(entry.value.toString());
                 }).toList()
               : [],
+    );
+  }
+
+  static int? readInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
+
+  UserModel copyWith({
+    int? followerCount,
+    int? followingCount,
+    int? postCount,
+    int? totalLikes,
+  }) {
+    return UserModel(
+      id: id,
+      firebaseUid: firebaseUid,
+      username: username,
+      fullName: fullName,
+      email: email,
+      phoneNumber: phoneNumber,
+      bio: bio,
+      avatarUrl: avatarUrl,
+      gender: gender,
+      dateOfBirth: dateOfBirth,
+      isVerified: isVerified,
+      instagramUrl: instagramUrl,
+      youtubeUrl: youtubeUrl,
+      isPrivate: isPrivate,
+      isProfileLocked: isProfileLocked,
+      allowComments: allowComments,
+      allowDirectMsgs: allowDirectMsgs,
+      messagePermission: messagePermission,
+      canPost: canPost,
+      language: language,
+      theme: theme,
+      country: country,
+      region: region,
+      city: city,
+      followerCount: followerCount ?? this.followerCount,
+      followingCount: followingCount ?? this.followingCount,
+      postCount: postCount ?? this.postCount,
+      totalLikes: totalLikes ?? this.totalLikes,
+      isBanned: isBanned,
+      banReason: banReason,
+      bannedUntil: bannedUntil,
+      fcmToken: fcmToken,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      roles: roles,
     );
   }
 

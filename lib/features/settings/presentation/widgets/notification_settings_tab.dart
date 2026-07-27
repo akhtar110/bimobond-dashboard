@@ -6,6 +6,7 @@ import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/admin_settings_bloc.dart';
+import 'settings_header.dart';
 
 /// Switches for NOTIFICATIONS_* settings with immediate patch on toggle.
 class NotificationSettingsTab extends StatelessWidget {
@@ -21,7 +22,8 @@ class NotificationSettingsTab extends StatelessWidget {
       buildWhen: (prev, next) =>
           prev.settings != next.settings ||
           prev.isLoading != next.isLoading ||
-          prev.isSaving != next.isSaving,
+          prev.isSaving != next.isSaving ||
+          prev.isSeeding != next.isSeeding,
       builder: (context, state) {
         if (state.isLoading && state.settings.isEmpty) {
           return const Center(child: CircularProgressIndicator());
@@ -37,6 +39,21 @@ class NotificationSettingsTab extends StatelessWidget {
               'settingsNoNotificationsMessage',
               'Seed defaults or create notification toggles.',
             ),
+            action: canWrite
+                ? FilledButton.tonalIcon(
+                    onPressed: state.isSeeding
+                        ? null
+                        : () => confirmAndSeedAdminSettings(context),
+                    icon: state.isSeeding
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.grass_outlined, size: 18),
+                    label: Text(l10n.tOr('seedSettings', 'Seed defaults')),
+                  )
+                : null,
           );
         }
 

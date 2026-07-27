@@ -25,7 +25,10 @@ class PostRepostsPanel extends StatelessWidget {
     if (reposts.isEmpty) {
       return _EmptyState(
         icon: Icons.repeat_rounded,
-        message: l10n.t('noRepostsYet'),
+        message: l10n.tOr(
+          'noPostRepostsYet',
+          "This post hasn't been reposted yet",
+        ),
         subtitle: total > 0
             ? context.tr('repostsCountSummary', {'count': '$total'})
             : null,

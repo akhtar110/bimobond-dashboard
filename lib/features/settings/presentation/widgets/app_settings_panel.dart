@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
-import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../bloc/app_settings_bloc.dart';
 import '../bloc/settings_cubit.dart';
@@ -50,13 +49,6 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
         context.select<SettingsCubit, Locale>((c) => c.state.locale);
         final l10n = context.l10n;
 
-        final columns = <DataColumn>[
-          DataColumn(label: Text(l10n.t('settingKey'))),
-          DataColumn(label: Text(l10n.t('settingValue'))),
-          DataColumn(label: Text(l10n.t('description'))),
-          if (widget.canManage) DataColumn(label: Text(l10n.t('actions'))),
-        ];
-
         final body = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -81,82 +73,12 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
                 message: l10n.t('noSettingsMessage'),
               )
             else
-              ResponsiveDataTable(
-                columns: columns,
-                rows: state.settings.map((setting) {
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(setting.key)),
-                      DataCell(Text(setting.value)),
-                      DataCell(Text(setting.description ?? '—')),
-                      if (widget.canManage)
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: l10n.t('edit'),
-                                icon: const Icon(Icons.edit_outlined),
-                                onPressed: state.isSaving
-                                    ? null
-                                    : () => _openEditor(
-                                          context,
-                                          existing: setting,
-                                        ),
-                              ),
-                              IconButton(
-                                tooltip: l10n.t('delete'),
-                                icon: Icon(
-                                  Icons.delete_outline,
-                                  color: scheme.error,
-                                ),
-                                onPressed: state.isSaving
-                                    ? null
-                                    : () => _confirmDelete(
-                                          context,
-                                          setting.key,
-                                        ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  );
-                }).toList(),
-                mobileCards: [
-                  for (final setting in state.settings)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              setting.key,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              l10n.tArgs(
-                                'settingValueLabel',
-                                {'value': setting.value},
-                              ),
-                            ),
-                            if (setting.description != null)
-                              Text(
-                                l10n.tArgs(
-                                  'settingDescriptionLabel',
-                                  {'description': setting.description!},
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+              _AppSettingsList(
+                settings: state.settings,
+                canManage: widget.canManage,
+                isSaving: state.isSaving,
+                onEdit: (setting) => _openEditor(context, existing: setting),
+                onDelete: (key) => _confirmDelete(context, key),
               ),
             if (state.isSaving) ...[
               const SizedBox(height: 12),
@@ -285,5 +207,248 @@ class _AppSettingsPanelState extends State<AppSettingsPanel> {
     if (confirmed == true && context.mounted) {
       context.read<AppSettingsBloc>().add(DeleteAppSettingEvent(key));
     }
+  }
+}
+
+/// Responsive settings list — no horizontal scroll; actions stay visible.
+class _AppSettingsList extends StatelessWidget {
+  const _AppSettingsList({
+    required this.settings,
+    required this.canManage,
+    required this.isSaving,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final List<AppSettingEntity> settings;
+  final bool canManage;
+  final bool isSaving;
+  final ValueChanged<AppSettingEntity> onEdit;
+  final ValueChanged<String> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < settings.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.7),
+              ),
+            _AppSettingRow(
+              setting: settings[i],
+              canManage: canManage,
+              isSaving: isSaving,
+              keyLabel: l10n.t('settingKey'),
+              valueLabel: l10n.t('settingValue'),
+              descriptionLabel: l10n.t('description'),
+              onEdit: () => onEdit(settings[i]),
+              onDelete: () => onDelete(settings[i].key),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AppSettingRow extends StatelessWidget {
+  const _AppSettingRow({
+    required this.setting,
+    required this.canManage,
+    required this.isSaving,
+    required this.keyLabel,
+    required this.valueLabel,
+    required this.descriptionLabel,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final AppSettingEntity setting;
+  final bool canManage;
+  final bool isSaving;
+  final String keyLabel;
+  final String valueLabel;
+  final String descriptionLabel;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+
+    final actions = canManage
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: l10n.t('edit'),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                onPressed: isSaving ? null : onEdit,
+              ),
+              IconButton(
+                tooltip: l10n.t('delete'),
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: scheme.error,
+                ),
+                onPressed: isSaving ? null : onDelete,
+              ),
+            ],
+          )
+        : null;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 720;
+
+        if (wide) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _LabeledField(
+                    label: keyLabel,
+                    child: Text(
+                      setting.key,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: _LabeledField(
+                    label: valueLabel,
+                    child: Text(
+                      setting.value,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: _LabeledField(
+                    label: descriptionLabel,
+                    child: Text(
+                      setting.description?.trim().isNotEmpty == true
+                          ? setting.description!
+                          : '—',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: setting.description?.trim().isNotEmpty == true
+                            ? null
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                if (actions != null) ...[
+                  const SizedBox(width: 8),
+                  actions,
+                ],
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      setting.key,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  ?actions,
+                ],
+              ),
+              const SizedBox(height: 8),
+              _LabeledField(
+                label: valueLabel,
+                child: Text(
+                  setting.value,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+              if (setting.description?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                _LabeledField(
+                  label: descriptionLabel,
+                  child: Text(
+                    setting.description!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  const _LabeledField({
+    required this.label,
+    required this.child,
+  });
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 2),
+        child,
+      ],
+    );
   }
 }

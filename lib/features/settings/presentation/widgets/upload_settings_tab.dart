@@ -8,6 +8,7 @@ import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/admin_settings_bloc.dart';
 import 'setting_edit_dialog.dart';
 import 'setting_item_card.dart';
+import 'settings_header.dart';
 
 /// Cards for UPLOAD_* configuration keys.
 class UploadSettingsTab extends StatelessWidget {
@@ -21,7 +22,8 @@ class UploadSettingsTab extends StatelessWidget {
     return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
       buildWhen: (prev, next) =>
           prev.settings != next.settings ||
-          prev.isLoading != next.isLoading,
+          prev.isLoading != next.isLoading ||
+          prev.isSeeding != next.isSeeding,
       builder: (context, state) {
         if (state.isLoading && state.settings.isEmpty) {
           return const Center(child: CircularProgressIndicator());
@@ -37,6 +39,21 @@ class UploadSettingsTab extends StatelessWidget {
               'settingsNoUploadsMessage',
               'Upload limits will appear here after seeding.',
             ),
+            action: canWrite
+                ? FilledButton.tonalIcon(
+                    onPressed: state.isSeeding
+                        ? null
+                        : () => confirmAndSeedAdminSettings(context),
+                    icon: state.isSeeding
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.grass_outlined, size: 18),
+                    label: Text(l10n.tOr('seedSettings', 'Seed defaults')),
+                  )
+                : null,
           );
         }
 

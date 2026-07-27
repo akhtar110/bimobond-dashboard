@@ -218,12 +218,21 @@ class GiftAnimationPreview extends StatefulWidget {
     this.networkUrl,
     this.fileName,
     this.onClear,
+    this.compact = false,
+    this.expandToFill = false,
   });
 
   final Uint8List? bytes;
   final String? networkUrl;
   final String? fileName;
   final VoidCallback? onClear;
+
+  /// Tighter chrome for create/edit/preview dialogs.
+  final bool compact;
+
+  /// When true, fills a parent with bounded height (uses [Expanded]
+  /// instead of [AspectRatio]) so dialogs don't overflow.
+  final bool expandToFill;
 
   @override
   State<GiftAnimationPreview> createState() => _GiftAnimationPreviewState();
@@ -541,24 +550,47 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
       widget.networkUrl,
     );
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.7),
+    final compact = widget.compact;
+    final expandToFill = widget.expandToFill;
+    final radius = compact ? 10.0 : 14.0;
+    final headerPad = compact
+        ? const EdgeInsets.fromLTRB(8, 6, 4, 4)
+        : const EdgeInsets.fromLTRB(12, 10, 8, 8);
+    final previewPad = compact
+        ? const EdgeInsets.fromLTRB(6, 0, 6, 6)
+        : const EdgeInsets.fromLTRB(10, 0, 10, 10);
+    final footerPad = compact
+        ? const EdgeInsets.fromLTRB(8, 0, 8, 8)
+        : const EdgeInsets.fromLTRB(12, 0, 12, 12);
+
+    final previewStage = ClipRRect(
+      borderRadius: BorderRadius.circular(compact ? 8 : 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF111318),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.35),
+          ),
         ),
+        child: _buildPreview(scheme),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+
+    final header = Padding(
+      padding: headerPad,
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-            child: Row(
+          Flexible(
+            child: Wrap(
+              spacing: compact ? 6 : 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 6 : 8,
+                    vertical: compact ? 3 : 4,
+                  ),
                   decoration: BoxDecoration(
                     color: scheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
@@ -571,25 +603,27 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
                     children: [
                       Icon(
                         Icons.animation_rounded,
-                        size: 14,
+                        size: compact ? 12 : 14,
                         color: scheme.primary,
                       ),
-                      const SizedBox(width: 5),
+                      SizedBox(width: compact ? 4 : 5),
                       Text(
                         'Animation',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: scheme.primary,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
+                          fontSize: compact ? 10 : null,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 5 : 7,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: scheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
@@ -603,68 +637,87 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
                     ),
                   ),
                 ),
-                const Spacer(),
-                if (widget.onClear != null)
-                  IconButton(
-                    tooltip: 'Remove',
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints(
-                      minWidth: 34,
-                      minHeight: 34,
-                    ),
-                    onPressed: widget.onClear,
-                    icon: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: scheme.error,
-                    ),
-                  ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 16 / 10,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111318),
-                    border: Border.all(
-                      color: scheme.outlineVariant.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: _buildPreview(scheme),
-                ),
+          if (widget.onClear != null)
+            IconButton(
+              tooltip: 'Remove',
+              visualDensity: VisualDensity.compact,
+              constraints: BoxConstraints(
+                minWidth: compact ? 30 : 34,
+                minHeight: compact ? 30 : 34,
+              ),
+              onPressed: widget.onClear,
+              icon: Icon(
+                Icons.close_rounded,
+                size: compact ? 16 : 18,
+                color: scheme.error,
               ),
             ),
+        ],
+      ),
+    );
+
+    final footer = Padding(
+      padding: footerPad,
+      child: Row(
+        children: [
+          Icon(
+            Icons.insert_drive_file_outlined,
+            size: 14,
+            color: scheme.onSurfaceVariant,
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.insert_drive_file_outlined,
-                  size: 14,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    displayName,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              displayName,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                fontSize: compact ? 11 : null,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: expandToFill ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            header,
+            if (expandToFill)
+              Expanded(
+                child: Padding(
+                  padding: previewPad,
+                  child: previewStage,
+                ),
+              )
+            else
+              Padding(
+                padding: previewPad,
+                child: AspectRatio(
+                  aspectRatio: compact ? 16 / 9 : 16 / 10,
+                  child: previewStage,
+                ),
+              ),
+            footer,
+          ],
+        ),
       ),
     );
   }
@@ -967,7 +1020,7 @@ class _LocalVideoPreviewState extends State<_LocalVideoPreview> {
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(0);
+      await controller.setVolume(1);
       await controller.play();
       if (!mounted) return;
       setState(() => _ready = true);
@@ -1041,7 +1094,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(0);
+      await controller.setVolume(1);
       await controller.play();
       if (!mounted) return;
       setState(() => _ready = true);
@@ -1213,36 +1266,49 @@ class _GiftVideoSurface extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                            ),
                           ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Muted · Loop',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Sound · Loop',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),

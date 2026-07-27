@@ -307,7 +307,14 @@ class AdminSettingsState extends Equatable {
 
   List<AppSettingEntity> settingsByKeys(Iterable<String> keys) {
     final set = keys.toSet();
-    return filteredSettings.where((s) => set.contains(s.key)).toList();
+    // Use unfiltered list so Uploads / Notifications stay complete when
+    // global search or category filters are active.
+    return settings.where((s) => set.contains(s.key)).toList()
+      ..sort((a, b) {
+        final c = a.sortOrder.compareTo(b.sortOrder);
+        if (c != 0) return c;
+        return a.key.compareTo(b.key);
+      });
   }
 
   AdminSettingsState copyWith({

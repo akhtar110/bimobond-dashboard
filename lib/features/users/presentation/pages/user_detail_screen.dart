@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
@@ -22,6 +23,81 @@ class UserDetailScreen extends StatefulWidget {
 }
 
 class _UserDetailScreenState extends State<UserDetailScreen> {
+  void _showAvatarPreview(UserEntity user) {
+    final url = user.avatarUrl?.trim();
+    if (url == null || url.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.72),
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final size = MediaQuery.sizeOf(ctx);
+        final maxSide = (size.shortestSide * 0.86).clamp(240.0, 520.0);
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: maxSide,
+                  maxHeight: maxSide,
+                ),
+                child: Material(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 4,
+                    child: CachedNetworkImage(
+                      imageUrl: url,
+                      fit: BoxFit.contain,
+                      width: maxSide,
+                      height: maxSide,
+                      placeholder: (_, _) => SizedBox(
+                        width: maxSide,
+                        height: maxSide,
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (_, _, _) => SizedBox(
+                        width: maxSide,
+                        height: maxSide,
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          size: 48,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Material(
+                  color: scheme.surface.withValues(alpha: 0.92),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -152,6 +228,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                   children: [
                     UserDetailHeader(
                       user: user,
+                      onAvatarTap: () => _showAvatarPreview(user),
                       adminActions: UserAdminActionsSection(
                         user: user,
                         executingAction: state.executingAction,
@@ -159,7 +236,10 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    UserDetailStatsGrid(user: user),
+                    UserDetailStatsGrid(
+                      user: user,
+                      wallet: state.userDetail.wallet,
+                    ),
                     const SizedBox(height: 12),
                     if (user.isProfileLocked) ...[
                       UserDetailLockedCard(user: user),

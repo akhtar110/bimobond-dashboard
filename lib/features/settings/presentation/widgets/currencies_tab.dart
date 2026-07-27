@@ -41,6 +41,15 @@ class CurrenciesTab extends StatelessWidget {
               'settingsNoCurrenciesMessage',
               'Add currencies to support multi-currency pricing.',
             ),
+            action: canManage
+                ? FilledButton.icon(
+                    onPressed: state.isSaving
+                        ? null
+                        : () => _openCurrencyDialog(context),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: Text(l10n.tOr('addCurrency', 'Add currency')),
+                  )
+                : null,
           );
         }
 
@@ -214,33 +223,8 @@ class CurrenciesTab extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, String code) async {
-    final l10n = context.l10n;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.tOr('deleteCurrencyTitle', 'Delete currency?')),
-        content: Text(
-          l10n
-              .tOr('deleteCurrencyMessage', 'Remove currency {code}?')
-              .replaceAll('{code}', code),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.tOr('cancel', 'Cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.tOr('delete', 'Delete')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && context.mounted) {
-      context.read<AdminSettingsBloc>().add(DeleteAdminCurrencyEvent(code));
-    }
-  }
+  Future<void> _confirmDelete(BuildContext context, String code) =>
+      confirmDeleteCurrency(context, code);
 
   Future<void> _openCurrencyDialog(
     BuildContext context, {
@@ -254,6 +238,34 @@ class CurrenciesTab extends StatelessWidget {
         child: _CurrencyFormDialog(existing: existing),
       ),
     );
+  }
+}
+
+Future<void> confirmDeleteCurrency(BuildContext context, String code) async {
+  final l10n = context.l10n;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(l10n.tOr('deleteCurrencyTitle', 'Delete currency?')),
+      content: Text(
+        l10n
+            .tOr('deleteCurrencyMessage', 'Remove currency {code}?')
+            .replaceAll('{code}', code),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(l10n.tOr('cancel', 'Cancel')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(l10n.tOr('delete', 'Delete')),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    context.read<AdminSettingsBloc>().add(DeleteAdminCurrencyEvent(code));
   }
 }
 
@@ -272,6 +284,7 @@ class _CurrencyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final bloc = context.read<AdminSettingsBloc>();
 
     return Card(
       margin: EdgeInsets.zero,
@@ -297,16 +310,35 @@ class _CurrencyCard extends StatelessWidget {
                   .replaceAll('{symbol}', currency.symbol ?? '—')
                   .replaceAll('{coins}', '${currency.coinsPerUnit ?? '—'}'),
             ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (currency.isDefault)
+                  Chip(
+                    label: Text(l10n.tOr('defaultLabel', 'Default')),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                Chip(
+                  label: Text(
+                    currency.isActive
+                        ? l10n.tOr('active', 'Active')
+                        : l10n.tOr('inactive', 'Inactive'),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
             if (canManage) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Wrap(
-                spacing: 4,
+                spacing: 0,
                 children: [
                   TextButton(
                     onPressed: isSaving
                         ? null
                         : () {
-                            final bloc = context.read<AdminSettingsBloc>();
                             showSettingsAdaptiveForm<void>(
                               context: context,
                               builder: (ctx) =>
@@ -318,6 +350,48 @@ class _CurrencyCard extends StatelessWidget {
                           },
                     child: Text(l10n.tOr('edit', 'Edit')),
                   ),
+                  if (!currency.isDefault)
+                    TextButton(
+                      onPressed: isSaving
+                          ? null
+                          : () => bloc.add(
+                                UpdateAdminCurrencyEvent(
+                                  currency.copyWith(isDefault: true),
+                                ),
+                              ),
+                      child: Text(
+                        l10n.tOr('setDefaultCurrency', 'Set default'),
+                      ),
+                    ),
+                  TextButton(
+                    onPressed: isSaving
+                        ? null
+                        : () => bloc.add(
+                              UpdateAdminCurrencyEvent(
+                                currency.copyWith(
+                                  isActive: !currency.isActive,
+                                ),
+                              ),
+                            ),
+                    child: Text(
+                      currency.isActive
+                          ? l10n.tOr('deactivate', 'Deactivate')
+                          : l10n.tOr('activate', 'Activate'),
+                    ),
+                  ),
+                  if (!currency.isDefault)
+                    TextButton(
+                      onPressed: isSaving
+                          ? null
+                          : () => confirmDeleteCurrency(
+                                context,
+                                currency.code,
+                              ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: scheme.error,
+                      ),
+                      child: Text(l10n.tOr('delete', 'Delete')),
+                    ),
                 ],
               ),
             ],
@@ -411,13 +485,13 @@ class _CurrencyFormDialogState extends State<_CurrencyFormDialog> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final compact = MediaQuery.sizeOf(context).width < 600;
     final editing = widget.existing != null;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
 
     final form = Form(
       key: _formKey,
       child: SingleChildScrollView(
-        padding: EdgeInsets.all(compact ? 16 : 20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -515,21 +589,12 @@ class _CurrencyFormDialogState extends State<_CurrencyFormDialog> {
       ),
     );
 
-    if (compact) {
-      return Material(
-        color: scheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        clipBehavior: Clip.antiAlias,
-        child: form,
-      );
-    }
-
     return Material(
       color: scheme.surface,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: BoxConstraints(maxWidth: 480, maxHeight: maxHeight),
         child: form,
       ),
     );

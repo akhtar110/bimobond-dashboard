@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/user_entity.dart';
 import 'user_follow_connections_sheet.dart';
 
@@ -91,8 +92,22 @@ class UserDetailStatCard extends StatelessWidget {
 }
 
 class UserDetailStatsGrid extends StatelessWidget {
-  const UserDetailStatsGrid({super.key, required this.user});
+  const UserDetailStatsGrid({
+    super.key,
+    required this.user,
+    this.wallet,
+  });
+
   final UserEntity user;
+  final Map<String, dynamic>? wallet;
+
+  static double _balanceCoins(Map<String, dynamic>? wallet) {
+    if (wallet == null) return 0;
+    final raw = wallet['balanceCoins'] ?? wallet['balance'];
+    if (raw is num) return raw.toDouble();
+    if (raw is String) return double.tryParse(raw) ?? 0;
+    return 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +115,7 @@ class UserDetailStatsGrid extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     final followListsEnabled = !user.isProfileLocked;
+    final balance = _balanceCoins(wallet);
 
     final stats = [
       (
@@ -133,6 +149,13 @@ class UserDetailStatsGrid extends StatelessWidget {
         user.postCount.toString(),
         Icons.video_collection_rounded,
         scheme.secondary,
+        null,
+      ),
+      (
+        l10n.tOr('userBalance', 'Balance'),
+        CoinFormat.coins(balance),
+        Icons.account_balance_wallet_rounded,
+        const Color(0xFFCA8A04),
         null,
       ),
     ];
