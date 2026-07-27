@@ -59,8 +59,10 @@ class UsersSelectionHeader extends StatelessWidget {
                   opacity: state.isBulkActionLoading ? 0.55 : 1,
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      // Collapse bulk admin actions before they collide with
+                      // the selection controls on laptop/MacBook widths.
                       final narrow = metrics.compactSelectionBar ||
-                          constraints.maxWidth < 720;
+                          constraints.maxWidth < 1180;
                       return Row(
                         children: [
                           Expanded(

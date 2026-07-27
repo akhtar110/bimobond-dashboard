@@ -26,7 +26,9 @@ class UsersTableConfig {
       showAccount: width >= (device == DeviceType.tablet ? 640 : 720),
       // Keep followers / posts / likes visible whenever the table is shown.
       showEngagement: true,
-      compactActions: width < 1100,
+      // Inline action chips need ~320px+; laptop/MacBook content widths
+      // often leave a narrower actions column → use overflow menu.
+      compactActions: width < 1400,
       minWidth: width,
       checkboxWidth: device == DeviceType.tablet ? 36 : 34,
     );
