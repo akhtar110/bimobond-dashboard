@@ -17,7 +17,7 @@ class UsersSearchBar extends StatelessWidget {
   final ValueChanged<String> onSubmitted;
   final UsersLayoutMetrics metrics;
 
-  static const _borderRadius = 14.0;
+  static const _borderRadius = 12.0;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,7 @@ class UsersSearchBar extends StatelessWidget {
       borderSide: BorderSide(color: scheme.primary, width: 1.5),
     );
 
-    final verticalPadding = (metrics.searchFieldHeight - 20) / 2;
+    final verticalPadding = (metrics.searchFieldHeight - 18) / 2;
 
     return SizedBox(
       height: metrics.searchFieldHeight,
@@ -44,18 +44,19 @@ class UsersSearchBar extends StatelessWidget {
         controller: controller,
         textInputAction: TextInputAction.search,
         style: theme.textTheme.bodyMedium?.copyWith(
-          fontSize: compact ? 14 : null,
+          fontSize: compact ? 12.5 : 13,
+          height: 1.2,
         ),
         decoration: InputDecoration(
           hintText: l10n.t('searchUsers'),
           hintStyle: theme.textTheme.bodyMedium?.copyWith(
             color: scheme.onSurfaceVariant,
-            fontSize: compact ? 14 : null,
+            fontSize: compact ? 12.5 : 13,
           ),
           prefixIcon: Icon(
             Icons.search_rounded,
             color: scheme.onSurfaceVariant,
-            size: compact ? 20 : 22,
+            size: compact ? 18 : 20,
           ),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
@@ -65,10 +66,12 @@ class UsersSearchBar extends StatelessWidget {
                 tooltip: l10n.t('clear'),
                 icon: Icon(
                   Icons.close_rounded,
-                  size: compact ? 18 : 20,
+                  size: compact ? 16 : 18,
                   color: scheme.onSurfaceVariant,
                 ),
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                 onPressed: () {
                   controller.clear();
                   onSubmitted('');
@@ -77,10 +80,10 @@ class UsersSearchBar extends StatelessWidget {
             },
           ),
           filled: true,
-          fillColor: scheme.surface,
+          fillColor: scheme.surfaceContainerLow,
           isDense: true,
           contentPadding: EdgeInsetsDirectional.symmetric(
-            horizontal: compact ? 12 : 16,
+            horizontal: compact ? 10 : 12,
             vertical: verticalPadding,
           ),
           border: enabledBorder,

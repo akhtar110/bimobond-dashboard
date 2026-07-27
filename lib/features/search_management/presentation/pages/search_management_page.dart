@@ -80,6 +80,8 @@ class _SearchManagementViewState extends State<_SearchManagementView>
         final metrics = SearchManagementLayoutMetrics(
           getSearchManagementDeviceType(constraints.maxWidth),
         );
+        final compact = metrics.isMobile;
+        final tabHeight = compact ? 34.0 : 36.0;
 
         return BlocConsumer<SearchManagementBloc, SearchManagementState>(
           listenWhen: (p, c) =>
@@ -133,60 +135,18 @@ class _SearchManagementViewState extends State<_SearchManagementView>
                   ],
                   SearchManagementFiltersBar(metrics: metrics),
                   SizedBox(height: metrics.toolbarFilterGap),
-                  Material(
-                    color: scheme.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: scheme.outlineVariant),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      dividerColor: Colors.transparent,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      indicator: BoxDecoration(
-                        color: scheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      labelColor: scheme.onPrimaryContainer,
-                      unselectedLabelColor: scheme.onSurfaceVariant,
-                      labelStyle: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                      unselectedLabelStyle:
-                          Theme.of(context).textTheme.labelMedium,
-                      tabs: [
-                        Tab(
-                          height: 36,
-                          text: l10n.tOr('searchMgmtTabOverview', 'Overview'),
-                        ),
-                        Tab(
-                          height: 36,
-                          text: l10n.tOr('searchMgmtTabSearches', 'Searches'),
-                        ),
-                        Tab(
-                          height: 36,
-                          text: l10n.tOr('searchMgmtTabUsers', 'Users'),
-                        ),
-                        Tab(
-                          height: 36,
-                          text: l10n.tOr('searchMgmtTabSounds', 'Sounds'),
-                        ),
-                        Tab(
-                          height: 36,
-                          text: l10n.tOr('searchMgmtTabHashtags', 'Hashtags'),
-                        ),
-                        Tab(
-                          height: 36,
-                          text: l10n.tOr('searchMgmtTabTrends', 'Trends'),
-                        ),
-                      ],
-                    ),
+                  _SearchManagementTabs(
+                    controller: _tabController,
+                    height: tabHeight,
+                    compact: compact,
+                    labels: [
+                      l10n.tOr('searchMgmtTabOverview', 'Overview'),
+                      l10n.tOr('searchMgmtTabSearches', 'Searches'),
+                      l10n.tOr('searchMgmtTabUsers', 'Users'),
+                      l10n.tOr('searchMgmtTabSounds', 'Sounds'),
+                      l10n.tOr('searchMgmtTabHashtags', 'Hashtags'),
+                      l10n.tOr('searchMgmtTabTrends', 'Trends'),
+                    ],
                   ),
                   if (isInitial || isRefreshing) ...[
                     SizedBox(height: metrics.toolbarFilterGap),
@@ -200,6 +160,68 @@ class _SearchManagementViewState extends State<_SearchManagementView>
           },
         );
       },
+    );
+  }
+}
+
+/// Dense, scrollable pill tabs — works on narrow and wide screens.
+class _SearchManagementTabs extends StatelessWidget {
+  const _SearchManagementTabs({
+    required this.controller,
+    required this.height,
+    required this.labels,
+    this.compact = false,
+  });
+
+  final TabController controller;
+  final double height;
+  final List<String> labels;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: compact ? 12 : 13,
+          height: 1.1,
+        );
+
+    return SizedBox(
+      height: height + 4,
+      child: TabBar(
+        controller: controller,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        dividerColor: Colors.transparent,
+        dividerHeight: 0,
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelPadding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
+        padding: EdgeInsets.zero,
+        splashBorderRadius: BorderRadius.circular(999),
+        indicator: BoxDecoration(
+          color: scheme.primary,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        indicatorPadding: const EdgeInsets.symmetric(vertical: 2),
+        labelColor: scheme.onPrimary,
+        unselectedLabelColor: scheme.onSurfaceVariant,
+        labelStyle: labelStyle,
+        unselectedLabelStyle: labelStyle?.copyWith(fontWeight: FontWeight.w600),
+        overlayColor: WidgetStatePropertyAll(
+          scheme.primary.withValues(alpha: 0.08),
+        ),
+        tabs: [
+          for (final label in labels)
+            Tab(
+              height: height,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12),
+                child: Text(label),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -218,91 +240,92 @@ class _PageHeader extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final compact = metrics.isMobile;
+    final controlHeight = compact ? 34.0 : 36.0;
     final titleStyle = (compact
             ? Theme.of(context).textTheme.titleMedium
             : Theme.of(context).textTheme.titleLarge)
-        ?.copyWith(fontWeight: FontWeight.w800);
-
-    final actions = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: l10n.tOr('refresh', 'Refresh'),
-          onPressed: onRefresh,
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-        const SizedBox(width: 2),
-        if (compact)
-          IconButton.outlined(
-            tooltip: l10n.tOr('export', 'Export'),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    l10n.tOr(
-                      'searchMgmtExportComingSoon',
-                      'Export coming soon',
-                    ),
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.download_outlined, size: 18),
-          )
-        else
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    l10n.tOr(
-                      'searchMgmtExportComingSoon',
-                      'Export coming soon',
-                    ),
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.download_outlined, size: 18),
-            label: Text(l10n.tOr('export', 'Export')),
-          ),
-      ],
+        ?.copyWith(
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.45,
+      height: 1.05,
+      color: scheme.onSurface,
     );
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.tOr('searchMgmtTitle', 'Search Management'),
-                style: titleStyle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: metrics.toolbarFilterGap),
-              Text(
-                l10n.tOr(
-                  'searchMgmtSubtitle',
-                  'Explore unified search, trends, and platform search activity.',
-                ),
-                maxLines: compact ? 2 : 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: compact ? 12 : null,
-                      height: 1.3,
-                    ),
-              ),
-            ],
+    void showExportSoon() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.tOr(
+              'searchMgmtExportComingSoon',
+              'Export coming soon',
+            ),
           ),
         ),
-        const SizedBox(width: 8),
-        actions,
-      ],
+      );
+    }
+
+    final refreshBtn = IconButton.filledTonal(
+      tooltip: l10n.tOr('refresh', 'Refresh'),
+      onPressed: onRefresh,
+      icon: Icon(Icons.refresh_rounded, size: compact ? 18 : 20),
+      style: IconButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        minimumSize: Size(controlHeight, controlHeight),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+
+    final exportBtn = compact
+        ? IconButton.outlined(
+            tooltip: l10n.tOr('export', 'Export'),
+            onPressed: showExportSoon,
+            icon: const Icon(Icons.download_outlined, size: 18),
+            style: IconButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: Size(controlHeight, controlHeight),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          )
+        : OutlinedButton.icon(
+            onPressed: showExportSoon,
+            icon: const Icon(Icons.download_outlined, size: 18),
+            label: Text(l10n.tOr('export', 'Export')),
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(0, controlHeight),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              l10n.tOr('searchMgmtTitle', 'Search Management'),
+              style: titleStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(width: compact ? 6 : 8),
+          exportBtn,
+          SizedBox(width: compact ? 6 : 8),
+          refreshBtn,
+        ],
+      ),
     );
   }
 }

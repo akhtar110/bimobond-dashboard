@@ -130,9 +130,19 @@ class ArOverlaysRemoteDataSourceImpl implements ArOverlaysRemoteDataSource {
     final originalName =
         filename.trim().isEmpty ? 'overlay.json' : filename.trim();
     final isJson = _looksLikeJsonAsset(originalName, bytes);
+    final isVideo = !isJson &&
+        (originalName.toLowerCase().endsWith('.mp4') ||
+            (bytes.length >= 8 &&
+                bytes[4] == 0x66 &&
+                bytes[5] == 0x74 &&
+                bytes[6] == 0x79 &&
+                bytes[7] == 0x70));
     final uploadName = isJson
         ? _jsonUploadMediaFilename(originalName)
         : originalName;
+    final contentType = (isJson || isVideo)
+        ? DioMediaType('video', 'mp4')
+        : null;
 
     final formData = FormData();
     formData.files.add(
@@ -141,14 +151,15 @@ class ArOverlaysRemoteDataSourceImpl implements ArOverlaysRemoteDataSource {
         MultipartFile.fromBytes(
           bytes,
           filename: uploadName,
-          contentType: isJson ? DioMediaType('video', 'mp4') : null,
+          contentType: contentType,
         ),
       ),
     );
 
     if (kDebugMode) {
       debugPrint(
-        '[ArOverlays] Uploading ${isJson ? 'Lottie JSON' : 'media'} '
+        '[ArOverlays] Uploading '
+        '${isJson ? 'Lottie JSON' : isVideo ? 'MP4 video' : 'media'} '
         '($originalName as $uploadName, ${bytes.length} bytes) to /posts/upload...',
       );
     }

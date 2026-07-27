@@ -10,6 +10,8 @@ import '../bloc/stories_event.dart';
 import '../bloc/stories_state.dart';
 import '../utils/stories_admin_l10n.dart';
 
+/// Dense stories filters — prefers a single horizontal row to leave vertical
+/// room for the stories catalog. Filter state lives in [StoriesBloc].
 class StoryFiltersBar extends StatefulWidget {
   const StoryFiltersBar({
     super.key,
@@ -30,10 +32,17 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
   Timer? _searchDebounce;
   String _lastAppliedSearch = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(() => setState(() {}));
+  /// Compact control height used only on the stories chrome (does not change
+  /// shared [PostsLayoutMetrics] used by posts).
+  double get _controlHeight {
+    final m = widget.metrics;
+    if (m == null) return widget.compact ? 36.0 : 40.0;
+    return switch (m.deviceType) {
+      PostsDeviceType.mobileSmall => 34.0,
+      PostsDeviceType.mobileLarge => 36.0,
+      PostsDeviceType.tablet => 36.0,
+      PostsDeviceType.desktop => 38.0,
+    };
   }
 
   @override
@@ -83,31 +92,36 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
     Widget? suffixIcon,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    final m = widget.metrics;
-    final verticalPad = m != null
-        ? (m.filterControlHeight - 24) / 2
-        : (widget.compact ? 10.0 : 12.0);
+    final verticalPad = ((_controlHeight - 20) / 2).clamp(6.0, 10.0);
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 12.5,
+        color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+      ),
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       isDense: true,
       filled: true,
       fillColor: scheme.surfaceContainerLow,
       contentPadding: EdgeInsets.symmetric(
-        horizontal: m?.isMobile == true ? 10 : 12,
+        horizontal: widget.metrics?.isMobile == true ? 8 : 10,
         vertical: verticalPad,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(9),
+        borderSide: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.7),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(9),
+        borderSide: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.7),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(9),
         borderSide: BorderSide(color: scheme.primary),
       ),
     );
@@ -169,11 +183,13 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
         _syncSearchFromState(_valuesFromState(state).search, force: true);
       },
       child: BlocBuilder<StoriesBloc, StoriesState>(
-        buildWhen: (prev, next) => _valuesFromState(prev) != _valuesFromState(next),
+        buildWhen: (prev, next) =>
+            _valuesFromState(prev) != _valuesFromState(next),
         builder: (context, state) {
           final values = _valuesFromState(state);
           _syncSearchFromState(values.search);
           final filterCount = _activeFilterCount(values);
+          final gap = widget.metrics?.filterGap ?? 6.0;
 
           final content = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -187,56 +203,40 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
                 ],
                 compact: widget.compact,
                 metrics: widget.metrics,
+                controlHeight: _controlHeight,
               ),
               if (filterCount > 0) ...[
-                SizedBox(height: widget.metrics?.filterGap ?? 8),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 520;
-                    final summary = Text(
-                      context.tr('activeFiltersCount', {
-                        'count': '$filterCount',
-                      }),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: scheme.onSurfaceVariant,
+                SizedBox(height: gap * 0.6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        context.tr('activeFiltersCount', {
+                          'count': '$filterCount',
+                        }),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurfaceVariant,
+                          height: 1.1,
+                        ),
                       ),
-                    );
-                    final clearButton = TextButton(
+                    ),
+                    TextButton(
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
                       ),
-                      onPressed:
-                          values.isApplying ? null : _clearAllFilters,
+                      onPressed: values.isApplying ? null : _clearAllFilters,
                       child: Text(
                         l10n.t('clearAllFilters'),
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 11.5),
                       ),
-                    );
-
-                    if (compact) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          summary,
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: clearButton,
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      children: [
-                        Expanded(child: summary),
-                        clearButton,
-                      ],
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -244,15 +244,7 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
 
           if (widget.compact) return content;
 
-          return Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: scheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: content,
-          );
+          return content;
         },
       ),
     );
@@ -264,47 +256,60 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
     bool isApplying,
   ) {
     final scheme = theme.colorScheme;
-    return TextField(
-      controller: _searchController,
-      focusNode: _searchFocusNode,
-      onChanged: _onSearchChanged,
-      onSubmitted: _applySearch,
-      textInputAction: TextInputAction.search,
-      style: TextStyle(fontSize: widget.compact ? 13 : 14),
-      decoration: _fieldDecoration(
-        context,
-        hint: StoriesAdminL10n.searchHint(context),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          size: widget.compact ? 18 : 20,
-          color: scheme.onSurfaceVariant,
-        ),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isApplying)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: 4),
-                child: SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: scheme.primary,
-                  ),
-                ),
-              ),
-            if (_searchController.text.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.close, size: 16),
-                onPressed: () {
-                  _searchController.clear();
-                  _applySearch('');
-                },
-                tooltip: l10n.t('clear'),
-                visualDensity: VisualDensity.compact,
-              ),
-          ],
+    return SizedBox(
+      height: _controlHeight,
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        onChanged: _onSearchChanged,
+        onSubmitted: _applySearch,
+        textInputAction: TextInputAction.search,
+        style: TextStyle(fontSize: widget.compact ? 12.5 : 13),
+        decoration: _fieldDecoration(
+          context,
+          hint: StoriesAdminL10n.searchHint(context),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _searchController,
+            builder: (context, value, _) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isApplying)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 4),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ),
+                  if (value.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 15),
+                      onPressed: () {
+                        _searchController.clear();
+                        _applySearch('');
+                      },
+                      tooltip: l10n.t('clear'),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -320,90 +325,106 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
   Widget _statusDropdown(AppLocalizations l10n, _StoryFilterValues values) {
     final dropdownValue = _statusDropdownValue(values);
 
-    return DropdownButtonFormField<String?>(
-      key: ValueKey('story_status_$dropdownValue'),
-      initialValue: dropdownValue,
-      isExpanded: true,
-      decoration: _fieldDecoration(
-        context,
-        hint: l10n.tOr('status', 'Status'),
-      ),
-      items: [
-        DropdownMenuItem(
-          value: null,
-          child: Text(l10n.tOr('all', 'All')),
+    return SizedBox(
+      height: _controlHeight,
+      child: DropdownButtonFormField<String?>(
+        key: ValueKey('story_status_$dropdownValue'),
+        initialValue: dropdownValue,
+        isExpanded: true,
+        isDense: true,
+        style: TextStyle(
+          fontSize: 12.5,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
-        for (final status in const ['PUBLISHED', 'HIDDEN', 'EXPIRED'])
+        decoration: _fieldDecoration(
+          context,
+          hint: l10n.tOr('status', 'Status'),
+        ),
+        items: [
           DropdownMenuItem(
-            value: status,
-            child: Text(StoriesAdminL10n.statusLabel(context, status)),
+            value: null,
+            child: Text(l10n.tOr('all', 'All')),
           ),
-        DropdownMenuItem(
-          value: StoriesAdminL10n.activeStatusFilter,
-          child: Text(StoriesAdminL10n.activeStatusFilterLabel(context)),
-        ),
-      ],
-      onChanged: values.isApplying
-          ? null
-          : (value) {
-              if (value == null) {
+          for (final status in const ['PUBLISHED', 'HIDDEN', 'EXPIRED'])
+            DropdownMenuItem(
+              value: status,
+              child: Text(StoriesAdminL10n.statusLabel(context, status)),
+            ),
+          DropdownMenuItem(
+            value: StoriesAdminL10n.activeStatusFilter,
+            child: Text(StoriesAdminL10n.activeStatusFilterLabel(context)),
+          ),
+        ],
+        onChanged: values.isApplying
+            ? null
+            : (value) {
+                if (value == null) {
+                  context.read<StoriesBloc>().add(
+                        const FilterStoriesEvent(
+                          clearStatus: true,
+                          clearActiveOnly: true,
+                        ),
+                      );
+                  return;
+                }
+                if (value == StoriesAdminL10n.activeStatusFilter) {
+                  context.read<StoriesBloc>().add(
+                        const FilterStoriesEvent(
+                          clearStatus: true,
+                          activeOnly: true,
+                        ),
+                      );
+                  return;
+                }
                 context.read<StoriesBloc>().add(
-                      const FilterStoriesEvent(
-                        clearStatus: true,
+                      FilterStoriesEvent(
+                        status: value,
                         clearActiveOnly: true,
                       ),
                     );
-                return;
-              }
-              if (value == StoriesAdminL10n.activeStatusFilter) {
-                context.read<StoriesBloc>().add(
-                      const FilterStoriesEvent(
-                        clearStatus: true,
-                        activeOnly: true,
-                      ),
-                    );
-                return;
-              }
-              context.read<StoriesBloc>().add(
-                    FilterStoriesEvent(
-                      status: value,
-                      clearActiveOnly: true,
-                    ),
-                  );
-            },
+              },
+      ),
     );
   }
 
   Widget _privacyDropdown(AppLocalizations l10n, _StoryFilterValues values) {
-    return DropdownButtonFormField<String?>(
-      key: ValueKey('story_privacy_${values.privacy}'),
-      initialValue: values.privacy,
-      isExpanded: true,
-      decoration: _fieldDecoration(
-        context,
-        hint: l10n.tOr('privacy', 'Privacy'),
-      ),
-      items: [
-        DropdownMenuItem(
-          value: null,
-          child: Text(l10n.tOr('all', 'All')),
+    return SizedBox(
+      height: _controlHeight,
+      child: DropdownButtonFormField<String?>(
+        key: ValueKey('story_privacy_${values.privacy}'),
+        initialValue: values.privacy,
+        isExpanded: true,
+        isDense: true,
+        style: TextStyle(
+          fontSize: 12.5,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
-        for (final privacy in const ['PUBLIC', 'PRIVATE', 'FRIENDS'])
+        decoration: _fieldDecoration(
+          context,
+          hint: l10n.tOr('privacy', 'Privacy'),
+        ),
+        items: [
           DropdownMenuItem(
-            value: privacy,
-            child: Text(StoriesAdminL10n.privacyLabel(context, privacy)),
+            value: null,
+            child: Text(l10n.tOr('all', 'All')),
           ),
-      ],
-      onChanged: values.isApplying
-          ? null
-          : (value) {
-              context.read<StoriesBloc>().add(
-                    FilterStoriesEvent(
-                      privacyStatus: value,
-                      clearPrivacyStatus: value == null,
-                    ),
-                  );
-            },
+          for (final privacy in const ['PUBLIC', 'PRIVATE', 'FRIENDS'])
+            DropdownMenuItem(
+              value: privacy,
+              child: Text(StoriesAdminL10n.privacyLabel(context, privacy)),
+            ),
+        ],
+        onChanged: values.isApplying
+            ? null
+            : (value) {
+                context.read<StoriesBloc>().add(
+                      FilterStoriesEvent(
+                        privacyStatus: value,
+                        clearPrivacyStatus: value == null,
+                      ),
+                    );
+              },
+      ),
     );
   }
 }
@@ -448,12 +469,14 @@ class _FilterContent extends StatelessWidget {
     required this.searchField,
     required this.dropdowns,
     required this.compact,
+    required this.controlHeight,
     this.metrics,
   });
 
   final Widget searchField;
   final List<Widget> dropdowns;
   final bool compact;
+  final double controlHeight;
   final PostsLayoutMetrics? metrics;
 
   @override
@@ -463,10 +486,10 @@ class _FilterContent extends StatelessWidget {
         final width = constraints.maxWidth;
         final m = metrics ?? PostsLayoutMetrics(getPostsDeviceType(width));
         final gap = m.filterGap;
-        final narrow = width < 760;
-        final medium = width < 1100;
+        // Stack only on very narrow widths so medium+ keep one filter row.
+        final stackFilters = width < 560;
 
-        if (narrow) {
+        if (stackFilters) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -474,7 +497,6 @@ class _FilterContent extends StatelessWidget {
               searchField,
               SizedBox(height: gap),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: dropdowns[0]),
                   SizedBox(width: gap),
@@ -485,47 +507,18 @@ class _FilterContent extends StatelessWidget {
           );
         }
 
-        if (compact) {
-          if (medium) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                searchField,
-                SizedBox(height: gap),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 2, child: dropdowns[0]),
-                    SizedBox(width: gap),
-                    Expanded(flex: 2, child: dropdowns[1]),
-                  ],
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        return SizedBox(
+          height: controlHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(flex: 3, child: searchField),
+              Expanded(flex: compact ? 3 : 3, child: searchField),
               SizedBox(width: gap),
               Expanded(flex: 2, child: dropdowns[0]),
               SizedBox(width: gap),
               Expanded(flex: 2, child: dropdowns[1]),
             ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 3, child: searchField),
-            SizedBox(width: gap),
-            Expanded(flex: 2, child: dropdowns[0]),
-            SizedBox(width: gap),
-            Expanded(flex: 2, child: dropdowns[1]),
-          ],
+          ),
         );
       },
     );

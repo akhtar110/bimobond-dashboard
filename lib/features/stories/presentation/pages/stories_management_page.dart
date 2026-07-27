@@ -174,15 +174,15 @@ class _StoriesManagementViewState extends State<_StoriesManagementView> {
                   return Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(
                       metrics.pageHorizontalPadding,
-                      metrics.isMobile ? 8 : 12,
+                      metrics.isMobile ? 6 : 8,
                       metrics.pageHorizontalPadding,
-                      metrics.isMobile ? 12 : 16,
+                      metrics.isMobile ? 10 : 12,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         StoriesPageHeader(metrics: metrics),
-                        SizedBox(height: metrics.sectionGap),
+                        SizedBox(height: metrics.isMobile ? 6 : 8),
                         Expanded(
                           child: BlocBuilder<StoriesBloc, StoriesState>(
                             buildWhen: (prev, next) =>

@@ -1,8 +1,12 @@
 import 'dart:typed_data';
 
 Future<({String name, Uint8List bytes})?> pickArOverlayJsonFile() async {
+  return pickArOverlayAnimationFile();
+}
+
+Future<({String name, Uint8List bytes})?> pickArOverlayAnimationFile() async {
   throw UnsupportedError(
-    'AR overlay JSON picking is only supported on web.',
+    'AR overlay animation picking is only supported on web.',
   );
 }
 

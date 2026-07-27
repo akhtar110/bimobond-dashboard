@@ -13,7 +13,6 @@ import '../bloc/sound_groups_bloc.dart';
 import '../bloc/sounds_bloc.dart';
 import '../services/sound_preview_service.dart';
 import '../utils/sound_display_filters.dart';
-import 'sound_selected_group_banner.dart';
 import 'sound_skeleton.dart';
 import 'sounds_table.dart';
 
@@ -102,8 +101,6 @@ class SoundLibraryBody extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (selectedGroup != null)
-                    SoundSelectedGroupBanner(group: selectedGroup),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 56),
                     child: Column(
@@ -145,8 +142,6 @@ class SoundLibraryBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (selectedGroup != null)
-                  SoundSelectedGroupBanner(group: selectedGroup),
                 if (state.selectedCount > 0)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(

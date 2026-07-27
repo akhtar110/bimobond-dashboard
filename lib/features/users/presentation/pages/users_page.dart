@@ -170,27 +170,6 @@ class _UsersPageViewState extends State<_UsersPageView> {
                       ),
                 );
 
-                final Widget searchFiltersSection;
-                if (metrics.searchFiltersInRow) {
-                  searchFiltersSection = Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(flex: 6, child: search),
-                      const SizedBox(width: 20),
-                      Expanded(flex: 5, child: filters),
-                    ],
-                  );
-                } else {
-                  searchFiltersSection = Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      search,
-                      SizedBox(height: metrics.searchFilterGap),
-                      filters,
-                    ],
-                  );
-                }
-
                 return Padding(
                   padding: EdgeInsetsDirectional.fromSTEB(
                     metrics.pageHorizontalPadding,
@@ -203,23 +182,15 @@ class _UsersPageViewState extends State<_UsersPageView> {
                     children: [
                       UsersPageHeader(
                         metrics: metrics,
+                        searchBar: search,
+                        filters: filters,
                         onRefresh: () => context.read<UsersBloc>().add(
                               LoadUsersEvent(refresh: true),
                             ),
                       ),
                       SizedBox(height: metrics.sectionSpacing),
-                      Container(
-                        padding:
-                            EdgeInsets.all(metrics.filterSectionPadding),
-                        decoration: BoxDecoration(
-                          color: scheme.surface.withValues(alpha: 0.88),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: searchFiltersSection,
-                      ),
-                      SizedBox(height: metrics.isMobile ? 8 : 10),
                       UsersSelectionHeader(metrics: metrics),
-                      SizedBox(height: metrics.isMobile ? 8 : 10),
+                      SizedBox(height: metrics.isMobile ? 6 : 8),
                       Expanded(
                         child: UsersTablePanel(
                           metrics: metrics,

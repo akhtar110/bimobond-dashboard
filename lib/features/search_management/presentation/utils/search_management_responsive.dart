@@ -32,16 +32,16 @@ class SearchManagementLayoutMetrics {
 
   double get pageTopPadding => switch (deviceType) {
         SearchManagementDeviceType.mobileSmall => 6,
-        SearchManagementDeviceType.mobileLarge => 8,
-        SearchManagementDeviceType.tablet => 10,
-        SearchManagementDeviceType.desktop => 16,
+        SearchManagementDeviceType.mobileLarge => 6,
+        SearchManagementDeviceType.tablet => 8,
+        SearchManagementDeviceType.desktop => 10,
       };
 
   double get pageBottomPadding => switch (deviceType) {
-        SearchManagementDeviceType.mobileSmall => 10,
-        SearchManagementDeviceType.mobileLarge => 12,
-        SearchManagementDeviceType.tablet => 14,
-        SearchManagementDeviceType.desktop => 24,
+        SearchManagementDeviceType.mobileSmall => 8,
+        SearchManagementDeviceType.mobileLarge => 10,
+        SearchManagementDeviceType.tablet => 12,
+        SearchManagementDeviceType.desktop => 16,
       };
 
   double get sectionGap => switch (deviceType) {
@@ -67,8 +67,8 @@ class SearchManagementLayoutMetrics {
 
   double get toolbarControlHeight => switch (deviceType) {
         SearchManagementDeviceType.mobileSmall => 36,
-        SearchManagementDeviceType.mobileLarge => 38,
-        SearchManagementDeviceType.tablet => 40,
-        SearchManagementDeviceType.desktop => 42,
+        SearchManagementDeviceType.mobileLarge => 36,
+        SearchManagementDeviceType.tablet => 38,
+        SearchManagementDeviceType.desktop => 40,
       };
 }

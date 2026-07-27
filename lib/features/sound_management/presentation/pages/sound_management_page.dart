@@ -107,21 +107,21 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
   }
 
   double _horizontalPadding(double width) {
-    if (width < 400) return 10;
-    if (width < 600) return 14;
-    return 20;
-  }
-
-  double _verticalPadding(double width) {
-    if (width < 400) return 10;
-    if (width < 720) return 12;
+    if (width < 400) return 8;
+    if (width < 600) return 12;
     return 16;
   }
 
+  double _verticalPadding(double width) {
+    if (width < 400) return 6;
+    if (width < 720) return 8;
+    return 10;
+  }
+
   double _sectionSpacing(double width) {
-    if (width < 400) return 8;
-    if (width < 720) return 10;
-    return 12;
+    if (width < 400) return 4;
+    if (width < 720) return 6;
+    return 8;
   }
 
   void _refreshOverview() {
@@ -569,15 +569,6 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SoundManagementHeader(
-                        isLoading: false,
-                        compact: compactHeader,
-                        onAdd: _openAddDialog,
-                        onRefresh: _refreshAll,
-                      ),
-                      SizedBox(height: sectionGap),
-                      const _OverviewSection(),
-                      SizedBox(height: sectionGap),
                       BlocSelector<SoundsBloc, SoundsState, SoundsQuery>(
                         selector: (state) => switch (state) {
                           SoundsLoaded(:final query) => query,
@@ -585,18 +576,27 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                           _ => const SoundsQuery(),
                         },
                         builder: (context, query) {
-                          return SoundFiltersPanel(
-                            query: query,
-                            // Status filters apply to the full library. A group
-                            // tab would otherwise hide deactivated matches.
-                            onStatusChanged: () {
-                              if (_selectedGroupId != null) {
-                                setState(() => _selectedGroupId = null);
-                              }
-                            },
+                          return SoundManagementHeader(
+                            isLoading: false,
+                            compact: compactHeader,
+                            onAdd: _openAddDialog,
+                            onRefresh: _refreshAll,
+                            toolbar: SoundFiltersPanel(
+                              query: query,
+                              compact: compactHeader,
+                              // Status filters apply to the full library. A group
+                              // tab would otherwise hide deactivated matches.
+                              onStatusChanged: () {
+                                if (_selectedGroupId != null) {
+                                  setState(() => _selectedGroupId = null);
+                                }
+                              },
+                            ),
                           );
                         },
                       ),
+                      SizedBox(height: sectionGap),
+                      const _OverviewSection(),
                       SizedBox(height: sectionGap),
                       SoundGroupsTabsBar(
                         selectedGroupId: _selectedGroupId,
@@ -604,7 +604,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                           setState(() => _selectedGroupId = group?.id);
                         },
                       ),
-                      SizedBox(height: width < 520 ? 8 : 10),
+                      SizedBox(height: width < 520 ? 6 : 8),
                       SoundLibraryBody(
                         preview: preview,
                         useDesktopPagination: _useDesktopPagination,
@@ -614,7 +614,7 @@ class _SoundManagementViewState extends State<_SoundManagementView> {
                         onDelete: _deleteSound,
                         onBulkAction: _bulkAction,
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: width < 520 ? 12 : 16),
                     ],
                   ),
                 ),

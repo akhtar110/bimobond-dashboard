@@ -379,6 +379,17 @@ class _GroupTabChipState extends State<_GroupTabChip> {
                                 selected ? scheme.onPrimary : scheme.onSurface,
                           ),
                     ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${widget.group.soundCount}',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: selected
+                                ? scheme.onPrimary.withValues(alpha: 0.85)
+                                : scheme.onSurfaceVariant,
+                          ),
+                    ),
                   ],
                 ),
               ),

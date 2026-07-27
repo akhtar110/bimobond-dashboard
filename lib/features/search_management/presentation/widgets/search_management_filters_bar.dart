@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,6 +7,13 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/toolbar_filter_style.dart';
+import '../../../gifts/presentation/widgets/gifts_active_filters.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_button.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_chip.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_footer.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_header.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
 import '../../domain/entities/search_management_entities.dart';
 import '../bloc/search_management_bloc.dart';
 import '../bloc/search_management_event.dart';
@@ -13,15 +21,21 @@ import '../bloc/search_management_state.dart';
 import '../utils/search_management_responsive.dart';
 import 'search_management_date_range_dialog.dart';
 
-/// Compact filter toolbar matching [LocationToolbar] / Search History style.
+/// Count of advanced filters only (search text lives in the search field).
+int searchManagementAppliedFilterCount(SearchManagementFilterQuery filter) {
+  var n = 0;
+  if (filter.apiTab != SearchApiTab.best) n++;
+  if (filter.from != null || filter.to != null) n++;
+  if (filter.sort != SearchManagementSort.relevance) n++;
+  if (filter.trendingOnly) n++;
+  return n;
+}
+
+/// Gifts-style filter bar: search + Filters button on one horizontal row.
 class SearchManagementFiltersBar extends StatefulWidget {
   const SearchManagementFiltersBar({super.key, this.metrics});
 
   final SearchManagementLayoutMetrics? metrics;
-
-  static const controlHeight = ToolbarFilterStyle.controlHeight;
-  static const dropdownWidth = 128.0;
-  static const dateWidth = 156.0;
 
   @override
   State<SearchManagementFiltersBar> createState() =>
@@ -51,7 +65,6 @@ class _SearchManagementFiltersBarState
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
 
     return BlocSelector<SearchManagementBloc, SearchManagementState,
         SearchManagementFilterQuery?>(
@@ -60,203 +73,60 @@ class _SearchManagementFiltersBarState
       builder: (context, filter) {
         if (filter == null) return const SizedBox.shrink();
 
-        final hasActiveFilters = filter.hasActiveFilters;
-
-        final searchField = _CompactSearchField(
-          hint: l10n.tOr(
-            'searchMgmtSearchPlaceholder',
-            'Search queries, users, sounds…',
-          ),
-          initialValue: filter.q,
-          onChanged: _onSearchChanged,
-        );
-
-        final categoryDropdown = _CompactFilterDropdown<SearchApiTab>(
-          hint: l10n.tOr('searchMgmtCategory', 'Category'),
-          value: filter.apiTab,
-          items: SearchApiTab.values,
-          itemLabel: (v) => v.apiValue,
-          onChanged: (v) {
-            if (v == null) return;
-            context
-                .read<SearchManagementBloc>()
-                .add(SearchManagementCategoryChangedEvent(v));
-          },
-        );
-
-        final sortDropdown = _CompactFilterDropdown<SearchManagementSort>(
-          hint: l10n.tOr('sort', 'Sort'),
-          value: filter.sort,
-          items: SearchManagementSort.values,
-          itemLabel: (v) => switch (v) {
-            SearchManagementSort.relevance =>
-              l10n.tOr('searchMgmtSortRelevance', 'Relevance'),
-            SearchManagementSort.newest =>
-              l10n.tOr('searchMgmtSortNewest', 'Newest'),
-            SearchManagementSort.oldest =>
-              l10n.tOr('searchMgmtSortOldest', 'Oldest'),
-            SearchManagementSort.popularity =>
-              l10n.tOr('searchMgmtSortPopular', 'Popularity'),
-          },
-          onChanged: (v) {
-            if (v == null) return;
-            context
-                .read<SearchManagementBloc>()
-                .add(SearchManagementSortChangedEvent(v));
-          },
-        );
-
-        final dateFilter = _CompactDateRangeFilter(
-          from: filter.from,
-          to: filter.to,
-          onChanged: (from, to, {required bool clear}) {
-            context.read<SearchManagementBloc>().add(
-                  SearchManagementDateChangedEvent(
-                    from: from,
-                    to: to,
-                    clear: clear,
-                  ),
-                );
-          },
-        );
-
-        final trendingChip = FilterChip(
-          label: Text(
-            l10n.tOr('searchMgmtTrendingOnly', 'Trending'),
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-          selected: filter.trendingOnly,
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-          onSelected: (v) => context
-              .read<SearchManagementBloc>()
-              .add(SearchManagementTrendingFilterChangedEvent(v)),
-        );
-
-        final clearButton = hasActiveFilters
-            ? IconButton(
-                tooltip: l10n.tOr('searchMgmtResetFilters', 'Reset'),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: () => context
-                    .read<SearchManagementBloc>()
-                    .add(const SearchManagementFilterResetEvent()),
-                icon: Icon(
-                  Icons.filter_alt_off_outlined,
-                  size: 17,
-                  color: scheme.error,
-                ),
-              )
-            : null;
-
         return LayoutBuilder(
           builder: (context, constraints) {
             final m = widget.metrics ??
                 SearchManagementLayoutMetrics(
                   getSearchManagementDeviceType(constraints.maxWidth),
                 );
-            final gap = m.toolbarFilterGap;
-            final controlHeight = m.toolbarControlHeight;
-            final veryNarrow = constraints.maxWidth < 520;
-            final narrow = constraints.maxWidth < 760;
-            final medium = constraints.maxWidth < 1120;
+            final height = m.toolbarControlHeight;
+            final gap = m.isMobile ? 8.0 : 10.0;
+            final activeCount = searchManagementAppliedFilterCount(filter);
 
-            Widget sized(Widget child, {double? width}) {
-              return SizedBox(
-                width: width,
-                height: controlHeight,
-                child: child,
-              );
-            }
-
-            Widget filterRow({
-              required List<Widget> filters,
-              bool inlineClear = false,
-            }) {
-              return Row(
-                children: [
-                  for (var i = 0; i < filters.length; i++) ...[
-                    if (i > 0) SizedBox(width: gap),
-                    Expanded(child: sized(filters[i])),
-                  ],
-                  if (inlineClear && clearButton != null) ...[
-                    SizedBox(width: gap),
-                    clearButton,
-                  ],
-                ],
-              );
-            }
-
-            if (veryNarrow || narrow) {
-              return Column(
+            return SizedBox(
+              height: height,
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  sized(searchField),
-                  SizedBox(height: gap),
-                  filterRow(
-                    filters: [categoryDropdown, sortDropdown],
-                    inlineClear: true,
-                  ),
-                  SizedBox(height: gap),
-                  Row(
-                    children: [
-                      Expanded(child: sized(dateFilter)),
-                      SizedBox(width: gap),
-                      trendingChip,
-                    ],
-                  ),
-                ],
-              );
-            }
-
-            if (medium) {
-              return Row(
-                children: [
                   Expanded(
-                    flex: 3,
-                    child: sized(searchField),
+                    child: _CompactSearchField(
+                      hint: l10n.tOr(
+                        'searchMgmtSearchPlaceholder',
+                        'Search queries, users, sounds…',
+                      ),
+                      initialValue: filter.q,
+                      height: height,
+                      onChanged: _onSearchChanged,
+                    ),
                   ),
                   SizedBox(width: gap),
-                  Expanded(child: sized(categoryDropdown)),
-                  SizedBox(width: gap),
-                  Expanded(child: sized(sortDropdown)),
-                  SizedBox(width: gap),
-                  Expanded(flex: 2, child: sized(dateFilter)),
-                  SizedBox(width: gap),
-                  trendingChip,
-                  ?clearButton,
+                  Builder(
+                    builder: (buttonContext) {
+                      return GiftsFilterButton(
+                        activeCount: activeCount,
+                        height: height,
+                        onPressed: () {
+                          final box =
+                              buttonContext.findRenderObject() as RenderBox?;
+                          final origin =
+                              box?.localToGlobal(Offset.zero) ?? Offset.zero;
+                          final size = box?.size ?? Size.zero;
+                          showSearchManagementFilterPopup(
+                            context: buttonContext,
+                            filter: filter,
+                            anchorRect: Rect.fromLTWH(
+                              origin.dx,
+                              origin.dy,
+                              size.width,
+                              size.height,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: sized(searchField),
-                ),
-                SizedBox(width: gap),
-                sized(
-                  categoryDropdown,
-                  width: SearchManagementFiltersBar.dropdownWidth,
-                ),
-                SizedBox(width: gap),
-                sized(
-                  sortDropdown,
-                  width: SearchManagementFiltersBar.dropdownWidth,
-                ),
-                SizedBox(width: gap),
-                sized(
-                  dateFilter,
-                  width: SearchManagementFiltersBar.dateWidth,
-                ),
-                SizedBox(width: gap),
-                trendingChip,
-                ?clearButton,
-              ],
+              ),
             );
           },
         );
@@ -269,11 +139,13 @@ class _CompactSearchField extends StatefulWidget {
   const _CompactSearchField({
     required this.hint,
     required this.onChanged,
+    required this.height,
     this.initialValue = '',
   });
 
   final String hint;
   final ValueChanged<String> onChanged;
+  final double height;
   final String initialValue;
 
   @override
@@ -309,270 +181,485 @@ class _CompactSearchFieldState extends State<_CompactSearchField> {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return TextField(
-      controller: _controller,
-      onChanged: (value) {
-        setState(() {});
-        widget.onChanged(value);
-      },
-      style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
-      textInputAction: TextInputAction.search,
-      decoration: ToolbarFilterStyle.inputDecoration(
-        scheme,
-        hintText: widget.hint,
-        hintStyle: textTheme.bodySmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-          fontSize: 13,
-        ),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          size: 18,
-          color: scheme.onSurfaceVariant,
-        ),
-        suffixIcon: _controller.text.isNotEmpty
-            ? IconButton(
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                onPressed: () {
-                  _controller.clear();
-                  widget.onChanged('');
-                  setState(() {});
-                },
-                icon: Icon(
-                  Icons.close_rounded,
-                  size: 16,
-                  color: scheme.onSurfaceVariant,
-                ),
-              )
-            : null,
-      ),
-    );
-  }
-}
-
-class _CompactFilterDropdown<T> extends StatelessWidget {
-  const _CompactFilterDropdown({
-    required this.hint,
-    required this.value,
-    required this.items,
-    required this.itemLabel,
-    required this.onChanged,
-  });
-
-  final String hint;
-  final T? value;
-  final List<T> items;
-  final String Function(T) itemLabel;
-  final ValueChanged<T?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final safeValue = items.contains(value) ? value : null;
-
-    return Container(
-      height: ToolbarFilterStyle.controlHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.center,
-      decoration: ToolbarFilterStyle.boxDecoration(scheme),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: safeValue,
-          isExpanded: true,
-          isDense: true,
-          borderRadius: ToolbarFilterStyle.radius,
-          dropdownColor: scheme.surface,
-          style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
-          hint: Text(
-            hint,
-            style: textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-            overflow: TextOverflow.ellipsis,
+    return SizedBox(
+      height: widget.height,
+      child: TextField(
+        controller: _controller,
+        onChanged: (value) {
+          setState(() {});
+          widget.onChanged(value);
+        },
+        style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
+        textInputAction: TextInputAction.search,
+        decoration: ToolbarFilterStyle.inputDecoration(
+          scheme,
+          hintText: widget.hint,
+          hintStyle: textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontSize: 13,
           ),
-          icon: Icon(
-            Icons.expand_more_rounded,
+          prefixIcon: Icon(
+            Icons.search_rounded,
             size: 18,
             color: scheme.onSurfaceVariant,
           ),
-          items: [
-            for (final v in items)
-              DropdownMenuItem(
-                value: v,
-                child: Text(
-                  itemLabel(v),
-                  style: textTheme.bodySmall?.copyWith(color: scheme.onSurface),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
-          onChanged: onChanged,
+          suffixIcon: _controller.text.isNotEmpty
+              ? IconButton(
+                  style: IconButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size(widget.height - 4, widget.height - 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: () {
+                    _controller.clear();
+                    widget.onChanged('');
+                    setState(() {});
+                  },
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                )
+              : null,
+        ).copyWith(
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          prefixIconConstraints: BoxConstraints(
+            minWidth: widget.height,
+            minHeight: widget.height,
+            maxHeight: widget.height,
+          ),
+          suffixIconConstraints: BoxConstraints(
+            minHeight: widget.height,
+            maxHeight: widget.height,
+          ),
         ),
       ),
     );
   }
 }
 
-enum _DatePreset { all, today, last7, last30, custom }
+Future<void> showSearchManagementFilterPopup({
+  required BuildContext context,
+  required SearchManagementFilterQuery filter,
+  required Rect anchorRect,
+}) {
+  final bloc = context.read<SearchManagementBloc>();
+  final width = MediaQuery.sizeOf(context).width;
 
-class _CompactDateRangeFilter extends StatelessWidget {
-  const _CompactDateRangeFilter({
-    required this.from,
-    required this.to,
-    required this.onChanged,
-  });
+  Widget wrap(Widget child) => BlocProvider<SearchManagementBloc>.value(
+        value: bloc,
+        child: child,
+      );
 
-  final DateTime? from;
-  final DateTime? to;
-  final void Function(DateTime? from, DateTime? to, {required bool clear})
-      onChanged;
-
-  static const _controlHeight = ToolbarFilterStyle.controlHeight;
-
-  bool get _hasRange => from != null && to != null;
-
-  _DatePreset _activePreset() {
-    if (!_hasRange) return _DatePreset.all;
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-    if (_sameDay(from!, startOfToday)) return _DatePreset.today;
-    if (_sameDay(from!, now.subtract(const Duration(days: 7)))) {
-      return _DatePreset.last7;
-    }
-    if (_sameDay(from!, now.subtract(const Duration(days: 30)))) {
-      return _DatePreset.last30;
-    }
-    return _DatePreset.custom;
+  if (width < 600) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: wrap(
+          _SearchManagementFilterPopup(
+            filter: filter,
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.72,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+        ),
+      ),
+    );
   }
 
-  bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
+  if (width < 900) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+        child: Align(
+          alignment: Alignment.center,
+          child: wrap(
+            _SearchManagementFilterPopup(
+              filter: filter,
+              width: 380,
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-  Future<void> _pickCustom(BuildContext context) async {
+  const panelWidth = 380.0;
+  final media = MediaQuery.sizeOf(context);
+  final padding = MediaQuery.paddingOf(context);
+  final isRtl = Directionality.of(context) == ui.TextDirection.rtl;
+
+  var left = isRtl ? anchorRect.right - panelWidth : anchorRect.left;
+  left = left.clamp(12.0, media.width - panelWidth - 12);
+  var top = anchorRect.bottom + 8;
+  final maxPanelHeight = media.height * 0.68;
+  if (top + 320 > media.height - padding.bottom) {
+    top = (anchorRect.top - 8 - maxPanelHeight)
+        .clamp(padding.top + 12.0, media.height - 320.0);
+  }
+
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: 0.18),
+    transitionDuration: const Duration(milliseconds: 180),
+    pageBuilder: (ctx, animation, secondaryAnimation) {
+      return Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            child: FadeTransition(
+              opacity: animation,
+              child: wrap(
+                _SearchManagementFilterPopup(
+                  filter: filter,
+                  width: panelWidth,
+                  maxHeight: maxPanelHeight,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _SearchManagementFilterPopup extends StatefulWidget {
+  const _SearchManagementFilterPopup({
+    required this.filter,
+    this.width,
+    this.maxHeight = 480,
+    this.borderRadius,
+  });
+
+  final SearchManagementFilterQuery filter;
+  final double? width;
+  final double maxHeight;
+  final BorderRadius? borderRadius;
+
+  @override
+  State<_SearchManagementFilterPopup> createState() =>
+      _SearchManagementFilterPopupState();
+}
+
+class _SearchManagementFilterPopupState
+    extends State<_SearchManagementFilterPopup> {
+  late SearchApiTab _apiTab;
+  late SearchManagementSort _sort;
+  late bool _trendingOnly;
+  DateTime? _from;
+  DateTime? _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncFrom(widget.filter);
+  }
+
+  void _syncFrom(SearchManagementFilterQuery filter) {
+    _apiTab = filter.apiTab;
+    _sort = filter.sort;
+    _trendingOnly = filter.trendingOnly;
+    _from = filter.from;
+    _to = filter.to;
+  }
+
+  void _reset() {
+    setState(() {
+      _apiTab = SearchApiTab.best;
+      _sort = SearchManagementSort.relevance;
+      _trendingOnly = false;
+      _from = null;
+      _to = null;
+    });
+  }
+
+  void _close() {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) nav.pop();
+  }
+
+  void _apply() {
+    context.read<SearchManagementBloc>().add(
+          SearchManagementFilterAppliedEvent(
+            filter: SearchManagementFilterQuery(
+              q: widget.filter.q,
+              apiTab: _apiTab,
+              sort: _sort,
+              trendingOnly: _trendingOnly,
+              from: _from,
+              to: _to,
+              page: 1,
+              limit: widget.filter.limit,
+            ),
+          ),
+        );
+    _close();
+  }
+
+  Future<void> _pickCustomDate() async {
     final result = await showSearchManagementDateRangeDialog(
       context,
-      initialFrom: from,
-      initialTo: to,
+      initialFrom: _from,
+      initialTo: _to,
     );
-    if (result == null) return;
-    if (result.clear) {
-      onChanged(null, null, clear: true);
-      return;
+    if (result == null || !mounted) return;
+    setState(() {
+      if (result.clear) {
+        _from = null;
+        _to = null;
+      } else {
+        _from = result.range?.start;
+        _to = result.range?.end;
+      }
+    });
+  }
+
+  String _sortLabel(AppLocalizations l10n, SearchManagementSort sort) {
+    return switch (sort) {
+      SearchManagementSort.relevance =>
+        l10n.tOr('searchMgmtSortRelevance', 'Relevance'),
+      SearchManagementSort.newest =>
+        l10n.tOr('searchMgmtSortNewest', 'Newest'),
+      SearchManagementSort.oldest =>
+        l10n.tOr('searchMgmtSortOldest', 'Oldest'),
+      SearchManagementSort.popularity =>
+        l10n.tOr('searchMgmtSortPopular', 'Popularity'),
+    };
+  }
+
+  String _dateLabel(AppLocalizations l10n) {
+    if (_from == null || _to == null) {
+      return l10n.tOr('all', 'All');
     }
-    final range = result.range;
-    if (range == null) return;
-    onChanged(range.start, range.end, clear: false);
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    bool sameDay(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month && a.day == b.day;
+    if (sameDay(_from!, startOfToday)) {
+      return l10n.tOr('promoDateRangeToday', 'Today');
+    }
+    if (sameDay(_from!, now.subtract(const Duration(days: 7)))) {
+      return l10n.tOr('promoDateRange7Days', 'Last 7 days');
+    }
+    if (sameDay(_from!, now.subtract(const Duration(days: 30)))) {
+      return l10n.tOr('promoDateRange30Days', 'Last 30 days');
+    }
+    return '${DateFormat.MMMd().format(_from!)} – ${DateFormat.MMMd().format(_to!)}';
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final preset = _activePreset();
-    final isActive = preset != _DatePreset.all;
+    final radius = widget.borderRadius ?? BorderRadius.circular(20);
 
-    final label = switch (preset) {
-      _DatePreset.today => l10n.tOr('promoDateRangeToday', 'Today'),
-      _DatePreset.last7 => l10n.tOr('promoDateRange7Days', 'Last 7 days'),
-      _DatePreset.last30 => l10n.tOr('promoDateRange30Days', 'Last 30 days'),
-      _DatePreset.custom when _hasRange =>
-        '${DateFormat.MMMd().format(from!)} – ${DateFormat.MMMd().format(to!)}',
-      _DatePreset.custom => l10n.tOr('promoDateRangeCustom', 'Custom'),
-      _DatePreset.all => l10n.tOr('searchMgmtDateRange', 'Date'),
-    };
+    final activeItems = <GiftsActiveFilterItem>[
+      if (_apiTab != SearchApiTab.best)
+        GiftsActiveFilterItem(
+          id: 'category',
+          label: _apiTab.apiValue,
+          onRemove: () => setState(() => _apiTab = SearchApiTab.best),
+        ),
+      if (_sort != SearchManagementSort.relevance)
+        GiftsActiveFilterItem(
+          id: 'sort',
+          label: _sortLabel(l10n, _sort),
+          onRemove: () =>
+              setState(() => _sort = SearchManagementSort.relevance),
+        ),
+      if (_from != null || _to != null)
+        GiftsActiveFilterItem(
+          id: 'date',
+          label: _dateLabel(l10n),
+          onRemove: () => setState(() {
+            _from = null;
+            _to = null;
+          }),
+        ),
+      if (_trendingOnly)
+        GiftsActiveFilterItem(
+          id: 'trending',
+          label: l10n.tOr('searchMgmtTrendingOnly', 'Trending'),
+          onRemove: () => setState(() => _trendingOnly = false),
+        ),
+    ];
 
     return Material(
       color: scheme.surface,
+      elevation: 10,
+      shadowColor: scheme.shadow.withValues(alpha: 0.22),
       shape: RoundedRectangleBorder(
-        borderRadius: ToolbarFilterStyle.radius,
+        borderRadius: radius,
         side: BorderSide(color: scheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
-      child: PopupMenuButton<_DatePreset>(
-        tooltip: l10n.tOr('searchMgmtDateRange', 'Date'),
-        offset: const Offset(0, _controlHeight),
-        padding: EdgeInsets.zero,
-        onSelected: (value) {
-          final now = DateTime.now();
-          switch (value) {
-            case _DatePreset.all:
-              onChanged(null, null, clear: true);
-            case _DatePreset.today:
-              onChanged(
-                DateTime(now.year, now.month, now.day),
-                now,
-                clear: false,
-              );
-            case _DatePreset.last7:
-              onChanged(
-                now.subtract(const Duration(days: 7)),
-                now,
-                clear: false,
-              );
-            case _DatePreset.last30:
-              onChanged(
-                now.subtract(const Duration(days: 30)),
-                now,
-                clear: false,
-              );
-            case _DatePreset.custom:
-              _pickCustom(context);
-          }
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem(
-            value: _DatePreset.all,
-            child: Text(l10n.tOr('all', 'All')),
-          ),
-          PopupMenuItem(
-            value: _DatePreset.today,
-            child: Text(l10n.tOr('promoDateRangeToday', 'Today')),
-          ),
-          PopupMenuItem(
-            value: _DatePreset.last7,
-            child: Text(l10n.tOr('promoDateRange7Days', 'Last 7 days')),
-          ),
-          PopupMenuItem(
-            value: _DatePreset.last30,
-            child: Text(l10n.tOr('promoDateRange30Days', 'Last 30 days')),
-          ),
-          PopupMenuItem(
-            value: _DatePreset.custom,
-            child: Text(l10n.tOr('promoDateRangeCustom', 'Custom')),
-          ),
-        ],
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            children: [
-              Icon(
-                Icons.date_range_outlined,
-                size: 16,
-                color: isActive ? scheme.primary : scheme.onSurfaceVariant,
+      child: SizedBox(
+        width: widget.width ?? 380,
+        height: widget.maxHeight,
+        child: Column(
+          children: [
+            GiftsFilterHeader(onResetAll: _reset, onClose: _close),
+            if (activeItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: GiftsActiveFilters(items: activeItems),
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isActive
-                            ? scheme.onSurface
-                            : scheme.onSurfaceVariant,
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.w500,
-                      ),
-                ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 8),
+                children: [
+                  GiftsFilterSection(
+                    title: l10n
+                        .tOr('searchMgmtCategory', 'Category')
+                        .toUpperCase(),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        for (final tab in SearchApiTab.values)
+                          GiftsFilterChoiceChip(
+                            label: tab.apiValue,
+                            selected: _apiTab == tab,
+                            onTap: () => setState(() => _apiTab = tab),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n.tOr('sort', 'Sort').toUpperCase(),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        for (final sort in SearchManagementSort.values)
+                          GiftsFilterChoiceChip(
+                            label: _sortLabel(l10n, sort),
+                            selected: _sort == sort,
+                            onTap: () => setState(() => _sort = sort),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n
+                        .tOr('searchMgmtDateRange', 'Date')
+                        .toUpperCase(),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('all', 'All'),
+                          selected: _from == null && _to == null,
+                          onTap: () => setState(() {
+                            _from = null;
+                            _to = null;
+                          }),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('promoDateRangeToday', 'Today'),
+                          selected: () {
+                            if (_from == null) return false;
+                            final now = DateTime.now();
+                            final start =
+                                DateTime(now.year, now.month, now.day);
+                            return _from!.year == start.year &&
+                                _from!.month == start.month &&
+                                _from!.day == start.day;
+                          }(),
+                          onTap: () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _from = DateTime(now.year, now.month, now.day);
+                              _to = now;
+                            });
+                          },
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('promoDateRange7Days', 'Last 7 days'),
+                          selected: () {
+                            if (_from == null) return false;
+                            final target =
+                                DateTime.now().subtract(const Duration(days: 7));
+                            return _from!.year == target.year &&
+                                _from!.month == target.month &&
+                                _from!.day == target.day;
+                          }(),
+                          onTap: () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _from = now.subtract(const Duration(days: 7));
+                              _to = now;
+                            });
+                          },
+                        ),
+                        GiftsFilterChoiceChip(
+                          label:
+                              l10n.tOr('promoDateRange30Days', 'Last 30 days'),
+                          selected: () {
+                            if (_from == null) return false;
+                            final target = DateTime.now()
+                                .subtract(const Duration(days: 30));
+                            return _from!.year == target.year &&
+                                _from!.month == target.month &&
+                                _from!.day == target.day;
+                          }(),
+                          onTap: () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _from = now.subtract(const Duration(days: 30));
+                              _to = now;
+                            });
+                          },
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('promoDateRangeCustom', 'Custom'),
+                          selected: _from != null &&
+                              _to != null &&
+                              _dateLabel(l10n).contains('–'),
+                          onTap: _pickCustomDate,
+                        ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: l10n
+                        .tOr('searchMgmtTrending', 'Trending')
+                        .toUpperCase(),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('all', 'All'),
+                          selected: !_trendingOnly,
+                          onTap: () => setState(() => _trendingOnly = false),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label:
+                              l10n.tOr('searchMgmtTrendingOnly', 'Trending'),
+                          selected: _trendingOnly,
+                          onTap: () => setState(() => _trendingOnly = true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.expand_more_rounded,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+            ),
+            GiftsFilterFooter(
+              onReset: _reset,
+              onCancel: _close,
+              onApply: _apply,
+            ),
+          ],
         ),
       ),
     );

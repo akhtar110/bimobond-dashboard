@@ -68,7 +68,13 @@ class SearchManagementTrendingFilterChangedEvent extends SearchManagementEvent {
 }
 
 class SearchManagementFilterAppliedEvent extends SearchManagementEvent {
-  const SearchManagementFilterAppliedEvent();
+  const SearchManagementFilterAppliedEvent({this.filter});
+
+  /// When set, replaces advanced filter fields (keeps current search query).
+  final SearchManagementFilterQuery? filter;
+
+  @override
+  List<Object?> get props => [filter];
 }
 
 class SearchManagementFilterResetEvent extends SearchManagementEvent {

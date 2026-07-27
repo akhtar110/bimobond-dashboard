@@ -1,20 +1,28 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../domain/entities/ar_overlay_entities.dart';
+import '../widgets/ar_overlay_media_player.dart';
 
-/// Popup preview for an AR overlay Lottie animation (`lottieUrl`).
+/// Popup preview for an AR overlay animation (`lottieUrl` — JSON or MP4).
 Future<void> openArOverlayPreviewDialog(
   BuildContext context, {
   required ArOverlayEntity overlay,
+  Uint8List? lottieBytes,
+  String? lottieFilename,
 }) {
   return showDialog<void>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.55),
-    builder: (ctx) => ArOverlayPreviewDialog(overlay: overlay),
+    builder: (ctx) => ArOverlayPreviewDialog(
+      overlay: overlay,
+      lottieBytes: lottieBytes,
+      lottieFilename: lottieFilename,
+    ),
   );
 }
 
@@ -22,9 +30,13 @@ class ArOverlayPreviewDialog extends StatelessWidget {
   const ArOverlayPreviewDialog({
     super.key,
     required this.overlay,
+    this.lottieBytes,
+    this.lottieFilename,
   });
 
   final ArOverlayEntity overlay;
+  final Uint8List? lottieBytes;
+  final String? lottieFilename;
 
   Color _parseColorHex(String? input) {
     if (input == null || input.trim().isEmpty) {
@@ -48,7 +60,10 @@ class ArOverlayPreviewDialog extends StatelessWidget {
         resolveMediaUrl(overlay.lottieUrl) ?? overlay.lottieUrl.trim();
     final thumbUrl = overlay.thumbnailUrl == null
         ? null
-        : (resolveMediaUrl(overlay.thumbnailUrl) ?? overlay.thumbnailUrl!.trim());
+        : (resolveMediaUrl(overlay.thumbnailUrl) ??
+            overlay.thumbnailUrl!.trim());
+    final hasLottie = (lottieBytes != null && lottieBytes!.isNotEmpty) ||
+        lottieUrl.isNotEmpty;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -84,7 +99,10 @@ class ArOverlayPreviewDialog extends StatelessWidget {
                         children: [
                           Text(
                             overlay.label,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
                             maxLines: 1,
@@ -92,8 +110,14 @@ class ArOverlayPreviewDialog extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            l10n.tOr('arOverlayPreviewSubtitle', 'Overlay preview'),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            l10n.tOr(
+                              'arOverlayPreviewSubtitle',
+                              'Overlay preview',
+                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
                                   color: scheme.onSurfaceVariant,
                                 ),
                           ),
@@ -114,61 +138,78 @@ class ArOverlayPreviewDialog extends StatelessWidget {
                   padding: const EdgeInsets.all(14),
                   child: AspectRatio(
                     aspectRatio: 9 / 16,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: ColoredBox(
                         color: previewColor.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: scheme.outlineVariant.withValues(alpha: 0.8),
-                        ),
-                        image: thumbUrl != null && thumbUrl.isNotEmpty
-                            ? DecorationImage(
-                                image: CachedNetworkImageProvider(thumbUrl),
-                                fit: BoxFit.cover,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // Thumbnail as a separate layer so its load cannot
+                            // rebuild/restart the Lottie player (was janky).
+                            if (thumbUrl != null && thumbUrl.isNotEmpty)
+                              Opacity(
                                 opacity: 0.18,
-                              )
-                            : null,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: lottieUrl.isEmpty
-                            ? _PreviewFallback(
+                                child: CachedNetworkImage(
+                                  imageUrl: thumbUrl,
+                                  fit: BoxFit.cover,
+                                  fadeInDuration: Duration.zero,
+                                  fadeOutDuration: Duration.zero,
+                                  memCacheWidth: 480,
+                                  errorWidget: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                ),
+                              ),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: scheme.outlineVariant
+                                      .withValues(alpha: 0.8),
+                                ),
+                              ),
+                            ),
+                            if (!hasLottie)
+                              _PreviewFallback(
                                 emoji: overlay.emoji,
                                 message: l10n.tOr(
                                   'arOverlayPreviewMissingLottie',
-                                  'No Lottie URL on this overlay',
+                                  'No animation URL on this overlay',
                                 ),
                               )
-                            : Lottie.network(
-                                lottieUrl,
-                                fit: BoxFit.contain,
-                                repeat: true,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _PreviewFallback(
-                                    emoji: overlay.emoji,
-                                    message: l10n.tOr(
-                                      'arOverlayPreviewFailed',
-                                      'Could not load Lottie preview',
+                            else
+                              ArOverlayMediaPlayer(
+                                key: ValueKey(
+                                  lottieBytes != null &&
+                                          lottieBytes!.isNotEmpty
+                                      ? 'bytes-${lottieBytes!.length}'
+                                      : lottieUrl,
+                                ),
+                                networkUrl:
+                                    lottieUrl.isNotEmpty ? lottieUrl : null,
+                                bytes: lottieBytes,
+                                fileName: lottieFilename,
+                                loadingBuilder: (context) => Center(
+                                  child: SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: scheme.primary,
                                     ),
-                                    detail: overlay.lottieUrl,
-                                  );
-                                },
-                                frameBuilder: (context, child, composition) {
-                                  if (composition == null) {
-                                    return Center(
-                                      child: SizedBox(
-                                        width: 28,
-                                        height: 28,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: scheme.primary,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return child;
-                                },
+                                  ),
+                                ),
+                                errorBuilder: (context, _) => _PreviewFallback(
+                                  emoji: overlay.emoji,
+                                  message: l10n.tOr(
+                                    'arOverlayPreviewFailed',
+                                    'Could not load overlay preview',
+                                  ),
+                                  detail: overlay.lottieUrl,
+                                ),
                               ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

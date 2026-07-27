@@ -9,6 +9,7 @@ import '../utils/posts_responsive.dart';
 import 'posts_filter_bar.dart';
 import 'posts_view_toggle.dart';
 
+/// Compact posts top bar — no border chrome; filters stay on one dense row.
 class PostsPageHeader extends StatelessWidget {
   const PostsPageHeader({super.key, this.metrics});
 
@@ -18,58 +19,45 @@ class PostsPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
 
-    return Container(
-      padding: EdgeInsets.all(
-        metrics?.headerPadding ?? 12,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final m = metrics ??
-              PostsLayoutMetrics(getPostsDeviceType(constraints.maxWidth));
-          final desktop = constraints.maxWidth >= 1040;
-          final compactHeader = m.isMobile;
-          final title = PostsHeaderTitle(
-            l10n: l10n,
-            theme: theme,
-            compact: compactHeader,
-          );
-          final toolbar = PostsHeaderFilterToolbar(metrics: m);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final m = metrics ??
+            PostsLayoutMetrics(getPostsDeviceType(constraints.maxWidth));
+        final desktop = constraints.maxWidth >= 1040;
+        final title = PostsHeaderTitle(
+          l10n: l10n,
+          theme: theme,
+          compact: m.isMobile,
+        );
+        final toolbar = PostsHeaderFilterToolbar(metrics: m);
 
-          if (desktop) {
-            return Row(
+        if (desktop) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: m.isMobile ? 2 : 4),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 title,
-                SizedBox(width: m.filterGap + 8),
+                SizedBox(width: m.filterGap + 6),
                 Expanded(child: toolbar),
               ],
-            );
-          }
+            ),
+          );
+        }
 
-          return Column(
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: m.isMobile ? 2 : 4),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               title,
-              SizedBox(height: m.filterGap + 2),
+              SizedBox(height: m.filterGap),
               toolbar,
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -88,23 +76,20 @@ class PostsHeaderTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = theme.colorScheme;
-    final titleStyle = (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-        ?.copyWith(
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.45,
-          color: scheme.onSurface,
-          height: 1.05,
-        );
+    final titleStyle =
+        (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+            ?.copyWith(
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.45,
+      color: scheme.onSurface,
+      height: 1.05,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          l10n.t('posts'),
-          style: titleStyle,
-        ),
-        const SizedBox(height: 4),
+        Text(l10n.t('posts'), style: titleStyle),
         BlocSelector<PostsBloc, PostsState, String?>(
           selector: (state) => switch (state) {
             PostsLoaded(:final filters) => filters.categoryName,
@@ -122,7 +107,8 @@ class PostsHeaderTitle extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
-                height: 1.2,
+                height: 1.1,
+                fontWeight: FontWeight.w500,
               ),
             );
           },
@@ -165,36 +151,27 @@ class PostsHeaderFilterToolbar extends StatelessWidget {
       builder: (context, constraints) {
         final m = metrics ??
             PostsLayoutMetrics(getPostsDeviceType(constraints.maxWidth));
-        final narrow = constraints.maxWidth < 760;
+        final narrow = constraints.maxWidth < 560;
         final createButton = PostsCreatePostButton(
-          iconOnly: narrow,
+          iconOnly: narrow || m.isMobile,
           onPressed: () => _openCreatePost(context),
         );
 
-        if (narrow) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PostsFilterBar(isDark: isDark, compact: true, metrics: m),
-              SizedBox(height: m.filterGap + 1),
-              Row(
-                children: [
-                  const PostsViewToggle(),
-                  const Spacer(),
-                  createButton,
-                ],
-              ),
-            ],
-          );
-        }
-
+        // Always one horizontal row: search+filters | view | create.
+        // On very narrow widths, create becomes icon-only so filters stay inline.
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(child: PostsFilterBar(isDark: isDark, compact: true, metrics: m)),
-            SizedBox(width: m.filterGap + 1),
+            Expanded(
+              child: PostsFilterBar(
+                isDark: isDark,
+                compact: true,
+                metrics: m,
+              ),
+            ),
+            SizedBox(width: m.filterGap),
             const PostsViewToggle(),
-            SizedBox(width: m.filterGap + 1),
+            SizedBox(width: m.filterGap),
             createButton,
           ],
         );
@@ -203,8 +180,9 @@ class PostsHeaderFilterToolbar extends StatelessWidget {
   }
 }
 
-class PostsCreatePostButton extends StatefulWidget {
+class PostsCreatePostButton extends StatelessWidget {
   const PostsCreatePostButton({
+    super.key,
     required this.onPressed,
     this.iconOnly = false,
   });
@@ -213,50 +191,38 @@ class PostsCreatePostButton extends StatefulWidget {
   final bool iconOnly;
 
   @override
-  State<PostsCreatePostButton> createState() => PostsCreatePostButtonState();
-}
-
-class PostsCreatePostButtonState extends State<PostsCreatePostButton> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
-    if (widget.iconOnly) {
+    if (iconOnly) {
       return IconButton.filled(
-        onPressed: widget.onPressed,
+        onPressed: onPressed,
         tooltip: l10n.t('createPost'),
         icon: const Icon(Icons.add_rounded, size: 20),
+        style: IconButton.styleFrom(
+          minimumSize: const Size(36, 36),
+          visualDensity: VisualDensity.compact,
+        ),
       );
     }
 
-    final bg = _hovered
-        ? scheme.primary.withValues(alpha: 0.85)
-        : scheme.primary;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        child: FilledButton.icon(
-          onPressed: widget.onPressed,
-          style: FilledButton.styleFrom(
-            backgroundColor: bg,
-            foregroundColor: scheme.onPrimary,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text(
-            l10n.t('createPost'),
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-          ),
+    return FilledButton.icon(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
+      ),
+      icon: const Icon(Icons.add_rounded, size: 18),
+      label: Text(
+        l10n.t('createPost'),
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
       ),
     );
   }

@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 
-/// Page header for Sound Management (Gifts-style).
+/// Compact Sound Management top bar — no subtitle or card chrome.
+/// Optional [toolbar] (search + filters) sits on the same row on wide screens.
 class SoundManagementHeader extends StatelessWidget {
   const SoundManagementHeader({
     super.key,
     required this.isLoading,
     required this.onAdd,
     required this.onRefresh,
+    this.toolbar,
     this.compact = false,
   });
 
   final bool isLoading;
   final VoidCallback onAdd;
   final VoidCallback onRefresh;
+  final Widget? toolbar;
   final bool compact;
 
   @override
@@ -23,31 +26,40 @@ class SoundManagementHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final refreshBtn = Material(
-      color: scheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: isLoading ? null : onRefresh,
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Center(
-            child: isLoading
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  )
-                : Icon(
-                    Icons.refresh_rounded,
-                    size: 20,
-                    color: scheme.onSurfaceVariant,
-                  ),
-          ),
+    final title = Text(
+      l10n.tOr('soundManagementTitle', 'Sound Management'),
+      style: (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
+          ?.copyWith(
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.45,
+        color: scheme.onSurface,
+        height: 1.05,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    final controlHeight = compact ? 34.0 : 36.0;
+
+    final refreshBtn = IconButton.filledTonal(
+      onPressed: isLoading ? null : onRefresh,
+      tooltip: l10n.t('retry'),
+      icon: isLoading
+          ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.onSurfaceVariant,
+              ),
+            )
+          : Icon(Icons.refresh_rounded, size: compact ? 18 : 20),
+      style: IconButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        minimumSize: Size(controlHeight, controlHeight),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
       ),
     );
@@ -56,8 +68,10 @@ class SoundManagementHeader extends StatelessWidget {
         ? FilledButton(
             onPressed: onAdd,
             style: FilledButton.styleFrom(
-              minimumSize: const Size(44, 40),
+              minimumSize: Size(controlHeight, controlHeight),
               padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -69,104 +83,114 @@ class SoundManagementHeader extends StatelessWidget {
             icon: const Icon(Icons.add_rounded, size: 18),
             label: Text(l10n.tOr('soundAddTitle', 'Add sound')),
             style: FilledButton.styleFrom(
-              minimumSize: const Size(120, 40),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: Size(0, controlHeight),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
           );
 
-    final actionRow = Row(
+    final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         addBtn,
-        const SizedBox(width: 8),
+        SizedBox(width: compact ? 6 : 8),
         refreshBtn,
       ],
     );
 
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.tOr('soundManagementTitle', 'Sound Management'),
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-            color: scheme.onSurface,
-            height: 1.15,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          l10n.tOr(
-            'soundManagementSubtitle',
-            'Manage library sounds, shelves, and bulk actions',
-          ),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontSize: 14,
-            height: 1.45,
-          ),
-        ),
-      ],
-    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final inlineAll = toolbar != null && width >= 960;
+        final titleAbove = width < 640;
+        final gap = compact ? 6.0 : 8.0;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(compact ? 12 : 16),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(compact ? 12 : 16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final inline = constraints.maxWidth >= 720;
-            if (inline) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+        if (inlineAll) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(child: title),
+                SizedBox(width: gap + 4),
+                Expanded(child: toolbar!),
+                SizedBox(width: gap),
+                actions,
+              ],
+            ),
+          );
+        }
+
+        if (toolbar == null) {
+          if (titleAbove && compact) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: titleBlock),
-                  const SizedBox(width: 16),
-                  actionRow,
+                  title,
+                  SizedBox(height: gap),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: actions,
+                  ),
                 ],
-              );
-            }
+              ),
+            );
+          }
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+            child: Row(
+              children: [
+                Expanded(child: title),
+                SizedBox(width: gap),
+                actions,
+              ],
+            ),
+          );
+        }
 
-            return Column(
+        if (titleAbove) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: titleBlock),
-                    if (!compact) actionRow,
+                    Expanded(child: title),
+                    actions,
                   ],
                 ),
-                if (compact) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Spacer(),
-                      addBtn,
-                      const SizedBox(width: 8),
-                      refreshBtn,
-                    ],
-                  ),
-                ],
+                SizedBox(height: gap),
+                toolbar!,
               ],
-            );
-          },
-        ),
-      ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Flexible(child: title),
+                  SizedBox(width: gap),
+                  actions,
+                ],
+              ),
+              SizedBox(height: gap),
+              toolbar!,
+            ],
+          ),
+        );
+      },
     );
   }
 }

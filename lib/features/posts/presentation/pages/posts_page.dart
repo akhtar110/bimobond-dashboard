@@ -179,19 +179,19 @@ class _PostsPageViewState extends State<_PostsPageView> {
                       return Padding(
                         padding: EdgeInsetsDirectional.fromSTEB(
                           metrics.pageHorizontalPadding,
-                          metrics.isMobile ? 8 : 12,
+                          metrics.isMobile ? 6 : 8,
                           metrics.pageHorizontalPadding,
-                          metrics.isMobile ? 12 : 16,
+                          metrics.isMobile ? 10 : 12,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             PostsPageHeader(metrics: metrics),
-                            SizedBox(height: metrics.sectionGap),
+                            SizedBox(height: metrics.isMobile ? 6 : 8),
                             PostsCategoryFilter(metrics: metrics),
                             SizedBox(height: metrics.filterGap),
                             const BulkSelectionToolbar(),
-                            SizedBox(height: metrics.sectionGap),
+                            SizedBox(height: metrics.isMobile ? 6 : 8),
                             Expanded(
                               child: BlocBuilder<PostsBloc, PostsState>(
                                 buildWhen: (prev, next) =>

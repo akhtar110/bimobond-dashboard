@@ -128,6 +128,21 @@ class SearchManagementBloc
     SearchManagementFilterAppliedEvent event,
     Emitter<SearchManagementState> emit,
   ) async {
+    if (event.filter != null) {
+      final next = event.filter!;
+      _filter = SearchManagementFilterQuery(
+        q: _filter.q,
+        apiTab: next.apiTab,
+        page: 1,
+        limit: next.limit,
+        from: next.from,
+        to: next.to,
+        sort: next.sort,
+        trendingOnly: next.trendingOnly,
+      );
+      await _reloadContent(emit);
+      return;
+    }
     _filter = _filter.copyWith(page: 1);
     await _reloadAll(emit, refreshing: true);
   }
