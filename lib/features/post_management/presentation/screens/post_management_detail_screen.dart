@@ -93,9 +93,7 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
     if (state is! PostManagementLoaded) return;
     bloc.add(
       ChangeManagedPostFieldEvent(
-        state.draft.copyWith(
-          description: _captionController.text.trim(),
-        ),
+        state.draft.copyWith(description: _captionController.text.trim()),
       ),
     );
   }
@@ -166,8 +164,9 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
                     child: Material(
                       color: isSelected
                           ? scheme.primaryContainer
-                          : scheme.surfaceContainerHighest
-                              .withValues(alpha: 0.4),
+                          : scheme.surfaceContainerHighest.withValues(
+                              alpha: 0.4,
+                            ),
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         onTap: () => setState(() => selected = status),
@@ -235,10 +234,7 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
   void _handleBack(BuildContext context) {
     PostVideoControllerCache.instance.pauseAll();
     if (_updatedPost != null) {
-      Navigator.pop(
-        context,
-        PostManagementNavResult.updated(_updatedPost!),
-      );
+      Navigator.pop(context, PostManagementNavResult.updated(_updatedPost!));
       return;
     }
     Navigator.pop(context);
@@ -250,129 +246,121 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
     final l10n = context.l10n;
 
     return BlocConsumer<PostManagementBloc, PostManagementState>(
-        listenWhen: (prev, curr) {
-          if (curr is PostManagementDeleted || curr is PostManagementError) {
-            return true;
+      listenWhen: (prev, curr) {
+        if (curr is PostManagementDeleted || curr is PostManagementError) {
+          return true;
+        }
+        if (curr is! PostManagementLoaded) return false;
+        if (curr.successMessage != null || curr.errorMessage != null) {
+          return true;
+        }
+        return prev is! PostManagementLoaded ||
+            prev.draft.id != curr.draft.id ||
+            prev.draft.description != curr.draft.description ||
+            prev.draft.category != curr.draft.category ||
+            prev.draft.categoryEntity?.id != curr.draft.categoryEntity?.id;
+      },
+      listener: (context, state) {
+        if (state is PostManagementLoaded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _syncDraftControllers(state.draft);
+          });
+          if (state.successMessage != null) {
+            _updatedPost = state.post;
+            final text = state.successMessage == 'commentDeleted'
+                ? l10n.t('commentDeleted')
+                : state.successMessage!;
+            _showSnack(context, text);
+          } else if (state.errorMessage != null) {
+            _showSnack(context, state.errorMessage!, isError: true);
           }
-          if (curr is! PostManagementLoaded) return false;
-          if (curr.successMessage != null || curr.errorMessage != null) {
-            return true;
-          }
-          return prev is! PostManagementLoaded ||
-              prev.draft.id != curr.draft.id ||
-              prev.draft.description != curr.draft.description ||
-              prev.draft.category != curr.draft.category ||
-              prev.draft.categoryEntity?.id != curr.draft.categoryEntity?.id;
-        },
-        listener: (context, state) {
-          if (state is PostManagementLoaded) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              _syncDraftControllers(state.draft);
-            });
-            if (state.successMessage != null) {
-              _updatedPost = state.post;
-              final text = state.successMessage == 'commentDeleted'
-                  ? l10n.t('commentDeleted')
-                  : state.successMessage!;
-              _showSnack(context, text);
-            } else if (state.errorMessage != null) {
-              _showSnack(context, state.errorMessage!, isError: true);
-            }
-          }
-          if (state is PostManagementDeleted) {
-            PostVideoControllerCache.instance.pauseAll();
-            Navigator.pop(context, const PostManagementNavResult.deleted());
-          }
-          if (state is PostManagementError) {
-            _showSnack(context, state.message, isError: true);
-          }
-        },
-        builder: (context, state) {
-          final loaded = state is PostManagementLoaded ? state : null;
-          final isBusy = loaded != null &&
-              (loaded.isSaving ||
-                  loaded.isDeleting ||
-                  loaded.isActioning);
-          final dirty = loaded != null &&
-              hasDraftChanges(loaded.post, loaded.draft);
+        }
+        if (state is PostManagementDeleted) {
+          PostVideoControllerCache.instance.pauseAll();
+          Navigator.pop(context, const PostManagementNavResult.deleted());
+        }
+        if (state is PostManagementError) {
+          _showSnack(context, state.message, isError: true);
+        }
+      },
+      builder: (context, state) {
+        final loaded = state is PostManagementLoaded ? state : null;
+        final isBusy =
+            loaded != null &&
+            (loaded.isSaving || loaded.isDeleting || loaded.isActioning);
+        final dirty =
+            loaded != null && hasDraftChanges(loaded.post, loaded.draft);
 
-          return Scaffold(
-            backgroundColor: theme.colorScheme.surfaceContainerLowest,
-            body: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.colorScheme.surfaceContainerLowest,
-                    theme.colorScheme.surface,
-                    Color.alphaBlend(
-                      theme.colorScheme.primary.withValues(alpha: 0.04),
-                      theme.colorScheme.surfaceContainerLow,
-                    ),
-                  ],
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (loaded != null)
-                    InvestigationHeader(
-                      onBack: () => _handleBack(context),
-                    ),
-                  Expanded(
-                    child: switch (state) {
-                      PostManagementLoading() || PostManagementInitial() =>
-                        const InvestigationSkeleton(),
-                      PostManagementError(:final message) => Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(message, textAlign: TextAlign.center),
-                          ),
-                        ),
-                      PostManagementDeleted() => const SizedBox.shrink(),
-                      PostManagementLoaded() => PostInvestigationLayout(
-                          isBusy: isBusy,
-                          isSaving: loaded!.isSaving,
-                          dirty: dirty,
-                          hideComments: widget.seedPost.isStory,
-                          captionController: _captionController,
-                          onCaptionChanged: () => _patchDraftFromControllers(
-                            context.read<PostManagementBloc>(),
-                          ),
-                          onCategorySelected: (CategoryEntity cat) =>
-                              _updateDraft(
-                            context.read<PostManagementBloc>(),
-                            (d) => d.copyWith(
-                              category: cat.name,
-                              categoryEntity: cat,
-                            ),
-                          ),
-                          onPrivacyChanged: (v) => _updateDraft(
-                            context.read<PostManagementBloc>(),
-                            (d) => d.copyWith(privacyStatus: v),
-                          ),
-                          onDraftToggle: (updater) => _updateDraft(
-                            context.read<PostManagementBloc>(),
-                            updater,
-                          ),
-                          onChangeStatus: () => _showChangeStatusDialog(
-                            context,
-                            loaded.draft.status,
-                          ),
-                          onSave: () => context
-                              .read<PostManagementBloc>()
-                              .add(UpdateManagedPostEvent()),
-                          onDelete: () => _showDeleteConfirmDialog(context),
-                        ),
-                    },
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surfaceContainerLowest,
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  theme.colorScheme.surfaceContainerLowest,
+                  theme.colorScheme.surface,
+                  Color.alphaBlend(
+                    theme.colorScheme.primary.withValues(alpha: 0.04),
+                    theme.colorScheme.surfaceContainerLow,
                   ),
                 ],
               ),
             ),
-          );
-        },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (loaded != null)
+                  InvestigationHeader(onBack: () => _handleBack(context)),
+                Expanded(
+                  child: switch (state) {
+                    PostManagementLoading() ||
+                    PostManagementInitial() => const InvestigationSkeleton(),
+                    PostManagementError(:final message) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(message, textAlign: TextAlign.center),
+                      ),
+                    ),
+                    PostManagementDeleted() => const SizedBox.shrink(),
+                    PostManagementLoaded() => PostInvestigationLayout(
+                      isBusy: isBusy,
+                      isSaving: loaded!.isSaving,
+                      dirty: dirty,
+                      hideComments: widget.seedPost.isStory,
+                      captionController: _captionController,
+                      onCaptionChanged: () => _patchDraftFromControllers(
+                        context.read<PostManagementBloc>(),
+                      ),
+                      onCategorySelected: (CategoryEntity cat) => _updateDraft(
+                        context.read<PostManagementBloc>(),
+                        (d) =>
+                            d.copyWith(category: cat.name, categoryEntity: cat),
+                      ),
+                      onPrivacyChanged: (v) => _updateDraft(
+                        context.read<PostManagementBloc>(),
+                        (d) => d.copyWith(privacyStatus: v),
+                      ),
+                      onDraftToggle: (updater) => _updateDraft(
+                        context.read<PostManagementBloc>(),
+                        updater,
+                      ),
+                      onChangeStatus: () =>
+                          _showChangeStatusDialog(context, loaded.draft.status),
+                      onSave: () => context.read<PostManagementBloc>().add(
+                        UpdateManagedPostEvent(),
+                      ),
+                      onDelete: () => _showDeleteConfirmDialog(context),
+                    ),
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

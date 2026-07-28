@@ -31,7 +31,8 @@ class CreatePostDescriptionField extends StatefulWidget {
       _CreatePostDescriptionFieldState();
 }
 
-class _CreatePostDescriptionFieldState extends State<CreatePostDescriptionField> {
+class _CreatePostDescriptionFieldState
+    extends State<CreatePostDescriptionField> {
   late final TextEditingController _controller;
   final _focusNode = FocusNode();
   Timer? _debounce;
@@ -197,9 +198,7 @@ class _CreatePostDescriptionFieldState extends State<CreatePostDescriptionField>
                     ),
                   )
                 : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           ),
           onChanged: _onChanged,
         ),
@@ -229,8 +228,7 @@ class _CreatePostDescriptionFieldState extends State<CreatePostDescriptionField>
                       dense: true,
                       leading: CircleAvatar(
                         radius: 16,
-                        backgroundImage:
-                            url != null ? NetworkImage(url) : null,
+                        backgroundImage: url != null ? NetworkImage(url) : null,
                         child: url == null
                             ? Text(
                                 user.username.isNotEmpty

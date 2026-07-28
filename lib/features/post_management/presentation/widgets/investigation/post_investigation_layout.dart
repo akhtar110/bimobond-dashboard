@@ -44,15 +44,18 @@ class PostInvestigationLayout extends StatelessWidget {
   final void Function(CategoryEntity) onCategorySelected;
   final ValueChanged<String> onPrivacyChanged;
   final void Function(ManagedPostEntity Function(ManagedPostEntity) updater)
-      onDraftToggle;
+  onDraftToggle;
   final VoidCallback onChangeStatus;
   final VoidCallback onSave;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return BlocSelector<PostManagementBloc, PostManagementState,
-        PostManagementLoaded?>(
+    return BlocSelector<
+      PostManagementBloc,
+      PostManagementState,
+      PostManagementLoaded?
+    >(
       selector: (s) => s is PostManagementLoaded ? s : null,
       builder: (context, loaded) {
         if (loaded == null) return const SizedBox.shrink();
@@ -103,7 +106,7 @@ class _InvestigationBody extends StatelessWidget {
   final void Function(CategoryEntity) onCategorySelected;
   final ValueChanged<String> onPrivacyChanged;
   final void Function(ManagedPostEntity Function(ManagedPostEntity) updater)
-      onDraftToggle;
+  onDraftToggle;
   final VoidCallback onChangeStatus;
   final VoidCallback onSave;
   final VoidCallback onDelete;
@@ -114,8 +117,16 @@ class _InvestigationBody extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget moderationSidebar() {
-      return BlocSelector<PostManagementBloc, PostManagementState,
-          ({ManagedPostEntity post, ManagedPostEntity draft, bool saving, bool deleting})>(
+      return BlocSelector<
+        PostManagementBloc,
+        PostManagementState,
+        ({
+          ManagedPostEntity post,
+          ManagedPostEntity draft,
+          bool saving,
+          bool deleting,
+        })
+      >(
         selector: (s) {
           if (s is! PostManagementLoaded) {
             return (
@@ -172,8 +183,11 @@ class _InvestigationBody extends StatelessWidget {
     }
 
     Widget centerContent() {
-      return BlocSelector<PostManagementBloc, PostManagementState,
-          ManagedPostEntity>(
+      return BlocSelector<
+        PostManagementBloc,
+        PostManagementState,
+        ManagedPostEntity
+      >(
         selector: (s) => s is PostManagementLoaded ? s.draft : state.draft,
         builder: (context, draft) {
           return Column(
@@ -207,10 +221,14 @@ class _InvestigationBody extends StatelessWidget {
     }
 
     Widget leftMedia() {
-      return BlocSelector<PostManagementBloc, PostManagementState,
-          PostMediaSnapshot?>(
-        selector: (s) =>
-            s is PostManagementLoaded ? PostMediaSnapshot.fromPost(s.post) : null,
+      return BlocSelector<
+        PostManagementBloc,
+        PostManagementState,
+        PostMediaSnapshot?
+      >(
+        selector: (s) => s is PostManagementLoaded
+            ? PostMediaSnapshot.fromPost(s.post)
+            : null,
         builder: (context, snapshot) {
           if (snapshot == null) return const SizedBox.shrink();
           return PortraitMediaPanel(snapshot: snapshot);
@@ -220,58 +238,70 @@ class _InvestigationBody extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final isDesktop = width >= InvestigationTheme.desktop;
+        final mediaWidth = MediaQuery.sizeOf(context).width;
+        final width = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : mediaWidth;
+        final isThreeColumn = width >= InvestigationTheme.threeColumn;
         final isWide = width >= InvestigationTheme.wide;
         final isTablet =
-            width >= InvestigationTheme.tablet && width < InvestigationTheme.desktop;
-        // Two side-by-side text columns need ~900px to stay readable.
-        final tabletSideBySide = width >= 900;
-        final pagePadding = width < InvestigationTheme.tablet ? 12.0 : 20.0;
+            width >= InvestigationTheme.tablet &&
+            width < InvestigationTheme.threeColumn;
+        final twoColumnSideBySide = width >= InvestigationTheme.twoColumnRow;
+        final pagePadding = width < InvestigationTheme.tablet
+            ? 12.0
+            : width < InvestigationTheme.twoColumnRow
+            ? 16.0
+            : 20.0;
 
         Widget columns;
-        Widget centeredMedia({double? maxWidth}) {
-          final width = maxWidth ?? 750.0;
-          return Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: width),
-              child: leftMedia(),
-            ),
+        Widget centeredMedia() {
+          return LayoutBuilder(
+            builder: (context, mediaConstraints) {
+              final parentW =
+                  mediaConstraints.maxWidth.isFinite &&
+                      mediaConstraints.maxWidth > 0
+                  ? mediaConstraints.maxWidth
+                  : width;
+              final cap = parentW.clamp(280.0, 750.0);
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: cap),
+                  child: leftMedia(),
+                ),
+              );
+            },
           );
         }
 
-        if (isDesktop) {
-          // On narrower desktops give the text columns a bit more room;
-          // the media panel caps its own width anyway.
+        Widget moderationColumn() {
+          return moderationSidebar();
+        }
+
+        if (isThreeColumn) {
           columns = Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: isWide ? 30 : 32,
-                child: SingleChildScrollView(child: moderationSidebar()),
-              ),
+              Expanded(flex: isWide ? 30 : 32, child: moderationColumn()),
               const SizedBox(width: InvestigationTheme.s16),
-              Expanded(
-                flex: isWide ? 40 : 36,
-                child: centeredMedia(),
-              ),
+              Expanded(flex: isWide ? 40 : 36, child: centeredMedia()),
               const SizedBox(width: InvestigationTheme.s16),
               Expanded(flex: isWide ? 30 : 32, child: centerContent()),
             ],
           );
-        } else if (isTablet && tabletSideBySide) {
+        } else if (isTablet && twoColumnSideBySide) {
           columns = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              centeredMedia(maxWidth: 750.0),
+              centeredMedia(),
               const SizedBox(height: InvestigationTheme.s16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 3, child: centerContent()),
+                  Expanded(child: centerContent()),
                   const SizedBox(width: InvestigationTheme.s16),
-                  Expanded(flex: 2, child: moderationSidebar()),
+                  Expanded(child: moderationColumn()),
                 ],
               ),
             ],
@@ -280,11 +310,11 @@ class _InvestigationBody extends StatelessWidget {
           columns = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              centeredMedia(maxWidth: 750.0),
+              centeredMedia(),
               const SizedBox(height: InvestigationTheme.s16),
               centerContent(),
               const SizedBox(height: InvestigationTheme.s16),
-              moderationSidebar(),
+              moderationColumn(),
             ],
           );
         }
@@ -294,9 +324,12 @@ class _InvestigationBody extends StatelessWidget {
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(pagePadding, 8, pagePadding, 20),
-                child: Center(
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1920),
+                    constraints: BoxConstraints(
+                      maxWidth: width.clamp(320.0, 1920.0),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -357,39 +390,78 @@ class _FloatingSaveBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < InvestigationTheme.compact;
+
     return Material(
       elevation: 0,
       color: scheme.surfaceContainerHigh,
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Row(
-            children: [
-              Icon(Icons.edit_note_rounded, color: scheme.primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  context.l10n.t('unsavedChanges'),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: isBusy ? null : onSave,
-                icon: isSaving
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: scheme.onPrimary,
-                        ),
-                      )
-                    : const Icon(Icons.save_rounded, size: 18),
-                label: Text(context.l10n.t('saveChangesPost')),
-              ),
-            ],
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 24,
+            vertical: 12,
           ),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.edit_note_rounded, color: scheme.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            context.l10n.t('unsavedChanges'),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: isBusy ? null : onSave,
+                      icon: isSaving
+                          ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: scheme.onPrimary,
+                              ),
+                            )
+                          : const Icon(Icons.save_rounded, size: 18),
+                      label: Text(context.l10n.t('saveChangesPost')),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(Icons.edit_note_rounded, color: scheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        context.l10n.t('unsavedChanges'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: isBusy ? null : onSave,
+                      icon: isSaving
+                          ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: scheme.onPrimary,
+                              ),
+                            )
+                          : const Icon(Icons.save_rounded, size: 18),
+                      label: Text(context.l10n.t('saveChangesPost')),
+                    ),
+                  ],
+                ),
         ),
       ),
     );

@@ -26,14 +26,29 @@ class _CreatePostView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final pageBackground = isDark
+        ? theme.scaffoldBackgroundColor
+        : const Color(0xFFF7F9FC);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF7F9FC),
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        title: Text(l10n.t('createPostTitle')),
+        elevation: 0,
+        backgroundColor: pageBackground,
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        iconTheme: IconThemeData(color: scheme.onSurface),
         centerTitle: false,
+        title: Text(
+          l10n.t('createPostTitle'),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurface,
+          ),
+        ),
       ),
       body: BlocConsumer<CreatePostBloc, CreatePostState>(
         listenWhen: (prev, next) =>
@@ -47,9 +62,9 @@ class _CreatePostView extends StatelessWidget {
             Navigator.of(context).pop(state.wasDraft ? 'draft' : 'published');
           } else if (state.errorMessage != null) {
             final message = _localizedError(l10n, state.errorMessage!);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(message)),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(message)));
           }
         },
         builder: (context, state) {
@@ -76,9 +91,9 @@ class _CreatePostView extends StatelessWidget {
                         CreatePostStepHeader(
                           currentStep: state.step,
                           onStepTap: (step) {
-                            context
-                                .read<CreatePostBloc>()
-                                .add(CreatePostStepChanged(step));
+                            context.read<CreatePostBloc>().add(
+                              CreatePostStepChanged(step),
+                            );
                           },
                         ),
                       ],
@@ -111,8 +126,7 @@ class _CreatePostView extends StatelessWidget {
           );
         },
       ),
-      bottomNavigationBar:
-          BlocBuilder<CreatePostBloc, CreatePostState>(
+      bottomNavigationBar: BlocBuilder<CreatePostBloc, CreatePostState>(
         builder: (context, state) => CreatePostBottomBar(state: state),
       ),
     );
@@ -145,22 +159,19 @@ class _StepBody extends StatelessWidget {
     return SingleChildScrollView(
       child: switch (state.step) {
         0 => MediaUploadSection(
-            form: state.form,
-            status: state.status,
-            isGeneratingThumbnail: state.isGeneratingThumbnail,
-            onFilesPicked: (files) => bloc.add(PickMedia(files)),
-            onRemove: (id) => bloc.add(RemoveMedia(id)),
-            onReorder: (oldIndex, newIndex) =>
-                bloc.add(ReorderMedia(oldIndex, newIndex)),
-          ),
-        1 => PostDetailsSection(
-            form: state.form,
-            onFieldUpdate: onFieldUpdate,
-          ),
+          form: state.form,
+          status: state.status,
+          isGeneratingThumbnail: state.isGeneratingThumbnail,
+          onFilesPicked: (files) => bloc.add(PickMedia(files)),
+          onRemove: (id) => bloc.add(RemoveMedia(id)),
+          onReorder: (oldIndex, newIndex) =>
+              bloc.add(ReorderMedia(oldIndex, newIndex)),
+        ),
+        1 => PostDetailsSection(form: state.form, onFieldUpdate: onFieldUpdate),
         2 => PostSettingsSection(
-            form: state.form,
-            onFieldUpdate: onFieldUpdate,
-          ),
+          form: state.form,
+          onFieldUpdate: onFieldUpdate,
+        ),
         _ => PostPreviewSection(form: state.form),
       },
     );

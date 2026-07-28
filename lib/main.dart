@@ -67,9 +67,7 @@ class AdminDashboardApp extends StatelessWidget {
               return AppSettingsWrapper(
                 child: Directionality(
                   textDirection: textDirection,
-                  child: AuthGate(
-                    navigator: child ?? const SizedBox.shrink(),
-                  ),
+                  child: AuthGate(navigator: child ?? const SizedBox.shrink()),
                 ),
               );
             },
