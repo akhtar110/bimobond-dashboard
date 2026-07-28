@@ -355,6 +355,20 @@ class ClearFiltersEffectsMessage extends FiltersEffectsEvent {
   const ClearFiltersEffectsMessage();
 }
 
+/// Surfaces a one-shot snackbar/dialog message on the management page.
+class ShowFiltersEffectsMessage extends FiltersEffectsEvent {
+  const ShowFiltersEffectsMessage(
+    this.message, {
+    this.isError = true,
+  });
+
+  final String message;
+  final bool isError;
+
+  @override
+  List<Object?> get props => [message, isError];
+}
+
 class ToggleFilterSelectionEvent extends FiltersEffectsEvent {
   const ToggleFilterSelectionEvent(this.filterId);
 

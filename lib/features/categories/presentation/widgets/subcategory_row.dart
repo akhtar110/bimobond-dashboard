@@ -42,12 +42,15 @@ class _SubcategoryTableLayout extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final showParent = showParentColumn && width >= 480;
-        final compactMeta = width < 560;
+        final showParent = showParentColumn && width >= 640;
+        final showChildren = width >= 520;
+        final showUpdated = width >= 420;
+        final compactMeta = width < 640;
+        final actionsWidth = width < 360 ? 64.0 : _actionsWidth;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _horizontalPadding,
+          padding: EdgeInsets.symmetric(
+            horizontal: width < 360 ? 8 : _horizontalPadding,
             vertical: 6,
           ),
           child: Row(
@@ -69,35 +72,46 @@ class _SubcategoryTableLayout extends StatelessWidget {
                     child: parent,
                   ),
                 ),
-              Expanded(
-                flex: compactMeta ? 3 : 4,
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: status,
+              if (showChildren || showUpdated)
+                Expanded(
+                  flex: compactMeta ? 2 : 4,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: status,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: childrenColumn,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: updated,
-                      ),
-                    ),
-                  ],
+                      if (showChildren)
+                        Expanded(
+                          flex: 2,
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: childrenColumn,
+                          ),
+                        ),
+                      if (showUpdated)
+                        Expanded(
+                          flex: 3,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: updated,
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              else
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: status,
+                  ),
                 ),
-              ),
-              SizedBox(width: _actionsWidth, child: actions),
+              SizedBox(width: actionsWidth, child: actions),
             ],
           ),
         );

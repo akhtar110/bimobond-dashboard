@@ -8,6 +8,9 @@ import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/effect_editor_bloc.dart';
 import '../bloc/effect_editor_event.dart';
 import '../bloc/effect_editor_state.dart';
+import '../bloc/filters_effects_bloc.dart';
+import '../bloc/filters_effects_event.dart';
+import '../utils/fe_api_errors.dart';
 import '../widgets/effect_editor_basic_section.dart';
 import '../widgets/effect_editor_composition_section.dart';
 import '../widgets/effect_editor_preview_panel.dart';
@@ -102,21 +105,36 @@ class EffectFormDialog extends StatelessWidget {
           return;
         }
         if (state.submitError != null) {
-          final scheme = Theme.of(context).colorScheme;
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.submitError!,
-                  style: TextStyle(color: scheme.onError),
-                ),
-                backgroundColor: scheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+          final errorKey = state.submitError!;
           context.read<EffectEditorBloc>().add(
             const ClearEffectEditorSubmitErrorEvent(),
+          );
+
+          if (errorKey == feFilterEffectAlreadyExistsKey) {
+            try {
+              context.read<FiltersEffectsBloc>().add(
+                ShowFiltersEffectsMessage(errorKey),
+              );
+              return;
+            } catch (_) {
+              // Fall through to a local dialog if the page bloc is unavailable.
+            }
+          }
+
+          final l10n = context.l10n;
+          final errorText = l10n.tOr(errorKey, errorKey);
+          showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(l10n.tOr('error', 'Error')),
+              content: Text(errorText),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(l10n.tOr('close', 'Close')),
+                ),
+              ],
+            ),
           );
         }
       },
