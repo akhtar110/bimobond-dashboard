@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart';
@@ -107,6 +108,96 @@ class _ArOverlayFormDialogState extends State<ArOverlayFormDialog> {
     if (clean.length == 6) clean = 'FF$clean';
     final val = int.tryParse(clean, radix: 16);
     return val != null ? Color(val) : const Color(0xFF1E88E5);
+  }
+
+  String _colorToHex(Color color) {
+    final r = (color.r * 255.0).round() & 0xff;
+    final g = (color.g * 255.0).round() & 0xff;
+    final b = (color.b * 255.0).round() & 0xff;
+    return '#${r.toRadixString(16).padLeft(2, '0')}'
+            '${g.toRadixString(16).padLeft(2, '0')}'
+            '${b.toRadixString(16).padLeft(2, '0')}'
+        .toUpperCase();
+  }
+
+  Future<void> _pickPreviewColor(BuildContext context) async {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    var selected = _parseColorHex(_previewColorCtrl.text);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final hex = _colorToHex(selected);
+            return AlertDialog(
+              title: Text(l10n.tOr('previewColorHex', 'Preview Color')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: selected,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: scheme.outlineVariant),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            hex,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ColorPicker(
+                      pickerColor: selected,
+                      onColorChanged: (color) {
+                        setDialogState(() => selected = color);
+                      },
+                      enableAlpha: false,
+                      hexInputBar: true,
+                      labelTypes: const [],
+                      pickerAreaHeightPercent: 0.72,
+                      displayThumbColor: true,
+                      portraitOnly: true,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(l10n.tOr('cancel', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, hex),
+                  child: Text(l10n.tOr('apply', 'Apply')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null || !mounted) return;
+    _previewColorCtrl.text = result;
   }
 
   Future<void> _onSubmit() async {
@@ -595,38 +686,55 @@ class _ArOverlayFormDialogState extends State<ArOverlayFormDialog> {
         ),
         const SizedBox(height: 16),
 
-        // Preview Color Hex
-        TextFormField(
-          controller: _previewColorCtrl,
-          decoration: InputDecoration(
-            labelText: l10n.tOr('previewColorHex', 'Preview Color (#RRGGBB)'),
-            hintText: '#1E88E5',
-            prefixIcon: BlocSelector<ArOverlayFormCubit, ArOverlayFormState,
-                String>(
-              selector: (state) => state.previewColorHex,
-              builder: (context, previewColorHex) {
-                return Container(
-                  margin: const EdgeInsets.all(12),
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: _parseColorHex(previewColorHex),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: scheme.outlineVariant),
+        // Preview Color
+        BlocSelector<ArOverlayFormCubit, ArOverlayFormState, String>(
+          selector: (state) => state.previewColorHex,
+          builder: (context, previewColorHex) {
+            final hex = previewColorHex.trim().isEmpty
+                ? '#1E88E5'
+                : previewColorHex.trim().toUpperCase();
+            return InputDecorator(
+              decoration: InputDecoration(
+                labelText:
+                    l10n.tOr('previewColorHex', 'Preview Color (#RRGGBB)'),
+                filled: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => _pickPreviewColor(context),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _parseColorHex(hex),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: scheme.outlineVariant),
+                      ),
+                    ),
                   ),
-                );
-              },
-            ),
-            filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          validator: (val) {
-            if (val == null || val.trim().isEmpty) return null;
-            final clean = val.trim().replaceAll('#', '');
-            if (clean.length != 6 || int.tryParse(clean, radix: 16) == null) {
-              return 'Must match #RRGGBB format';
-            }
-            return null;
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      hex,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _pickPreviewColor(context),
+                    child: Text(l10n.tOr('giftPickColor', 'Pick')),
+                  ),
+                ],
+              ),
+            );
           },
         ),
       ],

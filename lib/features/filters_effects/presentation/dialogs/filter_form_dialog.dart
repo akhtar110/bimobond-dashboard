@@ -16,6 +16,10 @@ import '../bloc/filter_editor_event.dart';
 
 import '../bloc/filter_editor_state.dart';
 
+import '../bloc/filters_effects_bloc.dart';
+import '../bloc/filters_effects_event.dart';
+
+import '../utils/fe_api_errors.dart';
 import '../utils/fe_filter_preview_support.dart';
 import '../widgets/filter_beauty_settings_section.dart';
 import '../widgets/filter_editor_basic_section.dart';
@@ -144,26 +148,38 @@ class _FilterFormDialogState extends State<FilterFormDialog> {
         }
 
         if (state.submitError != null) {
-          final scheme = Theme.of(context).colorScheme;
-
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.submitError!,
-
-                  style: TextStyle(color: scheme.onError),
-                ),
-
-                backgroundColor: scheme.error,
-
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-
+          final errorKey = state.submitError!;
           context.read<FilterEditorBloc>().add(
             const ClearFilterEditorSubmitErrorEvent(),
+          );
+
+          // Duplicate conflicts: surface via management page so a dialog opens
+          // above this editor modal (snackbars are hidden under it).
+          if (errorKey == feFilterEffectAlreadyExistsKey) {
+            try {
+              context.read<FiltersEffectsBloc>().add(
+                ShowFiltersEffectsMessage(errorKey),
+              );
+              return;
+            } catch (_) {
+              // Fall through to a local dialog if the page bloc is unavailable.
+            }
+          }
+
+          final l10n = context.l10n;
+          final errorText = l10n.tOr(errorKey, errorKey);
+          showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(l10n.tOr('error', 'Error')),
+              content: Text(errorText),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(l10n.tOr('close', 'Close')),
+                ),
+              ],
+            ),
           );
         }
       },

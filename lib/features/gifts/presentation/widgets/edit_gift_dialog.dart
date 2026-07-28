@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -16,11 +16,11 @@ import '../bloc/gift_groups_bloc.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
-import '../utils/gift_schedule_label.dart';
-import 'gift_animation_preview.dart';
+import 'gift_animation_upload_section.dart';
 import 'gift_audio_preview.dart';
 import 'gift_color_picker_field.dart';
 import 'gift_dialog_layout.dart';
+import 'gift_preview_dialog.dart';
 import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
 import 'gift_type_selector.dart';
@@ -35,16 +35,13 @@ void showEditGiftDialog(BuildContext pageContext, GiftEntity gift) {
 void showPreviewGiftDialog(BuildContext pageContext, GiftEntity gift) {
   showDialog<void>(
     context: pageContext,
-    builder: (_) => EditGiftDialog(
-      pageContext: pageContext,
-      gift: gift,
-      previewOnly: true,
-    ),
+    builder: (_) => GiftPreviewDialog(pageContext: pageContext, gift: gift),
   );
 }
 
 class EditGiftDialog extends StatefulWidget {
   const EditGiftDialog({
+    super.key,
     required this.pageContext,
     required this.gift,
     this.previewOnly = false,
@@ -94,10 +91,16 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.gift.name);
     _priceCtrl = TextEditingController(
-        text: widget.gift.priceCoins.toStringAsFixed(2));
+      text: widget.gift.priceCoins.toStringAsFixed(
+        widget.gift.priceCoins.truncateToDouble() == widget.gift.priceCoins
+            ? 0
+            : 2,
+      ),
+    );
     _tagCtrl = TextEditingController(text: widget.gift.tag ?? '');
-    _sortOrderCtrl =
-        TextEditingController(text: widget.gift.sortOrder.toString());
+    _sortOrderCtrl = TextEditingController(
+      text: widget.gift.sortOrder.toString(),
+    );
     _publishedAt = widget.gift.publishedAt;
     _selectedSize = widget.gift.size;
     _selectedType = widget.gift.type;
@@ -296,149 +299,284 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     }
 
     final tagValue = _normalizedTag();
-    final colorValue =
-        _selectedType == GiftType.audio ? _selectedColor : null;
+    final colorValue = _selectedType == GiftType.audio ? _selectedColor : null;
 
-    widget.pageContext.read<GiftsBloc>().add(UpdateGiftEvent(
-          widget.gift.id,
-          UpdateGiftData(
-            name: _nameCtrl.text.trim().isEmpty
-                ? null
-                : _nameCtrl.text.trim(),
-            priceCoins: double.tryParse(_priceCtrl.text.trim()),
-            size: _selectedSize,
-            type: _selectedType,
-            tag: tagValue,
-            clearTag: tagValue == null && widget.gift.tag != null,
-            color: colorValue,
-            clearColor: _selectedType == GiftType.image
-                ? widget.gift.color != null
-                : (colorValue == null && widget.gift.color != null),
-            sortOrder: int.tryParse(_sortOrderCtrl.text.trim()),
-            isActive: _isActive,
-            publishedAt: _publishedAt,
-            clearPublishedAt:
-                widget.gift.publishedAt != null && _publishedAt == null,
-            imageBytes:
-                _selectedType == GiftType.image ? _newImageBytes : null,
-            imageName: _selectedType == GiftType.image ? _newImageName : null,
-            animationUrl: animationUrl,
-            clearAnimationUrl: clearAnimationUrl,
-            audioUrl: audioUrl,
-            clearAudioUrl: clearAudioUrl,
-            assignGroupId: _selectedGroupId,
-            previousAssignGroupId: _initialGroupId,
+    widget.pageContext.read<GiftsBloc>().add(
+          UpdateGiftEvent(
+            widget.gift.id,
+            UpdateGiftData(
+              name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+              priceCoins: double.tryParse(_priceCtrl.text.trim()),
+              size: _selectedSize,
+              type: _selectedType,
+              tag: tagValue,
+              clearTag: tagValue == null && widget.gift.tag != null,
+              color: colorValue,
+              clearColor: _selectedType == GiftType.image
+                  ? widget.gift.color != null
+                  : (colorValue == null && widget.gift.color != null),
+              sortOrder: int.tryParse(_sortOrderCtrl.text.trim()),
+              isActive: _isActive,
+              publishedAt: _publishedAt,
+              clearPublishedAt:
+                  widget.gift.publishedAt != null && _publishedAt == null,
+              imageBytes:
+                  _selectedType == GiftType.image ? _newImageBytes : null,
+              imageName:
+                  _selectedType == GiftType.image ? _newImageName : null,
+              animationUrl: animationUrl,
+              clearAnimationUrl: clearAnimationUrl,
+              audioUrl: audioUrl,
+              clearAudioUrl: clearAudioUrl,
+              assignGroupId: _selectedGroupId,
+              previousAssignGroupId: _initialGroupId,
+            ),
           ),
-        ));
+        );
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.previewOnly) {
-      return _buildPreviewDialog(context);
+      return GiftPreviewDialog(
+        pageContext: widget.pageContext,
+        gift: widget.gift,
+      );
     }
 
     final l10n = context.l10n;
-    final layout = GiftDialogLayout(MediaQuery.sizeOf(context));
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final hasNewImage = _newImageBytes != null;
     final showAnimation = !_clearAnimation &&
         ((_animationBytes != null && _animationBytes!.isNotEmpty) ||
             (_animationUrl != null && _animationUrl!.trim().isNotEmpty));
 
-    return BlocListener<GiftsBloc, GiftsState>(
-      bloc: widget.pageContext.read<GiftsBloc>(),
-      // Only close after a save we started finishes — not on unrelated
-      // isActioning flips (those were disposing the PAG player mid-play).
-      listenWhen: (p, c) =>
-          p is GiftsLoaded &&
-          c is GiftsLoaded &&
-          p.isActioning &&
-          !c.isActioning,
-      listener: (_, state) {
-        if (state is GiftsLoaded && !state.isActioning && mounted) {
-          Navigator.of(context, rootNavigator: true).maybePop();
-        }
-      },
-      child: BlocBuilder<GiftsBloc, GiftsState>(
-        bloc: widget.pageContext.read<GiftsBloc>(),
-        buildWhen: (p, c) =>
-            c is GiftsLoaded &&
-            (p is! GiftsLoaded || p.isActioning != c.isActioning),
-        builder: (_, state) {
-          final isActioning = state is GiftsLoaded && state.isActioning;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final layout = GiftDialogLayout(constraints.biggest);
+          final isWide = constraints.maxWidth >= 720;
 
-          final mediaColumn = _buildEditMediaColumn(
-            context: context,
-            layout: layout,
-            l10n: l10n,
-            isActioning: isActioning,
-            hasNewImage: hasNewImage,
-            showAnimation: showAnimation,
-          );
-          final fieldsColumn = _buildEditFieldsColumn(
-            context: context,
-            layout: layout,
-            l10n: l10n,
-            isActioning: isActioning,
-          );
+          return BlocListener<GiftsBloc, GiftsState>(
+            bloc: widget.pageContext.read<GiftsBloc>(),
+            listenWhen: (p, c) =>
+                p is GiftsLoaded &&
+                c is GiftsLoaded &&
+                p.isActioning &&
+                !c.isActioning,
+            listener: (_, state) {
+              if (state is GiftsLoaded && !state.isActioning && mounted) {
+                Navigator.of(context, rootNavigator: true).maybePop();
+              }
+            },
+            child: BlocBuilder<GiftsBloc, GiftsState>(
+              bloc: widget.pageContext.read<GiftsBloc>(),
+              buildWhen: (p, c) =>
+                  c is GiftsLoaded &&
+                  (p is! GiftsLoaded || p.isActioning != c.isActioning),
+              builder: (_, state) {
+                final isActioning = state is GiftsLoaded && state.isActioning;
 
-          return AlertDialog(
-            insetPadding: layout.insetPadding,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: Text(l10n.t('editGift')),
-            content: SizedBox(
-              width: layout.dialogWidth,
-              child: Form(
-                key: _formKey,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: layout.maxBodyHeight),
-                  child: SingleChildScrollView(
-                    primary: false,
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        GiftTypeSelector(
-                        value: _selectedType,
-                        enabled: !isActioning,
-                        onChanged: (value) => setState(() {
-                          _selectedType = value;
-                          if (value == GiftType.audio) {
-                            _newImageBytes = null;
-                            _newImageName = null;
-                          }
-                        }),
+                return Container(
+                  width: layout.dialogWidth,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 28,
+                        offset: const Offset(0, 10),
                       ),
-                        SizedBox(height: layout.gap),
-                        mediaColumn,
-                        SizedBox(height: layout.gap),
-                        fieldsColumn,
-                      ],
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // --- Header Bar ---
+                          _buildHeader(context, l10n),
+
+                          const Divider(height: 1, thickness: 1),
+
+                          // --- Scrollable Body ---
+                          Flexible(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(20),
+                              child: isWide
+                                  ? Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Left Media Column
+                                        Expanded(
+                                          flex: 5,
+                                          child: _buildEditMediaColumn(
+                                            context: context,
+                                            layout: layout,
+                                            l10n: l10n,
+                                            isActioning: isActioning,
+                                            hasNewImage: hasNewImage,
+                                            showAnimation: showAnimation,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 20),
+                                        // Right Form Fields Column
+                                        Expanded(
+                                          flex: 6,
+                                          child: _buildEditFieldsColumn(
+                                            context: context,
+                                            layout: layout,
+                                            l10n: l10n,
+                                            isActioning: isActioning,
+                                            isWide: isWide,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildEditMediaColumn(
+                                          context: context,
+                                          layout: layout,
+                                          l10n: l10n,
+                                          isActioning: isActioning,
+                                          hasNewImage: hasNewImage,
+                                          showAnimation: showAnimation,
+                                        ),
+                                        const SizedBox(height: 20),
+                                        _buildEditFieldsColumn(
+                                          context: context,
+                                          layout: layout,
+                                          l10n: l10n,
+                                          isActioning: isActioning,
+                                          isWide: isWide,
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+
+                          const Divider(height: 1, thickness: 1),
+
+                          // --- Footer Action Bar ---
+                          _buildFooter(context, l10n, isActioning),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(l10n.t('cancel')),
-              ),
-              FilledButton(
-                onPressed: (isActioning || _uploadingAnimation || _uploadingAudio)
-                    ? null
-                    : _submit,
-                child: Text(l10n.t('save')),
-              ),
-            ],
           );
         },
       ),
     );
   }
 
+  // Header Bar
+  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.secondary, scheme.primary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.secondary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.edit_note_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.t('editGift'),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.gift.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Left Column: Media & Type Selection
   Widget _buildEditMediaColumn({
     required BuildContext context,
     required GiftDialogLayout layout,
@@ -450,293 +588,296 @@ class EditGiftDialogState extends State<EditGiftDialog> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final imageTile = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton.icon(
-          onPressed: isActioning ? null : _pickImage,
-          icon: const Icon(Icons.upload_file_outlined, size: 18),
-          label: Text(
-            hasNewImage ? l10n.t('changeImage') : l10n.t('uploadNewImage'),
-          ),
-          style: layout.denseOutlinedButtonStyle(),
-        ),
-        SizedBox(height: layout.fieldGap),
-        layout.mediaFrame(
-          child: hasNewImage
-              ? Image.memory(
-                  _newImageBytes!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _imagePlaceholder(),
-                )
-              : (widget.gift.thumbnailUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: widget.gift.thumbnailUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (_, _) => _imagePlaceholder(),
-                      errorWidget: (_, _, _) => _imagePlaceholder(),
-                    )
-                  : _imagePlaceholder()),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          hasNewImage ? _newImageName ?? '' : l10n.t('currentImageHint'),
-          style: theme.textTheme.bodySmall,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-
-    final animationTile = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton.icon(
-          onPressed:
-              (isActioning || _uploadingAnimation) ? null : _pickAnimation,
-          icon: _uploadingAnimation
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.animation_rounded, size: 18),
-          label: Text(
-            _uploadingAnimation
-                ? l10n.tOr('uploading', 'Uploading…')
-                : showAnimation
-                    ? l10n.tOr('changeAnimation', 'Change animation')
-                    : l10n.tOr(
-                        'uploadAnimationOptional',
-                        'Upload animation (optional)',
-                      ),
-          ),
-          style: layout.denseOutlinedButtonStyle(),
-        ),
-        if (_animationError != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            _animationError!,
-            style: TextStyle(color: scheme.error, fontSize: 12),
-          ),
-        ],
-        SizedBox(height: layout.fieldGap),
-        if (showAnimation)
-          SizedBox(
-            height: layout.mediaMaxHeight + 56,
-            child: GiftAnimationPreview(
-              key: const ValueKey('edit-gift-animation-preview'),
-              compact: true,
-              expandToFill: true,
-              bytes: _animationBytes,
-              networkUrl: _animationUrl,
-              fileName: _animationName ?? _animationUrl,
-              onClear: (isActioning || _uploadingAnimation)
-                  ? null
-                  : () => setState(() {
-                        _animationBytes = null;
-                        _animationUrl = null;
-                        _animationName = null;
-                        _clearAnimation = true;
-                        _animationError = null;
-                      }),
-            ),
-          )
-        else if (layout.useWideLayout)
-          layout.mediaFrame(
-            child: ColoredBox(
-              color: scheme.surfaceContainerLow,
-              child: Center(
+    // Image Upload Card
+    final imageTile = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.image_outlined, size: 18, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
                 child: Text(
-                  l10n.tOr('noAnimation', 'No animation'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                  l10n.tOr('giftImageHeader', 'Gift Image'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
+              OutlinedButton.icon(
+                onPressed: isActioning ? null : _pickImage,
+                icon: const Icon(Icons.upload_file_outlined, size: 16),
+                label: Text(
+                  hasNewImage
+                      ? l10n.t('changeImage')
+                      : l10n.t('uploadNewImage'),
+                ),
+                style: layout.denseOutlinedButtonStyle(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 130,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: hasNewImage
+                  ? Image.memory(
+                      _newImageBytes!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                    )
+                  : (widget.gift.thumbnailUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: widget.gift.thumbnailUrl,
+                          fit: BoxFit.contain,
+                          placeholder: (_, __) => _imagePlaceholder(),
+                          errorWidget: (_, __, ___) => _imagePlaceholder(),
+                        )
+                      : _imagePlaceholder()),
             ),
           ),
-      ],
+          const SizedBox(height: 6),
+          Text(
+            hasNewImage ? _newImageName ?? '' : l10n.t('currentImageHint'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+
+    // Animation Upload Card
+    final animationTile = GiftAnimationUploadSection(
+      layout: layout,
+      hasAnimation: showAnimation,
+      uploading: _uploadingAnimation,
+      animationBytes: _animationBytes,
+      animationUrl: _animationUrl,
+      animationName: _animationName ?? _animationUrl,
+      animationError: _animationError,
+      isActioning: isActioning,
+      onPickAnimation: (isActioning || _uploadingAnimation)
+          ? null
+          : _pickAnimation,
+      onClearAnimation: (isActioning || _uploadingAnimation)
+          ? null
+          : () => setState(() {
+                _animationBytes = null;
+                _animationUrl = null;
+                _animationName = null;
+                _clearAnimation = true;
+                _animationError = null;
+              }),
     );
 
     final hasAudio = !_clearAudio &&
         ((_audioBytes != null && _audioBytes!.isNotEmpty) ||
             (_audioUrl != null && _audioUrl!.trim().isNotEmpty));
-    final audioTile = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton.icon(
-          onPressed: (isActioning || _uploadingAudio) ? null : _pickAudio,
-          icon: _uploadingAudio
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.audiotrack_rounded, size: 18),
-          label: Text(
-            _uploadingAudio
-                ? l10n.tOr('uploading', 'Uploading…')
-                : hasAudio
-                    ? l10n.tOr('changeAudio', 'Change audio')
-                    : l10n.tOr('uploadAudioRequired', 'Upload audio *'),
-          ),
-          style: layout.denseOutlinedButtonStyle(),
-        ),
-        if (_audioError != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            _audioError!,
-            style: TextStyle(color: scheme.error, fontSize: 12),
-          ),
-        ],
-        if (hasAudio) ...[
-          SizedBox(height: layout.fieldGap),
-          GiftAudioPreview(
-            key: ValueKey('edit-audio-${_audioUrl ?? _audioName}'),
-            networkUrl: _clearAudio ? null : _audioUrl,
-            bytes: _audioBytes,
-            fileName: _audioName ?? _audioUrl,
-            onClear: (isActioning || _uploadingAudio)
-                ? null
-                : () => setState(() {
-                      _audioBytes = null;
-                      _audioUrl = null;
-                      _audioName = null;
-                      _clearAudio = true;
-                      _audioError = null;
-                    }),
-          ),
-        ],
-      ],
-    );
 
-    final secondaryTile =
-        _selectedType == GiftType.audio ? audioTile : animationTile;
-
-    if (_selectedType == GiftType.audio) {
-      final colorTile = Column(
+    // Audio Upload Card
+    final audioTile = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              Icon(Icons.audiotrack_rounded, size: 18, color: scheme.secondary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.tOr('giftAudioHeader', 'Audio File *'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed:
+                    (isActioning || _uploadingAudio) ? null : _pickAudio,
+                icon: _uploadingAudio
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file_outlined, size: 16),
+                label: Text(
+                  _uploadingAudio
+                      ? l10n.tOr('uploading', 'Uploading…')
+                      : hasAudio
+                          ? l10n.tOr('changeAudio', 'Change')
+                          : l10n.tOr('uploadAudioRequired', 'Upload'),
+                ),
+                style: layout.denseOutlinedButtonStyle(),
+              ),
+            ],
+          ),
+          if (_audioError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _audioError!,
+              style: TextStyle(color: scheme.error, fontSize: 12),
+            ),
+          ],
+          if (hasAudio) ...[
+            const SizedBox(height: 10),
+            GiftAudioPreview(
+              key: ValueKey('edit-audio-${_audioUrl ?? _audioName}'),
+              networkUrl: _audioUrl,
+              bytes: _audioBytes,
+              fileName: _audioName ?? _audioUrl,
+              onClear: (isActioning || _uploadingAudio)
+                  ? null
+                  : () => setState(() {
+                        _audioBytes = null;
+                        _audioUrl = null;
+                        _audioName = null;
+                        _clearAudio = true;
+                        _audioError = null;
+                      }),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Gift Type Selector
+        GiftTypeSelector(
+          value: _selectedType,
+          enabled: !isActioning,
+          onChanged: (value) => setState(() {
+            _selectedType = value;
+            if (value == GiftType.audio) {
+              _newImageBytes = null;
+              _newImageName = null;
+            }
+          }),
+        ),
+        const SizedBox(height: 14),
+
+        if (_selectedType == GiftType.image) ...[
+          imageTile,
+          const SizedBox(height: 12),
+          animationTile,
+        ] else ...[
           GiftColorPickerField(
             layout: layout,
             value: _selectedColor,
             enabled: !isActioning,
             onChanged: (value) => setState(() => _selectedColor = value),
           ),
-          SizedBox(height: layout.fieldGap),
-          layout.mediaFrame(
-            child: ColoredBox(
-              color: parseGiftHex(_selectedColor) ??
-                  scheme.surfaceContainerHighest,
-              child: Center(
-                child: Icon(
-                  Icons.audiotrack_rounded,
-                  size: 28,
-                  color: (parseGiftHex(_selectedColor) == null
-                          ? scheme.onSurfaceVariant
-                          : _contrastingOnColor(
-                              parseGiftHex(_selectedColor)!))
-                      .withValues(alpha: 0.9),
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-
-      if (layout.useWideLayout) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: colorTile),
-            SizedBox(width: layout.fieldGap),
-            Expanded(child: audioTile),
-          ],
-        );
-      }
-
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          colorTile,
-          SizedBox(height: layout.fieldGap),
+          const SizedBox(height: 12),
           audioTile,
         ],
-      );
-    }
-
-    if (layout.useWideLayout) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: imageTile),
-          SizedBox(width: layout.fieldGap),
-          Expanded(child: secondaryTile),
-        ],
-      );
-    }
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        imageTile,
-        SizedBox(height: layout.fieldGap),
-        secondaryTile,
       ],
     );
   }
 
-  Color _contrastingOnColor(Color color) {
-    final luminance = color.computeLuminance();
-    return luminance > 0.55 ? Colors.black87 : Colors.white;
+  Widget _imagePlaceholder() {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: scheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.card_giftcard_rounded,
+          size: 40,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 
+  // Right Column: Form Fields
   Widget _buildEditFieldsColumn({
     required BuildContext context,
     required GiftDialogLayout layout,
     required AppLocalizations l10n,
     required bool isActioning,
+    required bool isWide,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _SectionHeader(title: l10n.tOr('giftInfoSection', 'GIFT DETAILS')),
+        const SizedBox(height: 10),
+
+        // Gift Name
         TextFormField(
           controller: _nameCtrl,
-          decoration: layout.denseDecoration(labelText: l10n.t('giftNameLabel')),
+          enabled: !isActioning,
+          decoration: layout.denseDecoration(
+            labelText: l10n.t('giftNameLabel'),
+            prefixIcon: const Icon(Icons.card_giftcard_rounded, size: 18),
+          ),
           validator: (v) =>
               v?.trim().isEmpty == true ? l10n.t('requiredField') : null,
         ),
-        SizedBox(height: layout.fieldGap),
-        TextFormField(
-          controller: _tagCtrl,
-          enabled: !isActioning,
-          maxLength: 50,
-          decoration: layout.denseDecoration(
-            labelText: l10n.tOr('giftTag', 'Tag'),
-            helperText: l10n.tOr(
-              'giftTagHint',
-              'Any string up to 50 chars, e.g. NEW, HOT, LIMITED',
-            ),
-          ),
-        ),
-        SizedBox(height: layout.fieldGap),
+        const SizedBox(height: 10),
+
+        // Price & Size Row
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
+              flex: 6,
+              child: GiftPriceCoinsField(
+                controller: _priceCtrl,
+                enabled: !isActioning,
+                validator: (v) {
+                  if (v?.trim().isEmpty == true) {
+                    return l10n.t('requiredField');
+                  }
+                  if (double.tryParse(v!.trim()) == null) {
+                    return l10n.t('requiredField');
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 5,
               child: DropdownButtonFormField<GiftSize>(
                 value: _selectedSize,
                 isDense: true,
                 decoration: layout.denseDecoration(
                   labelText: l10n.tOr('giftSizeLabel', 'Size'),
+                  prefixIcon: const Icon(Icons.aspect_ratio_rounded, size: 18),
                 ),
                 items: GiftSize.values
                     .map(
@@ -755,7 +896,14 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                       },
               ),
             ),
-            SizedBox(width: layout.fieldGap),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Group Tab & Tag Row
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Expanded(
               child: _loadingGroups
                   ? const Padding(
@@ -768,7 +916,8 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                           : null,
                       isDense: true,
                       decoration: layout.denseDecoration(
-                        labelText: l10n.tOr('giftGroupName', 'Tab name'),
+                        labelText: l10n.tOr('giftGroupName', 'Tab Name'),
+                        prefixIcon: const Icon(Icons.folder_outlined, size: 18),
                       ),
                       items: [
                         DropdownMenuItem<String?>(
@@ -784,377 +933,189 @@ class EditGiftDialogState extends State<EditGiftDialog> {
                       onChanged: isActioning
                           ? null
                           : (value) =>
-                              setState(() => _selectedGroupId = value),
+                                setState(() => _selectedGroupId = value),
                     ),
             ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextFormField(
+                controller: _tagCtrl,
+                enabled: !isActioning,
+                maxLength: 50,
+                buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                    null,
+                decoration: layout.denseDecoration(
+                  labelText: l10n.tOr('giftTag', 'Tag'),
+                  prefixIcon: const Icon(Icons.local_offer_outlined, size: 18),
+                ),
+              ),
+            ),
           ],
         ),
-        SizedBox(height: layout.fieldGap),
-        if (layout.useWideLayout)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: GiftPriceCoinsField(
-                  controller: _priceCtrl,
-                  enabled: !isActioning,
-                  validator: (v) {
-                    if (v?.trim().isEmpty == true) {
-                      return l10n.t('requiredField');
-                    }
-                    if (double.tryParse(v!.trim()) == null) {
-                      return l10n.t('requiredField');
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              SizedBox(width: layout.fieldGap),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: GiftPublishedAtPicker(
-                    value: _publishedAt,
-                    onTap: isActioning ? null : _pickPublishedAt,
-                    onClear: _publishedAt != null
-                        ? () => setState(() => _publishedAt = null)
-                        : null,
-                  ),
-                ),
-              ),
-            ],
-          )
-        else ...[
-          GiftPriceCoinsField(
-            controller: _priceCtrl,
-            enabled: !isActioning,
-            validator: (v) {
-              if (v?.trim().isEmpty == true) return l10n.t('requiredField');
-              if (double.tryParse(v!.trim()) == null) {
-                return l10n.t('requiredField');
-              }
-              return null;
-            },
-          ),
-          SizedBox(height: layout.fieldGap),
-          GiftPublishedAtPicker(
-            value: _publishedAt,
-            onTap: isActioning ? null : _pickPublishedAt,
-            onClear: _publishedAt != null
-                ? () => setState(() => _publishedAt = null)
-                : null,
-          ),
-        ],
-        SizedBox(height: layout.fieldGap),
-        TextFormField(
-          controller: _sortOrderCtrl,
-          enabled: !isActioning,
-          keyboardType: TextInputType.number,
-          decoration: layout.denseDecoration(
-            labelText: l10n.tOr('giftSortOrder', 'Sort order'),
-          ),
-        ),
-        SizedBox(height: layout.fieldGap),
-        SwitchListTile.adaptive(
-          value: _isActive,
-          onChanged: isActioning
-              ? null
-              : (value) => setState(() => _isActive = value),
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          visualDensity: VisualDensity.compact,
-          title: Text(
-            l10n.tOr('activeLabel', 'Active'),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-        ),
-        if (isActioning) ...[
-          SizedBox(height: layout.fieldGap),
-          Row(
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: Text(l10n.t('savingChanges'))),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
+        const SizedBox(height: 16),
 
-  Widget _buildPreviewDialog(BuildContext context) {
-    final l10n = context.l10n;
-    final layout = GiftDialogLayout(MediaQuery.sizeOf(context));
-    final theme = Theme.of(context);
-    final gift = widget.gift;
-    final showAnimation = gift.type == GiftType.image &&
-        gift.animationUrl != null &&
-        gift.animationUrl!.trim().isNotEmpty;
-    final showAudio = gift.type == GiftType.audio &&
-        gift.audioUrl != null &&
-        gift.audioUrl!.trim().isNotEmpty;
+        _SectionHeader(
+            title: l10n.tOr('giftPublishSection', 'PUBLISHING & STATUS')),
+        const SizedBox(height: 10),
 
-    final imageTile = gift.type == GiftType.audio
-        ? layout.mediaFrame(
-            child: ColoredBox(
-              color: parseGiftHex(gift.color) ??
-                  Theme.of(context).colorScheme.secondaryContainer,
-              child: Center(
-                child: Icon(
-                  Icons.audiotrack_rounded,
-                  size: 36,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
-              ),
-            ),
-          )
-        : layout.mediaFrame(
-            child: widget.gift.thumbnailUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: widget.gift.thumbnailUrl,
-                    fit: BoxFit.contain,
-                    placeholder: (context, url) => _imagePlaceholder(),
-                    errorWidget: (context, url, error) => _imagePlaceholder(),
-                  )
-                : _imagePlaceholder(),
-          );
-
-    final secondaryTile = showAnimation
-        ? SizedBox(
-            height: layout.mediaMaxHeight + 56,
-            child: GiftAnimationPreview(
-              key: const ValueKey('preview-gift-animation-preview'),
-              compact: true,
-              expandToFill: true,
-              networkUrl: widget.gift.animationUrl,
-              fileName: widget.gift.animationUrl,
-            ),
-          )
-        : showAudio
-            ? GiftAudioPreview(
-                key: const ValueKey('preview-gift-audio-preview'),
-                networkUrl: gift.audioUrl,
-                fileName: gift.audioUrl,
-              )
-            : null;
-
-    final mediaColumn = layout.useWideLayout && secondaryTile != null
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: imageTile),
-              SizedBox(width: layout.fieldGap),
-              Expanded(child: secondaryTile),
-            ],
-          )
-        : Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              imageTile,
-              if (secondaryTile != null) ...[
-                SizedBox(height: layout.fieldGap),
-                secondaryTile,
-              ],
-            ],
-          );
-
-    final scheduleLabel = giftScheduleLabelFor(l10n, gift);
-
-    final detailsColumn = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        GiftTypePreviewBanner(type: gift.type),
-        SizedBox(height: layout.fieldGap),
-        Text(
-          widget.gift.name,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        SizedBox(height: layout.fieldGap),
-        Wrap(
-          spacing: layout.fieldGap,
-          runSpacing: layout.fieldGap,
+        // Published At & Sort Order Row
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _PreviewMetaChip(
-              label: l10n.tOr('giftSizeLabel', 'Size'),
-              value: gift.size.apiValue,
+            Expanded(
+              flex: 6,
+              child: GiftPublishedAtPicker(
+                value: _publishedAt,
+                onTap: isActioning ? null : _pickPublishedAt,
+                onClear: _publishedAt != null
+                    ? () => setState(() => _publishedAt = null)
+                    : null,
+              ),
             ),
-            _PreviewMetaChip(
-              label: l10n.tOr('giftTag', 'Tag'),
-              value: gift.tag ?? l10n.tOr('giftNoTag', 'None'),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 5,
+              child: TextFormField(
+                controller: _sortOrderCtrl,
+                enabled: !isActioning,
+                keyboardType: TextInputType.number,
+                decoration: layout.denseDecoration(
+                  labelText: l10n.tOr('giftSortOrder', 'Sort Order'),
+                  prefixIcon:
+                      const Icon(Icons.format_list_numbered_rounded, size: 18),
+                ),
+              ),
             ),
-            if (gift.color != null && gift.color!.trim().isNotEmpty)
-              _PreviewMetaChip(
-                label: l10n.tOr('giftColor', 'Color'),
-                value: gift.color!,
-                swatchColor: _parseHexColor(gift.color),
-              ),
-            if (showAudio)
-              _PreviewMetaChip(
-                label: l10n.tOr('giftAudioUrl', 'Audio URL'),
-                value: gift.audioUrl!,
-              ),
-            if (showAnimation)
-              _PreviewMetaChip(
-                label: l10n.tOr('giftAnimationUrl', 'Animation URL'),
-                value: gift.animationUrl!,
-              ),
           ],
         ),
-        SizedBox(height: layout.fieldGap),
-        _PreviewMetaChip(
-          label: l10n.tOr('giftFilterPublished', 'Published'),
-          value: scheduleLabel.text,
-        ),
-        SizedBox(height: layout.fieldGap),
-        GiftPriceCoinsField(
-          controller: _priceCtrl,
-          enabled: false,
-          validator: (_) => null,
-        ),
-        SizedBox(height: layout.fieldGap),
-        GiftPublishedAtPicker(
-          value: _publishedAt,
-          onTap: null,
-        ),
-      ],
-    );
+        const SizedBox(height: 12),
 
-    return AlertDialog(
-      insetPadding: layout.insetPadding,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(l10n.tOr('previewGift', 'Preview gift')),
-      content: SizedBox(
-        width: layout.dialogWidth,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: layout.maxBodyHeight),
-          child: SingleChildScrollView(
-            primary: false,
-            child: layout.useWideLayout
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 6, child: mediaColumn),
-                      SizedBox(width: layout.gap),
-                      Expanded(flex: 5, child: detailsColumn),
-                    ],
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      mediaColumn,
-                      SizedBox(height: layout.gap),
-                      detailsColumn,
-                    ],
-                  ),
+        // Active Status Switch Card
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border:
+                Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          ),
+          child: SwitchListTile.adaptive(
+            value: _isActive,
+            onChanged: isActioning
+                ? null
+                : (value) => setState(() => _isActive = value),
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            title: Text(
+              l10n.tOr('activeLabel', 'Active Status'),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              _isActive
+                  ? l10n.tOr('giftActiveHint', 'Visible to users in store')
+                  : l10n.tOr('giftInactiveHint', 'Hidden from users'),
+              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+            ),
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.t('close')),
-        ),
       ],
     );
   }
 
-  Widget _imagePlaceholder() {
-    final scheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: scheme.surfaceContainerHighest,
-      child: Center(
-        child: Icon(Icons.card_giftcard_rounded,
-            size: 40, color: scheme.onSurfaceVariant),
+  // Footer Actions Widget
+  Widget _buildFooter(
+    BuildContext context,
+    AppLocalizations l10n,
+    bool isActioning,
+  ) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      color: scheme.surfaceContainerLowest,
+      child: Row(
+        children: [
+          if (isActioning || _uploadingAnimation || _uploadingAudio) ...[
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isActioning
+                    ? l10n.t('savingChanges')
+                    : l10n.tOr('uploadingFile', 'Uploading file…'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary,
+                ),
+              ),
+            ),
+          ] else
+            const Spacer(),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(l10n.t('cancel')),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: (isActioning || _uploadingAnimation || _uploadingAudio)
+                ? null
+                : _submit,
+            icon: const Icon(Icons.save_rounded, size: 18),
+            label: Text(l10n.t('save')),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Parses a `#RRGGBB` (or `RRGGBB`) hex string into a [Color], or `null`
-/// when the value is missing/malformed.
-Color? _parseHexColor(String? hex) {
-  if (hex == null || hex.trim().isEmpty) return null;
-  final cleaned = hex.trim().replaceFirst('#', '');
-  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(cleaned)) return null;
-  return Color(int.parse('FF$cleaned', radix: 16));
-}
+// Section Header Helper
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
 
-class _PreviewMetaChip extends StatelessWidget {
-  const _PreviewMetaChip({
-    required this.label,
-    required this.value,
-    this.swatchColor,
-  });
-
-  final String label;
-  final String value;
-  final Color? swatchColor;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: scheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
+
+    return Row(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+            color: scheme.primary,
           ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (swatchColor != null) ...[
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: swatchColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: scheme.outlineVariant),
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: scheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Divider(
+            height: 1,
+            color: scheme.primary.withValues(alpha: 0.2),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

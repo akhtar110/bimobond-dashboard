@@ -8,6 +8,7 @@ import '../../domain/entities/filters_effects_entities.dart';
 import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
 import '../bloc/filters_effects_state.dart';
+import '../utils/fe_api_errors.dart';
 import '../utils/fe_filter_preview_support.dart';
 import '../utils/filters_effects_responsive.dart';
 import '../widgets/ar_overlays_tab.dart';
@@ -91,12 +92,43 @@ class _FiltersEffectsManagementPageState
               }
               final scheme = Theme.of(context).colorScheme;
               final isError = state.isErrorMessage;
+              final text = _resolveMessage(context, state);
+              final isDuplicatePopup =
+                  state.message == feFilterEffectAlreadyExistsKey;
+
+              // Clear first so the same conflict can be shown again later.
+              context.read<FiltersEffectsBloc>().add(
+                const ClearFiltersEffectsMessage(),
+              );
+
+              // Duplicate create/edit must use a dialog: snackbars sit under the
+              // open editor modal and are not visible.
+              if (isError && isDuplicatePopup) {
+                final l10n = context.l10n;
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(
+                      l10n.tOr('error', 'Error'),
+                    ),
+                    content: Text(text),
+                    actions: [
+                      FilledButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text(l10n.tOr('close', 'Close')),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
                 ..showSnackBar(
                   SnackBar(
                     content: Text(
-                      _resolveMessage(context, state),
+                      text,
                       style: TextStyle(
                         color: isError ? scheme.onError : Colors.white,
                       ),
@@ -107,9 +139,6 @@ class _FiltersEffectsManagementPageState
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
-              context.read<FiltersEffectsBloc>().add(
-                const ClearFiltersEffectsMessage(),
-              );
             },
             builder: (context, state) {
               final isInitialLoad =

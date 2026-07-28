@@ -238,6 +238,17 @@ class EffectEditorBloc extends Bloc<EffectEditorEvent, EffectEditorState> {
         ),
       );
     } catch (e) {
+      // Duplicate name/slug is handled by the backend; always surface a snackbar.
+      if (isFeDuplicateConflict(e)) {
+        emit(
+          current.copyWith(
+            isSaving: false,
+            submitError: feFilterEffectAlreadyExistsKey,
+            clearFieldErrors: true,
+          ),
+        );
+        return;
+      }
       final message = formatFeApiError(e);
       final serverErrors = _serverFieldErrors(e);
       if (serverErrors.isNotEmpty) {

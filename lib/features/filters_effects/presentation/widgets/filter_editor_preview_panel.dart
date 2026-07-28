@@ -51,12 +51,12 @@ class FilterEditorPreviewPanel extends StatelessWidget {
         _SummaryCard(
           children: [
             _SummaryRow(
-              label: l10n.tOr('feFieldSlug', 'Slug'),
-              value: form.slug.trim().isEmpty ? '—' : form.slug.trim(),
+              label: l10n.tOr('feFieldName', 'Name'),
+              value: form.label.trim().isEmpty ? '—' : form.label.trim(),
             ),
             _SummaryRow(
-              label: l10n.tOr('feFieldLabel', 'Label'),
-              value: form.label.trim().isEmpty ? '—' : form.label.trim(),
+              label: l10n.tOr('feFieldSlug', 'Slug'),
+              value: form.slug.trim().isEmpty ? '—' : form.slug.trim(),
             ),
             if (form.customLabel != null && form.customLabel!.trim().isNotEmpty)
               _SummaryRow(

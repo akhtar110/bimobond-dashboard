@@ -184,73 +184,82 @@ class _ChildrenPanelHeader extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (showBackButton) ...[
-            IconButton(
-              tooltip: l10n.tOr('back', 'Back'),
-              icon: const Icon(Icons.arrow_back_rounded),
-              visualDensity: VisualDensity.compact,
-              onPressed: onBack,
-            ),
-            const SizedBox(width: 4),
-          ],
-          CategoryIcon(
-            category: root,
-            size: 40,
-            borderRadius: BorderRadius.circular(10),
-            backgroundColor: accent.withValues(alpha: 0.12),
-            iconColor: accent,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  root.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 520;
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showBackButton) ...[
+                IconButton(
+                  tooltip: l10n.tOr('back', 'Back'),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onBack,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  hasSearch
-                      ? l10n.tOr(
-                          'showingChildResultsCount',
-                          'Showing $shownCount of $totalCount subcategories',
-                        )
-                      : l10n.tOr(
-                          'subcategoriesCount',
-                          '${formatCategoryCount(totalCount)} subcategories',
-                        ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
+                const SizedBox(width: 4),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (MediaQuery.sizeOf(context).width < 480)
-            Tooltip(
-              message: l10n.t('addSubcategory'),
-              child: IconButton(
-                icon: Icon(Icons.add_rounded, color: accent),
-                visualDensity: VisualDensity.compact,
-                onPressed: isSubmitting ? null : onAddSubcategory,
+              CategoryIcon(
+                category: root,
+                size: narrow ? 34 : 40,
+                borderRadius: BorderRadius.circular(10),
+                backgroundColor: accent.withValues(alpha: 0.12),
+                iconColor: accent,
               ),
-            )
-          else
-            _AddSubcategoryButton(
-              accent: accent,
-              enabled: !isSubmitting,
-              onPressed: onAddSubcategory,
-            ),
-        ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      root.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: narrow ? 15 : null,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasSearch
+                          ? l10n.tOr(
+                              'showingChildResultsCount',
+                              'Showing $shownCount of $totalCount subcategories',
+                            )
+                          : l10n.tOr(
+                              'subcategoriesCount',
+                              '${formatCategoryCount(totalCount)} subcategories',
+                            ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (narrow)
+                Tooltip(
+                  message: l10n.t('addSubcategory'),
+                  child: IconButton(
+                    icon: Icon(Icons.add_rounded, color: accent),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: isSubmitting ? null : onAddSubcategory,
+                  ),
+                )
+              else
+                _AddSubcategoryButton(
+                  accent: accent,
+                  enabled: !isSubmitting,
+                  onPressed: onAddSubcategory,
+                ),
+            ],
+          );
+        },
       ),
     );
   }
