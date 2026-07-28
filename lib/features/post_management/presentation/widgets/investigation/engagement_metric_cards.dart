@@ -12,7 +12,11 @@ class EngagementMetricCards extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cols = constraints.maxWidth > 520 ? 3 : 2;
+        final cols = constraints.maxWidth >= 520
+            ? 3
+            : constraints.maxWidth >= 320
+                ? 2
+                : 1;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

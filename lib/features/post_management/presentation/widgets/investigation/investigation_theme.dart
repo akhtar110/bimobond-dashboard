@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 
 /// Shared spacing + breakpoint tokens for the moderation dashboard.
 abstract final class InvestigationTheme {
+  /// Minimum width for three-column moderation layout (with sidebar open,
+  /// content pane is often narrower than full viewport).
+  static const threeColumn = 1280.0;
   static const desktop = 1200.0;
   static const wide = 1440.0;
   static const tablet = 768.0;
+  /// Side-by-side post fields + moderation row (tablet landscape / narrow desktop).
+  static const twoColumnRow = 992.0;
+  static const compact = 480.0;
 
   static const s4 = 4.0;
   static const s8 = 8.0;
@@ -36,9 +42,7 @@ abstract final class InvestigationTheme {
     return BoxDecoration(
       color: scheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: scheme.outlineVariant.withValues(alpha: 0.55),
-      ),
+      border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.55)),
       boxShadow: [
         BoxShadow(
           color: scheme.shadow.withValues(alpha: 0.05),

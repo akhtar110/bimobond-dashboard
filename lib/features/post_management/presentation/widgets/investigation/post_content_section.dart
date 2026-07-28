@@ -88,7 +88,9 @@ class PostContentSection extends StatelessWidget {
               _PostInfoRow(
                 icon: Icons.calendar_today_outlined,
                 label: l10n.t('created'),
-                value: DateFormat('MMM dd, yyyy · HH:mm').format(draft.createdAt),
+                value: DateFormat(
+                  'MMM dd, yyyy · HH:mm',
+                ).format(draft.createdAt),
               ),
               if (draft.media.isNotEmpty) ...[
                 const SizedBox(height: InvestigationTheme.s8),
@@ -112,15 +114,20 @@ class PostContentSection extends StatelessWidget {
               const SizedBox(height: InvestigationTheme.s12),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final sideBySide = constraints.maxWidth >= 480;
+                  final sideBySide =
+                      constraints.maxWidth >= InvestigationTheme.compact + 80;
                   final category = _CategoryDropdown(
                     draft: draft,
                     isBusy: isBusy,
                     onCategorySelected: onCategorySelected,
                   );
                   final privacy = DropdownButtonFormField<String>(
-                    initialValue: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
-                            .contains(draft.privacyStatus)
+                    initialValue:
+                        const [
+                          'PUBLIC',
+                          'PRIVATE',
+                          'FRIENDS',
+                        ].contains(draft.privacyStatus)
                         ? draft.privacyStatus
                         : 'PUBLIC',
                     decoration: InvestigationTheme.fieldDecoration(
@@ -216,10 +223,12 @@ class PostContentSection extends StatelessWidget {
               const SizedBox(height: InvestigationTheme.s12),
               Text(
                 context.tr('postTimestamps', {
-                  'created': DateFormat('MMM dd, yyyy · HH:mm')
-                      .format(draft.createdAt),
-                  'updated': DateFormat('MMM dd, yyyy · HH:mm')
-                      .format(draft.updatedAt),
+                  'created': DateFormat(
+                    'MMM dd, yyyy · HH:mm',
+                  ).format(draft.createdAt),
+                  'updated': DateFormat(
+                    'MMM dd, yyyy · HH:mm',
+                  ).format(draft.updatedAt),
                 }),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
@@ -276,11 +285,7 @@ class _PostInfoRow extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _Badge({required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -332,15 +337,16 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-String? _resolveCategoryLabel(ManagedPostEntity draft, CategoriesState catState) {
+String? _resolveCategoryLabel(
+  ManagedPostEntity draft,
+  CategoriesState catState,
+) {
   if (draft.category != null && draft.category!.trim().isNotEmpty) {
     return draft.category;
   }
 
   final entityId = draft.categoryEntity?.id;
-  if (entityId != null &&
-      entityId.isNotEmpty &&
-      catState is CategoriesLoaded) {
+  if (entityId != null && entityId.isNotEmpty && catState is CategoriesLoaded) {
     for (final cat in catState.catalogCategories) {
       if (cat.id == entityId) return cat.name;
     }
@@ -403,11 +409,13 @@ class _CategoryDropdown extends StatelessWidget {
         }
         final selectedId =
             (resolvedId != null && cats.any((c) => c.id == resolvedId))
-                ? resolvedId
-                : null;
+            ? resolvedId
+            : null;
 
         return DropdownButtonFormField<String?>(
-          key: ValueKey('cat_${draft.id}_${selectedId ?? draft.category ?? ''}'),
+          key: ValueKey(
+            'cat_${draft.id}_${selectedId ?? draft.category ?? ''}',
+          ),
           initialValue: selectedId,
           isExpanded: true,
           decoration: InvestigationTheme.fieldDecoration(

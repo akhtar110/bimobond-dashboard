@@ -11,9 +11,10 @@ class InvestigationSkeleton extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final desktop = constraints.maxWidth >= InvestigationTheme.desktop;
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        final threeColumn = constraints.maxWidth >= InvestigationTheme.threeColumn;
+        final pagePad = constraints.maxWidth < InvestigationTheme.tablet ? 12.0 : 20.0;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(pagePad, 8, pagePad, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -21,8 +22,7 @@ class InvestigationSkeleton extends StatelessWidget {
               const SizedBox(height: InvestigationTheme.s8),
               _Bone(scheme: scheme, height: 14, width: 420),
               const SizedBox(height: InvestigationTheme.s24),
-              Expanded(
-                child: desktop
+              threeColumn
                     ? Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -39,9 +39,17 @@ class InvestigationSkeleton extends StatelessWidget {
                             flex: 40,
                             child: Column(
                               children: [
-                                _Bone(scheme: scheme, height: 120, radius: InvestigationTheme.radius),
+                                _Bone(
+                                  scheme: scheme,
+                                  height: 120,
+                                  radius: InvestigationTheme.radius,
+                                ),
                                 const SizedBox(height: 12),
-                                _Bone(scheme: scheme, height: 240, radius: InvestigationTheme.radius),
+                                _Bone(
+                                  scheme: scheme,
+                                  height: 240,
+                                  radius: InvestigationTheme.radius,
+                                ),
                               ],
                             ),
                           ),
@@ -50,9 +58,17 @@ class InvestigationSkeleton extends StatelessWidget {
                             flex: 32,
                             child: Column(
                               children: [
-                                _Bone(scheme: scheme, height: 180, radius: InvestigationTheme.radius),
+                                _Bone(
+                                  scheme: scheme,
+                                  height: 180,
+                                  radius: InvestigationTheme.radius,
+                                ),
                                 const SizedBox(height: 12),
-                                _Bone(scheme: scheme, height: 220, radius: InvestigationTheme.radius),
+                                _Bone(
+                                  scheme: scheme,
+                                  height: 220,
+                                  radius: InvestigationTheme.radius,
+                                ),
                               ],
                             ),
                           ),
@@ -66,14 +82,25 @@ class InvestigationSkeleton extends StatelessWidget {
                             radius: InvestigationTheme.radius,
                           ),
                           const SizedBox(height: 12),
-                          _Bone(scheme: scheme, height: 200, radius: InvestigationTheme.radius),
+                          _Bone(
+                            scheme: scheme,
+                            height: 200,
+                            radius: InvestigationTheme.radius,
+                          ),
                           const SizedBox(height: 12),
-                          _Bone(scheme: scheme, height: 280, radius: InvestigationTheme.radius),
+                          _Bone(
+                            scheme: scheme,
+                            height: 280,
+                            radius: InvestigationTheme.radius,
+                          ),
                         ],
                       ),
-              ),
               const SizedBox(height: 16),
-              _Bone(scheme: scheme, height: 180, radius: InvestigationTheme.radius),
+              _Bone(
+                scheme: scheme,
+                height: 180,
+                radius: InvestigationTheme.radius,
+              ),
             ],
           ),
         );
