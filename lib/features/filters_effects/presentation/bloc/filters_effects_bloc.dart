@@ -122,6 +122,7 @@ class FiltersEffectsBloc
     on<PublishFiltersEffectsCatalogEvent>(_onPublishCatalog);
     on<SeedFiltersEffectsCatalogEvent>(_onSeedCatalog);
     on<ClearFiltersEffectsMessage>(_onClearMessage);
+    on<ShowFiltersEffectsMessage>(_onShowMessage);
     on<ToggleFilterSelectionEvent>(_onToggleFilterSelection);
     on<ToggleEffectSelectionEvent>(_onToggleEffectSelection);
     on<SelectAllVisibleFiltersEvent>(_onSelectAllVisibleFilters);
@@ -903,10 +904,16 @@ class FiltersEffectsBloc
     } catch (e) {
       final after = _currentLoaded();
       if (after != null) {
+        final preferConflictKey =
+            conflictKey == feFilterEffectAlreadyExistsKey ||
+            conflictKey == 'feVersionAlreadyPublished';
+        final message = preferConflictKey && isFeDuplicateConflict(e)
+            ? conflictKey
+            : formatFeApiError(e, conflictKey: conflictKey);
         emit(
           after.copyWith(
             isActioning: false,
-            message: formatFeApiError(e, conflictKey: conflictKey),
+            message: message,
             isErrorMessage: true,
           ),
         );
@@ -921,6 +928,7 @@ class FiltersEffectsBloc
     emit,
     () => _createFilter(event.request),
     successMessage: 'feFilterCreatedSuccess',
+    conflictKey: feFilterEffectAlreadyExistsKey,
   );
 
   Future<void> _onUpdateFilter(
@@ -1040,6 +1048,7 @@ class FiltersEffectsBloc
     emit,
     () => _createEffect(event.request),
     successMessage: 'feEffectCreatedSuccess',
+    conflictKey: feFilterEffectAlreadyExistsKey,
   );
 
   Future<void> _onUpdateEffect(
@@ -1209,5 +1218,20 @@ class FiltersEffectsBloc
     final current = _currentLoaded();
     if (current == null) return;
     emit(current.copyWith(clearMessage: true, operationSuccess: false));
+  }
+
+  void _onShowMessage(
+    ShowFiltersEffectsMessage event,
+    Emitter<FiltersEffectsState> emit,
+  ) {
+    final current = _currentLoaded();
+    if (current == null) return;
+    emit(
+      current.copyWith(
+        message: event.message,
+        isErrorMessage: event.isError,
+        operationSuccess: false,
+      ),
+    );
   }
 }

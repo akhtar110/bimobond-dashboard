@@ -91,7 +91,9 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final useSplitView = constraints.maxWidth >= 720;
+                // Prefer stacked master→detail below ~1000px so selected
+                // category + subcategories aren't crushed on laptop widths.
+                final useSplitView = constraints.maxWidth >= 1000;
                 if (useSplitView) {
                   return _SplitMasterDetailView(
                     state: widget.state,
@@ -99,6 +101,7 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
                     onFormRequest: widget.onFormRequest,
                     onDeleteRequest: widget.onDeleteRequest,
                     useInfiniteScroll: metrics.useInfiniteScroll,
+                    availableWidth: constraints.maxWidth,
                   );
                 }
                 return _MobileMasterDetailView(
@@ -166,6 +169,7 @@ class _SplitMasterDetailView extends StatelessWidget {
     required this.onFormRequest,
     required this.onDeleteRequest,
     required this.useInfiniteScroll,
+    required this.availableWidth,
   });
 
   final CategoriesLoaded state;
@@ -173,17 +177,20 @@ class _SplitMasterDetailView extends StatelessWidget {
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
   final bool useInfiniteScroll;
+  final double availableWidth;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final hideSubs = state.typeFilter == CategoryTypeFilter.rootOnly;
+    // Keep master panel proportional so the subcategory panel stays usable.
+    final masterWidth = (availableWidth * 0.34).clamp(280.0, 360.0);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          width: 360,
+          width: masterWidth,
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: scheme.surfaceContainerLowest,
