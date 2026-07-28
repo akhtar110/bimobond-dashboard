@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -24,24 +26,31 @@ class BulkUserSelector extends StatefulWidget {
 class _BulkUserSelectorState extends State<BulkUserSelector> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  Timer? _searchDebounce;
   bool _showDropdown = false;
+
+  static const _searchDebounceDuration = Duration(milliseconds: 250);
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _dispatchSearch(String query) {
+    context.read<NotificationsBloc>().add(NotificationUserSearchChanged(query));
   }
 
   void _addUser(UserEntity user) {
     if (widget.selectedUsers.any((u) => u.id == user.id)) return;
     final updated = [...widget.selectedUsers, user];
     widget.onChanged(updated);
+    _searchDebounce?.cancel();
     _controller.clear();
     setState(() => _showDropdown = false);
-    context.read<NotificationsBloc>().add(
-          const NotificationUserSearchChanged(''),
-        );
+    _dispatchSearch('');
   }
 
   void _removeUser(UserEntity user) {
@@ -52,9 +61,15 @@ class _BulkUserSelectorState extends State<BulkUserSelector> {
 
   void _onSearchChanged(String query) {
     setState(() => _showDropdown = true);
-    context.read<NotificationsBloc>().add(
-          NotificationUserSearchChanged(query),
-        );
+    _searchDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      _dispatchSearch('');
+      return;
+    }
+    _searchDebounce = Timer(_searchDebounceDuration, () {
+      if (!mounted) return;
+      _dispatchSearch(_controller.text);
+    });
   }
 
   @override
@@ -107,10 +122,9 @@ class _BulkUserSelectorState extends State<BulkUserSelector> {
                       )
                     : const Icon(Icons.group_add_outlined),
                 suffixText: widget.selectedUsers.isNotEmpty
-                    ? l10n.tArgs(
-                        'notificationUsersSelected',
-                        {'count': '${widget.selectedUsers.length}'},
-                      )
+                    ? l10n.tArgs('notificationUsersSelected', {
+                        'count': '${widget.selectedUsers.length}',
+                      })
                     : null,
                 suffixStyle: TextStyle(
                   color: scheme.primary,
@@ -121,8 +135,9 @@ class _BulkUserSelectorState extends State<BulkUserSelector> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 filled: true,
-                fillColor:
-                    scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                fillColor: scheme.surfaceContainerHighest.withValues(
+                  alpha: 0.4,
+                ),
                 hintText: l10n.t('notificationBulkSearchHint'),
               ),
               onChanged: _onSearchChanged,
@@ -154,8 +169,9 @@ class _BulkUserSelectorState extends State<BulkUserSelector> {
                     ),
                     itemBuilder: (context, i) {
                       final user = state.userSearchResults[i];
-                      final alreadyAdded =
-                          widget.selectedUsers.any((u) => u.id == user.id);
+                      final alreadyAdded = widget.selectedUsers.any(
+                        (u) => u.id == user.id,
+                      );
                       return _BulkUserTile(
                         user: user,
                         alreadyAdded: alreadyAdded,
@@ -200,10 +216,7 @@ class _UserChip extends StatelessWidget {
       deleteIcon: const Icon(Icons.close, size: 14),
       onDeleted: onRemove,
       backgroundColor: scheme.primaryContainer.withValues(alpha: 0.5),
-      labelStyle: TextStyle(
-        color: scheme.onPrimaryContainer,
-        fontSize: 13,
-      ),
+      labelStyle: TextStyle(color: scheme.onPrimaryContainer, fontSize: 13),
     );
   }
 }
@@ -249,27 +262,32 @@ class _BulkUserTile extends StatelessWidget {
                   children: [
                     Text(
                       '@${user.username}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (user.fullName != null)
                       Text(
                         user.fullName!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                   ],
                 ),
               ),
               if (alreadyAdded)
-                Icon(Icons.check_circle_rounded,
-                    size: 18, color: scheme.primary)
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: scheme.primary,
+                )
               else
-                Icon(Icons.add_circle_outline_rounded,
-                    size: 18, color: scheme.onSurfaceVariant),
+                Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
             ],
           ),
         ),

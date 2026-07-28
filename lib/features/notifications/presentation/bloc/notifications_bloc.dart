@@ -17,8 +17,7 @@ import '../../domain/usecases/notifications_usecases.dart';
 part 'notifications_event.dart';
 part 'notifications_state.dart';
 
-class NotificationsBloc
-    extends Bloc<NotificationsEvent, NotificationsState> {
+class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   NotificationsBloc({
     required this.sendNotification,
     required this.sendBulkNotification,
@@ -66,11 +65,9 @@ class NotificationsBloc
 
   StreamSubscription<AdminNotificationEventEntity>? _socketSub;
   Timer? _scheduleTimer;
+  int _userSearchToken = 0;
 
-  void _onConnect(
-    ConnectAdminSocket event,
-    Emitter<NotificationsState> emit,
-  ) {
+  void _onConnect(ConnectAdminSocket event, Emitter<NotificationsState> emit) {
     repository.connectAdminSocket();
 
     _socketSub?.cancel();
@@ -103,10 +100,9 @@ class NotificationsBloc
     SendNotificationRequested event,
     Emitter<NotificationsState> emit,
   ) async {
-    emit(state.copyWith(
-      status: NotificationsSendStatus.sending,
-      clearError: true,
-    ));
+    emit(
+      state.copyWith(status: NotificationsSendStatus.sending, clearError: true),
+    );
     try {
       final result = await sendNotification(
         NotificationRequestEntity(
@@ -118,15 +114,19 @@ class NotificationsBloc
           data: event.data,
         ),
       );
-      emit(state.copyWith(
-        status: NotificationsSendStatus.sent,
-        lastResult: result,
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.sent,
+          lastResult: result,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: NotificationsSendStatus.error,
-        errorMessage: _friendlyError(e),
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.error,
+          errorMessage: _friendlyError(e),
+        ),
+      );
     }
   }
 
@@ -134,10 +134,9 @@ class NotificationsBloc
     SendBulkNotificationRequested event,
     Emitter<NotificationsState> emit,
   ) async {
-    emit(state.copyWith(
-      status: NotificationsSendStatus.sending,
-      clearError: true,
-    ));
+    emit(
+      state.copyWith(status: NotificationsSendStatus.sending, clearError: true),
+    );
     try {
       final result = await sendBulkNotification(
         NotificationRequestEntity(
@@ -149,15 +148,19 @@ class NotificationsBloc
           data: event.data,
         ),
       );
-      emit(state.copyWith(
-        status: NotificationsSendStatus.sent,
-        lastResult: result,
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.sent,
+          lastResult: result,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: NotificationsSendStatus.error,
-        errorMessage: _friendlyError(e),
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.error,
+          errorMessage: _friendlyError(e),
+        ),
+      );
     }
   }
 
@@ -165,10 +168,9 @@ class NotificationsBloc
     BroadcastNotificationRequested event,
     Emitter<NotificationsState> emit,
   ) async {
-    emit(state.copyWith(
-      status: NotificationsSendStatus.sending,
-      clearError: true,
-    ));
+    emit(
+      state.copyWith(status: NotificationsSendStatus.sending, clearError: true),
+    );
     try {
       final result = await broadcastNotification(
         NotificationRequestEntity(
@@ -179,15 +181,19 @@ class NotificationsBloc
           data: event.data,
         ),
       );
-      emit(state.copyWith(
-        status: NotificationsSendStatus.sent,
-        lastResult: result,
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.sent,
+          lastResult: result,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: NotificationsSendStatus.error,
-        errorMessage: _friendlyError(e),
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.error,
+          errorMessage: _friendlyError(e),
+        ),
+      );
     }
   }
 
@@ -195,10 +201,9 @@ class NotificationsBloc
     BroadcastAdminsRequested event,
     Emitter<NotificationsState> emit,
   ) async {
-    emit(state.copyWith(
-      status: NotificationsSendStatus.sending,
-      clearError: true,
-    ));
+    emit(
+      state.copyWith(status: NotificationsSendStatus.sending, clearError: true),
+    );
     try {
       final result = await broadcastAdminsNotification(
         NotificationRequestEntity(
@@ -209,15 +214,19 @@ class NotificationsBloc
           data: event.data,
         ),
       );
-      emit(state.copyWith(
-        status: NotificationsSendStatus.sent,
-        lastResult: result,
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.sent,
+          lastResult: result,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: NotificationsSendStatus.error,
-        errorMessage: _friendlyError(e),
-      ));
+      emit(
+        state.copyWith(
+          status: NotificationsSendStatus.error,
+          errorMessage: _friendlyError(e),
+        ),
+      );
     }
   }
 
@@ -226,25 +235,30 @@ class NotificationsBloc
     Emitter<NotificationsState> emit,
   ) async {
     final query = event.query.trim();
-    emit(state.copyWith(
-      userSearchQuery: query,
-      userSearchLoading: query.isNotEmpty,
-      userSearchResults: query.isEmpty ? [] : state.userSearchResults,
-    ));
+    final searchToken = ++_userSearchToken;
+    final previousQuery = state.userSearchQuery;
+
+    emit(
+      state.copyWith(
+        userSearchQuery: query,
+        userSearchLoading: query.isNotEmpty,
+        userSearchResults: query.isEmpty
+            ? []
+            : (query == previousQuery ? state.userSearchResults : []),
+      ),
+    );
 
     if (query.isEmpty) return;
 
     try {
       final page = await getUsers(page: 1, limit: 10, search: query);
-      emit(state.copyWith(
-        userSearchResults: page.users,
-        userSearchLoading: false,
-      ));
+      if (searchToken != _userSearchToken) return;
+      emit(
+        state.copyWith(userSearchResults: page.users, userSearchLoading: false),
+      );
     } catch (_) {
-      emit(state.copyWith(
-        userSearchResults: [],
-        userSearchLoading: false,
-      ));
+      if (searchToken != _userSearchToken) return;
+      emit(state.copyWith(userSearchResults: [], userSearchLoading: false));
     }
   }
 
@@ -252,11 +266,13 @@ class NotificationsBloc
     ClearNotificationStatus event,
     Emitter<NotificationsState> emit,
   ) {
-    emit(state.copyWith(
-      status: NotificationsSendStatus.idle,
-      clearError: true,
-      clearResult: true,
-    ));
+    emit(
+      state.copyWith(
+        status: NotificationsSendStatus.idle,
+        clearError: true,
+        clearResult: true,
+      ),
+    );
   }
 
   void _onScheduleModeChanged(
@@ -268,8 +284,7 @@ class NotificationsBloc
         isScheduled: event.isScheduled,
         clearScheduledDateTime: !event.isScheduled,
         scheduledDateTime: event.isScheduled
-            ? (state.scheduledDateTime ??
-                _defaultScheduledDateTime())
+            ? (state.scheduledDateTime ?? _defaultScheduledDateTime())
             : null,
         clearError: true,
       ),
@@ -304,10 +319,7 @@ class NotificationsBloc
     }
 
     emit(
-      state.copyWith(
-        status: NotificationsSendStatus.sending,
-        clearError: true,
-      ),
+      state.copyWith(status: NotificationsSendStatus.sending, clearError: true),
     );
 
     final timezoneName = DateTime.now().timeZoneName;
@@ -449,7 +461,8 @@ class NotificationsBloc
     if (msg.contains('401')) return 'Unauthorized. Please log in again.';
     if (msg.contains('403')) return 'Insufficient permissions for this action.';
     if (msg.contains('404')) return 'User not found.';
-    if (msg.contains('400')) return 'Invalid request. Please check your inputs.';
+    if (msg.contains('400'))
+      return 'Invalid request. Please check your inputs.';
     if (msg.contains('500')) return 'Server error. Please try again later.';
     return msg.replaceFirst('Exception: ', '');
   }
@@ -460,13 +473,15 @@ class NotificationsBloc
     FetchNotificationsRequested event,
     Emitter<NotificationsState> emit,
   ) async {
-    emit(state.copyWith(
-      notificationsLoading: true,
-      notifications: [],
-      notificationsPage: 0,
-      notificationsHasReachedMax: false,
-      clearNotificationsError: true,
-    ));
+    emit(
+      state.copyWith(
+        notificationsLoading: true,
+        notifications: [],
+        notificationsPage: 0,
+        notificationsHasReachedMax: false,
+        clearNotificationsError: true,
+      ),
+    );
     await _fetchPage(1, emit, replace: true);
   }
 
@@ -474,13 +489,15 @@ class NotificationsBloc
     RefreshNotificationsRequested event,
     Emitter<NotificationsState> emit,
   ) async {
-    emit(state.copyWith(
-      notificationsLoading: true,
-      notifications: [],
-      notificationsPage: 0,
-      notificationsHasReachedMax: false,
-      clearNotificationsError: true,
-    ));
+    emit(
+      state.copyWith(
+        notificationsLoading: true,
+        notifications: [],
+        notificationsPage: 0,
+        notificationsHasReachedMax: false,
+        clearNotificationsError: true,
+      ),
+    );
     await _fetchPage(1, emit, replace: true);
   }
 
@@ -500,14 +517,16 @@ class NotificationsBloc
     Emitter<NotificationsState> emit,
   ) async {
     if (event.filters == state.filters) return;
-    emit(state.copyWith(
-      filters: event.filters,
-      notificationsLoading: true,
-      notifications: [],
-      notificationsPage: 0,
-      notificationsHasReachedMax: false,
-      clearNotificationsError: true,
-    ));
+    emit(
+      state.copyWith(
+        filters: event.filters,
+        notificationsLoading: true,
+        notifications: [],
+        notificationsPage: 0,
+        notificationsHasReachedMax: false,
+        clearNotificationsError: true,
+      ),
+    );
     await _fetchPage(1, emit, replace: true);
   }
 
@@ -516,14 +535,16 @@ class NotificationsBloc
     Emitter<NotificationsState> emit,
   ) async {
     if (state.filters.isEmpty) return;
-    emit(state.copyWith(
-      filters: const NotificationFilters(),
-      notificationsLoading: true,
-      notifications: [],
-      notificationsPage: 0,
-      notificationsHasReachedMax: false,
-      clearNotificationsError: true,
-    ));
+    emit(
+      state.copyWith(
+        filters: const NotificationFilters(),
+        notificationsLoading: true,
+        notifications: [],
+        notificationsPage: 0,
+        notificationsHasReachedMax: false,
+        clearNotificationsError: true,
+      ),
+    );
     await _fetchPage(1, emit, replace: true);
   }
 
@@ -541,20 +562,24 @@ class NotificationsBloc
       final newList = replace
           ? result.notifications
           : [...state.notifications, ...result.notifications];
-      emit(state.copyWith(
-        notifications: newList,
-        notificationsPage: result.page,
-        notificationsTotal: result.total,
-        notificationsHasReachedMax: result.page >= result.lastPage,
-        notificationsLoading: false,
-        notificationsLoadingMore: false,
-      ));
+      emit(
+        state.copyWith(
+          notifications: newList,
+          notificationsPage: result.page,
+          notificationsTotal: result.total,
+          notificationsHasReachedMax: result.page >= result.lastPage,
+          notificationsLoading: false,
+          notificationsLoadingMore: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        notificationsLoading: false,
-        notificationsLoadingMore: false,
-        notificationsError: _friendlyError(e),
-      ));
+      emit(
+        state.copyWith(
+          notificationsLoading: false,
+          notificationsLoadingMore: false,
+          notificationsError: _friendlyError(e),
+        ),
+      );
     }
   }
 
