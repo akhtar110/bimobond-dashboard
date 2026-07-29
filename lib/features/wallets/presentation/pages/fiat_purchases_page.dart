@@ -61,10 +61,6 @@ class _FiatPurchasesPageState extends State<FiatPurchasesPage> {
               WalletsPageHeader(
                 metrics: metrics,
                 title: walletL10nOr(context, 'walletTitleFiatPurchases', 'Fiat purchases'),
-                subtitle: walletL10nOr(context,
-                  'walletSubtitleFiatPurchases',
-                  'Find purchases by user, then filter by status or payment provider.',
-                ),
               ),
               SizedBox(height: metrics.sectionGap),
               FiatPurchasesToolbar(

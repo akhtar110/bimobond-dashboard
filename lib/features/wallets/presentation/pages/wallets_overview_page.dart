@@ -45,15 +45,15 @@ class WalletsOverviewPage extends StatelessWidget {
             children: [
               WalletOverviewHeader(
                 metrics: metrics,
-                title: walletL10nOr(context, 'walletTitleWalletKpis', 'Wallet KPIs'),
-                subtitle: walletL10nOr(context,
-                  'walletSubtitleWalletKpis',
-                  'Platform-wide wallet health, purchases, and recent ledger activity.',
+                title: walletL10nOr(
+                  context,
+                  'walletTitleWalletKpis',
+                  'Wallet KPIs',
                 ),
               ),
-              SizedBox(height: metrics.sectionGap + 4),
+              SizedBox(height: metrics.sectionGap),
               WalletOverviewKpiSection(overview: overview),
-              SizedBox(height: metrics.sectionGap * 2),
+              SizedBox(height: metrics.sectionGap),
               WalletLedgerByTypeSection(
                 items: overview.ledgerByType,
                 metrics: metrics,

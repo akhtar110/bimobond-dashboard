@@ -70,10 +70,6 @@ class CoinPackagesPage extends StatelessWidget {
               WalletsPageHeader(
                 metrics: metrics,
                 title: walletL10nOr(context, 'walletTitleCoinPackages', 'Coin packages'),
-                subtitle: walletL10nOr(context,
-                  'walletSubtitleCoinPackages',
-                  'Manage coin bundles available for fiat purchase.',
-                ),
                 trailing: canManage
                     ? FilledButton.icon(
                         onPressed: state.isSaving
