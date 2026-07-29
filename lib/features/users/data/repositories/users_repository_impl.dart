@@ -19,6 +19,7 @@ class UsersRepositoryImpl implements UsersRepository {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    String? location,
   }) async {
     final result = await remoteDataSource.getUsers(
       page: page,
@@ -26,6 +27,7 @@ class UsersRepositoryImpl implements UsersRepository {
       search: search,
       isVerified: isVerified,
       isBanned: isBanned,
+      location: location,
     );
 
     return UsersPageEntity(

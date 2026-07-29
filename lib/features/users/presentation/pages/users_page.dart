@@ -9,9 +9,13 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
+import '../users_ui_filter.dart';
 import '../utils/responsive.dart';
+import '../utils/users_list_filter_debounce.dart';
 import '../widgets/users_filter_chips.dart';
 import '../widgets/users_page_header.dart';
+import '../widgets/users_list_active_filters.dart';
+import '../widgets/users_location_filter.dart';
 import '../widgets/users_search_bar.dart';
 import '../widgets/users_selection_header.dart';
 import '../widgets/users_table_panel.dart';
@@ -44,12 +48,14 @@ class _UsersPageView extends StatefulWidget {
 
 class _UsersPageViewState extends State<_UsersPageView> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
   final ScrollController _horizontalScrollController = ScrollController();
   final ScrollController _listScrollController = ScrollController();
-  Timer? _searchDebounce;
+  Timer? _filtersDebounce;
   String _lastSubmittedQuery = '';
+  String _lastSubmittedLocation = '';
 
-  static const _searchDebounceDuration = Duration(milliseconds: 350);
+  static const _filterDebounceDuration = usersListFilterDebounce;
 
   @override
   void initState() {
@@ -59,8 +65,9 @@ class _UsersPageViewState extends State<_UsersPageView> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
+    _filtersDebounce?.cancel();
     _searchController.dispose();
+    _locationController.dispose();
     _horizontalScrollController.dispose();
     _listScrollController.removeListener(_onListScroll);
     _listScrollController.dispose();
@@ -79,23 +86,83 @@ class _UsersPageViewState extends State<_UsersPageView> {
     }
   }
 
-  void _submitSearch(String rawQuery, {bool immediate = false}) {
-    final query = rawQuery.trim();
-    if (query == _lastSubmittedQuery) return;
+  void _scheduleCombinedFilterRefresh({bool immediate = false}) {
+    final search = _searchController.text.trim();
+    final location = _locationController.text.trim();
+    if (search == _lastSubmittedQuery && location == _lastSubmittedLocation) {
+      return;
+    }
 
     void dispatch() {
       if (!mounted) return;
-      _lastSubmittedQuery = query;
-      context.read<UsersBloc>().add(SearchUsersEvent(query));
+      final nextSearch = _searchController.text.trim();
+      final nextLocation = _locationController.text.trim();
+      if (nextSearch == _lastSubmittedQuery &&
+          nextLocation == _lastSubmittedLocation) {
+        return;
+      }
+      _lastSubmittedQuery = nextSearch;
+      _lastSubmittedLocation = nextLocation;
+      context.read<UsersBloc>().add(
+        ApplyUsersListFiltersEvent(
+          search: nextSearch,
+          location: nextLocation,
+        ),
+      );
     }
 
-    _searchDebounce?.cancel();
+    _filtersDebounce?.cancel();
     if (immediate) {
       dispatch();
       return;
     }
 
-    _searchDebounce = Timer(_searchDebounceDuration, dispatch);
+    _filtersDebounce = Timer(_filterDebounceDuration, dispatch);
+  }
+
+  void _submitSearch(String rawQuery, {bool immediate = false}) {
+    _scheduleCombinedFilterRefresh(immediate: immediate);
+  }
+
+  void _submitLocationFilter(String rawQuery, {bool immediate = false}) {
+    _scheduleCombinedFilterRefresh(immediate: immediate);
+  }
+
+  void _clearSearchFilter() {
+    _filtersDebounce?.cancel();
+    _searchController.clear();
+    _lastSubmittedQuery = '';
+    context.read<UsersBloc>().add(
+      ApplyUsersListFiltersEvent(
+        search: '',
+        location: _locationController.text.trim(),
+      ),
+    );
+  }
+
+  void _clearLocationFilter() {
+    _filtersDebounce?.cancel();
+    _locationController.clear();
+    _lastSubmittedLocation = '';
+    context.read<UsersBloc>().add(
+      ApplyUsersListFiltersEvent(
+        search: _searchController.text.trim(),
+        location: '',
+      ),
+    );
+  }
+
+  void _clearStatusFilter() {
+    context.read<UsersBloc>().add(FilterUsersEvent(UsersUiFilter.all));
+  }
+
+  void _clearAllListFilters() {
+    _filtersDebounce?.cancel();
+    _searchController.clear();
+    _locationController.clear();
+    _lastSubmittedQuery = '';
+    _lastSubmittedLocation = '';
+    context.read<UsersBloc>().add(ClearUsersListFiltersEvent());
   }
 
   void _openUserDetail(UserEntity user) {
@@ -118,8 +185,9 @@ class _UsersPageViewState extends State<_UsersPageView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
-            backgroundColor:
-                state.bulkActionIsError ? scheme.errorContainer : null,
+            backgroundColor: state.bulkActionIsError
+                ? scheme.errorContainer
+                : null,
             content: Text(
               state.bulkActionMessage!,
               style: TextStyle(
@@ -153,21 +221,27 @@ class _UsersPageViewState extends State<_UsersPageView> {
             constraints: const BoxConstraints(maxWidth: 1680),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final metrics =
-                    UsersLayoutMetrics(getDeviceType(constraints.maxWidth));
+                final metrics = UsersLayoutMetrics(
+                  getDeviceType(constraints.maxWidth),
+                );
 
                 final search = UsersSearchBar(
                   controller: _searchController,
                   metrics: metrics,
                   onChanged: _submitSearch,
+                  onSubmitted: (value) => _submitSearch(value, immediate: true),
+                );
+                final locationFilter = UsersLocationFilter(
+                  controller: _locationController,
+                  metrics: metrics,
+                  onChanged: _submitLocationFilter,
                   onSubmitted: (value) =>
-                      _submitSearch(value, immediate: true),
+                      _submitLocationFilter(value, immediate: true),
                 );
                 final filters = UsersFilterChips(
                   metrics: metrics,
-                  onChanged: (filter) => context.read<UsersBloc>().add(
-                        FilterUsersEvent(filter),
-                      ),
+                  onChanged: (filter) =>
+                      context.read<UsersBloc>().add(FilterUsersEvent(filter)),
                 );
 
                 return Padding(
@@ -183,10 +257,18 @@ class _UsersPageViewState extends State<_UsersPageView> {
                       UsersPageHeader(
                         metrics: metrics,
                         searchBar: search,
+                        locationFilter: locationFilter,
                         filters: filters,
                         onRefresh: () => context.read<UsersBloc>().add(
-                              LoadUsersEvent(refresh: true),
-                            ),
+                          LoadUsersEvent(refresh: true),
+                        ),
+                      ),
+                      UsersListActiveFilters(
+                        metrics: metrics,
+                        onClearSearch: _clearSearchFilter,
+                        onClearLocation: _clearLocationFilter,
+                        onClearStatus: _clearStatusFilter,
+                        onClearAll: _clearAllListFilters,
                       ),
                       SizedBox(height: metrics.sectionSpacing),
                       UsersSelectionHeader(metrics: metrics),

@@ -19,7 +19,9 @@ class SettingsState {
 
 class SettingsCubit extends Cubit<SettingsState> {
   SettingsCubit(this._preferences)
-    : super(const SettingsState(themeMode: ThemeMode.dark, locale: Locale('en')));
+    : super(
+        const SettingsState(themeMode: ThemeMode.dark, locale: Locale('en')),
+      );
 
   final AppPreferencesLocalDataSource _preferences;
 

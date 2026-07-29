@@ -1,4 +1,5 @@
 import 'message_permission.dart';
+import 'user_last_location_entity.dart';
 import 'user_wallet_entity.dart';
 
 enum UserRole {
@@ -69,6 +70,7 @@ class UserEntity {
     required this.roles,
     this.wallet,
     this.relationCounts,
+    this.lastLocation,
   });
 
   final String id;
@@ -145,6 +147,9 @@ class UserEntity {
 
   /// Nested `_count` relations from list/detail payloads.
   final UserRelationCountsEntity? relationCounts;
+
+  /// Latest GPS point from admin list/detail (`UserLocationHistory` or profile fallback).
+  final UserLastLocationEntity? lastLocation;
 }
 
 class UsersPageEntity {

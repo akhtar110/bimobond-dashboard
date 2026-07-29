@@ -1,5 +1,6 @@
 import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/user_last_location_entity.dart';
 import '../../domain/entities/user_wallet_entity.dart';
 
 class UserModel extends UserEntity {
@@ -64,6 +65,7 @@ class UserModel extends UserEntity {
     required super.roles,
     super.wallet,
     super.relationCounts,
+    super.lastLocation,
   });
 
   factory UserModel.fromJson(
@@ -185,6 +187,7 @@ class UserModel extends UserEntity {
               : [],
       wallet: wallet,
       relationCounts: relationCounts,
+      lastLocation: UserLastLocationEntity.tryParse(json['lastLocation']),
     );
   }
 
@@ -203,6 +206,7 @@ class UserModel extends UserEntity {
     int? totalLikes,
     UserWalletEntity? wallet,
     UserRelationCountsEntity? relationCounts,
+    UserLastLocationEntity? lastLocation,
   }) {
     return UserModel(
       id: id,
@@ -265,6 +269,7 @@ class UserModel extends UserEntity {
       roles: roles,
       wallet: wallet ?? this.wallet,
       relationCounts: relationCounts ?? this.relationCounts,
+      lastLocation: lastLocation ?? this.lastLocation,
     );
   }
 

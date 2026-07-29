@@ -1,20 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
-
-String formatUserLocation(BuildContext context, UserEntity user) {
-  final parts = [
-    user.city,
-    user.region,
-    user.country,
-  ].where((p) => p != null && p.isNotEmpty).toList();
-  return parts.isEmpty
-      ? context.l10n.t('notProvided')
-      : parts.join(', ');
-}
+import '../utils/user_location_list_utils.dart';
 
 class UserDetailSectionTitle extends StatelessWidget {
   const UserDetailSectionTitle(this.title, {super.key, this.color});
@@ -60,11 +50,7 @@ class UserDetailInfoItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: scheme.onSurfaceVariant,
-          ),
+          Icon(icon, size: 20, color: scheme.onSurfaceVariant),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
