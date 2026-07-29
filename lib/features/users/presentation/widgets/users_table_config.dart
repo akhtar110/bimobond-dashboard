@@ -5,6 +5,7 @@ class UsersTableConfig {
   const UsersTableConfig({
     required this.showAccount,
     required this.showEngagement,
+    required this.showLocation,
     required this.compactActions,
     required this.minWidth,
     this.checkboxWidth = 44,
@@ -12,6 +13,7 @@ class UsersTableConfig {
 
   final bool showAccount;
   final bool showEngagement;
+  final bool showLocation;
   final bool compactActions;
   final double minWidth;
   final double checkboxWidth;
@@ -26,6 +28,7 @@ class UsersTableConfig {
       showAccount: width >= (device == DeviceType.tablet ? 640 : 720),
       // Keep followers / posts / likes visible whenever the table is shown.
       showEngagement: true,
+      showLocation: true,
       // Inline action chips need ~320px+; laptop/MacBook content widths
       // often leave a narrower actions column → use overflow menu.
       compactActions: width < 1400,

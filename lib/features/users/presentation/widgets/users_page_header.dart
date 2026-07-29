@@ -11,12 +11,14 @@ class UsersPageHeader extends StatelessWidget {
     required this.onRefresh,
     required this.metrics,
     required this.searchBar,
+    required this.locationFilter,
     required this.filters,
   });
 
   final VoidCallback onRefresh;
   final UsersLayoutMetrics metrics;
   final Widget searchBar;
+  final Widget locationFilter;
   final Widget filters;
 
   @override
@@ -57,16 +59,18 @@ class UsersPageHeader extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         // Keep search + filters on one horizontal line whenever possible.
-        final inlineAll = width >= 900;
+        final inlineAll = width >= 1100;
         final titleAbove = width < 640;
 
         final searchFilters = Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(flex: 5, child: searchBar),
+            Expanded(flex: 4, child: searchBar),
+            SizedBox(width: metrics.chipSpacing),
+            Expanded(flex: 3, child: locationFilter),
             SizedBox(width: metrics.chipSpacing + 2),
             Flexible(
-              flex: 4,
+              flex: 3,
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: filters,
@@ -104,7 +108,11 @@ class UsersPageHeader extends StatelessWidget {
                   ],
                 ),
                 SizedBox(height: metrics.chipSpacing),
-                searchFilters,
+                searchBar,
+                SizedBox(height: metrics.chipSpacing),
+                locationFilter,
+                SizedBox(height: metrics.chipSpacing),
+                filters,
               ],
             ),
           );

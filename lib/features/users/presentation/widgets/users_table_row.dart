@@ -5,6 +5,7 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
+import 'user_location_cell.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 import 'users_table_config.dart';
@@ -71,7 +72,7 @@ class UsersTableRow extends StatelessWidget {
                 ),
               ),
               Expanded(
-                flex: config.showAccount ? 28 : 36,
+                flex: config.showAccount ? 26 : 32,
                 child: Row(
                   children: [
                     _UserAvatar(user: user, isAdmin: isAdmin),
@@ -108,7 +109,7 @@ class UsersTableRow extends StatelessWidget {
               ),
               if (config.showAccount)
                 Expanded(
-                  flex: 22,
+                  flex: 20,
                   child: Padding(
                     padding: const EdgeInsetsDirectional.only(end: 8),
                     child: Column(
@@ -119,7 +120,9 @@ class UsersTableRow extends StatelessWidget {
                           _roleLabel(context),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
+                          style: cellStyle?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -137,7 +140,7 @@ class UsersTableRow extends StatelessWidget {
                 ),
               const SizedBox(width: 8),
               Expanded(
-                flex: 14,
+                flex: 13,
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Wrap(
@@ -161,15 +164,25 @@ class UsersTableRow extends StatelessWidget {
               if (config.showEngagement) ...[
                 const SizedBox(width: 8),
                 Expanded(
-                  flex: 16,
+                  flex: 14,
                   child: UserEngagementBar(
                     user: user,
                     compact: config.compactActions,
                   ),
                 ),
               ],
+              if (config.showLocation) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 14,
+                  child: UserLocationCell(
+                    user: user,
+                    compact: config.compactActions,
+                  ),
+                ),
+              ],
               Expanded(
-                flex: config.showAccount ? 28 : 34,
+                flex: config.showAccount ? 26 : 30,
                 child: Align(
                   alignment: AlignmentDirectional.centerEnd,
                   child: UserActionButtons(
@@ -187,10 +200,7 @@ class UsersTableRow extends StatelessWidget {
 }
 
 class _UserAvatar extends StatelessWidget {
-  const _UserAvatar({
-    required this.user,
-    required this.isAdmin,
-  });
+  const _UserAvatar({required this.user, required this.isAdmin});
 
   final UserEntity user;
   final bool isAdmin;
@@ -201,8 +211,8 @@ class _UserAvatar extends StatelessWidget {
     final ringColors = isAdmin
         ? [scheme.tertiary, scheme.tertiaryContainer]
         : user.isVerified
-            ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
-            : [Colors.transparent, Colors.transparent];
+        ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
+        : [Colors.transparent, Colors.transparent];
 
     return Container(
       padding: const EdgeInsets.all(2),
@@ -269,10 +279,7 @@ class _HoverableRowState extends State<_HoverableRow> {
       cursor: SystemMouseCursors.click,
       child: Material(
         color: rowColor,
-        child: InkWell(
-          onTap: widget.onTap,
-          child: widget.child,
-        ),
+        child: InkWell(onTap: widget.onTap, child: widget.child),
       ),
     );
   }

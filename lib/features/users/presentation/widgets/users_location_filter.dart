@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import '../utils/responsive.dart';
 
-class UsersSearchBar extends StatelessWidget {
-  const UsersSearchBar({
+/// Partial-match filter on city, region/state, or country (`GET /users?location=`).
+class UsersLocationFilter extends StatelessWidget {
+  const UsersLocationFilter({
     super.key,
     required this.controller,
     required this.onChanged,
@@ -48,15 +49,21 @@ class UsersSearchBar extends StatelessWidget {
           height: 1.2,
         ),
         decoration: InputDecoration(
-          hintText: l10n.t('searchUsers'),
+          labelText: l10n.t('location'),
+          floatingLabelBehavior: FloatingLabelBehavior.never,
+          hintText: l10n.t('filterUsersByPlace'),
           hintStyle: theme.textTheme.bodyMedium?.copyWith(
             color: scheme.onSurfaceVariant,
             fontSize: compact ? 12.5 : 13,
           ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: scheme.onSurfaceVariant,
-            size: compact ? 18 : 20,
+          prefixIcon: Tooltip(
+            message: l10n.t('usersLocationFilterTooltip'),
+            waitDuration: const Duration(milliseconds: 500),
+            child: Icon(
+              Icons.place_outlined,
+              color: scheme.onSurfaceVariant,
+              size: compact ? 18 : 20,
+            ),
           ),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
@@ -74,8 +81,8 @@ class UsersSearchBar extends StatelessWidget {
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                 onPressed: () {
                   controller.clear();
-                  onChanged('');
                   onSubmitted('');
+                  onChanged('');
                 },
               );
             },
