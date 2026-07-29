@@ -9,6 +9,7 @@ import 'package:video_player/video_player.dart';
 import '../../../create_post/presentation/utils/create_post_video_source.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../utils/gift_animation_bytes.dart';
+import '../utils/gift_embedded_video_frame.dart';
 import '../utils/pag_preview.dart';
 import '../utils/swf_preview.dart';
 
@@ -220,6 +221,8 @@ class GiftAnimationPreview extends StatefulWidget {
     this.onClear,
     this.compact = false,
     this.expandToFill = false,
+    this.showChrome = true,
+    this.clipBorderRadius,
   });
 
   final Uint8List? bytes;
@@ -234,6 +237,12 @@ class GiftAnimationPreview extends StatefulWidget {
   /// instead of [AspectRatio]) so dialogs don't overflow.
   final bool expandToFill;
 
+  /// When false, renders only the animation stage (no header, footer, or dark frame).
+  final bool showChrome;
+
+  /// Clips the stage (e.g. gift preview dialog frame). Defaults to 16 when [showChrome] is false.
+  final double? clipBorderRadius;
+
   @override
   State<GiftAnimationPreview> createState() => _GiftAnimationPreviewState();
 }
@@ -244,6 +253,9 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
   var _resolving = false;
   String? _resolveError;
   int _resolveToken = 0;
+
+  double get _effectiveClipRadius =>
+      widget.clipBorderRadius ?? (widget.showChrome ? 0 : 16);
 
   @override
   void initState() {
@@ -388,16 +400,19 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
   }
 
   Widget _placeholder(ColorScheme scheme) {
+    final onStage = !widget.showChrome;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.animation_rounded, size: 34, color: scheme.primary),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Animation preview',
             style: TextStyle(
-              color: Colors.white70,
+              color: onStage
+                  ? scheme.onSurfaceVariant
+                  : Colors.white70,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -417,19 +432,23 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
     Widget? body;
 
     if (_resolveError != null && bytes == null && !_resolving) {
+      final onStage = !widget.showChrome;
       body = Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.videocam_off_outlined,
-                  size: 34, color: Colors.white54),
+              Icon(
+                Icons.videocam_off_outlined,
+                size: 34,
+                color: onStage ? scheme.onSurfaceVariant : Colors.white54,
+              ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Preview unavailable',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: onStage ? scheme.onSurface : Colors.white70,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -440,7 +459,12 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white38, fontSize: 10),
+                style: TextStyle(
+                  color: onStage
+                      ? scheme.onSurfaceVariant
+                      : Colors.white38,
+                  fontSize: 10,
+                ),
               ),
               if (url != null && url.trim().isNotEmpty) ...[
                 const SizedBox(height: 10),
@@ -476,16 +500,22 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
         networkUrl: (bytes == null || bytes.isEmpty) ? url : null,
       );
     } else if (kind == _AnimKind.image) {
+      final imageFit =
+          widget.showChrome ? BoxFit.contain : BoxFit.cover;
       if (bytes != null) {
         body = Image.memory(
           bytes,
-          fit: BoxFit.contain,
+          fit: imageFit,
+          width: widget.showChrome ? null : double.infinity,
+          height: widget.showChrome ? null : double.infinity,
           errorBuilder: (_, __, ___) => _placeholder(scheme),
         );
       } else if (url != null && url.isNotEmpty) {
         body = Image.network(
           resolveMediaUrl(url) ?? url,
-          fit: BoxFit.contain,
+          fit: imageFit,
+          width: widget.showChrome ? null : double.infinity,
+          height: widget.showChrome ? null : double.infinity,
           errorBuilder: (_, __, ___) => _placeholder(scheme),
         );
       }
@@ -494,9 +524,18 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
         final name = widget.fileName?.isNotEmpty == true
             ? widget.fileName!
             : 'animation.mp4';
-        body = _LocalVideoPreview(bytes: bytes, fileName: name);
+        body = _LocalVideoPreview(
+          bytes: bytes,
+          fileName: name,
+          embeddedPreview: !widget.showChrome,
+          clipBorderRadius: _effectiveClipRadius,
+        );
       } else if (url != null && url.isNotEmpty) {
-        body = _NetworkVideoPreview(url: url);
+        body = _NetworkVideoPreview(
+          url: url,
+          embeddedPreview: !widget.showChrome,
+          clipBorderRadius: _effectiveClipRadius,
+        );
       }
     }
 
@@ -507,15 +546,19 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
       children: [
         body,
         if (_resolving)
-          const ColoredBox(
-            color: Color(0x99111318),
+          ColoredBox(
+            color: widget.showChrome
+                ? const Color(0x99111318)
+                : scheme.surface.withValues(alpha: 0.72),
             child: Center(
               child: SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.2,
-                  color: Color(0xFF8AB4FF),
+                  color: widget.showChrome
+                      ? const Color(0xFF8AB4FF)
+                      : scheme.primary,
                 ),
               ),
             ),
@@ -563,18 +606,27 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
         ? const EdgeInsets.fromLTRB(8, 0, 8, 8)
         : const EdgeInsets.fromLTRB(12, 0, 12, 12);
 
-    final previewStage = ClipRRect(
-      borderRadius: BorderRadius.circular(compact ? 8 : 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFF111318),
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.35),
+    final stageRadius = widget.showChrome ? (compact ? 8.0 : 12.0) : 0.0;
+
+    Widget previewStage = _buildPreview(scheme);
+    if (widget.showChrome) {
+      previewStage = ClipRRect(
+        borderRadius: BorderRadius.circular(stageRadius),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF111318),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.35),
+            ),
           ),
+          child: previewStage,
         ),
-        child: _buildPreview(scheme),
-      ),
-    );
+      );
+    }
+
+    if (!widget.showChrome) {
+      return SizedBox.expand(child: previewStage);
+    }
 
     final header = Padding(
       padding: headerPad,
@@ -977,10 +1029,14 @@ class _LocalVideoPreview extends StatefulWidget {
   const _LocalVideoPreview({
     required this.bytes,
     required this.fileName,
+    this.embeddedPreview = false,
+    this.clipBorderRadius = 0,
   });
 
   final Uint8List bytes;
   final String fileName;
+  final bool embeddedPreview;
+  final double clipBorderRadius;
 
   @override
   State<_LocalVideoPreview> createState() => _LocalVideoPreviewState();
@@ -1023,6 +1079,9 @@ class _LocalVideoPreviewState extends State<_LocalVideoPreview> {
       await controller.setVolume(1);
       await controller.play();
       if (!mounted) return;
+      if (widget.embeddedPreview && widget.clipBorderRadius > 0) {
+        styleGiftEmbeddedVideo(uri, borderRadius: widget.clipBorderRadius);
+      }
       setState(() => _ready = true);
     } catch (_) {
       if (mounted) setState(() => _failed = true);
@@ -1051,14 +1110,22 @@ class _LocalVideoPreviewState extends State<_LocalVideoPreview> {
       controller: _controller,
       ready: _ready,
       failed: _failed,
+      embeddedPreview: widget.embeddedPreview,
+      clipBorderRadius: widget.clipBorderRadius,
     );
   }
 }
 
 class _NetworkVideoPreview extends StatefulWidget {
-  const _NetworkVideoPreview({required this.url});
+  const _NetworkVideoPreview({
+    required this.url,
+    this.embeddedPreview = false,
+    this.clipBorderRadius = 0,
+  });
 
   final String url;
+  final bool embeddedPreview;
+  final double clipBorderRadius;
 
   @override
   State<_NetworkVideoPreview> createState() => _NetworkVideoPreviewState();
@@ -1097,6 +1164,9 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
       await controller.setVolume(1);
       await controller.play();
       if (!mounted) return;
+      if (widget.embeddedPreview && widget.clipBorderRadius > 0) {
+        styleGiftEmbeddedVideo(resolved, borderRadius: widget.clipBorderRadius);
+      }
       setState(() => _ready = true);
     } catch (_) {
       if (mounted) setState(() => _failed = true);
@@ -1115,6 +1185,8 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
       controller: _controller,
       ready: _ready,
       failed: _failed,
+      embeddedPreview: widget.embeddedPreview,
+      clipBorderRadius: widget.clipBorderRadius,
     );
   }
 }
@@ -1124,11 +1196,15 @@ class _GiftVideoSurface extends StatelessWidget {
     required this.controller,
     required this.ready,
     required this.failed,
+    this.embeddedPreview = false,
+    this.clipBorderRadius = 0,
   });
 
   final VideoPlayerController? controller;
   final bool ready;
   final bool failed;
+  final bool embeddedPreview;
+  final double clipBorderRadius;
 
   String _formatDuration(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -1136,9 +1212,59 @@ class _GiftVideoSurface extends StatelessWidget {
     return '$m:$s';
   }
 
+  Widget _framedVideo(
+    VideoPlayerController controller,
+    VideoPlayerValue value,
+  ) {
+    if (embeddedPreview) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
+        child: SizedBox(
+          width: value.size.width,
+          height: value.size.height,
+          child: VideoPlayer(controller),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ar = value.aspectRatio;
+        if (ar <= 0 || !ar.isFinite) {
+          return Center(child: VideoPlayer(controller));
+        }
+
+        var maxW = constraints.maxWidth;
+        var maxH = constraints.maxHeight;
+        if (!maxW.isFinite || maxW <= 0) maxW = value.size.width;
+        if (!maxH.isFinite || maxH <= 0) maxH = value.size.height;
+
+        late final double w;
+        late final double h;
+        if (maxW / maxH > ar) {
+          h = maxH;
+          w = h * ar;
+        } else {
+          w = maxW;
+          h = w / ar;
+        }
+
+        return Center(
+          child: SizedBox(
+            width: w,
+            height: h,
+            child: VideoPlayer(controller),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final onLightStage = embeddedPreview;
 
     if (failed || controller == null) {
       return Center(
@@ -1148,13 +1274,13 @@ class _GiftVideoSurface extends StatelessWidget {
             Icon(
               Icons.videocam_off_outlined,
               size: 34,
-              color: Colors.white54,
+              color: onLightStage ? scheme.onSurfaceVariant : Colors.white54,
             ),
             const SizedBox(height: 8),
             Text(
               'Preview unavailable',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
+                    color: onLightStage ? scheme.onSurface : Colors.white70,
                     fontWeight: FontWeight.w600,
                   ),
             ),
@@ -1180,7 +1306,9 @@ class _GiftVideoSurface extends StatelessWidget {
             Text(
               'Loading preview…',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white70,
+                    color: onLightStage
+                        ? scheme.onSurfaceVariant
+                        : Colors.white70,
                     fontWeight: FontWeight.w600,
                   ),
             ),
@@ -1197,24 +1325,20 @@ class _GiftVideoSurface extends StatelessWidget {
             : (value.position.inMilliseconds / value.duration.inMilliseconds)
                 .clamp(0.0, 1.0);
 
-        return Stack(
+        return _clipIfNeeded(
+          Stack(
           fit: StackFit.expand,
+          clipBehavior: Clip.hardEdge,
           children: [
-            Center(
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: value.size.width,
-                  height: value.size.height,
-                  child: VideoPlayer(controller!),
-                ),
-              ),
+            Positioned.fill(
+              child: _framedVideo(controller!, value),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
+            if (!embeddedPreview)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: DecoratedBox(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -1320,8 +1444,18 @@ class _GiftVideoSurface extends StatelessWidget {
               ),
             ),
           ],
+        ),
         );
       },
+    );
+  }
+
+  Widget _clipIfNeeded(Widget child) {
+    if (clipBorderRadius <= 0) return child;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(clipBorderRadius),
+      clipBehavior: Clip.antiAlias,
+      child: child,
     );
   }
 }

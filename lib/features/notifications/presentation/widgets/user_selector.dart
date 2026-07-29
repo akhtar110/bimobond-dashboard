@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -26,7 +28,10 @@ class UserSelector extends StatefulWidget {
 class _UserSelectorState extends State<UserSelector> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  Timer? _searchDebounce;
   bool _showDropdown = false;
+
+  static const _searchDebounceDuration = Duration(milliseconds: 250);
 
   @override
   void initState() {
@@ -39,35 +44,44 @@ class _UserSelectorState extends State<UserSelector> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  void _dispatchSearch(String query) {
+    context.read<NotificationsBloc>().add(NotificationUserSearchChanged(query));
+  }
+
   void _onChanged(String query) {
     setState(() => _showDropdown = true);
-    context.read<NotificationsBloc>().add(
-          NotificationUserSearchChanged(query),
-        );
+    _searchDebounce?.cancel();
+    if (query.trim().isEmpty) {
+      _dispatchSearch('');
+      return;
+    }
+    _searchDebounce = Timer(_searchDebounceDuration, () {
+      if (!mounted) return;
+      _dispatchSearch(_controller.text);
+    });
   }
 
   void _selectUser(UserEntity user) {
+    _searchDebounce?.cancel();
     _controller.text =
         '@${user.username}${user.fullName != null ? ' – ${user.fullName}' : ''}';
     setState(() => _showDropdown = false);
     _focusNode.unfocus();
     widget.onUserSelected(user);
-    context.read<NotificationsBloc>().add(
-          const NotificationUserSearchChanged(''),
-        );
+    _dispatchSearch('');
   }
 
   void _clearSelection() {
+    _searchDebounce?.cancel();
     _controller.clear();
     widget.onUserSelected(null);
-    context.read<NotificationsBloc>().add(
-          const NotificationUserSearchChanged(''),
-        );
+    _dispatchSearch('');
   }
 
   @override
@@ -87,7 +101,8 @@ class _UserSelectorState extends State<UserSelector> {
               controller: _controller,
               focusNode: _focusNode,
               decoration: InputDecoration(
-                labelText: widget.label ?? l10n.t('notificationSelectUserLabel'),
+                labelText:
+                    widget.label ?? l10n.t('notificationSelectUserLabel'),
                 prefixIcon: widget.selectedUser != null
                     ? _avatarPrefix(widget.selectedUser!, scheme)
                     : const Padding(
@@ -103,8 +118,7 @@ class _UserSelectorState extends State<UserSelector> {
                         child: SizedBox(
                           width: 16,
                           height: 16,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       ),
                     if (widget.selectedUser != null)
@@ -119,8 +133,9 @@ class _UserSelectorState extends State<UserSelector> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 filled: true,
-                fillColor:
-                    scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                fillColor: scheme.surfaceContainerHighest.withValues(
+                  alpha: 0.4,
+                ),
                 hintText: l10n.t('notificationSearchUsersHint'),
               ),
               onChanged: _onChanged,
@@ -154,13 +169,10 @@ class _UserSelectorState extends State<UserSelector> {
       child: CircleAvatar(
         radius: 14,
         backgroundColor: scheme.primaryContainer,
-        backgroundImage:
-            url != null ? NetworkImage(url) : null,
+        backgroundImage: url != null ? NetworkImage(url) : null,
         child: url == null
             ? Text(
-                (user.username.isNotEmpty
-                        ? user.username[0]
-                        : '?')
+                (user.username.isNotEmpty ? user.username[0] : '?')
                     .toUpperCase(),
                 style: const TextStyle(fontSize: 12),
               )
@@ -171,10 +183,7 @@ class _UserSelectorState extends State<UserSelector> {
 }
 
 class _SearchDropdown extends StatelessWidget {
-  const _SearchDropdown({
-    required this.users,
-    required this.onTap,
-  });
+  const _SearchDropdown({required this.users, required this.onTap});
 
   final List<UserEntity> users;
   final ValueChanged<UserEntity> onTap;
@@ -197,10 +206,8 @@ class _SearchDropdown extends StatelessWidget {
             height: 1,
             color: scheme.outlineVariant.withValues(alpha: 0.4),
           ),
-          itemBuilder: (context, i) => _UserTile(
-            user: users[i],
-            onTap: () => onTap(users[i]),
-          ),
+          itemBuilder: (context, i) =>
+              _UserTile(user: users[i], onTap: () => onTap(users[i])),
         ),
       ),
     );
@@ -230,9 +237,7 @@ class _UserTile extends StatelessWidget {
               backgroundImage: url != null ? NetworkImage(url) : null,
               child: url == null
                   ? Text(
-                      (user.username.isNotEmpty
-                              ? user.username[0]
-                              : '?')
+                      (user.username.isNotEmpty ? user.username[0] : '?')
                           .toUpperCase(),
                     )
                   : null,
@@ -244,24 +249,25 @@ class _UserTile extends StatelessWidget {
                 children: [
                   Text(
                     '@${user.username}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   if (user.fullName != null)
                     Text(
                       user.fullName!,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 12, color: scheme.onSurfaceVariant),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 12,
+              color: scheme.onSurfaceVariant,
+            ),
           ],
         ),
       ),

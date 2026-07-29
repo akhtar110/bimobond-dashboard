@@ -142,14 +142,15 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                     messenger.showSnackBar(
                       SnackBar(
                         content: Text(state.bulkActionMessage!),
-                        backgroundColor:
-                            state.bulkActionIsError ? scheme.error : null,
+                        backgroundColor: state.bulkActionIsError
+                            ? scheme.error
+                            : null,
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
-                    context
-                        .read<GiftsBloc>()
-                        .add(ClearGiftsBulkFeedbackEvent());
+                    context.read<GiftsBloc>().add(
+                      ClearGiftsBulkFeedbackEvent(),
+                    );
                   },
                 ),
                 BlocListener<GiftsBloc, GiftsState>(
@@ -167,8 +168,8 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                       // Keep tab membership UI in sync after create/update
                       // (group assign runs in GiftsBloc via replace-group-gifts).
                       ctx.read<GiftGroupsBloc>().add(
-                            const LoadGiftGroupsEvent(refresh: true),
-                          );
+                        const LoadGiftGroupsEvent(refresh: true),
+                      );
                       messenger
                         ..hideCurrentSnackBar()
                         ..showSnackBar(
@@ -216,14 +217,15 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                             state.feedbackMessage!,
                           ),
                         ),
-                        backgroundColor:
-                            state.feedbackIsError ? scheme.error : null,
+                        backgroundColor: state.feedbackIsError
+                            ? scheme.error
+                            : null,
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
-                    context
-                        .read<GiftGroupsBloc>()
-                        .add(const ClearGiftGroupsFeedbackEvent());
+                    context.read<GiftGroupsBloc>().add(
+                      const ClearGiftGroupsFeedbackEvent(),
+                    );
                   },
                 ),
               ],
@@ -258,8 +260,9 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final width = constraints.maxWidth;
-                      final metrics =
-                          GiftsLayoutMetrics(getGiftsDeviceType(width));
+                      final metrics = GiftsLayoutMetrics(
+                        getGiftsDeviceType(width),
+                      );
                       final hPad = _horizontalPadding(width);
                       final vPad = _verticalPadding(width);
                       final sectionGap = _sectionSpacing(width);
@@ -268,8 +271,8 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                       final loaded = isLoaded ? state : null;
                       final showDesktopPagination =
                           metrics.useDesktopPagination &&
-                              loaded != null &&
-                              loaded.giftsTotalCount > 0;
+                          loaded != null &&
+                          loaded.giftsTotalCount > 0;
 
                       final isSelectionMode =
                           loaded != null && loaded.isSelectionMode;
@@ -290,14 +293,10 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                         compact: compactHeader,
                         onAdd: () => showCreateGiftDialog(ctx),
                         onRefresh: () {
-                          ctx
-                              .read<GiftsBloc>()
-                              .add(LoadAdminGiftsEvent());
+                          ctx.read<GiftsBloc>().add(LoadAdminGiftsEvent());
                           ctx.read<GiftGroupsBloc>().add(
-                                const LoadGiftGroupsEvent(
-                                  refresh: true,
-                                ),
-                              );
+                            const LoadGiftGroupsEvent(refresh: true),
+                          );
                         },
                       );
 
@@ -314,8 +313,11 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                           : null;
 
                       final catalogTabsWidget = loaded != null
-                          ? BlocSelector<GiftsCatalogSelectionCubit, String?,
-                              String?>(
+                          ? BlocSelector<
+                              GiftsCatalogSelectionCubit,
+                              String?,
+                              String?
+                            >(
                               selector: (id) => id,
                               builder: (context, selectedGroupId) {
                                 return GiftsCatalogTabsBar(
@@ -326,8 +328,8 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                                         .selectGroup(group?.id);
                                     if (group != null) {
                                       ctx.read<GiftsBloc>().add(
-                                            GoToGiftsPageEvent(1),
-                                          );
+                                        GoToGiftsPageEvent(1),
+                                      );
                                     }
                                   },
                                 );
@@ -336,8 +338,11 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                           : null;
 
                       final paginationWidget = showDesktopPagination
-                          ? BlocSelector<GiftsCatalogSelectionCubit, String?,
-                              String?>(
+                          ? BlocSelector<
+                              GiftsCatalogSelectionCubit,
+                              String?,
+                              String?
+                            >(
                               selector: (id) => id,
                               builder: (context, selectedGroupId) {
                                 return _CatalogPagination(
@@ -450,9 +455,7 @@ class _CatalogBodyPanel extends StatelessWidget {
       return CustomScrollView(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          GiftsSliverError(message: (state as GiftsError).message),
-        ],
+        slivers: [GiftsSliverError(message: (state as GiftsError).message)],
       );
     }
     if (state is GiftsLoaded) {
@@ -508,10 +511,8 @@ class _CatalogLoadedScroll extends StatelessWidget {
         return null;
       },
       builder: (context, selectedGroup) {
-        final giftIdFilter =
-            selectedGroup?.gifts.map((m) => m.gift.id).toSet();
-        final preferOrder =
-            selectedGroup?.gifts.map((m) => m.gift.id).toList();
+        final giftIdFilter = selectedGroup?.gifts.map((m) => m.gift.id).toSet();
+        final preferOrder = selectedGroup?.gifts.map((m) => m.gift.id).toList();
 
         return CustomScrollView(
           controller: scrollController,
@@ -539,10 +540,7 @@ class _CatalogLoadedScroll extends StatelessWidget {
 }
 
 class _CatalogPagination extends StatelessWidget {
-  const _CatalogPagination({
-    required this.loaded,
-    this.selectedGroupId,
-  });
+  const _CatalogPagination({required this.loaded, this.selectedGroupId});
 
   final GiftsLoaded loaded;
   final String? selectedGroupId;
@@ -560,10 +558,7 @@ class _CatalogPagination extends StatelessWidget {
       }
     }
 
-    final total = giftsFilteredTotalCount(
-      loaded,
-      giftIdFilter: giftIdFilter,
-    );
+    final total = giftsFilteredTotalCount(loaded, giftIdFilter: giftIdFilter);
     final lastPage = total <= 0
         ? 1
         : (total + GiftsBloc.pageLimit - 1) ~/ GiftsBloc.pageLimit;
@@ -616,9 +611,9 @@ class _SelectedGroupBanner extends StatelessWidget {
                   '${group.name} · ${group.giftCount} ${l10n.tOr('giftGroupGiftsCount', 'gifts')}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
             ],

@@ -34,8 +34,8 @@ class PostsPage extends StatelessWidget {
       },
       child: PersistentBlocProvider<CategoriesBloc>(
         debugLabel: 'PostsPage/Categories',
-        create: () => di.sl<CategoriesBloc>()
-          ..add(LoadCategoriesEvent(forCatalog: true)),
+        create: () =>
+            di.sl<CategoriesBloc>()..add(LoadCategoriesEvent(forCatalog: true)),
         child: const _PostsPageView(),
       ),
     );
@@ -107,10 +107,10 @@ class _PostsPageViewState extends State<_PostsPageView> {
           refreshPostsPageFeed(context);
         } else if (result.post != null) {
           context.read<PostsBloc>().add(
-                PatchPostEvent(
-                  mergeManagedPostForListDisplay(listBaseline, result.post!),
-                ),
-              );
+            PatchPostEvent(
+              mergeManagedPostForListDisplay(listBaseline, result.post!),
+            ),
+          );
           refreshPostsPageFeed(context);
         }
       },
@@ -159,8 +159,9 @@ class _PostsPageViewState extends State<_PostsPageView> {
               messenger.showSnackBar(
                 SnackBar(
                   content: Text(state.bulkActionMessage!),
-                  backgroundColor:
-                      state.bulkActionIsError ? Colors.red.shade700 : null,
+                  backgroundColor: state.bulkActionIsError
+                      ? Colors.red.shade700
+                      : null,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -213,27 +214,27 @@ class _PostsPageViewState extends State<_PostsPageView> {
                                             prev.isPerformingBulkAction !=
                                                 next.isPerformingBulkAction)),
                                 builder: (context, state) => switch (state) {
-                                  PostsInitial() || PostsLoading() =>
-                                    LayoutBuilder(
-                                      builder: (ctx, c) =>
-                                          PostsSkeletonGrid(width: c.maxWidth),
-                                    ),
+                                  PostsInitial() ||
+                                  PostsLoading() => LayoutBuilder(
+                                    builder: (ctx, c) =>
+                                        PostsSkeletonGrid(width: c.maxWidth),
+                                  ),
                                   PostsEmpty() => PostsEmptyView(
-                                      onClearFilters: () => context
-                                          .read<PostsBloc>()
-                                          .add(ClearPostFiltersEvent()),
-                                    ),
+                                    onClearFilters: () => context
+                                        .read<PostsBloc>()
+                                        .add(ClearPostFiltersEvent()),
+                                  ),
                                   PostsError(:final message) => PostsErrorView(
-                                      message: message,
-                                      onRetry: () => context
-                                          .read<PostsBloc>()
-                                          .add(GetAllPostsEvent()),
-                                    ),
+                                    message: message,
+                                    onRetry: () => context
+                                        .read<PostsBloc>()
+                                        .add(GetAllPostsEvent()),
+                                  ),
                                   PostsLoaded() => PostsContent(
-                                      state: state,
-                                      scrollController: _scrollController,
-                                      onPostTap: _openPostManagement,
-                                    ),
+                                    state: state,
+                                    scrollController: _scrollController,
+                                    onPostTap: _openPostManagement,
+                                  ),
                                 },
                               ),
                             ),
