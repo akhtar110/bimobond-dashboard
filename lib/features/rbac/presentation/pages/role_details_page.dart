@@ -7,6 +7,7 @@ import '../../domain/entities/role_entity.dart';
 import '../bloc/rbac_bloc.dart';
 import '../bloc/rbac_event.dart';
 import '../utils/permission_manager.dart';
+import '../utils/rbac_responsive.dart';
 import '../widgets/rbac_ui.dart';
 
 class RoleDetailsPage extends StatefulWidget {
@@ -104,45 +105,51 @@ class _RoleDetailsPageState extends State<RoleDetailsPage> {
       },
       builder: (context, state) {
         final role = state.selectedRole;
+        final metrics = RbacLayoutMetrics(
+          getRbacDeviceType(MediaQuery.sizeOf(context).width),
+        );
+        final compact = metrics.useIconActions;
         return RbacPageFrame(
           title: role?.name ?? context.l10n.tOr('roleDetails', 'Role details'),
-          subtitle: role?.slug,
+          metrics: metrics,
           onBack: widget.onBack,
           actions: role == null
               ? const []
               : [
                   if (widget.onViewUsers != null)
-                    OutlinedButton.icon(
+                    RbacHeaderAction(
+                      compact: compact,
+                      icon: Icons.people_outline_rounded,
+                      label: context.l10n.tOr('viewRoleUsers', 'View users'),
                       onPressed: state.isSubmitting
                           ? null
                           : () => widget.onViewUsers!(role),
-                      icon: const Icon(Icons.people_outline_rounded),
-                      label: Text(
-                        context.l10n.tOr('viewRoleUsers', 'View users'),
-                      ),
                     ),
                   PermissionGate(
                     permission: RbacPermissionKeys.manageRoles,
                     allowLegacyAdmin: true,
-                    child: OutlinedButton.icon(
+                    child: RbacHeaderAction(
+                      compact: compact,
+                      icon: Icons.edit_outlined,
+                      label: context.l10n.tOr('editRole', 'Edit role'),
                       onPressed: state.isSubmitting
                           ? null
                           : () => widget.onEdit?.call(role),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: Text(context.l10n.tOr('editRole', 'Edit role')),
                     ),
                   ),
                   PermissionGate(
                     allOf: RbacPermissionKeys.assignmentKeys,
                     allowLegacyAdmin: true,
-                    child: OutlinedButton.icon(
+                    child: RbacHeaderAction(
+                      compact: compact,
+                      icon: Icons.person_add_alt_1_outlined,
+                      label: context.l10n.tOr(
+                        'assignUserRoles',
+                        'Assign user roles',
+                      ),
                       onPressed: state.isSubmitting
                           ? null
                           : () => widget.onAssignUsers?.call(role),
-                      icon: const Icon(Icons.person_add_alt_1_outlined),
-                      label: Text(
-                        context.l10n.tOr('assignUserRoles', 'Assign user roles'),
-                      ),
                     ),
                   ),
                   PermissionGate(
@@ -154,13 +161,16 @@ class _RoleDetailsPageState extends State<RoleDetailsPage> {
                               'rbacSystemRoleDeleteBlocked',
                               'System roles cannot be deleted',
                             )
-                          : '',
-                      child: FilledButton.tonalIcon(
+                          : context.l10n.tOr('deleteRole', 'Delete role'),
+                      child: RbacHeaderAction(
+                        compact: compact,
+                        icon: Icons.delete_outline_rounded,
+                        label: context.l10n.tOr('deleteRole', 'Delete role'),
+                        outlined: false,
+                        tonal: true,
                         onPressed: state.isSubmitting || role.isSystem
                             ? null
                             : () => _delete(role),
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: Text(context.l10n.tOr('deleteRole', 'Delete role')),
                       ),
                     ),
                   ),
@@ -243,23 +253,38 @@ class _MetadataCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final narrow = MediaQuery.sizeOf(context).width < 480;
     Widget row(String label, Widget value) => Padding(
       padding: const EdgeInsetsDirectional.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+      child: narrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                value,
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 150,
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+                Expanded(child: value),
+              ],
             ),
-          ),
-          Expanded(child: value),
-        ],
-      ),
     );
 
     return Card(

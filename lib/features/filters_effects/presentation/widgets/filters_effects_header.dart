@@ -7,20 +7,28 @@ import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../settings/presentation/bloc/settings_cubit.dart';
 import '../bloc/filters_effects_bloc.dart';
 import '../bloc/filters_effects_event.dart';
+import '../../domain/entities/filters_effects_entities.dart';
 import '../dialogs/publish_catalog_dialog.dart';
 import '../dialogs/seed_catalog_dialog.dart';
 import '../utils/filters_effects_responsive.dart';
+import 'filters_effects_tab_bar.dart';
 
-/// Title + refresh / publish / seed actions (search & filters live below).
+/// Compact title + refresh / publish / seed actions (no subtitle).
 class FiltersEffectsHeader extends StatelessWidget {
   const FiltersEffectsHeader({
     super.key,
     required this.metrics,
     this.isLoading = false,
+    this.activeTab,
+    this.showCreateAction = false,
   });
 
   final FiltersEffectsLayoutMetrics metrics;
   final bool isLoading;
+  final FiltersEffectsTab? activeTab;
+
+  /// When true (small screens), create filter/effect lives here instead of the tab bar.
+  final bool showCreateAction;
 
   @override
   Widget build(BuildContext context) {
@@ -33,91 +41,91 @@ class FiltersEffectsHeader extends StatelessWidget {
       (b) => b.state.authContext?.permissionKeys,
     );
     final canManage = PermissionManager.canManageCameraStudio(context);
+    final resolvedTab = activeTab == null
+        ? null
+        : FiltersEffectsTabBar.normalizeTab(activeTab!);
+    final showCreate =
+        showCreateAction &&
+        canManage &&
+        (resolvedTab == FiltersEffectsTab.filters ||
+            resolvedTab == FiltersEffectsTab.effects);
 
     final titleStyle =
         (compact
                 ? Theme.of(context).textTheme.titleMedium
-                : Theme.of(context).textTheme.headlineSmall)
-            ?.copyWith(fontWeight: FontWeight.w800);
+                : Theme.of(context).textTheme.titleLarge)
+            ?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.45,
+              color: scheme.onSurface,
+              height: 1.05,
+            );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (compact) ...[
-          Text(
-            l10n.tOr('feModuleTitle', 'Filters & Effects'),
-            textAlign: TextAlign.start,
-            style: titleStyle,
-          ),
-          SizedBox(height: metrics.toolbarFilterGap),
-          Text(
-            l10n.tOr(
-              'feModuleSubtitle',
-              'Manage camera studio filters, effects, categories, and catalog publishing.',
-            ),
-            textAlign: TextAlign.start,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 12,
-              color: scheme.onSurfaceVariant,
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              l10n.tOr('feModuleTitle', 'Filters & Effects'),
+              textAlign: TextAlign.start,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: titleStyle,
             ),
           ),
-          SizedBox(height: metrics.toolbarSectionGap),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: Wrap(
-              spacing: metrics.filterGap,
-              runSpacing: metrics.filterGap,
-              children: [
-                _RefreshButton(isLoading: isLoading),
-                if (canManage) ...[
-                  _PublishButton(compact: true),
-                  _SeedButton(compact: true),
-                ],
-              ],
-            ),
+          SizedBox(width: metrics.filterGap),
+          if (showCreate) ...[
+            _HeaderCreateButton(activeTab: resolvedTab!),
+            SizedBox(width: metrics.filterGap),
+          ],
+          _RefreshButton(isLoading: isLoading),
+          if (canManage) ...[
+            SizedBox(width: metrics.filterGap),
+            _PublishButton(compact: compact),
+            SizedBox(width: metrics.filterGap),
+            _SeedButton(compact: compact),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderCreateButton extends StatelessWidget {
+  const _HeaderCreateButton({required this.activeTab});
+
+  final FiltersEffectsTab activeTab;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final isEffects = activeTab == FiltersEffectsTab.effects;
+    final label = isEffects
+        ? l10n.tOr('feCreateEffect', 'Create effect')
+        : l10n.tOr('feCreateFilter', 'Create filter');
+
+    return Tooltip(
+      message: label,
+      child: FilledButton(
+        onPressed: () {
+          if (isEffects) {
+            createCameraEffectFromManagement(context);
+          } else {
+            createCameraFilterFromManagement(context);
+          }
+        },
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(40, 40),
+          maximumSize: const Size(40, 40),
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ] else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      l10n.tOr('feModuleTitle', 'Filters & Effects'),
-                      textAlign: TextAlign.start,
-                      style: titleStyle,
-                    ),
-                    SizedBox(height: metrics.toolbarFilterGap),
-                    Text(
-                      l10n.tOr(
-                        'feModuleSubtitle',
-                        'Manage camera studio filters, effects, categories, and catalog publishing.',
-                      ),
-                      textAlign: TextAlign.start,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: metrics.filterGap),
-              _RefreshButton(isLoading: isLoading),
-              if (canManage) ...[
-                SizedBox(width: metrics.filterGap),
-                const _PublishButton(),
-                SizedBox(width: metrics.filterGap),
-                const _SeedButton(),
-              ],
-            ],
-          ),
-      ],
+        ),
+        child: const Icon(Icons.add_rounded, size: 22),
+      ),
     );
   }
 }
@@ -132,6 +140,7 @@ class _RefreshButton extends StatelessWidget {
     final l10n = context.l10n;
     return IconButton(
       tooltip: l10n.tOr('feRefresh', 'Refresh'),
+      visualDensity: VisualDensity.compact,
       onPressed: isLoading
           ? null
           : () => context.read<FiltersEffectsBloc>().add(
@@ -153,6 +162,7 @@ class _PublishButton extends StatelessWidget {
     return compact
         ? IconButton(
             tooltip: l10n.tOr('fePublishCatalog', 'Publish catalog'),
+            visualDensity: VisualDensity.compact,
             onPressed: () => showPublishCatalogDialog(context),
             icon: const Icon(Icons.publish_rounded),
           )
@@ -175,6 +185,7 @@ class _SeedButton extends StatelessWidget {
     return compact
         ? IconButton(
             tooltip: l10n.tOr('feSeedDefaults', 'Seed defaults'),
+            visualDensity: VisualDensity.compact,
             onPressed: () => showSeedCatalogDialog(context),
             icon: const Icon(Icons.grass_rounded),
           )

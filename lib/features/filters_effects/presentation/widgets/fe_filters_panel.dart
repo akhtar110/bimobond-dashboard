@@ -17,18 +17,20 @@ import '../bloc/filters_effects_event.dart';
 import '../utils/fe_display_filters.dart';
 import 'fe_catalog_item_preview.dart' show feEffectRenderTypeLabel;
 
-/// Search + Filter button row (Gifts-style) for Filters / Effects tabs.
+/// Search + Filter button row (borderless, dense) for Filters / Effects tabs.
 class FeFiltersPanel extends StatelessWidget {
   const FeFiltersPanel({
     super.key,
     required this.query,
     required this.showRenderType,
     this.showStatusFilter = true,
+    this.controlHeight = 40,
   });
 
   final FiltersEffectsListQuery query;
   final bool showRenderType;
   final bool showStatusFilter;
+  final double controlHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +42,12 @@ class FeFiltersPanel extends StatelessWidget {
             includeRenderType: showRenderType,
           )
         : 0;
-    const height = 48.0;
+    final height = controlHeight;
 
     return SizedBox(
       height: height,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: _FeSearchField(
@@ -57,7 +60,7 @@ class FeFiltersPanel extends StatelessWidget {
             ),
           ),
           if (showFilterButton) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Builder(
               builder: (buttonContext) {
                 return GiftsFilterButton(
@@ -148,30 +151,42 @@ class _FeSearchFieldState extends State<_FeSearchField> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final verticalPad = ((widget.height - 20) / 2).clamp(6.0, 10.0);
     return SizedBox(
       height: widget.height,
       child: TextField(
         controller: _ctrl,
         onChanged: _onChanged,
+        style: const TextStyle(fontSize: 13),
         decoration: InputDecoration(
           hintText: widget.hint,
-          prefixIcon: const Icon(Icons.search_rounded, size: 20),
+          hintStyle: TextStyle(
+            fontSize: 12.5,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
+          isDense: true,
           filled: true,
           fillColor: scheme.surfaceContainerLow,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: verticalPad,
+          ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: scheme.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: scheme.outline.withValues(alpha: 0.18),
-            ),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: scheme.primary, width: 1.5),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: scheme.primary, width: 1.2),
           ),
         ),
       ),

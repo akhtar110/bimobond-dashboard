@@ -77,6 +77,16 @@ class EffectEditorBasicSection extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           FeEditorSyncedTextField(
+            value: form.label,
+            decoration: InputDecoration(
+              labelText: l10n.tOr('feFieldName', 'Name'),
+              errorText: _fieldError(context, 'label'),
+            ),
+            onChanged: (value) =>
+                bloc.add(EffectBasicFieldChanged(label: value)),
+          ),
+          const SizedBox(height: 10),
+          FeEditorSyncedTextField(
             value: form.slug,
             decoration: InputDecoration(
               labelText: l10n.tOr('feFieldSlug', 'Slug'),
@@ -100,16 +110,6 @@ class EffectEditorBasicSection extends StatelessWidget {
               ).textTheme.bodySmall?.copyWith(color: scheme.error),
             ),
           ],
-          const SizedBox(height: 10),
-          FeEditorSyncedTextField(
-            value: form.label,
-            decoration: InputDecoration(
-              labelText: l10n.tOr('feFieldLabel', 'Label'),
-              errorText: _fieldError(context, 'label'),
-            ),
-            onChanged: (value) =>
-                bloc.add(EffectBasicFieldChanged(label: value)),
-          ),
           const SizedBox(height: 10),
           FeEditorSyncedTextField(
             value: form.labelKey ?? '',

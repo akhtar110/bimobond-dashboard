@@ -341,6 +341,10 @@ class _HomeShellState extends State<HomeShell> {
     if (tabIndex == 18) {
       return _canAccessSecurity(roles, permissions);
     }
+    if (tabIndex == 2) {
+      return permissions.contains(RbacPermissionKeys.readUsers) ||
+          roles.contains(UserRole.admin);
+    }
     return canAccessDashboardTab(tabIndex, roles);
   }
 
@@ -459,6 +463,10 @@ class _HomeShellChrome extends StatelessWidget {
       }
       if (tabIndex == 18) {
         return permissions.contains(RbacPermissionKeys.manageRoles) ||
+            roles.contains(UserRole.admin);
+      }
+      if (tabIndex == 2) {
+        return permissions.contains(RbacPermissionKeys.readUsers) ||
             roles.contains(UserRole.admin);
       }
       return canAccessDashboardTab(tabIndex, roles);

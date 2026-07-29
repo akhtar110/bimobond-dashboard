@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/user_wallet_entity.dart';
 import '../utils/user_detail_layout_metrics.dart';
 import 'user_follow_connections_sheet.dart';
 
@@ -113,14 +114,11 @@ class UserDetailStatsGrid extends StatelessWidget {
   });
 
   final UserEntity user;
-  final Map<String, dynamic>? wallet;
+  final UserWalletEntity? wallet;
 
-  static double _balanceCoins(Map<String, dynamic>? wallet) {
-    if (wallet == null) return 0;
-    final raw = wallet['balanceCoins'] ?? wallet['balance'];
-    if (raw is num) return raw.toDouble();
-    if (raw is String) return double.tryParse(raw) ?? 0;
-    return 0;
+  static double _balanceCoins(UserWalletEntity? wallet, UserEntity user) {
+    final w = wallet ?? user.wallet;
+    return w?.balanceCoins ?? 0;
   }
 
   @override
@@ -129,7 +127,7 @@ class UserDetailStatsGrid extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     final followListsEnabled = !user.isProfileLocked;
-    final balance = _balanceCoins(wallet);
+    final balance = _balanceCoins(wallet, user);
 
     final stats = [
       (

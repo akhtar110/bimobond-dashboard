@@ -52,6 +52,15 @@ class _FeCategoryTabsBarState extends State<FeCategoryTabsBar> {
     return (category as CameraFilterCategoryEntity).displayLabel;
   }
 
+  /// Category chip label with item count (All tab stays without a count).
+  String _chipLabel(Object category) {
+    final name = _label(category);
+    final count = widget.isEffectCategory
+        ? (category as CameraEffectCategoryEntity).effectsCount
+        : (category as CameraFilterCategoryEntity).filtersCount;
+    return '$name ($count)';
+  }
+
   String _id(Object category) {
     if (widget.isEffectCategory) {
       return (category as CameraEffectCategoryEntity).id;
@@ -132,117 +141,108 @@ class _FeCategoryTabsBarState extends State<FeCategoryTabsBar> {
         return aOrder.compareTo(bOrder);
       });
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.7),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 8, 8),
-        child: Listener(
-          onPointerSignal: (signal) {
-            if (signal is PointerScrollEvent) _onPointerScroll(signal);
-          },
-          child: Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _Chip(
-                        label: allLabel,
-                        selected: widget.selectedCategoryId == null,
-                        onTap: () => widget.onCategorySelected(null),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Listener(
+        onPointerSignal: (signal) {
+          if (signal is PointerScrollEvent) _onPointerScroll(signal);
+        },
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _Chip(
+                      label: allLabel,
+                      selected: widget.selectedCategoryId == null,
+                      onTap: () => widget.onCategorySelected(null),
+                    ),
+                    if (sorted.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 1,
+                        height: 22,
+                        color: scheme.outline.withValues(alpha: 0.2),
                       ),
-                      if (sorted.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 1,
-                          height: 26,
-                          color: scheme.outlineVariant,
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      for (var i = 0; i < sorted.length; i++) ...[
-                        _CategoryChip(
-                          label: _label(sorted[i]),
-                          category: sorted[i],
-                          isEffectCategory: widget.isEffectCategory,
-                          selected:
-                              widget.selectedCategoryId == _id(sorted[i]),
-                          onTap: () {
-                            final id = _id(sorted[i]);
-                            if (widget.selectedCategoryId == id) {
-                              widget.onCategorySelected(null);
-                            } else {
-                              widget.onCategorySelected(id);
-                            }
-                          },
-                        ),
-                        if (i < sorted.length - 1) const SizedBox(width: 8),
-                      ],
+                      const SizedBox(width: 8),
                     ],
-                  ),
+                    for (var i = 0; i < sorted.length; i++) ...[
+                      _CategoryChip(
+                        label: _chipLabel(sorted[i]),
+                        category: sorted[i],
+                        isEffectCategory: widget.isEffectCategory,
+                        selected:
+                            widget.selectedCategoryId == _id(sorted[i]),
+                        onTap: () {
+                          final id = _id(sorted[i]);
+                          if (widget.selectedCategoryId == id) {
+                            widget.onCategorySelected(null);
+                          } else {
+                            widget.onCategorySelected(id);
+                          }
+                        },
+                      ),
+                      if (i < sorted.length - 1) const SizedBox(width: 8),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              if (sorted.length > 1)
-                Tooltip(
-                  message: l10n.tOr('feReorderCategories', 'Reorder'),
-                  child: Material(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: _reorderCategories,
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Icon(
-                          Icons.swap_vert_rounded,
-                          size: 20,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              if (sorted.length > 1) const SizedBox(width: 6),
+            ),
+            const SizedBox(width: 8),
+            if (sorted.length > 1)
               Tooltip(
-                message: widget.isEffectCategory
-                    ? l10n.tOr(
-                        'feCreateEffectCategory',
-                        'Create effect category',
-                      )
-                    : l10n.tOr(
-                        'feCreateFilterCategory',
-                        'Create filter category',
-                      ),
+                message: l10n.tOr('feReorderCategories', 'Reorder'),
                 child: Material(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(10),
                   child: InkWell(
-                    onTap: _createCategory,
-                    borderRadius: BorderRadius.circular(12),
+                    onTap: _reorderCategories,
+                    borderRadius: BorderRadius.circular(10),
                     child: SizedBox(
-                      width: 40,
-                      height: 40,
+                      width: 36,
+                      height: 36,
                       child: Icon(
-                        Icons.add_rounded,
-                        size: 22,
-                        color: scheme.onPrimaryContainer,
+                        Icons.swap_vert_rounded,
+                        size: 18,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            if (sorted.length > 1) const SizedBox(width: 6),
+            Tooltip(
+              message: widget.isEffectCategory
+                  ? l10n.tOr(
+                      'feCreateEffectCategory',
+                      'Create effect category',
+                    )
+                  : l10n.tOr(
+                      'feCreateFilterCategory',
+                      'Create filter category',
+                    ),
+              child: Material(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: _createCategory,
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -282,7 +282,7 @@ class _ChipState extends State<_Chip> {
           borderRadius: BorderRadius.circular(999),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
               color: selected
                   ? scheme.primary
@@ -290,9 +290,6 @@ class _ChipState extends State<_Chip> {
                   ? scheme.surfaceContainerHighest
                   : scheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: selected ? scheme.primary : scheme.outlineVariant,
-              ),
             ),
             child: Text(
               widget.label,
@@ -421,9 +418,6 @@ class _CategoryChipState extends State<_CategoryChip> {
               ? scheme.surfaceContainerHighest
               : scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? scheme.primary : scheme.outlineVariant,
-          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -432,7 +426,7 @@ class _CategoryChipState extends State<_CategoryChip> {
               onTap: widget.onTap,
               borderRadius: BorderRadius.circular(999),
               child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(14, 9, 6, 9),
+                padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 6, 7),
                 child: Text(
                   widget.label,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(

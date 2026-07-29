@@ -2,131 +2,226 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../bloc/rbac_state.dart';
+import '../utils/rbac_responsive.dart';
 
+/// Compact page chrome — title + actions, no subtitle or border card.
 class RbacPageFrame extends StatelessWidget {
   const RbacPageFrame({
     super.key,
     required this.title,
     required this.child,
-    this.subtitle,
     this.actions = const [],
     this.onBack,
+    this.metrics,
   });
 
   final String title;
-  final String? subtitle;
   final Widget child;
   final List<Widget> actions;
   final VoidCallback? onBack;
+  final RbacLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-    final isCompact = width < 600;
-    final titleStyle = isCompact
-        ? Theme.of(context).textTheme.titleLarge
-        : Theme.of(context).textTheme.headlineSmall;
 
-    // No Scaffold here — pages live inside the dashboard content area so the
-    // side menu stays visible while navigating between RBAC screens.
     return ColoredBox(
-      color: scheme.surface,
-      child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(0, 0, 0, isCompact ? 4 : 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (isCompact) ...[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (onBack != null)
-                    IconButton(
-                      onPressed: onBack,
-                      tooltip: context.l10n.tOr('back', 'Back'),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title, style: titleStyle),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: scheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ],
-                    ),
+      color: scheme.surfaceContainerLowest,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final m = metrics ??
+              RbacLayoutMetrics(getRbacDeviceType(constraints.maxWidth));
+          final compact = m.isCompact;
+          final stackActions =
+              actions.isNotEmpty && constraints.maxWidth < 720;
+
+          final titleStyle =
+              (compact
+                      ? Theme.of(context).textTheme.titleMedium
+                      : Theme.of(context).textTheme.titleLarge)
+                  ?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.45,
+                    color: scheme.onSurface,
+                    height: 1.05,
+                  );
+
+          final titleRow = Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (onBack != null) ...[
+                IconButton(
+                  onPressed: onBack,
+                  tooltip: context.l10n.tOr('back', 'Back'),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    minimumSize: Size(compact ? 36 : 40, compact ? 36 : 40),
                   ),
-                ],
-              ),
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: actions,
                 ),
+                SizedBox(width: m.controlGap),
               ],
-            ] else
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.spaceBetween,
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: width < 900 ? width * 0.45 : 620,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (onBack != null) ...[
-                          IconButton(
-                            onPressed: onBack,
-                            tooltip: context.l10n.tOr('back', 'Back'),
-                            icon: const Icon(Icons.arrow_back_rounded),
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(title, style: titleStyle),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  subtitle!,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                      ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (actions.isNotEmpty)
-                    Wrap(spacing: 8, runSpacing: 8, children: actions),
-                ],
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: titleStyle,
+                ),
               ),
-            SizedBox(height: isCompact ? 12 : 16),
-            Expanded(child: child),
-          ],
+            ],
+          );
+
+          final header = stackActions
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    titleRow,
+                    if (actions.isNotEmpty) ...[
+                      SizedBox(height: m.headerGap),
+                      Wrap(
+                        spacing: m.controlGap,
+                        runSpacing: m.controlGap,
+                        alignment: WrapAlignment.end,
+                        children: actions,
+                      ),
+                    ],
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: titleRow),
+                    if (actions.isNotEmpty) ...[
+                      SizedBox(width: m.controlGap),
+                      Wrap(
+                        spacing: m.controlGap,
+                        runSpacing: m.controlGap,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: actions,
+                      ),
+                    ],
+                  ],
+                );
+
+          return Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              0,
+              m.pageTopPadding,
+              0,
+              m.pageBottomPadding,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+                  child: header,
+                ),
+                SizedBox(height: m.headerGap),
+                Expanded(child: child),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Dense toolbar button used across RBAC headers.
+class RbacHeaderAction extends StatelessWidget {
+  const RbacHeaderAction({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.outlined = true,
+    this.compact = false,
+    this.tonal = false,
+    this.isLoading = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool outlined;
+  final bool compact;
+  final bool tonal;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = isLoading
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Icon(icon, size: compact ? 20 : 18);
+
+    if (compact) {
+      if (outlined) {
+        return IconButton.outlined(
+          onPressed: onPressed,
+          tooltip: label,
+          icon: child,
+          visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(minimumSize: const Size(36, 36)),
+        );
+      }
+      if (tonal) {
+        return IconButton.filledTonal(
+          onPressed: onPressed,
+          tooltip: label,
+          icon: child,
+          visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(minimumSize: const Size(36, 36)),
+        );
+      }
+      return IconButton.filled(
+        onPressed: onPressed,
+        tooltip: label,
+        icon: child,
+        visualDensity: VisualDensity.compact,
+        style: IconButton.styleFrom(minimumSize: const Size(36, 36)),
+      );
+    }
+
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    );
+    if (outlined) {
+      return OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: child,
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 40),
+          visualDensity: VisualDensity.compact,
+          shape: shape,
         ),
+      );
+    }
+    if (tonal) {
+      return FilledButton.tonalIcon(
+        onPressed: onPressed,
+        icon: child,
+        label: Text(label),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 40),
+          visualDensity: VisualDensity.compact,
+          shape: shape,
+        ),
+      );
+    }
+    return FilledButton.icon(
+      onPressed: onPressed,
+      icon: child,
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        visualDensity: VisualDensity.compact,
+        shape: shape,
       ),
     );
   }
@@ -334,6 +429,7 @@ void showRbacFeedback(BuildContext context, String message, bool isError) {
     SnackBar(
       content: Text(message),
       backgroundColor: isError ? scheme.error : scheme.inverseSurface,
+      behavior: SnackBarBehavior.floating,
     ),
   );
 }

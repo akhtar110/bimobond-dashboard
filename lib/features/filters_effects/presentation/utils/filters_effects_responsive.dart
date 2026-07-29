@@ -46,43 +46,43 @@ class FiltersEffectsLayoutMetrics {
   };
 
   double get pageTopPadding => switch (deviceType) {
-    FiltersEffectsDeviceType.mobileSmall => 8,
-    FiltersEffectsDeviceType.mobileLarge => 10,
-    FiltersEffectsDeviceType.tabletSmall => 10,
-    FiltersEffectsDeviceType.tablet => 12,
-    FiltersEffectsDeviceType.laptop => 16,
-    FiltersEffectsDeviceType.desktop => 20,
-    FiltersEffectsDeviceType.desktopWide => 24,
+    FiltersEffectsDeviceType.mobileSmall => 6,
+    FiltersEffectsDeviceType.mobileLarge => 6,
+    FiltersEffectsDeviceType.tabletSmall => 8,
+    FiltersEffectsDeviceType.tablet => 8,
+    FiltersEffectsDeviceType.laptop => 8,
+    FiltersEffectsDeviceType.desktop => 10,
+    FiltersEffectsDeviceType.desktopWide => 10,
   };
 
   double get pageBottomPadding => switch (deviceType) {
-    FiltersEffectsDeviceType.mobileSmall => 12,
-    FiltersEffectsDeviceType.mobileLarge => 14,
-    FiltersEffectsDeviceType.tabletSmall => 14,
-    FiltersEffectsDeviceType.tablet => 16,
-    FiltersEffectsDeviceType.laptop => 20,
-    FiltersEffectsDeviceType.desktop => 28,
-    FiltersEffectsDeviceType.desktopWide => 32,
+    FiltersEffectsDeviceType.mobileSmall => 10,
+    FiltersEffectsDeviceType.mobileLarge => 10,
+    FiltersEffectsDeviceType.tabletSmall => 12,
+    FiltersEffectsDeviceType.tablet => 12,
+    FiltersEffectsDeviceType.laptop => 12,
+    FiltersEffectsDeviceType.desktop => 14,
+    FiltersEffectsDeviceType.desktopWide => 16,
   };
 
   double get sectionGap => switch (deviceType) {
-    FiltersEffectsDeviceType.mobileSmall => 6,
-    FiltersEffectsDeviceType.mobileLarge => 8,
-    FiltersEffectsDeviceType.tabletSmall => 8,
-    FiltersEffectsDeviceType.tablet => 10,
-    FiltersEffectsDeviceType.laptop => 10,
-    FiltersEffectsDeviceType.desktop => 12,
-    FiltersEffectsDeviceType.desktopWide => 14,
+    FiltersEffectsDeviceType.mobileSmall => 4,
+    FiltersEffectsDeviceType.mobileLarge => 4,
+    FiltersEffectsDeviceType.tabletSmall => 5,
+    FiltersEffectsDeviceType.tablet => 6,
+    FiltersEffectsDeviceType.laptop => 6,
+    FiltersEffectsDeviceType.desktop => 8,
+    FiltersEffectsDeviceType.desktopWide => 8,
   };
 
   double get toolbarSectionGap => switch (deviceType) {
     FiltersEffectsDeviceType.mobileSmall => 4,
-    FiltersEffectsDeviceType.mobileLarge => 5,
-    FiltersEffectsDeviceType.tabletSmall => 5,
-    FiltersEffectsDeviceType.tablet => 6,
-    FiltersEffectsDeviceType.laptop => 8,
-    FiltersEffectsDeviceType.desktop => 10,
-    FiltersEffectsDeviceType.desktopWide => 12,
+    FiltersEffectsDeviceType.mobileLarge => 4,
+    FiltersEffectsDeviceType.tabletSmall => 4,
+    FiltersEffectsDeviceType.tablet => 5,
+    FiltersEffectsDeviceType.laptop => 6,
+    FiltersEffectsDeviceType.desktop => 6,
+    FiltersEffectsDeviceType.desktopWide => 8,
   };
 
   double get filterGap => switch (deviceType) {
@@ -96,23 +96,23 @@ class FiltersEffectsLayoutMetrics {
   };
 
   double get toolbarFilterGap => switch (deviceType) {
-    FiltersEffectsDeviceType.mobileSmall => 3,
+    FiltersEffectsDeviceType.mobileSmall => 4,
     FiltersEffectsDeviceType.mobileLarge => 4,
     FiltersEffectsDeviceType.tabletSmall => 4,
-    FiltersEffectsDeviceType.tablet => 5,
-    FiltersEffectsDeviceType.laptop => 6,
-    FiltersEffectsDeviceType.desktop => 8,
-    FiltersEffectsDeviceType.desktopWide => 8,
+    FiltersEffectsDeviceType.tablet => 4,
+    FiltersEffectsDeviceType.laptop => 5,
+    FiltersEffectsDeviceType.desktop => 6,
+    FiltersEffectsDeviceType.desktopWide => 6,
   };
 
   double get toolbarControlHeight => switch (deviceType) {
-    FiltersEffectsDeviceType.mobileSmall => 38,
-    FiltersEffectsDeviceType.mobileLarge => 40,
-    FiltersEffectsDeviceType.tabletSmall => 40,
-    FiltersEffectsDeviceType.tablet => 42,
-    FiltersEffectsDeviceType.laptop => 42,
-    FiltersEffectsDeviceType.desktop => 44,
-    FiltersEffectsDeviceType.desktopWide => 44,
+    FiltersEffectsDeviceType.mobileSmall => 36,
+    FiltersEffectsDeviceType.mobileLarge => 36,
+    FiltersEffectsDeviceType.tabletSmall => 38,
+    FiltersEffectsDeviceType.tablet => 38,
+    FiltersEffectsDeviceType.laptop => 40,
+    FiltersEffectsDeviceType.desktop => 40,
+    FiltersEffectsDeviceType.desktopWide => 40,
   };
 
   double get kpiMinTileWidth => switch (deviceType) {

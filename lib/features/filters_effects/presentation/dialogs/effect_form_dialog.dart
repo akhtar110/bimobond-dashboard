@@ -150,11 +150,38 @@ class EffectFormDialog extends StatelessWidget {
         builder: (context, state) {
           final l10n = context.l10n;
           final ready = state is EffectEditorReady ? state : null;
-          final screen = MediaQuery.sizeOf(context);
-          final dialogWidth = (screen.width * 0.94).clamp(960.0, 1280.0);
-          final dialogHeight = (screen.height * 0.88).clamp(520.0, 820.0);
+          final media = MediaQuery.of(context);
+          final screen = media.size;
+          final viewPadding = media.viewPadding;
+          final viewInsets = media.viewInsets;
+
+          // Never force a size larger than the viewport (was clamping to 960×520).
+          final horizontalInset = screen.width < 720 ? 12.0 : 40.0;
+          final verticalInset = screen.height < 720 ? 12.0 : 24.0;
+          final availableWidth =
+              screen.width - (horizontalInset * 2) - viewPadding.horizontal;
+          final availableHeight = screen.height -
+              (verticalInset * 2) -
+              viewPadding.vertical -
+              viewInsets.vertical;
+          // Reserve space for AlertDialog title + actions chrome.
+          final contentMaxHeight =
+              (availableHeight - 132).clamp(240.0, 820.0);
+          final dialogWidth = screen.width >= 1100
+              ? (screen.width * 0.94).clamp(960.0, 1280.0).clamp(
+                  0.0,
+                  availableWidth,
+                )
+              : availableWidth.clamp(280.0, 1280.0);
+          final dialogHeight = (screen.height * 0.88)
+              .clamp(280.0, 820.0)
+              .clamp(240.0, contentMaxHeight);
 
           return AlertDialog(
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: horizontalInset,
+              vertical: verticalInset,
+            ),
             title: Row(
               children: [
                 Expanded(
@@ -173,7 +200,12 @@ class EffectFormDialog extends StatelessWidget {
                 ),
               ],
             ),
-            contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            contentPadding: EdgeInsets.fromLTRB(
+              screen.width < 720 ? 12 : 20,
+              0,
+              screen.width < 720 ? 12 : 20,
+              8,
+            ),
             content: SizedBox(
               width: dialogWidth,
               height: dialogHeight,
@@ -249,103 +281,124 @@ class _EffectEditorDialogBody extends StatelessWidget {
 class _EffectEditorReadyBody extends StatelessWidget {
   const _EffectEditorReadyBody();
 
+  static const double _wideBreakpoint = 1100;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isWide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
+    final l10n = context.l10n;
 
     return BlocSelector<EffectEditorBloc, EffectEditorState, bool>(
       selector: (state) => state is EffectEditorReady ? state.isSaving : false,
       builder: (context, isSaving) {
+        final basicPanel =
+            BlocSelector<EffectEditorBloc, EffectEditorState, _BasicPanelState?>(
+              selector: _selectBasicPanelState,
+              builder: (context, panelState) {
+                if (panelState == null) return const SizedBox.shrink();
+                return EffectEditorBasicSection(
+                  key: ValueKey(panelState.ready.effectId ?? 'new-effect'),
+                  state: panelState.ready,
+                  embedded: true,
+                );
+              },
+            );
+
+        final compositionPanel = BlocSelector<
+          EffectEditorBloc,
+          EffectEditorState,
+          _CompositionPanelState?
+        >(
+          selector: _selectCompositionPanelState,
+          builder: (context, panelState) {
+            if (panelState == null) return const SizedBox.shrink();
+            return EffectEditorCompositionSection(
+              state: panelState.ready,
+              embedded: true,
+            );
+          },
+        );
+
+        final previewPanel = const RepaintBoundary(
+          child: EffectEditorPreviewPanel(embedded: true),
+        );
+
+        final Widget bodyContent;
+        if (isWide) {
+          bodyContent = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 34,
+                child: _DialogColumn(
+                  title: l10n.tOr('feEffectSectionBasic', 'Basic information'),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(right: 4, bottom: 8),
+                    child: basicPanel,
+                  ),
+                ),
+              ),
+              VerticalDivider(width: 1, color: scheme.outlineVariant),
+              Expanded(
+                flex: 40,
+                child: _DialogColumn(
+                  title: l10n.tOr(
+                    'feEffectSectionComposition',
+                    'Effect composition',
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(right: 4, bottom: 8),
+                    child: compositionPanel,
+                  ),
+                ),
+              ),
+              VerticalDivider(width: 1, color: scheme.outlineVariant),
+              Expanded(
+                flex: 30,
+                child: _DialogColumn(
+                  title: l10n.tOr('feEffectSectionPreview', 'Live preview'),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(right: 4, bottom: 8),
+                    child: previewPanel,
+                  ),
+                ),
+              ),
+            ],
+          );
+        } else {
+          // Phone / tablet: stack sections so the dialog fits any width.
+          bodyContent = SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StackedSectionTitle(
+                  title: l10n.tOr('feEffectSectionBasic', 'Basic information'),
+                ),
+                basicPanel,
+                const SizedBox(height: 16),
+                _StackedSectionTitle(
+                  title: l10n.tOr(
+                    'feEffectSectionComposition',
+                    'Effect composition',
+                  ),
+                ),
+                compositionPanel,
+                const SizedBox(height: 16),
+                _StackedSectionTitle(
+                  title: l10n.tOr('feEffectSectionPreview', 'Live preview'),
+                ),
+                previewPanel,
+              ],
+            ),
+          );
+        }
+
         return Stack(
           fit: StackFit.expand,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 34,
-                  child: _DialogColumn(
-                    title: context.l10n.tOr(
-                      'feEffectSectionBasic',
-                      'Basic information',
-                    ),
-                    child:
-                        BlocSelector<
-                          EffectEditorBloc,
-                          EffectEditorState,
-                          _BasicPanelState?
-                        >(
-                          selector: _selectBasicPanelState,
-                          builder: (context, panelState) {
-                            if (panelState == null)
-                              return const SizedBox.shrink();
-                            return SingleChildScrollView(
-                              padding: const EdgeInsets.only(
-                                right: 4,
-                                bottom: 8,
-                              ),
-                              child: EffectEditorBasicSection(
-                                key: ValueKey(
-                                  panelState.ready.effectId ?? 'new-effect',
-                                ),
-                                state: panelState.ready,
-                                embedded: true,
-                              ),
-                            );
-                          },
-                        ),
-                  ),
-                ),
-                VerticalDivider(width: 1, color: scheme.outlineVariant),
-                Expanded(
-                  flex: 40,
-                  child: _DialogColumn(
-                    title: context.l10n.tOr(
-                      'feEffectSectionComposition',
-                      'Effect composition',
-                    ),
-                    child:
-                        BlocSelector<
-                          EffectEditorBloc,
-                          EffectEditorState,
-                          _CompositionPanelState?
-                        >(
-                          selector: _selectCompositionPanelState,
-                          builder: (context, panelState) {
-                            if (panelState == null)
-                              return const SizedBox.shrink();
-                            return SingleChildScrollView(
-                              padding: const EdgeInsets.only(
-                                right: 4,
-                                bottom: 8,
-                              ),
-                              child: EffectEditorCompositionSection(
-                                state: panelState.ready,
-                                embedded: true,
-                              ),
-                            );
-                          },
-                        ),
-                  ),
-                ),
-                VerticalDivider(width: 1, color: scheme.outlineVariant),
-                Expanded(
-                  flex: 30,
-                  child: _DialogColumn(
-                    title: context.l10n.tOr(
-                      'feEffectSectionPreview',
-                      'Live preview',
-                    ),
-                    child: RepaintBoundary(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(right: 4, bottom: 8),
-                        child: const EffectEditorPreviewPanel(embedded: true),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            bodyContent,
             if (isSaving)
               const ColoredBox(
                 color: Color(0x44000000),
@@ -354,6 +407,27 @@ class _EffectEditorReadyBody extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _StackedSectionTitle extends StatelessWidget {
+  const _StackedSectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: scheme.primary,
+        ),
+      ),
     );
   }
 }

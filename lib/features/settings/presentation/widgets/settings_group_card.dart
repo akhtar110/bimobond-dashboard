@@ -5,6 +5,7 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/admin_settings_bloc.dart';
+import '../utils/settings_admin_l10n.dart';
 import 'setting_edit_dialog.dart';
 import 'setting_item_card.dart';
 
@@ -40,7 +41,7 @@ class SettingsGroupCard extends StatelessWidget {
           tilePadding: const EdgeInsetsDirectional.fromSTEB(16, 4, 8, 4),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           title: Text(
-            category,
+            SettingsAdminL10n.categoryLabel(context, category),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),

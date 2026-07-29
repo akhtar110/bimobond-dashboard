@@ -1230,16 +1230,17 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     final alreadyIn = group.gifts.any((m) => m.gift.id == giftId);
     if (alreadyIn) return;
 
+    // Put the newly assigned gift first (sortOrder 0), matching All-tab
+    // placement for new gifts; shift existing members down.
+    final existing = [...group.gifts]
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final members = [
-      for (final member in group.gifts)
+      GiftGroupMembershipItem(giftId: giftId, sortOrder: 0),
+      for (var i = 0; i < existing.length; i++)
         GiftGroupMembershipItem(
-          giftId: member.gift.id,
-          sortOrder: member.sortOrder,
+          giftId: existing[i].gift.id,
+          sortOrder: i + 1,
         ),
-      GiftGroupMembershipItem(
-        giftId: giftId,
-        sortOrder: group.gifts.length,
-      ),
     ];
     await _replaceGroupGifts(groupId, members);
   }

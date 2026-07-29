@@ -544,11 +544,15 @@ class PaginationMetaModel extends PaginationMeta {
   });
 
   factory PaginationMetaModel.fromJson(Map<String, dynamic> json) {
+    final pages = _int(json['lastPage']);
+    final totalPages = _int(json['totalPages']);
     return PaginationMetaModel(
       total: _int(json['total']),
       page: _int(json['page']) == 0 ? 1 : _int(json['page']),
       limit: _int(json['limit']) == 0 ? 20 : _int(json['limit']),
-      totalPages: _int(json['totalPages']) == 0 ? 1 : _int(json['totalPages']),
+      totalPages: (pages == 0 ? totalPages : pages) == 0
+          ? 1
+          : (pages == 0 ? totalPages : pages),
     );
   }
 }

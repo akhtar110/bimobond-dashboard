@@ -7,12 +7,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../bloc/admin_settings_bloc.dart';
-import '../utils/settings_responsive.dart';
+import '../utils/settings_admin_l10n.dart';
 
 Future<void> showCreateSettingDialog(BuildContext context) {
   final bloc = context.read<AdminSettingsBloc>();
-  return showSettingsAdaptiveForm<void>(
+  return showDialog<void>(
     context: context,
+    barrierDismissible: true,
     builder: (ctx) => BlocProvider<AdminSettingsBloc>.value(
       value: bloc,
       child: const CreateSettingDialog(),
@@ -36,9 +37,20 @@ class _CreateSettingDialogState extends State<CreateSettingDialog> {
   final _sortOrderController = TextEditingController(text: '0');
 
   String _type = 'STRING';
-  String? _category = AppSettingCategories.general;
+  late String _category;
   bool _boolValue = false;
   bool _isPublic = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final categories = SettingsAdminL10n.resolveCategories(
+      context.read<AdminSettingsBloc>().state.categories,
+    );
+    _category = categories.contains(AppSettingCategories.features)
+        ? AppSettingCategories.features
+        : categories.first;
+  }
 
   @override
   void dispose() {
@@ -117,168 +129,179 @@ class _CreateSettingDialogState extends State<CreateSettingDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    final state = context.watch<AdminSettingsBloc>().state;
-    final categories = state.categories.isNotEmpty
-        ? state.categories
-        : AppSettingCategories.all;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
+    final isSaving = context.select<AdminSettingsBloc, bool>(
+      (b) => b.state.isSaving,
+    );
+    final apiCategories = context.select<AdminSettingsBloc, List<String>>(
+      (b) => b.state.categories,
+    );
+    final categories = SettingsAdminL10n.resolveCategories(apiCategories);
+    final selectedCategory =
+        categories.contains(_category) ? _category : categories.first;
 
-    final form = Form(
-      key: _formKey,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              l10n.tOr('createSettingTitle', 'New setting'),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _keyController,
-              validator: _validateKey,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: l10n.tOr('settingKey', 'Key'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _type,
-              decoration: InputDecoration(
-                labelText: l10n.tOr('settingsTypeField', 'Type'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'STRING', child: Text('STRING')),
-                DropdownMenuItem(value: 'NUMBER', child: Text('NUMBER')),
-                DropdownMenuItem(value: 'BOOLEAN', child: Text('BOOLEAN')),
-                DropdownMenuItem(value: 'JSON', child: Text('JSON')),
-              ],
-              onChanged: (v) {
-                if (v != null) setState(() => _type = v);
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String?>(
-              value: _category,
-              decoration: InputDecoration(
-                labelText: l10n.tOr('settingsFilterCategory', 'Category'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              items: [
-                for (final cat in categories)
-                  DropdownMenuItem<String?>(value: cat, child: Text(cat)),
-              ],
-              onChanged: (v) => setState(() => _category = v),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _labelController,
-              decoration: InputDecoration(
-                labelText: l10n.tOr('settingsLabelField', 'Label'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _descriptionController,
-              maxLines: 2,
-              decoration: InputDecoration(
-                labelText: l10n.tOr('description', 'Description'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_isBoolean)
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l10n.tOr('settingValue', 'Value')),
-                value: _boolValue,
-                onChanged: (v) => setState(() => _boolValue = v),
-              )
-            else
-              TextFormField(
-                controller: _valueController,
-                validator: _validateValue,
-                maxLines: _isJson ? 6 : 1,
-                keyboardType: _isNumber
-                    ? const TextInputType.numberWithOptions(decimal: true)
-                    : TextInputType.text,
-                inputFormatters: _isNumber
-                    ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.\-]'))]
-                    : null,
-                decoration: InputDecoration(
-                  labelText: l10n.tOr('settingValue', 'Value'),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _sortOrderController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: l10n.tOr('settingsSortOrderField', 'Sort order'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.tOr('settingsPublicField', 'Public')),
-              value: _isPublic,
-              onChanged: (v) => setState(() => _isPublic = v),
-            ),
-            const SizedBox(height: 16),
-            Row(
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(l10n.tOr('newSetting', 'New setting')),
+      content: SizedBox(
+        width: 480,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(
-                  onPressed: state.isSaving
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: Text(l10n.tOr('cancel', 'Cancel')),
+                TextFormField(
+                  controller: _keyController,
+                  validator: _validateKey,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: l10n.tOr('settingKey', 'Key'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                const Spacer(),
-                FilledButton(
-                  onPressed: state.isSaving ? null : _save,
-                  child: Text(l10n.tOr('create', 'Create')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('type_$_type'),
+                  initialValue: _type,
+                  decoration: InputDecoration(
+                    labelText: l10n.tOr('settingsTypeField', 'Type'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'STRING', child: Text('STRING')),
+                    DropdownMenuItem(value: 'NUMBER', child: Text('NUMBER')),
+                    DropdownMenuItem(value: 'BOOLEAN', child: Text('BOOLEAN')),
+                    DropdownMenuItem(value: 'JSON', child: Text('JSON')),
+                  ],
+                  onChanged: isSaving
+                      ? null
+                      : (v) {
+                          if (v != null) setState(() => _type = v);
+                        },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('category_$selectedCategory'),
+                  initialValue: selectedCategory,
+                  decoration: InputDecoration(
+                    labelText: l10n.tOr('settingsFilterCategory', 'Category'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: [
+                    for (final cat in categories)
+                      DropdownMenuItem<String>(
+                        value: cat,
+                        child: Text(
+                          SettingsAdminL10n.categoryLabel(context, cat),
+                        ),
+                      ),
+                  ],
+                  onChanged: isSaving
+                      ? null
+                      : (v) {
+                          if (v != null) setState(() => _category = v);
+                        },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _labelController,
+                  decoration: InputDecoration(
+                    labelText: l10n.tOr('settingsLabelField', 'Label'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: l10n.tOr('description', 'Description'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_isBoolean)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l10n.tOr('settingValue', 'Value')),
+                    value: _boolValue,
+                    onChanged:
+                        isSaving ? null : (v) => setState(() => _boolValue = v),
+                  )
+                else
+                  TextFormField(
+                    controller: _valueController,
+                    validator: _validateValue,
+                    maxLines: _isJson ? 6 : 1,
+                    keyboardType: _isNumber
+                        ? const TextInputType.numberWithOptions(decimal: true)
+                        : TextInputType.text,
+                    inputFormatters: _isNumber
+                        ? [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9.\-]'),
+                            ),
+                          ]
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: l10n.tOr('settingValue', 'Value'),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _sortOrderController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: l10n.tOr('settingsSortOrderField', 'Sort order'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.tOr('settingsPublicField', 'Public')),
+                  value: _isPublic,
+                  onChanged:
+                      isSaving ? null : (v) => setState(() => _isPublic = v),
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
-    );
-
-    return Material(
-      color: scheme.surface,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 520, maxHeight: maxHeight),
-        child: form,
-      ),
+      actions: [
+        TextButton(
+          onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+          child: Text(l10n.tOr('cancel', 'Cancel')),
+        ),
+        FilledButton(
+          onPressed: isSaving ? null : _save,
+          child: isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l10n.tOr('create', 'Create')),
+        ),
+      ],
     );
   }
 }

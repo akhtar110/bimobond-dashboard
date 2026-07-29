@@ -62,6 +62,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final GetAllNotifications getAllNotifications;
 
   static const int _feedLimit = 20;
+  static const _userSearchDebounce = Duration(milliseconds: 350);
 
   StreamSubscription<AdminNotificationEventEntity>? _socketSub;
   Timer? _scheduleTimer;
@@ -250,14 +251,17 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
 
     if (query.isEmpty) return;
 
+    await Future<void>.delayed(_userSearchDebounce);
+    if (isClosed || searchToken != _userSearchToken) return;
+
     try {
       final page = await getUsers(page: 1, limit: 10, search: query);
-      if (searchToken != _userSearchToken) return;
+      if (isClosed || searchToken != _userSearchToken) return;
       emit(
         state.copyWith(userSearchResults: page.users, userSearchLoading: false),
       );
     } catch (_) {
-      if (searchToken != _userSearchToken) return;
+      if (isClosed || searchToken != _userSearchToken) return;
       emit(state.copyWith(userSearchResults: [], userSearchLoading: false));
     }
   }

@@ -8,6 +8,7 @@ import '../utils/analytics_date_series_filler.dart';
 import '../utils/analytics_format.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../utils/analytics_l10n.dart';
+import '../utils/analytics_responsive.dart';
 import 'analytics_charts.dart';
 import 'analytics_dashboard_header.dart';
 import 'analytics_grid.dart';
@@ -17,13 +18,6 @@ import 'period_engagement_card.dart';
 import 'post_totals_card.dart';
 import 'posts_analytics_charts_section.dart';
 import 'stories_analytics_card.dart';
-
-double _analyticsGridWidth(BoxConstraints constraints, BuildContext context) {
-  final maxW = constraints.maxWidth.isFinite
-      ? constraints.maxWidth
-      : MediaQuery.sizeOf(context).width;
-  return (maxW.clamp(0.0, 1680.0) - 32).clamp(200.0, double.infinity);
-}
 
 class AnalyticsDashboardBody extends StatelessWidget {
   const AnalyticsDashboardBody({super.key});
@@ -36,16 +30,26 @@ class AnalyticsDashboardBody extends StatelessWidget {
           return Center(child: _FullError(message: state.message));
         }
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final width = _analyticsGridWidth(constraints, context);
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1680),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final metrics = AnalyticsLayoutMetrics(
+                  getAnalyticsDeviceType(constraints.maxWidth),
+                );
+                final gridWidth = (constraints.maxWidth -
+                        metrics.pageHorizontalPadding * 2)
+                    .clamp(200.0, double.infinity);
 
-            return Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1680),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 16),
+                return Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    metrics.pageHorizontalPadding,
+                    metrics.pageTopPadding,
+                    metrics.pageHorizontalPadding,
+                    metrics.pageBottomPadding,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -55,19 +59,21 @@ class AnalyticsDashboardBody extends StatelessWidget {
                             SliverToBoxAdapter(
                               child: switch (state) {
                                 AnalyticsInitial() =>
-                                  const AnalyticsDashboardSkeleton(),
+                                  AnalyticsDashboardSkeleton(metrics: metrics),
                                 AnalyticsLoading(:final previous)
                                     when previous == null =>
-                                  const AnalyticsDashboardSkeleton(),
+                                  AnalyticsDashboardSkeleton(metrics: metrics),
                                 AnalyticsLoaded s => _DashboardSections(
                                     state: s,
-                                    width: width,
+                                    width: gridWidth,
+                                    metrics: metrics,
                                   ),
                                 AnalyticsLoading(:final previous)
                                     when previous != null =>
                                   _DashboardSections(
                                     state: previous,
-                                    width: width,
+                                    width: gridWidth,
+                                    metrics: metrics,
                                     isRefreshing: true,
                                   ),
                                 _ => const Padding(
@@ -83,10 +89,10 @@ class AnalyticsDashboardBody extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
-              ),
-            );
-          },
+                );
+              },
+            ),
+          ),
         );
       },
     );
@@ -97,23 +103,29 @@ class _DashboardSections extends StatelessWidget {
   const _DashboardSections({
     required this.state,
     required this.width,
+    required this.metrics,
     this.isRefreshing = false,
   });
 
   final AnalyticsLoaded state;
   final double width;
+  final AnalyticsLayoutMetrics metrics;
   final bool isRefreshing;
 
   @override
   Widget build(BuildContext context) {
+    final gap = metrics.sectionGap;
+    final header = AnalyticsDashboardHeader(
+      isRefreshing: isRefreshing || state.isRefreshing,
+      metrics: metrics,
+    );
+
     if (!state.isAdminDashboard) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AnalyticsDashboardHeader(
-            isRefreshing: isRefreshing || state.isRefreshing,
-          ),
-          const SizedBox(height: 24),
+          header,
+          SizedBox(height: gap + 4),
           AnalyticsSectionCard(
             title: context.l10n.t('analyticsCreatorTitle'),
             child: Text(
@@ -130,15 +142,13 @@ class _DashboardSections extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AnalyticsDashboardHeader(
-          isRefreshing: isRefreshing || state.isRefreshing,
-        ),
-        const SizedBox(height: 16),
+        header,
+        SizedBox(height: metrics.headerGap),
         AnalyticsGrid(
           width: width,
           children: _kpiRow(state, context),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         AnalyticsGrid(
           width: width,
           children: [
@@ -154,7 +164,7 @@ class _DashboardSections extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         AnalyticsGrid(
           width: width,
           children: [
@@ -165,7 +175,7 @@ class _DashboardSections extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         AnalyticsGrid(
           width: width,
           children: [
@@ -184,7 +194,7 @@ class _DashboardSections extends StatelessWidget {
           ],
         ),
         if (state.posts != null) ...[
-          const SizedBox(height: 16),
+          SizedBox(height: gap),
           AnalyticsGrid(
             width: width,
             children: [
@@ -198,7 +208,7 @@ class _DashboardSections extends StatelessWidget {
             ],
           ),
         ],
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         AnalyticsGrid(
           width: width,
           children: [
@@ -220,7 +230,7 @@ class _DashboardSections extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         AnalyticsGrid(
           width: width,
           children: [
@@ -241,9 +251,9 @@ class _DashboardSections extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         _CategoriesSection(state: state),
-        const SizedBox(height: 24),
+        SizedBox(height: gap + 8),
       ],
     );
   }

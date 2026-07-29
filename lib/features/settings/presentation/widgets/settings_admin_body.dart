@@ -5,7 +5,6 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../bloc/admin_settings_bloc.dart';
 import '../utils/settings_responsive.dart';
-import 'app_settings_panel.dart';
 import 'auction_settings_tab.dart';
 import 'branding_tab.dart';
 import 'commission_tab.dart';
@@ -13,7 +12,6 @@ import 'currencies_tab.dart';
 import 'defaults_tab.dart';
 import 'economy_admin_tab.dart';
 import 'features_settings_tab.dart';
-import 'general_settings_tab.dart';
 import 'notification_settings_tab.dart';
 import 'promotion_settings_tab.dart';
 import 'upload_settings_tab.dart';
@@ -67,17 +65,16 @@ class SettingsAdminBody extends StatelessWidget {
           );
         }
 
-        final tab = state.tab == AdminSettingsTab.overview
-            ? AdminSettingsTab.economy
-            : state.tab;
+        final tab = switch (state.tab) {
+          AdminSettingsTab.overview ||
+          AdminSettingsTab.appSettings ||
+          AdminSettingsTab.general =>
+            AdminSettingsTab.economy,
+          _ => state.tab,
+        };
 
         final content = switch (tab) {
           AdminSettingsTab.economy => const EconomyAdminTab(),
-          AdminSettingsTab.appSettings => AppSettingsPanel(
-              canManage: canManage,
-              embedded: true,
-            ),
-          AdminSettingsTab.general => const GeneralSettingsTab(),
           AdminSettingsTab.branding => const BrandingTab(),
           AdminSettingsTab.commission => const CommissionTab(),
           AdminSettingsTab.currencies => const CurrenciesTab(),
@@ -87,7 +84,10 @@ class SettingsAdminBody extends StatelessWidget {
           AdminSettingsTab.notifications => const NotificationSettingsTab(),
           AdminSettingsTab.uploads => const UploadSettingsTab(),
           AdminSettingsTab.defaults => const DefaultsTab(),
-          AdminSettingsTab.overview => const SizedBox.shrink(),
+          AdminSettingsTab.appSettings ||
+          AdminSettingsTab.general ||
+          AdminSettingsTab.overview =>
+            const EconomyAdminTab(),
         };
 
         return DecoratedBox(

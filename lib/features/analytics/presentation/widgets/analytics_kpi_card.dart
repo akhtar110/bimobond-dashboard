@@ -57,6 +57,37 @@ class _AnalyticsKpiCardState extends State<AnalyticsKpiCard> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = widget.accent ?? scheme.primary;
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 720;
+    final tight = width < 480;
+
+    final padding = tight ? 10.0 : (compact ? 12.0 : 18.0);
+    final iconBox = tight ? 28.0 : (compact ? 32.0 : 40.0);
+    final iconSize = tight ? 14.0 : (compact ? 16.0 : 20.0);
+    final radius = tight ? 10.0 : (compact ? 12.0 : 16.0);
+    final iconRadius = tight ? 8.0 : (compact ? 10.0 : 12.0);
+    final titleGap = tight ? 8.0 : (compact ? 10.0 : 14.0);
+    final valueStyle = (tight
+            ? Theme.of(context).textTheme.titleMedium
+            : compact
+                ? Theme.of(context).textTheme.titleLarge
+                : Theme.of(context).textTheme.headlineSmall)
+        ?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: scheme.onSurface,
+      letterSpacing: -0.5,
+      height: 1.1,
+    );
+    final titleStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: scheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+          fontSize: tight ? 10.5 : (compact ? 11.5 : null),
+        );
+    final subtitleStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+          fontSize: tight ? 10 : (compact ? 11 : null),
+          height: 1.2,
+        );
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -64,12 +95,13 @@ class _AnalyticsKpiCardState extends State<AnalyticsKpiCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(padding),
         decoration: BoxDecoration(
           color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(
-            color: _hovered ? accent.withValues(alpha: 0.45) : scheme.outlineVariant,
+            color:
+                _hovered ? accent.withValues(alpha: 0.45) : scheme.outlineVariant,
           ),
           boxShadow: [
             BoxShadow(
@@ -81,43 +113,42 @@ class _AnalyticsKpiCardState extends State<AnalyticsKpiCard> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: iconBox,
+                  height: iconBox,
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(iconRadius),
                   ),
-                  child: Icon(widget.icon, size: 20, color: accent),
+                  child: Icon(widget.icon, size: iconSize, color: accent),
                 ),
                 const Spacer(),
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
+                Flexible(
+                  child: Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: titleStyle,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: titleGap),
             AnimatedCounterText(
               text: widget.value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.onSurface,
-                    letterSpacing: -0.5,
-                  ),
+              style: valueStyle,
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: tight ? 2 : 4),
             Text(
               widget.subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: subtitleStyle,
             ),
           ],
         ),
