@@ -566,7 +566,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     if (user.isBanned) {
       await unbanUser(event.userId);
     } else {
-      await banUser(reason: '', until: DateTime.now(), userId: event.userId);
+      await banUser(userId: event.userId, reason: 'Banned by admin');
     }
     add(LoadUsersEvent(page: _currentPage));
   }

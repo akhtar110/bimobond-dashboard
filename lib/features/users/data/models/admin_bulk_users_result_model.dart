@@ -11,6 +11,8 @@ class AdminBulkUsersResultModel extends AdminBulkUsersResultEntity {
     required super.notFoundIds,
     super.reason,
     super.until,
+    super.roles,
+    super.failed,
   });
 
   factory AdminBulkUsersResultModel.fromJson(
@@ -23,10 +25,28 @@ class AdminBulkUsersResultModel extends AdminBulkUsersResultEntity {
       orElse: () => fallbackAction,
     );
 
+    final failedRaw = json['failed'];
+    final failed = <AdminBulkUserFailureEntity>[];
+    if (failedRaw is List) {
+      for (final item in failedRaw) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final userId = map['userId']?.toString() ?? '';
+        final message = map['message']?.toString() ?? '';
+        if (userId.isEmpty && message.isEmpty) continue;
+        failed.add(
+          AdminBulkUserFailureEntity(
+            userId: userId.isEmpty ? 'unknown' : userId,
+            message: message.isEmpty ? 'Failed' : message,
+          ),
+        );
+      }
+    }
+
     return AdminBulkUsersResultModel(
       action: action,
       successCount: _readInt(json['successCount']) ?? 0,
-      failedCount: _readInt(json['failedCount']) ?? 0,
+      failedCount: _readInt(json['failedCount']) ?? failed.length,
       notFoundCount: _readInt(json['notFoundCount']) ?? 0,
       userIds: _readStringList(json['userIds']),
       notFoundIds: _readStringList(json['notFoundIds']),
@@ -34,6 +54,8 @@ class AdminBulkUsersResultModel extends AdminBulkUsersResultEntity {
       until: json['until'] is String && (json['until'] as String).isNotEmpty
           ? DateTime.tryParse(json['until'] as String)
           : null,
+      roles: _readStringList(json['roles']),
+      failed: failed,
     );
   }
 

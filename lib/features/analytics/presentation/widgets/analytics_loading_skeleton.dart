@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../utils/analytics_responsive.dart';
+
 class AnalyticsDashboardSkeleton extends StatelessWidget {
-  const AnalyticsDashboardSkeleton({super.key});
+  const AnalyticsDashboardSkeleton({this.metrics, super.key});
+
+  final AnalyticsLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final base = scheme.surfaceContainerHigh;
     final hi = scheme.surfaceContainerLow;
+    final gap = metrics?.sectionGap ?? 16.0;
+    final headerGap = metrics?.headerGap ?? 8.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ShimmerBox(color: base, height: 88, radius: 16),
-        const SizedBox(height: 16),
+        // Flat header placeholder (no card chrome).
+        _ShimmerBox(color: base, height: 40, radius: 10),
+        SizedBox(height: headerGap),
         LayoutBuilder(
           builder: (context, c) {
             final cols = c.maxWidth >= 900 ? 4 : c.maxWidth >= 600 ? 2 : 1;
@@ -32,11 +39,11 @@ class AnalyticsDashboardSkeleton extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: gap),
         _ShimmerBox(color: hi, height: 280, radius: 16),
-        const SizedBox(height: 12),
+        SizedBox(height: gap),
         _ShimmerBox(color: hi, height: 280, radius: 16),
-        const SizedBox(height: 12),
+        SizedBox(height: gap),
         LayoutBuilder(
           builder: (context, c) {
             final sideBySide = c.maxWidth >= 900;
@@ -44,7 +51,7 @@ class AnalyticsDashboardSkeleton extends StatelessWidget {
               return Column(
                 children: [
                   _ShimmerBox(color: base, height: 240, radius: 16),
-                  const SizedBox(height: 12),
+                  SizedBox(height: gap),
                   _ShimmerBox(color: base, height: 240, radius: 16),
                 ],
               );

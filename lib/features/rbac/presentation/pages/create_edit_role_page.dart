@@ -6,6 +6,7 @@ import '../../domain/entities/role_entity.dart';
 import '../../domain/repositories/rbac_repository.dart';
 import '../bloc/rbac_bloc.dart';
 import '../bloc/rbac_event.dart';
+import '../utils/rbac_responsive.dart';
 import '../widgets/permission_selector.dart';
 import '../widgets/rbac_ui.dart';
 
@@ -166,42 +167,42 @@ class _CreateEditRolePageState extends State<CreateEditRolePage> {
           context.read<RbacBloc>().add(const ClearRbacFeedback());
         }
       },
-      builder: (context, state) => RbacPageFrame(
-        title: _editing
-            ? context.l10n.tOr('editRole', 'Edit role')
-            : context.l10n.tOr('createRole', 'Create role'),
-        subtitle: context.l10n.tOr(
-          'roleFormSubtitle',
-          'Define the role and choose the access it grants.',
-        ),
-        onBack: widget.onBack,
-        actions: [
-          FilledButton.icon(
-            onPressed: state.isSubmitting ? null : _submit,
-            icon: state.isSubmitting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save_outlined),
-            label: Text(context.l10n.tOr('save', 'Save')),
-          ),
-        ],
-        child: state.status == RbacStatus.loading && state.permissions.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : state.status == RbacStatus.failure && state.permissions.isEmpty
-            ? RbacErrorView(
-                message: state.errorMessage == null
-                    ? context.l10n.tOr(
-                        'rbacPermissionsLoadFailed',
-                        'Unable to load permissions',
-                      )
-                    : rbacErrorText(context, state.errorMessage!),
-                onRetry: () =>
-                    context.read<RbacBloc>().add(const LoadPermissions()),
-              )
-            : _form(context, state),
-      ),
+      builder: (context, state) {
+        final metrics = RbacLayoutMetrics(
+          getRbacDeviceType(MediaQuery.sizeOf(context).width),
+        );
+        return RbacPageFrame(
+          title: _editing
+              ? context.l10n.tOr('editRole', 'Edit role')
+              : context.l10n.tOr('createRole', 'Create role'),
+          metrics: metrics,
+          onBack: widget.onBack,
+          actions: [
+            RbacHeaderAction(
+              compact: metrics.useIconActions,
+              icon: Icons.save_outlined,
+              label: context.l10n.tOr('save', 'Save'),
+              outlined: false,
+              isLoading: state.isSubmitting,
+              onPressed: state.isSubmitting ? null : _submit,
+            ),
+          ],
+          child: state.status == RbacStatus.loading && state.permissions.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : state.status == RbacStatus.failure && state.permissions.isEmpty
+              ? RbacErrorView(
+                  message: state.errorMessage == null
+                      ? context.l10n.tOr(
+                          'rbacPermissionsLoadFailed',
+                          'Unable to load permissions',
+                        )
+                      : rbacErrorText(context, state.errorMessage!),
+                  onRetry: () =>
+                      context.read<RbacBloc>().add(const LoadPermissions()),
+                )
+              : _form(context, state),
+        );
+      },
     );
   }
 
@@ -225,7 +226,11 @@ class _CreateEditRolePageState extends State<CreateEditRolePage> {
                       'roleSlugHelper',
                       'Lowercase identifier, e.g. content_moderator',
                     ),
-              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             validator: _validateSlug,
           ),
@@ -234,7 +239,11 @@ class _CreateEditRolePageState extends State<CreateEditRolePage> {
             controller: _nameController,
             decoration: InputDecoration(
               labelText: context.l10n.tOr('roleName', 'Role name'),
-              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             validator: _validateName,
           ),
@@ -245,7 +254,11 @@ class _CreateEditRolePageState extends State<CreateEditRolePage> {
             maxLines: 6,
             decoration: InputDecoration(
               labelText: context.l10n.tOr('description', 'Description'),
-              border: const OutlineInputBorder(),
+              isDense: true,
+              filled: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(height: 12),

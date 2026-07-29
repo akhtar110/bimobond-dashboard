@@ -21,7 +21,8 @@ class AdminBanUserUseCase {
 
   final UsersRepository _repository;
 
-  Future<void> call(String userId) => _repository.banUser(userId);
+  Future<void> call(String userId, {String? reason, DateTime? until}) =>
+      _repository.banUser(userId, reason: reason, until: until);
 }
 
 class AdminUnbanUserUseCase {

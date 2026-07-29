@@ -63,9 +63,11 @@ class NotificationsBloc
   final GetAllNotifications getAllNotifications;
 
   static const int _feedLimit = 20;
+  static const _userSearchDebounce = Duration(milliseconds: 350);
 
   StreamSubscription<AdminNotificationEventEntity>? _socketSub;
   Timer? _scheduleTimer;
+  int _userSearchSeq = 0;
 
   void _onConnect(
     ConnectAdminSocket event,
@@ -226,6 +228,8 @@ class NotificationsBloc
     Emitter<NotificationsState> emit,
   ) async {
     final query = event.query.trim();
+    final seq = ++_userSearchSeq;
+
     emit(state.copyWith(
       userSearchQuery: query,
       userSearchLoading: query.isNotEmpty,
@@ -234,13 +238,18 @@ class NotificationsBloc
 
     if (query.isEmpty) return;
 
+    await Future<void>.delayed(_userSearchDebounce);
+    if (isClosed || seq != _userSearchSeq) return;
+
     try {
       final page = await getUsers(page: 1, limit: 10, search: query);
+      if (isClosed || seq != _userSearchSeq) return;
       emit(state.copyWith(
         userSearchResults: page.users,
         userSearchLoading: false,
       ));
     } catch (_) {
+      if (isClosed || seq != _userSearchSeq) return;
       emit(state.copyWith(
         userSearchResults: [],
         userSearchLoading: false,

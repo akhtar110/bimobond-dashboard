@@ -70,7 +70,6 @@ class FeBulkSelectionToolbar extends StatelessWidget {
           decoration: BoxDecoration(
             color: scheme.primaryContainer.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
           ),
           child: Stack(
             children: [

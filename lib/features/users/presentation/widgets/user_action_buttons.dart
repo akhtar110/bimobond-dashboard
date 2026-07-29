@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../rbac/presentation/bloc/rbac_bloc.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
 
@@ -21,55 +23,71 @@ class UserActionButtons extends StatelessWidget {
     final l10n = context.l10n;
     final bloc = context.read<UsersBloc>();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Fall back to overflow menu when the actions cell is too narrow for
-        // Details / Ban / Promote / Delete chips (common on laptop widths).
-        final useCompact = compact ||
-            !constraints.hasBoundedWidth ||
-            constraints.maxWidth < 300;
+    return BlocBuilder<RbacBloc, RbacState>(
+      buildWhen: (previous, current) =>
+          previous.authContext != current.authContext,
+      builder: (context, _) {
+        final canBan = PermissionManager.canBanUsers(context);
+        final canUpdate = PermissionManager.canUpdateUsers(context);
+        final canAssignRoles =
+            PermissionManager.canAssignUserLegacyRoles(context);
 
-        if (useCompact) {
-          return _CompactActionsMenu(
-            user: user,
-            onDetails: () => _openDetails(context),
-            onBan: () => _confirmBanToggle(context, bloc),
-            onSetRole: (role) => bloc.add(
-              SetUserRoleEvent(userId: user.id, role: role),
-            ),
-            onDelete: () => UserDeleteDialog.show(context, user.id),
-          );
-        }
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final useCompact = compact ||
+                !constraints.hasBoundedWidth ||
+                constraints.maxWidth < 300;
 
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          alignment: WrapAlignment.end,
-          children: [
-            _ActionChip(
-              label: l10n.t('details'),
-              icon: Icons.open_in_new_rounded,
-              onPressed: () => _openDetails(context),
-            ),
-            _ActionChip(
-              label: user.isBanned ? l10n.t('unban') : l10n.t('ban'),
-              icon:
-                  user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
-              onPressed: () => _confirmBanToggle(context, bloc),
-            ),
-            _RoleActionButton(
-              user: user,
-              onSetRole: (role) => bloc.add(
-                SetUserRoleEvent(userId: user.id, role: role),
-              ),
-            ),
-            _ActionChip(
-              label: l10n.t('delete'),
-              icon: Icons.delete_outline_rounded,
-              isDestructive: true,
-              onPressed: () => UserDeleteDialog.show(context, user.id),
-            ),
-          ],
+            if (useCompact) {
+              return _CompactActionsMenu(
+                user: user,
+                canBan: canBan,
+                canUpdate: canUpdate,
+                canAssignRoles: canAssignRoles,
+                onDetails: () => _openDetails(context),
+                onBan: () => _confirmBanToggle(context, bloc),
+                onSetRole: (role) => bloc.add(
+                  SetUserRoleEvent(userId: user.id, role: role),
+                ),
+                onDelete: () => UserDeleteDialog.show(context, user.id),
+              );
+            }
+
+            return Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
+              children: [
+                _ActionChip(
+                  label: l10n.t('details'),
+                  icon: Icons.open_in_new_rounded,
+                  onPressed: () => _openDetails(context),
+                ),
+                if (canBan)
+                  _ActionChip(
+                    label: user.isBanned ? l10n.t('unban') : l10n.t('ban'),
+                    icon: user.isBanned
+                        ? Icons.lock_open_rounded
+                        : Icons.block_rounded,
+                    onPressed: () => _confirmBanToggle(context, bloc),
+                  ),
+                if (canAssignRoles)
+                  _RoleActionButton(
+                    user: user,
+                    onSetRole: (role) => bloc.add(
+                      SetUserRoleEvent(userId: user.id, role: role),
+                    ),
+                  ),
+                if (canUpdate)
+                  _ActionChip(
+                    label: l10n.t('delete'),
+                    icon: Icons.delete_outline_rounded,
+                    isDestructive: true,
+                    onPressed: () => UserDeleteDialog.show(context, user.id),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -180,6 +198,9 @@ class _ActionChip extends StatelessWidget {
 class _CompactActionsMenu extends StatelessWidget {
   const _CompactActionsMenu({
     required this.user,
+    required this.canBan,
+    required this.canUpdate,
+    required this.canAssignRoles,
     required this.onDetails,
     required this.onBan,
     required this.onSetRole,
@@ -187,6 +208,9 @@ class _CompactActionsMenu extends StatelessWidget {
   });
 
   final UserEntity user;
+  final bool canBan;
+  final bool canUpdate;
+  final bool canAssignRoles;
   final VoidCallback onDetails;
   final VoidCallback onBan;
   final ValueChanged<UserRole> onSetRole;
@@ -232,59 +256,63 @@ class _CompactActionsMenu extends StatelessWidget {
           value: 'details',
           child: _MenuRow(Icons.open_in_new_rounded, l10n.t('details')),
         ),
-        PopupMenuItem(
-          value: 'ban',
-          child: _MenuRow(
-            user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
-            user.isBanned ? l10n.t('unban') : l10n.t('ban'),
-          ),
-        ),
-        if (isAdmin) ...[
+        if (canBan)
           PopupMenuItem(
-            value: 'set_role_user',
+            value: 'ban',
             child: _MenuRow(
-              Icons.person_outline_rounded,
-              l10n.t('roleUser'),
+              user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
+              user.isBanned ? l10n.t('unban') : l10n.t('ban'),
             ),
           ),
-          PopupMenuItem(
-            value: 'set_role_moderator',
-            child: _MenuRow(
-              Icons.shield_outlined,
-              l10n.t('roleModerator'),
+        if (canAssignRoles) ...[
+          if (isAdmin) ...[
+            PopupMenuItem(
+              value: 'set_role_user',
+              child: _MenuRow(
+                Icons.person_outline_rounded,
+                l10n.t('roleUser'),
+              ),
             ),
-          ),
-        ] else ...[
-          PopupMenuItem(
-            value: 'set_role_user',
-            child: _MenuRow(
-              Icons.person_outline_rounded,
-              l10n.t('roleUser'),
+            PopupMenuItem(
+              value: 'set_role_moderator',
+              child: _MenuRow(
+                Icons.shield_outlined,
+                l10n.t('roleModerator'),
+              ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'set_role_moderator',
-            child: _MenuRow(
-              Icons.shield_outlined,
-              l10n.t('roleModerator'),
+          ] else ...[
+            PopupMenuItem(
+              value: 'set_role_user',
+              child: _MenuRow(
+                Icons.person_outline_rounded,
+                l10n.t('roleUser'),
+              ),
             ),
-          ),
-          PopupMenuItem(
-            value: 'set_role_admin',
-            child: _MenuRow(
-              Icons.admin_panel_settings_outlined,
-              l10n.t('roleAdmin'),
+            PopupMenuItem(
+              value: 'set_role_moderator',
+              child: _MenuRow(
+                Icons.shield_outlined,
+                l10n.t('roleModerator'),
+              ),
             ),
-          ),
+            PopupMenuItem(
+              value: 'set_role_admin',
+              child: _MenuRow(
+                Icons.admin_panel_settings_outlined,
+                l10n.t('roleAdmin'),
+              ),
+            ),
+          ],
         ],
-        PopupMenuItem(
-          value: 'delete',
-          child: _MenuRow(
-            Icons.delete_outline_rounded,
-            l10n.t('delete'),
-            color: Theme.of(context).colorScheme.error,
+        if (canUpdate)
+          PopupMenuItem(
+            value: 'delete',
+            child: _MenuRow(
+              Icons.delete_outline_rounded,
+              l10n.t('delete'),
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
-        ),
       ],
     );
   }

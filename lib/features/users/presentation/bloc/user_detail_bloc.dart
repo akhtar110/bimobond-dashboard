@@ -233,8 +233,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     return switch (action) {
       UserAdminActionType.ban => _banUser(
           userId: userId,
-          reason: '',
-          until: DateTime.now(),
+          reason: 'Banned by admin',
         ),
       UserAdminActionType.unban => _unbanUser(userId),
       UserAdminActionType.promote => _promoteUser(userId),

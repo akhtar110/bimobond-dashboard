@@ -1,4 +1,5 @@
 import 'message_permission.dart';
+import 'user_wallet_entity.dart';
 
 enum UserRole {
   user,
@@ -21,6 +22,29 @@ class UserEntity {
     required this.isVerified,
     this.instagramUrl,
     this.youtubeUrl,
+    this.websiteUrl,
+    this.tiktokUrl,
+    this.twitterUrl,
+    this.snapchatUrl,
+    this.spotifyUrl,
+    this.pronouns,
+    this.creatorCategory,
+    this.accountType,
+    this.verificationBadge,
+    this.likedVideosVisibility,
+    this.followersListVisibility,
+    this.followingListVisibility,
+    this.discoverable,
+    this.suggestToContacts,
+    this.profileViewHistoryEnabled,
+    this.showActivityStatus,
+    this.restrictedMode,
+    this.showShopOnProfile,
+    this.allowDuetsDefault,
+    this.allowStitchDefault,
+    this.allowDownloadsDefault,
+    this.allowRepostsDefault,
+    this.showRepostsOnProfile,
     required this.isPrivate,
     this.isProfileLocked = false,
     required this.allowComments,
@@ -43,6 +67,8 @@ class UserEntity {
     this.createdAt,
     this.updatedAt,
     required this.roles,
+    this.wallet,
+    this.relationCounts,
   });
 
   final String id;
@@ -62,6 +88,29 @@ class UserEntity {
 
   final String? instagramUrl;
   final String? youtubeUrl;
+  final String? websiteUrl;
+  final String? tiktokUrl;
+  final String? twitterUrl;
+  final String? snapchatUrl;
+  final String? spotifyUrl;
+  final String? pronouns;
+  final String? creatorCategory;
+  final String? accountType;
+  final String? verificationBadge;
+  final String? likedVideosVisibility;
+  final String? followersListVisibility;
+  final String? followingListVisibility;
+  final bool? discoverable;
+  final bool? suggestToContacts;
+  final bool? profileViewHistoryEnabled;
+  final bool? showActivityStatus;
+  final bool? restrictedMode;
+  final bool? showShopOnProfile;
+  final bool? allowDuetsDefault;
+  final bool? allowStitchDefault;
+  final bool? allowDownloadsDefault;
+  final bool? allowRepostsDefault;
+  final bool? showRepostsOnProfile;
 
   final bool isPrivate;
   final bool isProfileLocked;
@@ -90,6 +139,12 @@ class UserEntity {
   final DateTime? updatedAt;
 
   final List<UserRole> roles;
+
+  /// Nested wallet from list/detail payloads (may be null).
+  final UserWalletEntity? wallet;
+
+  /// Nested `_count` relations from list/detail payloads.
+  final UserRelationCountsEntity? relationCounts;
 }
 
 class UsersPageEntity {

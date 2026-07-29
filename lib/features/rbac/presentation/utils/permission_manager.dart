@@ -18,6 +18,21 @@ abstract final class RbacPermissionKeys {
   /// Required for admin password reset (`PATCH /users/admin/:id/password`).
   static const resetUserPassword = 'users.admin.password.reset';
 
+  /// Users admin list / investigation read (`GET /users`, detail tabs).
+  static const readUsers = 'users.admin.read';
+
+  /// Users admin update / delete (`PATCH /users/admin/:id`, `DELETE /users/:id`, bulk).
+  static const updateUsers = 'users.admin.update';
+
+  /// Ban / unban (`PATCH /users/:id/ban|unban`).
+  static const banUsers = 'users.admin.ban';
+
+  /// Search-history admin ops.
+  static const searchHistory = 'users.admin.search_history';
+
+  /// User location history / movements.
+  static const userLocations = 'users.admin.locations';
+
   /// Required for Camera Studio / Filters & Effects admin management.
   static const manageCameraStudio = 'camera_studio.admin.manage';
 
@@ -102,6 +117,37 @@ abstract final class PermissionManager {
   static bool canAssignRoles(BuildContext context) =>
       hasAll(context, RbacPermissionKeys.assignmentKeys) ||
       isLegacyAdmin(context);
+
+  /// Legacy role promote/demote / `PATCH /users/:id/role` — needs assign only.
+  static bool canAssignUserLegacyRoles(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.assignRoles) ||
+      isLegacyAdmin(context);
+
+  static bool canReadUsers(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.readUsers) ||
+      isLegacyAdmin(context);
+
+  static bool canUpdateUsers(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.updateUsers) ||
+      isLegacyAdmin(context);
+
+  static bool canBanUsers(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.banUsers) ||
+      isLegacyAdmin(context);
+
+  static bool canResetUserPassword(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.resetUserPassword) ||
+      isLegacyAdmin(context);
+
+  static bool canAccessSearchHistory(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.searchHistory) ||
+      isLegacyAdmin(context) ||
+      isLegacyModerator(context);
+
+  static bool canAccessUserLocations(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.userLocations) ||
+      isLegacyAdmin(context) ||
+      isLegacyModerator(context);
 
   /// Camera Studio catalog management (`camera_studio.admin.manage`) or
   /// legacy admin while RBAC catches up.
@@ -196,6 +242,10 @@ abstract final class PermissionManager {
     }
     if (tabIndex == 18) {
       return permissions.contains(RbacPermissionKeys.manageRoles) ||
+          roles.contains(UserRole.admin);
+    }
+    if (tabIndex == 2) {
+      return permissions.contains(RbacPermissionKeys.readUsers) ||
           roles.contains(UserRole.admin);
     }
 

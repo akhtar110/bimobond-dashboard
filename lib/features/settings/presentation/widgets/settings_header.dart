@@ -60,7 +60,8 @@ class SettingsHeader extends StatelessWidget {
     return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
       buildWhen: (prev, next) =>
           prev.isLoading != next.isLoading ||
-          prev.isSeeding != next.isSeeding,
+          prev.isSeeding != next.isSeeding ||
+          prev.isSaving != next.isSaving,
       builder: (context, state) {
         final refreshBtn = _HeaderIconButton(
           icon: Icons.refresh_rounded,

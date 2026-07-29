@@ -11,6 +11,8 @@ typedef StoryCardAction = void Function(StoryCardActionType type);
 
 enum StoryCardActionType { viewDetails, edit, delete }
 
+/// Compact story grid card — sized like [PostCard]; full details live in the
+/// details popup.
 class StoryCard extends StatefulWidget {
   const StoryCard({
     super.key,
@@ -30,6 +32,14 @@ class StoryCard extends StatefulWidget {
 class _StoryCardState extends State<StoryCard> {
   bool _hovered = false;
 
+  void _setHovered(bool value) {
+    if (!mounted || _hovered == value) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hovered == value) return;
+      setState(() => _hovered = value);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -37,16 +47,23 @@ class _StoryCardState extends State<StoryCard> {
     final story = widget.story;
     final canUpdate = PermissionManager.canUpdateStories(context);
     final canDelete = PermissionManager.canDeleteStories(context);
+    final description = story.description.trim();
+    final dateLabel = story.createdAt != null
+        ? DateFormat('MMM d, yyyy').format(story.createdAt!.toLocal())
+        : '—';
+    final viewsLabel = StoriesAdminL10n.viewsLabel(context, story.viewCount);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 170;
         final bodyPadding = compact ? 6.0 : 8.0;
         final radius = compact ? 10.0 : 12.0;
+        final nameSize = compact ? 10.5 : 11.5;
+        final metaSize = compact ? 9.0 : 10.0;
 
         return MouseRegion(
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
+          onEnter: (_) => _setHovered(true),
+          onExit: (_) => _setHovered(false),
           cursor: widget.onTap != null
               ? SystemMouseCursors.click
               : SystemMouseCursors.basic,
@@ -83,6 +100,12 @@ class _StoryCardState extends State<StoryCard> {
                         spreadRadius: _hovered ? 0.5 : 0,
                         offset: Offset(0, _hovered ? 8 : 3),
                       ),
+                      if (_hovered)
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: 0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
                     ],
                   ),
                   child: ClipRRect(
@@ -106,7 +129,8 @@ class _StoryCardState extends State<StoryCard> {
                                   placeholder: (_, _) => ColoredBox(
                                     color: scheme.surfaceContainerHighest,
                                   ),
-                                  errorWidget: (_, _, _) => _buildVideoOrFallback(
+                                  errorWidget: (_, _, _) =>
+                                      _buildVideoOrFallback(
                                     context,
                                     scheme,
                                     story,
@@ -114,7 +138,8 @@ class _StoryCardState extends State<StoryCard> {
                                 )
                               else
                                 _buildVideoOrFallback(context, scheme, story),
-                              if (story.isVideo && story.validImageThumbnailUrl != null)
+                              if (story.isVideo &&
+                                  story.validImageThumbnailUrl != null)
                                 Align(
                                   alignment: AlignmentDirectional.bottomEnd,
                                   child: Padding(
@@ -158,29 +183,36 @@ class _StoryCardState extends State<StoryCard> {
                                       onSelected: (action) =>
                                           widget.onAction?.call(action),
                                       itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: StoryCardActionType.viewDetails,
-                                        child: Text(
-                                          StoriesAdminL10n.viewDetails(context),
-                                        ),
-                                      ),
-                                      if (canUpdate)
                                         PopupMenuItem(
-                                          value: StoryCardActionType.edit,
+                                          value:
+                                              StoryCardActionType.viewDetails,
                                           child: Text(
-                                            StoriesAdminL10n.editStory(context),
+                                            StoriesAdminL10n.viewDetails(
+                                              context,
+                                            ),
                                           ),
                                         ),
-                                      if (canDelete)
-                                        PopupMenuItem(
-                                          value: StoryCardActionType.delete,
-                                          child: Text(
-                                            StoriesAdminL10n.deleteStory(context),
+                                        if (canUpdate)
+                                          PopupMenuItem(
+                                            value: StoryCardActionType.edit,
+                                            child: Text(
+                                              StoriesAdminL10n.editStory(
+                                                context,
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                    ],
+                                        if (canDelete)
+                                          PopupMenuItem(
+                                            value: StoryCardActionType.delete,
+                                            child: Text(
+                                              StoriesAdminL10n.deleteStory(
+                                                context,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
-                                ),
                                 ),
                             ],
                           ),
@@ -194,8 +226,10 @@ class _StoryCardState extends State<StoryCard> {
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   CircleAvatar(
                                     radius: compact ? 10 : 11,
@@ -208,8 +242,10 @@ class _StoryCardState extends State<StoryCard> {
                                             : null,
                                     child: story.user?.avatarUrl == null
                                         ? Text(
-                                            StoriesAdminL10n
-                                                .authorName(context, story)[0]
+                                            StoriesAdminL10n.authorName(
+                                              context,
+                                              story,
+                                            )[0]
                                                 .toUpperCase(),
                                             style: TextStyle(
                                               fontSize: compact ? 9 : 10,
@@ -224,6 +260,7 @@ class _StoryCardState extends State<StoryCard> {
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
                                           StoriesAdminL10n.authorName(
@@ -234,24 +271,27 @@ class _StoryCardState extends State<StoryCard> {
                                           overflow: TextOverflow.ellipsis,
                                           style: Theme.of(context)
                                               .textTheme
-                                              .labelMedium
+                                              .bodySmall
                                               ?.copyWith(
                                                 fontWeight: FontWeight.w700,
+                                                fontSize: nameSize,
+                                                height: 1.2,
+                                                letterSpacing: -0.1,
+                                                color: scheme.onSurface,
                                               ),
                                         ),
-                                        if (StoriesAdminL10n.authorUsername(story)
-                                            .isNotEmpty)
-                                          Text(
-                                            StoriesAdminL10n.authorUsername(story),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelSmall
-                                                ?.copyWith(
-                                                  color: scheme.onSurfaceVariant,
-                                                ),
+                                        SizedBox(height: compact ? 2 : 3),
+                                        Text(
+                                          '$dateLabel · $viewsLabel',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: metaSize,
+                                            color: scheme.onSurfaceVariant,
+                                            height: 1.1,
+                                            fontWeight: FontWeight.w500,
                                           ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -259,12 +299,17 @@ class _StoryCardState extends State<StoryCard> {
                               ),
                               SizedBox(height: compact ? 4 : 5),
                               Text(
-                                story.description.trim().isEmpty
-                                    ? '—'
-                                    : story.description.trim(),
-                                maxLines: 2,
+                                description.isEmpty ? '—' : description,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      fontSize: metaSize + 0.5,
+                                      height: 1.2,
+                                      color: scheme.onSurface,
+                                    ),
                               ),
                               SizedBox(height: compact ? 4 : 5),
                               Wrap(
@@ -285,55 +330,8 @@ class _StoryCardState extends State<StoryCard> {
                                     ),
                                     color: scheme.secondaryContainer,
                                   ),
-                                  _BadgeChip(
-                                    label: StoriesAdminL10n.activeIndicator(
-                                      context,
-                                      story,
-                                    ),
-                                    color: story.isActive
-                                        ? scheme.primaryContainer
-                                        : scheme.errorContainer,
-                                  ),
                                 ],
                               ),
-                              SizedBox(height: compact ? 4 : 5),
-                              Text(
-                                [
-                                  StoriesAdminL10n.viewsLabel(
-                                    context,
-                                    story.viewCount,
-                                  ),
-                                  StoriesAdminL10n.ttlHoursLabel(
-                                    context,
-                                    story.ttlHours,
-                                  ),
-                                  StoriesAdminL10n.formatDate(
-                                    context,
-                                    story.expiresAt,
-                                  ),
-                                ].join(' · '),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: scheme.onSurfaceVariant),
-                              ),
-                              if (story.createdAt != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  DateFormat.yMMMd(
-                                    Localizations.localeOf(context).toString(),
-                                  ).format(story.createdAt!.toLocal()),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                        fontSize: 10,
-                                      ),
-                                ),
-                              ],
                             ],
                           ),
                         ),

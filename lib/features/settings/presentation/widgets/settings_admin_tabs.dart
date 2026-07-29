@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/localization/localization.dart';
 import '../bloc/admin_settings_bloc.dart';
+import '../utils/settings_admin_l10n.dart';
 import '../utils/settings_responsive.dart';
 
 /// Horizontally scrollable Material 3 chips for admin settings tabs.
@@ -16,10 +16,9 @@ class SettingsAdminTabs extends StatelessWidget {
   final bool canReadAdmin;
   final bool canManageCurrencies;
 
+  /// API-aligned tabs — legacy App Settings / General (all) duplicates removed.
   static const _allTabs = <AdminSettingsTab>[
     AdminSettingsTab.economy,
-    AdminSettingsTab.appSettings,
-    AdminSettingsTab.general,
     AdminSettingsTab.branding,
     AdminSettingsTab.commission,
     AdminSettingsTab.currencies,
@@ -38,33 +37,37 @@ class SettingsAdminTabs extends StatelessWidget {
   }
 
   static String tabLabel(BuildContext context, AdminSettingsTab tab) {
-    final l10n = context.l10n;
     return switch (tab) {
-      AdminSettingsTab.economy => l10n.tOr('economyTab', 'Economy'),
-      AdminSettingsTab.appSettings =>
-        l10n.tOr('appSettingsTab', 'App settings'),
-      AdminSettingsTab.general => l10n.tOr('settingsTabGeneral', 'General'),
-      AdminSettingsTab.branding => l10n.tOr('settingsTabBranding', 'Branding'),
+      AdminSettingsTab.economy =>
+        SettingsAdminL10n.tabLabel(context, 'economy'),
+      AdminSettingsTab.branding =>
+        SettingsAdminL10n.tabLabel(context, 'branding'),
       AdminSettingsTab.commission =>
-        l10n.tOr('settingsTabCommission', 'Commission'),
+        SettingsAdminL10n.tabLabel(context, 'commission'),
       AdminSettingsTab.currencies =>
-        l10n.tOr('settingsTabCurrencies', 'Currencies'),
-      AdminSettingsTab.auction => l10n.tOr('settingsTabAuction', 'Auction'),
+        SettingsAdminL10n.tabLabel(context, 'currencies'),
+      AdminSettingsTab.auction =>
+        SettingsAdminL10n.tabLabel(context, 'auction'),
       AdminSettingsTab.promotion =>
-        l10n.tOr('settingsTabPromotion', 'Promotion'),
-      AdminSettingsTab.features => l10n.tOr('settingsTabFeatures', 'Features'),
+        SettingsAdminL10n.tabLabel(context, 'promotion'),
+      AdminSettingsTab.features =>
+        SettingsAdminL10n.tabLabel(context, 'features'),
       AdminSettingsTab.notifications =>
-        l10n.tOr('settingsTabNotifications', 'Notifications'),
-      AdminSettingsTab.uploads => l10n.tOr('settingsTabUploads', 'Uploads'),
-      AdminSettingsTab.defaults => l10n.tOr('settingsTabDefaults', 'Defaults'),
-      AdminSettingsTab.overview => l10n.tOr('settingsTabOverview', 'Overview'),
+        SettingsAdminL10n.tabLabel(context, 'notifications'),
+      AdminSettingsTab.uploads =>
+        SettingsAdminL10n.tabLabel(context, 'uploads'),
+      AdminSettingsTab.defaults =>
+        SettingsAdminL10n.tabLabel(context, 'defaults'),
+      // Removed / legacy tabs — keep labels for safety.
+      AdminSettingsTab.appSettings ||
+      AdminSettingsTab.general ||
+      AdminSettingsTab.overview =>
+        SettingsAdminL10n.tabLabel(context, 'economy'),
     };
   }
 
   static IconData tabIcon(AdminSettingsTab tab) => switch (tab) {
         AdminSettingsTab.economy => Icons.percent_outlined,
-        AdminSettingsTab.appSettings => Icons.tune_outlined,
-        AdminSettingsTab.general => Icons.settings_outlined,
         AdminSettingsTab.branding => Icons.branding_watermark_outlined,
         AdminSettingsTab.commission => Icons.pie_chart_outline_outlined,
         AdminSettingsTab.currencies => Icons.payments_outlined,
@@ -74,7 +77,10 @@ class SettingsAdminTabs extends StatelessWidget {
         AdminSettingsTab.notifications => Icons.notifications_outlined,
         AdminSettingsTab.uploads => Icons.cloud_upload_outlined,
         AdminSettingsTab.defaults => Icons.restore_outlined,
-        AdminSettingsTab.overview => Icons.dashboard_outlined,
+        AdminSettingsTab.appSettings ||
+        AdminSettingsTab.general ||
+        AdminSettingsTab.overview =>
+          Icons.settings_outlined,
       };
 
   @override
@@ -89,9 +95,13 @@ class SettingsAdminTabs extends StatelessWidget {
     return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
       buildWhen: (prev, next) => prev.tab != next.tab,
       builder: (context, state) {
-        var effectiveTab = state.tab == AdminSettingsTab.overview
-            ? AdminSettingsTab.economy
-            : state.tab;
+        var effectiveTab = switch (state.tab) {
+          AdminSettingsTab.overview ||
+          AdminSettingsTab.appSettings ||
+          AdminSettingsTab.general =>
+            AdminSettingsTab.economy,
+          _ => state.tab,
+        };
         if (!tabs.contains(effectiveTab)) {
           effectiveTab = tabs.first;
           if (state.tab != effectiveTab) {
@@ -155,7 +165,8 @@ class _AdminTabChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    final bg = selected ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+    final bg =
+        selected ? scheme.primaryContainer : scheme.surfaceContainerHighest;
 
     return Material(
       color: bg,

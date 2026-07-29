@@ -187,7 +187,12 @@ class _StoryFiltersBarState extends State<StoryFiltersBar> {
             _valuesFromState(prev) != _valuesFromState(next),
         builder: (context, state) {
           final values = _valuesFromState(state);
-          _syncSearchFromState(values.search);
+          // Keep search text in sync without mutating controllers during build
+          // (avoids layout jumps when empty search results rebuild the header).
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _syncSearchFromState(values.search);
+          });
           final filterCount = _activeFilterCount(values);
           final gap = widget.metrics?.filterGap ?? 6.0;
 
