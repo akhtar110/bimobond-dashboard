@@ -36,7 +36,10 @@ class GiftPreviewDialog extends StatefulWidget {
 }
 
 class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
-  int _selectedMediaTab = 0; // 0: Image / Hero, 1: Animation (if present)
+  int _selectedMediaTab = 0; // 0: Animation, 1: Thumbnail (when both exist)
+
+  static const _thumbnailPreviewHeight = 240.0;
+  static const _animationPreviewHeight = 320.0;
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +49,12 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
     final gift = widget.gift;
     final isAudio = gift.type == GiftType.audio;
 
-    final hasAnimation = !isAudio &&
+    final hasAnimation =
+        !isAudio &&
         gift.animationUrl != null &&
         gift.animationUrl!.trim().isNotEmpty;
-    final hasAudio = isAudio &&
-        gift.audioUrl != null &&
-        gift.audioUrl!.trim().isNotEmpty;
+    final hasAudio =
+        isAudio && gift.audioUrl != null && gift.audioUrl!.trim().isNotEmpty;
 
     final schedule = giftScheduleLabelFor(l10n, gift);
     final customColor = parseGiftHex(gift.color);
@@ -197,9 +200,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-      ),
+      decoration: BoxDecoration(color: scheme.surfaceContainerLowest),
       child: Row(
         children: [
           // Icon Avatar Badge
@@ -211,8 +212,9 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: (isAudio ? Colors.pink : Colors.indigo)
-                      .withValues(alpha: 0.3),
+                  color: (isAudio ? Colors.pink : Colors.indigo).withValues(
+                    alpha: 0.3,
+                  ),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -469,6 +471,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
           networkUrl: gift.audioUrl,
           fileName: gift.audioUrl,
           compact: false,
+          autoPlay: hasAudio,
         ),
       ],
     );
@@ -530,7 +533,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.image_rounded,
+                            Icons.animation_rounded,
                             size: 16,
                             color: _selectedMediaTab == 0
                                 ? scheme.primary
@@ -538,7 +541,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Thumbnail',
+                            'Live Animation',
                             style: theme.textTheme.labelMedium?.copyWith(
                               fontWeight: _selectedMediaTab == 0
                                   ? FontWeight.w700
@@ -576,7 +579,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.animation_rounded,
+                            Icons.image_rounded,
                             size: 16,
                             color: _selectedMediaTab == 1
                                 ? scheme.primary
@@ -584,7 +587,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Live Animation',
+                            'Thumbnail',
                             style: theme.textTheme.labelMedium?.copyWith(
                               fontWeight: _selectedMediaTab == 1
                                   ? FontWeight.w700
@@ -606,19 +609,11 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
         ],
 
         // Media Frame Display
-        if (!hasAnimation || _selectedMediaTab == 0) ...[
+        if (!hasAnimation || _selectedMediaTab == 1) ...[
           // Static Image Preview Frame
           Container(
-            height: 240,
-            decoration: BoxDecoration(
-              color: customColor?.withValues(alpha: 0.15) ??
-                  scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: customColor?.withValues(alpha: 0.4) ??
-                    scheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
+            height: _thumbnailPreviewHeight,
+            decoration: _imagePreviewFrameDecoration(scheme, customColor),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: gift.thumbnailUrl.isNotEmpty
@@ -632,19 +627,53 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
             ),
           ),
         ] else ...[
-          // Animation Player Frame
-          SizedBox(
-            height: 240,
+          // Animation — border hugs full-bleed media (no inner padding / letterbox gap)
+          Container(
+            height: _animationPreviewHeight,
+            clipBehavior: Clip.antiAlias,
+            decoration: _animationPreviewFrameDecoration(scheme, customColor),
             child: GiftAnimationPreview(
               key: const ValueKey('preview-gift-animation-tab'),
-              compact: true,
+              showChrome: false,
               expandToFill: true,
+              clipBorderRadius: 16,
               networkUrl: gift.animationUrl,
               fileName: gift.animationUrl,
             ),
           ),
         ],
       ],
+    );
+  }
+
+  BoxDecoration _imagePreviewFrameDecoration(
+    ColorScheme scheme,
+    Color? customColor,
+  ) {
+    return BoxDecoration(
+      color:
+          customColor?.withValues(alpha: 0.15) ??
+          scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color:
+            customColor?.withValues(alpha: 0.4) ??
+            scheme.outlineVariant.withValues(alpha: 0.4),
+      ),
+    );
+  }
+
+  BoxDecoration _animationPreviewFrameDecoration(
+    ColorScheme scheme,
+    Color? customColor,
+  ) {
+    return BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color:
+            customColor?.withValues(alpha: 0.55) ??
+            scheme.outlineVariant.withValues(alpha: 0.55),
+      ),
     );
   }
 
@@ -693,10 +722,7 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                const Color(0xFFFFF8E1),
-                const Color(0xFFFFECB3),
-              ],
+              colors: [const Color(0xFFFFF8E1), const Color(0xFFFFECB3)],
             ),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
@@ -775,7 +801,8 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
                 label: l10n.tOr('giftColor', 'Color'),
                 value: gift.color!,
                 swatchColor: customColor,
-                onTapCopy: () => _copyToClipboard(context, gift.color!, 'Color code'),
+                onTapCopy: () =>
+                    _copyToClipboard(context, gift.color!, 'Color code'),
               ),
             _MetaChip(
               icon: Icons.format_list_numbered_rounded,
@@ -826,7 +853,11 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
   }
 
   // Footer Actions (Close & Edit Gift)
-  Widget _buildFooter(BuildContext context, GiftEntity gift, AppLocalizations l10n) {
+  Widget _buildFooter(
+    BuildContext context,
+    GiftEntity gift,
+    AppLocalizations l10n,
+  ) {
     final theme = Theme.of(context);
 
     return Container(
@@ -866,7 +897,11 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
     );
   }
 
-  static void _copyToClipboard(BuildContext context, String text, String label) {
+  static void _copyToClipboard(
+    BuildContext context,
+    String text,
+    String label,
+  ) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(

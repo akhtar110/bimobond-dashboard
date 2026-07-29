@@ -9,10 +9,7 @@ import '../utils/notification_schedule_utils.dart';
 class NotificationSchedulerCard extends StatelessWidget {
   const NotificationSchedulerCard({super.key});
 
-  Future<void> _pickDate(
-    BuildContext context,
-    DateTime current,
-  ) async {
+  Future<void> _pickDate(BuildContext context, DateTime current) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: current,
@@ -28,15 +25,10 @@ class NotificationSchedulerCard extends StatelessWidget {
       current.hour,
       current.minute,
     );
-    context.read<NotificationsBloc>().add(
-          NotificationScheduleUpdated(updated),
-        );
+    context.read<NotificationsBloc>().add(NotificationScheduleUpdated(updated));
   }
 
-  Future<void> _pickTime(
-    BuildContext context,
-    DateTime current,
-  ) async {
+  Future<void> _pickTime(BuildContext context, DateTime current) async {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(current),
@@ -50,9 +42,7 @@ class NotificationSchedulerCard extends StatelessWidget {
       picked.hour,
       picked.minute,
     );
-    context.read<NotificationsBloc>().add(
-          NotificationScheduleUpdated(updated),
-        );
+    context.read<NotificationsBloc>().add(NotificationScheduleUpdated(updated));
   }
 
   @override
@@ -67,7 +57,8 @@ class NotificationSchedulerCard extends StatelessWidget {
           previous.scheduledDateTime != current.scheduledDateTime,
       builder: (context, state) {
         final scheduledAt =
-            state.scheduledDateTime ?? NotificationScheduleUtils.defaultScheduledDateTime();
+            state.scheduledDateTime ??
+            NotificationScheduleUtils.defaultScheduledDateTime();
         final validation = state.isScheduled
             ? NotificationScheduleUtils.validationMessage(
                 l10n,
@@ -102,8 +93,8 @@ class NotificationSchedulerCard extends StatelessWidget {
                 title: Text(l10n.t('notificationSendNow')),
                 onChanged: (value) {
                   context.read<NotificationsBloc>().add(
-                        const NotificationScheduleModeChanged(false),
-                      );
+                    const NotificationScheduleModeChanged(false),
+                  );
                 },
               ),
               RadioListTile<bool>(
@@ -114,8 +105,8 @@ class NotificationSchedulerCard extends StatelessWidget {
                 title: Text(l10n.t('notificationScheduleLater')),
                 onChanged: (value) {
                   context.read<NotificationsBloc>().add(
-                        const NotificationScheduleModeChanged(true),
-                      );
+                    const NotificationScheduleModeChanged(true),
+                  );
                 },
               ),
               if (state.isScheduled) ...[
@@ -125,7 +116,10 @@ class NotificationSchedulerCard extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => _pickDate(context, scheduledAt),
-                        icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                        icon: const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 18,
+                        ),
                         label: Text(
                           DateFormat.yMMMd().format(scheduledAt),
                           overflow: TextOverflow.ellipsis,
