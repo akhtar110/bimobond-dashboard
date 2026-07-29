@@ -9,10 +9,12 @@ class UserDeviceCard extends StatefulWidget {
     super.key,
     required this.device,
     required this.isDark,
+    this.onViewLastActiveHistory,
   });
 
   final UserDeviceEntity device;
   final bool isDark;
+  final VoidCallback? onViewLastActiveHistory;
 
   @override
   State<UserDeviceCard> createState() => _UserDeviceCardState();
@@ -140,6 +142,26 @@ class _UserDeviceCardState extends State<UserDeviceCard> {
                     ? dateFormat.format(device.lastActiveAt!)
                     : l10n.t('notAvailable'),
                 scheme: scheme,
+                trailing: widget.onViewLastActiveHistory == null
+                    ? null
+                    : IconButton(
+                        tooltip: l10n.tOr(
+                          'viewLastActiveHistory',
+                          'Last active history',
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        icon: Icon(
+                          Icons.history_rounded,
+                          size: 18,
+                          color: scheme.primary,
+                        ),
+                        onPressed: widget.onViewLastActiveHistory,
+                      ),
               ),
               _InfoRow(
                 label: l10n.t('registeredAt'),
@@ -178,11 +200,13 @@ class _InfoRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.scheme,
+    this.trailing,
   });
 
   final String label;
   final String value;
   final ColorScheme scheme;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +236,7 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
+          ?trailing,
         ],
       ),
     );

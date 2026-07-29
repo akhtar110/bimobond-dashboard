@@ -1,4 +1,5 @@
 import 'message_permission.dart';
+import 'user_last_location_entity.dart';
 import 'user_wallet_entity.dart';
 
 enum UserRole {
@@ -69,6 +70,7 @@ class UserEntity {
     required this.roles,
     this.wallet,
     this.relationCounts,
+    this.lastLocation,
   });
 
   final String id;
@@ -145,6 +147,17 @@ class UserEntity {
 
   /// Nested `_count` relations from list/detail payloads.
   final UserRelationCountsEntity? relationCounts;
+
+  /// Latest GPS point from admin list/detail (`UserLocationHistory` or profile fallback).
+  final UserLastLocationEntity? lastLocation;
+
+  bool get isAdminRole => roles.contains(UserRole.admin);
+
+  bool get isModeratorRole =>
+      roles.contains(UserRole.moderator) && !isAdminRole;
+
+  /// Standard / regular user (not admin and not moderator).
+  bool get isStandardRole => !isAdminRole && !isModeratorRole;
 }
 
 class UsersPageEntity {

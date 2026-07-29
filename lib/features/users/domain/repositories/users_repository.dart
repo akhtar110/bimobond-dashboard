@@ -12,6 +12,7 @@ abstract class UsersRepository {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    String? location,
   });
 
   Future<void> blockUser({
@@ -71,7 +72,11 @@ abstract class UsersRepository {
     required List<UserRole> roles,
   });
   Future<UserDetailEntity> getUserById(String userId);
-  Future<UserPostsResponseEntity> getUserPosts(String userId, {int page = 1, int limit = 20});
+  Future<UserPostsResponseEntity> getUserPosts(
+    String userId, {
+    int page = 1,
+    int limit = 20,
+  });
   Future<UserFollowListPageEntity> getUserFollowList({
     required String userId,
     required UserFollowListKind kind,

@@ -6,6 +6,7 @@ import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
+import 'user_location_cell.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 
@@ -55,9 +56,9 @@ class UsersCardRow extends StatelessWidget {
               Checkbox(
                 value: isSelected,
                 onChanged: selectionEnabled
-                    ? (_) => context
-                        .read<UsersBloc>()
-                        .add(ToggleUserSelectionEvent(user.id))
+                    ? (_) => context.read<UsersBloc>().add(
+                        ToggleUserSelectionEvent(user.id),
+                      )
                     : null,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
@@ -101,6 +102,8 @@ class UsersCardRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     UserEngagementBar(user: user, compact: true),
+                    const SizedBox(height: 6),
+                    UserLocationCell(user: user, compact: true),
                   ],
                 ),
               ),
@@ -115,10 +118,7 @@ class UsersCardRow extends StatelessWidget {
 }
 
 class _CardAvatar extends StatelessWidget {
-  const _CardAvatar({
-    required this.user,
-    required this.isAdmin,
-  });
+  const _CardAvatar({required this.user, required this.isAdmin});
 
   final UserEntity user;
   final bool isAdmin;
@@ -129,8 +129,8 @@ class _CardAvatar extends StatelessWidget {
     final ringColors = isAdmin
         ? [scheme.tertiary, scheme.tertiaryContainer]
         : user.isVerified
-            ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
-            : [Colors.transparent, Colors.transparent];
+        ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
+        : [Colors.transparent, Colors.transparent];
 
     return Container(
       padding: const EdgeInsets.all(2),

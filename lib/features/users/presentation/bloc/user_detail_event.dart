@@ -50,6 +50,13 @@ class DeleteUserAccountEvent extends UserDetailAdminActionEvent {
   UserAdminActionType get actionType => UserAdminActionType.delete;
 }
 
+/// Assign a single legacy role (`user` / `moderator` / `admin`).
+class SetUserDetailRoleEvent extends UserDetailEvent {
+  SetUserDetailRoleEvent(this.role);
+
+  final UserRole role;
+}
+
 UserDetailAdminActionEvent userDetailAdminActionEventFor(
   UserAdminActionType action,
 ) {

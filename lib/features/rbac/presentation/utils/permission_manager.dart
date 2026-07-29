@@ -33,6 +33,9 @@ abstract final class RbacPermissionKeys {
   /// User location history / movements.
   static const userLocations = 'users.admin.locations';
 
+  /// Activity admin read (`GET /activity/admin/*`).
+  static const activityAdminRead = 'activity.admin.read';
+
   /// Required for Camera Studio / Filters & Effects admin management.
   static const manageCameraStudio = 'camera_studio.admin.manage';
 

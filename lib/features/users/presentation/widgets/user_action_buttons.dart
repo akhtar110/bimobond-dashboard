@@ -219,7 +219,6 @@ class _CompactActionsMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isAdmin = user.roles.contains(UserRole.admin);
 
     return PopupMenuButton<String>(
       tooltip: l10n.t('actions'),
@@ -265,41 +264,42 @@ class _CompactActionsMenu extends StatelessWidget {
             ),
           ),
         if (canAssignRoles) ...[
-          if (isAdmin) ...[
+          if (user.isAdminRole)
             PopupMenuItem(
               value: 'set_role_user',
               child: _MenuRow(
                 Icons.person_outline_rounded,
-                l10n.t('roleUser'),
+                l10n.tOr('demoteToStandardUser', 'To User'),
               ),
-            ),
-            PopupMenuItem(
-              value: 'set_role_moderator',
-              child: _MenuRow(
-                Icons.shield_outlined,
-                l10n.t('roleModerator'),
-              ),
-            ),
-          ] else ...[
+            )
+          else if (user.isModeratorRole) ...[
             PopupMenuItem(
               value: 'set_role_user',
               child: _MenuRow(
                 Icons.person_outline_rounded,
-                l10n.t('roleUser'),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'set_role_moderator',
-              child: _MenuRow(
-                Icons.shield_outlined,
-                l10n.t('roleModerator'),
+                l10n.tOr('demoteToStandardUser', 'To User'),
               ),
             ),
             PopupMenuItem(
               value: 'set_role_admin',
               child: _MenuRow(
                 Icons.admin_panel_settings_outlined,
-                l10n.t('roleAdmin'),
+                l10n.tOr('promoteToAdmin', 'To Admin'),
+              ),
+            ),
+          ] else ...[
+            PopupMenuItem(
+              value: 'set_role_moderator',
+              child: _MenuRow(
+                Icons.shield_outlined,
+                l10n.tOr('promoteToModerator', 'To Moderator'),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'set_role_admin',
+              child: _MenuRow(
+                Icons.admin_panel_settings_outlined,
+                l10n.tOr('promoteToAdmin', 'To Admin'),
               ),
             ),
           ],
@@ -333,7 +333,49 @@ class _RoleActionButton extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = scheme.primary;
-    final isAdmin = user.roles.contains(UserRole.admin);
+    final isAdmin = user.isAdminRole;
+
+    final items = <PopupMenuEntry<UserRole>>[
+      if (user.isAdminRole)
+        PopupMenuItem(
+          value: UserRole.user,
+          child: _MenuRow(
+            Icons.person_outline_rounded,
+            l10n.tOr('demoteToStandardUser', 'To User'),
+          ),
+        )
+      else if (user.isModeratorRole) ...[
+        PopupMenuItem(
+          value: UserRole.user,
+          child: _MenuRow(
+            Icons.person_outline_rounded,
+            l10n.tOr('demoteToStandardUser', 'To User'),
+          ),
+        ),
+        PopupMenuItem(
+          value: UserRole.admin,
+          child: _MenuRow(
+            Icons.admin_panel_settings_outlined,
+            l10n.tOr('promoteToAdmin', 'To Admin'),
+          ),
+        ),
+      ] else ...[
+        PopupMenuItem(
+          value: UserRole.moderator,
+          child: _MenuRow(
+            Icons.shield_outlined,
+            l10n.tOr('promoteToModerator', 'To Moderator'),
+          ),
+        ),
+        PopupMenuItem(
+          value: UserRole.admin,
+          child: _MenuRow(
+            Icons.admin_panel_settings_outlined,
+            l10n.tOr('promoteToAdmin', 'To Admin'),
+          ),
+        ),
+      ],
+    ];
 
     return PopupMenuButton<UserRole>(
       tooltip: isAdmin
@@ -342,46 +384,7 @@ class _RoleActionButton extends StatelessWidget {
       onSelected: onSetRole,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       offset: const Offset(0, 8),
-      itemBuilder: (_) => isAdmin
-          ? [
-              PopupMenuItem(
-                value: UserRole.user,
-                child: _MenuRow(
-                  Icons.person_outline_rounded,
-                  l10n.t('roleUser'),
-                ),
-              ),
-              PopupMenuItem(
-                value: UserRole.moderator,
-                child: _MenuRow(
-                  Icons.shield_outlined,
-                  l10n.t('roleModerator'),
-                ),
-              ),
-            ]
-          : [
-              PopupMenuItem(
-                value: UserRole.user,
-                child: _MenuRow(
-                  Icons.person_outline_rounded,
-                  l10n.t('roleUser'),
-                ),
-              ),
-              PopupMenuItem(
-                value: UserRole.moderator,
-                child: _MenuRow(
-                  Icons.shield_outlined,
-                  l10n.t('roleModerator'),
-                ),
-              ),
-              PopupMenuItem(
-                value: UserRole.admin,
-                child: _MenuRow(
-                  Icons.admin_panel_settings_outlined,
-                  l10n.t('roleAdmin'),
-                ),
-              ),
-            ],
+      itemBuilder: (_) => items,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(

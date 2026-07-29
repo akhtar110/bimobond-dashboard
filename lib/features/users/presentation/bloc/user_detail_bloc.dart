@@ -4,6 +4,7 @@ import '../../../../core/utils/api_error_messages.dart';
 import '../../data/models/user_model.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_detail_entity.dart';
+import '../../domain/entities/user_entity.dart';
 import '../../domain/usecases/ban_user.dart';
 import '../../domain/usecases/delete_user.dart';
 import '../../domain/usecases/demote_user.dart';
@@ -13,6 +14,7 @@ import '../../domain/usecases/promote_to_admin.dart';
 import '../../domain/usecases/set_user_is_private.dart';
 import '../../domain/usecases/set_user_message_permission.dart';
 import '../../domain/usecases/unban_user.dart';
+import '../../domain/usecases/updte_role.dart';
 import 'user_detail_event.dart';
 import 'user_detail_state.dart';
 
@@ -25,6 +27,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     required PromoteUser promoteUser,
     required DemoteUser demoteUser,
     required DeleteUser deleteUser,
+    required UpdateUserRoles updateUserRoles,
     required SetUserIsPrivate setUserIsPrivate,
     required SetUserMessagePermission setUserMessagePermission,
   })  : _getUserById = getUserById,
@@ -34,11 +37,13 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
         _promoteUser = promoteUser,
         _demoteUser = demoteUser,
         _deleteUser = deleteUser,
+        _updateUserRoles = updateUserRoles,
         _setUserIsPrivate = setUserIsPrivate,
         _setUserMessagePermission = setUserMessagePermission,
         super(UserDetailInitial()) {
     on<LoadUserDetailEvent>(_onLoad);
     on<UserDetailAdminActionEvent>(_onAdminAction);
+    on<SetUserDetailRoleEvent>(_onSetRole);
     on<UpdateUserPrivacySettingsEvent>(_onUpdatePrivacySettings);
     on<ClearUserDetailActionFeedbackEvent>(_onClearFeedback);
   }
@@ -50,6 +55,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
   final PromoteUser _promoteUser;
   final DemoteUser _demoteUser;
   final DeleteUser _deleteUser;
+  final UpdateUserRoles _updateUserRoles;
   final SetUserIsPrivate _setUserIsPrivate;
   final SetUserMessagePermission _setUserMessagePermission;
 
@@ -105,6 +111,47 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
           userDetail: userDetail,
           clearExecutingAction: true,
           actionFeedback: action.successKey(userDetail.user),
+        ),
+      );
+    } catch (e) {
+      emit(
+        current.copyWith(
+          clearExecutingAction: true,
+          actionFeedback: _messageFromError(e),
+          actionFeedbackIsError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onSetRole(
+    SetUserDetailRoleEvent event,
+    Emitter<UserDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is! UserDetailLoaded) return;
+    if (current.isBusy) return;
+
+    final userId = current.userDetail.user.id;
+    final feedbackAction = event.role == UserRole.user
+        ? UserAdminActionType.demote
+        : UserAdminActionType.promote;
+
+    emit(
+      current.copyWith(
+        executingAction: feedbackAction,
+        clearActionFeedback: true,
+      ),
+    );
+
+    try {
+      await _updateUserRoles(userId: userId, roles: [event.role]);
+      final userDetail = await _fetchUserDetail(userId);
+      emit(
+        current.copyWith(
+          userDetail: userDetail,
+          clearExecutingAction: true,
+          actionFeedback: feedbackAction.successKey(userDetail.user),
         ),
       );
     } catch (e) {

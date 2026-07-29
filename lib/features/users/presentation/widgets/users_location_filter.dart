@@ -1,0 +1,109 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/localization/localization.dart';
+import '../utils/responsive.dart';
+
+/// Partial-match filter on city, region/state, or country (`GET /users?location=`).
+class UsersLocationFilter extends StatelessWidget {
+  const UsersLocationFilter({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+    required this.onSubmitted,
+    required this.metrics,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onSubmitted;
+  final UsersLayoutMetrics metrics;
+
+  static const _borderRadius = 12.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final compact = metrics.isMobile;
+
+    final borderRadius = BorderRadius.circular(_borderRadius);
+    final enabledBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: scheme.outlineVariant),
+    );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: scheme.primary, width: 1.5),
+    );
+
+    final verticalPadding = (metrics.searchFieldHeight - 18) / 2;
+
+    return SizedBox(
+      height: metrics.searchFieldHeight,
+      child: TextField(
+        controller: controller,
+        textInputAction: TextInputAction.done,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: compact ? 12.5 : 13,
+          height: 1.2,
+        ),
+        decoration: InputDecoration(
+          labelText: l10n.t('location'),
+          floatingLabelBehavior: FloatingLabelBehavior.never,
+          hintText: l10n.t('filterUsersByPlace'),
+          hintStyle: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontSize: compact ? 12.5 : 13,
+          ),
+          prefixIcon: Tooltip(
+            message: l10n.t('usersLocationFilterTooltip'),
+            waitDuration: const Duration(milliseconds: 500),
+            child: Icon(
+              Icons.place_outlined,
+              color: scheme.onSurfaceVariant,
+              size: compact ? 18 : 20,
+            ),
+          ),
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) {
+              if (value.text.isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                tooltip: l10n.t('clear'),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: compact ? 16 : 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: () {
+                  controller.clear();
+                  onSubmitted('');
+                  onChanged('');
+                },
+              );
+            },
+          ),
+          filled: true,
+          fillColor: scheme.surfaceContainerLow,
+          isDense: true,
+          contentPadding: EdgeInsetsDirectional.symmetric(
+            horizontal: compact ? 10 : 12,
+            vertical: verticalPadding,
+          ),
+          border: enabledBorder,
+          enabledBorder: enabledBorder,
+          focusedBorder: focusedBorder,
+          disabledBorder: enabledBorder,
+          errorBorder: enabledBorder,
+          focusedErrorBorder: focusedBorder,
+        ),
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
+      ),
+    );
+  }
+}

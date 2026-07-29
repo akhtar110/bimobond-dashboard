@@ -20,6 +20,7 @@ abstract class UsersRemoteDataSource {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    String? location,
   });
 
   Future<void> blockUser({
@@ -115,6 +116,7 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    String? location,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
@@ -127,6 +129,7 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
         if (search != null && search.isNotEmpty) 'search': search,
         if (isVerified != null) 'isVerified': isVerified,
         if (isBanned != null) 'isBanned': isBanned,
+        if (location != null && location.isNotEmpty) 'location': location,
       },
       options: Options(
         headers: {

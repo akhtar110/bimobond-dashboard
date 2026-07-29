@@ -42,7 +42,7 @@ class UsersSearchBar extends StatelessWidget {
       height: metrics.searchFieldHeight,
       child: TextField(
         controller: controller,
-        textInputAction: TextInputAction.search,
+        textInputAction: TextInputAction.done,
         style: theme.textTheme.bodyMedium?.copyWith(
           fontSize: compact ? 12.5 : 13,
           height: 1.2,
@@ -74,6 +74,7 @@ class UsersSearchBar extends StatelessWidget {
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                 onPressed: () {
                   controller.clear();
+                  onChanged('');
                   onSubmitted('');
                 },
               );

@@ -17,6 +17,8 @@ import '../../domain/usecases/reset_user_password_usecase.dart';
 import '../../domain/usecases/updte_role.dart';
 import '../../domain/usecases/unban_user.dart';
 import '../users_ui_filter.dart';
+import '../users_location_sort.dart';
+import '../utils/user_location_list_utils.dart';
 
 sealed class UsersEvent {}
 
@@ -43,6 +45,27 @@ class FilterUsersEvent extends UsersEvent {
   final UsersUiFilter filter;
 }
 
+/// Applies username/email search and location filter together (AND).
+class ApplyUsersListFiltersEvent extends UsersEvent {
+  ApplyUsersListFiltersEvent({
+    required this.search,
+    required this.location,
+  });
+
+  final String search;
+  final String location;
+}
+
+class FilterUsersByLocationEvent extends UsersEvent {
+  FilterUsersByLocationEvent(this.query);
+  final String query;
+}
+
+/// Clears search, location, and status filters and reloads the full list.
+class ClearUsersListFiltersEvent extends UsersEvent {}
+
+class SortUsersLocationEvent extends UsersEvent {}
+
 class ToggleBanUserEvent extends UsersEvent {
   ToggleBanUserEvent(this.userId);
   final String userId;
@@ -59,10 +82,7 @@ class DemoteUserEvent extends UsersEvent {
 }
 
 class SetUserRoleEvent extends UsersEvent {
-  SetUserRoleEvent({
-    required this.userId,
-    required this.role,
-  });
+  SetUserRoleEvent({required this.userId, required this.role});
   final String userId;
   final UserRole role;
 }
@@ -94,10 +114,7 @@ class BulkDemoteUsersEvent extends UsersEvent {}
 class ClearUsersBulkFeedbackEvent extends UsersEvent {}
 
 class ResetUserPasswordEvent extends UsersEvent {
-  ResetUserPasswordEvent({
-    required this.userId,
-    required this.newPassword,
-  });
+  ResetUserPasswordEvent({required this.userId, required this.newPassword});
 
   final String userId;
   final String newPassword;
@@ -125,11 +142,14 @@ class UsersLoaded extends UsersState {
     required this.total,
     required this.filter,
     required this.query,
+    this.locationQuery = '',
+    this.locationSort = UsersLocationSortOrder.none,
     this.selectedUserIds = const {},
     this.isBulkActionLoading = false,
     this.bulkActionMessage,
     this.bulkActionIsError = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
   });
 
   final List<UserEntity> users;
@@ -138,11 +158,14 @@ class UsersLoaded extends UsersState {
   final int total;
   final UsersUiFilter filter;
   final String query;
+  final String locationQuery;
+  final UsersLocationSortOrder locationSort;
   final Set<String> selectedUserIds;
   final bool isBulkActionLoading;
   final String? bulkActionMessage;
   final bool bulkActionIsError;
   final bool isLoadingMore;
+  final bool isRefreshing;
 
   int get selectedCount => selectedUserIds.length;
   bool get hasSelection => selectedUserIds.isNotEmpty;
@@ -165,11 +188,14 @@ class UsersLoaded extends UsersState {
     int? total,
     UsersUiFilter? filter,
     String? query,
+    String? locationQuery,
+    UsersLocationSortOrder? locationSort,
     Set<String>? selectedUserIds,
     bool? isBulkActionLoading,
     String? bulkActionMessage,
     bool? bulkActionIsError,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool clearBulkActionMessage = false,
   }) {
     return UsersLoaded(
@@ -179,6 +205,8 @@ class UsersLoaded extends UsersState {
       total: total ?? this.total,
       filter: filter ?? this.filter,
       query: query ?? this.query,
+      locationQuery: locationQuery ?? this.locationQuery,
+      locationSort: locationSort ?? this.locationSort,
       selectedUserIds: selectedUserIds ?? this.selectedUserIds,
       isBulkActionLoading: isBulkActionLoading ?? this.isBulkActionLoading,
       bulkActionMessage: clearBulkActionMessage
@@ -186,6 +214,7 @@ class UsersLoaded extends UsersState {
           : (bulkActionMessage ?? this.bulkActionMessage),
       bulkActionIsError: bulkActionIsError ?? this.bulkActionIsError,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 }
@@ -222,6 +251,10 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<LoadMoreUsersEvent>(_onLoadMore);
     on<GoToUsersPageEvent>(_onGoToPage);
     on<SearchUsersEvent>(_onSearch);
+    on<ApplyUsersListFiltersEvent>(_onApplyListFilters);
+    on<FilterUsersByLocationEvent>(_onLocationFilter);
+    on<ClearUsersListFiltersEvent>(_onClearListFilters);
+    on<SortUsersLocationEvent>(_onLocationSort);
     on<FilterUsersEvent>(_onFilter);
     on<ToggleBanUserEvent>(_onToggleBan);
     on<PromoteUserEvent>(_onPromote);
@@ -260,18 +293,22 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   int _currentPage = 1;
   int _lastPage = 1;
   int _total = 0;
-  bool _busy = false;
   bool _loadMoreBusy = false;
   bool _resetPasswordBusy = false;
   UsersState? _stateBeforeResetPassword;
+  int _listFetchGeneration = 0;
 
   String _query = '';
+  String _locationQuery = '';
+  UsersLocationSortOrder _locationSort = UsersLocationSortOrder.none;
   UsersUiFilter _filter = UsersUiFilter.all;
 
   final List<UserEntity> _users = [];
   final Set<String> _selectedUserIds = {};
 
   String get activeQuery => _query;
+  String get activeLocationQuery => _locationQuery;
+  UsersLocationSortOrder get activeLocationSort => _locationSort;
   UsersUiFilter get activeFilter => _filter;
 
   String? _pendingBulkMessage;
@@ -309,16 +346,51 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     if (page < 1) return;
 
     if (replace) {
-      if (_busy) return;
-      _busy = true;
-      emit(UsersLoading());
-    } else {
-      if (_loadMoreBusy || _busy) return;
-      _loadMoreBusy = true;
-      final current = state;
-      if (current is UsersLoaded) {
-        emit(current.copyWith(isLoadingMore: true));
+      final generation = ++_listFetchGeneration;
+      final prior = state;
+      if (prior is UsersLoaded) {
+        emit(prior.copyWith(isRefreshing: true));
+      } else {
+        emit(UsersLoading());
       }
+
+      try {
+        final response = await getUsers(
+          page: page,
+          limit: _limit,
+          search: _query,
+          location: _locationQuery.isEmpty ? null : _locationQuery,
+          isVerified: _filter == UsersUiFilter.verified ? true : null,
+          isBanned: _filter == UsersUiFilter.banned ? true : null,
+        );
+
+        if (generation != _listFetchGeneration) return;
+
+        _users
+          ..clear()
+          ..addAll(response.users);
+        _currentPage = response.page;
+        _lastPage = response.lastPage;
+        _total = response.total;
+        _applyLocationSort();
+
+        if (_users.isEmpty) {
+          emit(UsersEmpty());
+        } else {
+          _emitLoaded(emit, isLoadingMore: false, isRefreshing: false);
+        }
+      } catch (e) {
+        if (generation != _listFetchGeneration) return;
+        emit(UsersError(e.toString()));
+      }
+      return;
+    }
+
+    if (_loadMoreBusy) return;
+    _loadMoreBusy = true;
+    final current = state;
+    if (current is UsersLoaded) {
+      emit(current.copyWith(isLoadingMore: true));
     }
 
     try {
@@ -326,25 +398,21 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         page: page,
         limit: _limit,
         search: _query,
+        location: _locationQuery.isEmpty ? null : _locationQuery,
         isVerified: _filter == UsersUiFilter.verified ? true : null,
         isBanned: _filter == UsersUiFilter.banned ? true : null,
       );
 
-      if (replace) {
-        _users
-          ..clear()
-          ..addAll(response.users);
-      } else {
-        final existingIds = _users.map((u) => u.id).toSet();
-        for (final user in response.users) {
-          if (!existingIds.contains(user.id)) {
-            _users.add(user);
-          }
+      final existingIds = _users.map((u) => u.id).toSet();
+      for (final user in response.users) {
+        if (!existingIds.contains(user.id)) {
+          _users.add(user);
         }
       }
       _currentPage = response.page;
       _lastPage = response.lastPage;
       _total = response.total;
+      _applyLocationSort();
 
       if (_users.isEmpty) {
         emit(UsersEmpty());
@@ -352,20 +420,12 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         _emitLoaded(emit, isLoadingMore: false);
       }
     } catch (e) {
-      if (replace) {
-        emit(UsersError(e.toString()));
-      } else {
-        final current = state;
-        if (current is UsersLoaded) {
-          emit(current.copyWith(isLoadingMore: false));
-        }
+      final current = state;
+      if (current is UsersLoaded) {
+        emit(current.copyWith(isLoadingMore: false));
       }
     } finally {
-      if (replace) {
-        _busy = false;
-      } else {
-        _loadMoreBusy = false;
-      }
+      _loadMoreBusy = false;
     }
   }
 
@@ -376,6 +436,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     String? bulkActionMessage,
     bool? bulkActionIsError,
     bool? isLoadingMore,
+    bool? isRefreshing,
     bool clearBulkActionMessage = false,
   }) {
     final list = users ?? _users;
@@ -392,6 +453,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         total: _total,
         filter: _filter,
         query: _query,
+        locationQuery: _locationQuery,
+        locationSort: _locationSort,
         selectedUserIds: Set.of(_selectedUserIds),
         isBulkActionLoading: isBulkActionLoading ?? false,
         bulkActionMessage: clearBulkActionMessage
@@ -399,6 +462,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
             : (bulkActionMessage ?? _pendingBulkMessage),
         bulkActionIsError: bulkActionIsError ?? _pendingBulkIsError,
         isLoadingMore: isLoadingMore ?? false,
+        isRefreshing: isRefreshing ?? false,
       ),
     );
 
@@ -407,10 +471,101 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   }
 
   void _onSearch(SearchUsersEvent event, Emitter<UsersState> emit) {
-    final trimmed = event.query.trim();
-    if (trimmed == _query) return;
-    _query = trimmed;
+    _applyListFilters(
+      search: event.query.trim(),
+      location: _locationQuery,
+      emit: emit,
+    );
+  }
+
+  void _onApplyListFilters(
+    ApplyUsersListFiltersEvent event,
+    Emitter<UsersState> emit,
+  ) {
+    _applyListFilters(
+      search: event.search.trim(),
+      location: event.location.trim(),
+      emit: emit,
+    );
+  }
+
+  void _applyListFilters({
+    required String search,
+    required String location,
+    required Emitter<UsersState> emit,
+  }) {
+    if (search == _query && location == _locationQuery) return;
+    _query = search;
+    _locationQuery = location;
     add(LoadUsersEvent(refresh: true));
+  }
+
+  void _onLocationFilter(
+    FilterUsersByLocationEvent event,
+    Emitter<UsersState> emit,
+  ) {
+    _applyListFilters(
+      search: _query,
+      location: event.query.trim(),
+      emit: emit,
+    );
+  }
+
+  void _onClearListFilters(
+    ClearUsersListFiltersEvent event,
+    Emitter<UsersState> emit,
+  ) {
+    final hadFilters = _query.isNotEmpty ||
+        _locationQuery.isNotEmpty ||
+        _filter != UsersUiFilter.all ||
+        _locationSort != UsersLocationSortOrder.none;
+
+    if (!hadFilters) return;
+
+    _query = '';
+    _locationQuery = '';
+    _filter = UsersUiFilter.all;
+    _locationSort = UsersLocationSortOrder.none;
+
+    if (_selectedUserIds.isNotEmpty) {
+      _selectedUserIds.clear();
+    }
+
+    add(LoadUsersEvent(refresh: true));
+  }
+
+  void _onLocationSort(SortUsersLocationEvent event, Emitter<UsersState> emit) {
+    _locationSort = _locationSort.next;
+    if (_locationSort == UsersLocationSortOrder.none) {
+      add(LoadUsersEvent(refresh: true));
+      return;
+    }
+    _applyLocationSort();
+    if (state is UsersLoaded) {
+      _emitLoaded(emit);
+    }
+  }
+
+  void _applyLocationSort() {
+    if (_locationSort == UsersLocationSortOrder.none) return;
+
+    int compare(UserEntity a, UserEntity b) {
+      final ka = userLocationSortKey(a);
+      final kb = userLocationSortKey(b);
+      final aEmpty = ka.isEmpty;
+      final bEmpty = kb.isEmpty;
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      return ka.compareTo(kb);
+    }
+
+    _users.sort((a, b) {
+      final result = compare(a, b);
+      return _locationSort == UsersLocationSortOrder.descending
+          ? -result
+          : result;
+    });
   }
 
   void _onFilter(FilterUsersEvent event, Emitter<UsersState> emit) {
@@ -441,8 +596,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   void _onSelectAll(SelectAllUsersEvent event, Emitter<UsersState> emit) {
     if (state is! UsersLoaded) return;
     final visibleIds = _users.map((u) => u.id).toSet();
-    final allSelected = visibleIds.isNotEmpty &&
-        visibleIds.every(_selectedUserIds.contains);
+    final allSelected =
+        visibleIds.isNotEmpty && visibleIds.every(_selectedUserIds.contains);
     if (allSelected) {
       _selectedUserIds.removeAll(visibleIds);
     } else {
@@ -474,7 +629,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
 
   Future<void> _runBulkAction(
     Emitter<UsersState> emit, {
-    required Future<AdminBulkUsersResultEntity> Function(List<String> ids) action,
+    required Future<AdminBulkUsersResultEntity> Function(List<String> ids)
+    action,
     required String actionLabel,
   }) async {
     if (_selectedUserIds.isEmpty || state is! UsersLoaded) return;

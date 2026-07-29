@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
+import '../users_location_sort.dart';
 import '../utils/responsive.dart';
 import 'users_card_row.dart';
 import 'users_load_more_indicators.dart';
@@ -63,42 +64,41 @@ class UsersTablePanel extends StatelessWidget {
               switchOutCurve: Curves.easeInCubic,
               child: switch (state) {
                 UsersLoading() => const SizedBox(
-                    key: ValueKey('loading'),
-                    height: double.infinity,
-                    child: UsersTableSkeleton(),
-                  ),
+                  key: ValueKey('loading'),
+                  height: double.infinity,
+                  child: UsersTableSkeleton(),
+                ),
                 UsersError(:final message) => _StatePanel(
-                    key: const ValueKey('error'),
-                    icon: Icons.cloud_off_rounded,
-                    title: l10n.t('errorOccurred'),
-                    message: message,
-                    actionLabel: l10n.t('retry'),
-                    onAction: () => context.read<UsersBloc>().add(
-                          LoadUsersEvent(refresh: true),
-                        ),
-                    isDestructive: false,
+                  key: const ValueKey('error'),
+                  icon: Icons.cloud_off_rounded,
+                  title: l10n.t('errorOccurred'),
+                  message: message,
+                  actionLabel: l10n.t('retry'),
+                  onAction: () => context.read<UsersBloc>().add(
+                    LoadUsersEvent(refresh: true),
                   ),
+                  isDestructive: false,
+                ),
                 UsersEmpty() => _StatePanel(
-                    key: const ValueKey('empty'),
-                    icon: Icons.people_outline_rounded,
-                    title: l10n.t('noData'),
-                    message: l10n.t('tryAdjustFilters'),
-                    actionLabel: l10n.t('retry'),
-                    onAction: () => context.read<UsersBloc>().add(
-                          LoadUsersEvent(refresh: true),
-                        ),
-                    isDestructive: false,
+                  key: const ValueKey('empty'),
+                  icon: Icons.people_outline_rounded,
+                  title: l10n.t('noData'),
+                  message: l10n.t('tryAdjustFilters'),
+                  actionLabel: l10n.t('retry'),
+                  onAction: () => context.read<UsersBloc>().add(
+                    LoadUsersEvent(refresh: true),
                   ),
+                  isDestructive: false,
+                ),
                 UsersLoaded() ||
                 ResetUserPasswordLoading() ||
                 ResetUserPasswordSuccess() ||
-                ResetUserPasswordFailure() =>
-                  _LoadedUsersContent(
-                    key: const ValueKey('loaded'),
-                    metrics: metrics,
-                    listScrollController: listScrollController,
-                    onUserTap: onUserTap,
-                  ),
+                ResetUserPasswordFailure() => _LoadedUsersContent(
+                  key: const ValueKey('loaded'),
+                  metrics: metrics,
+                  listScrollController: listScrollController,
+                  onUserTap: onUserTap,
+                ),
               },
             );
           },
@@ -130,6 +130,14 @@ class _LoadedUsersContent extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            BlocSelector<UsersBloc, UsersState, bool>(
+              selector: (state) =>
+                  state is UsersLoaded && state.isRefreshing,
+              builder: (context, isRefreshing) {
+                if (!isRefreshing) return const SizedBox.shrink();
+                return const LinearProgressIndicator(minHeight: 2);
+              },
+            ),
             Padding(
               padding: EdgeInsets.fromLTRB(
                 metrics.cardPadding,
@@ -139,9 +147,9 @@ class _LoadedUsersContent extends StatelessWidget {
               ),
               child: Text(
                 '$total ${l10n.t('users')}',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
             Expanded(
@@ -191,7 +199,8 @@ class _MobileCardList extends StatelessWidget {
         );
       },
       builder: (context, data) {
-        final itemCount = data.users.length +
+        final itemCount =
+            data.users.length +
             (data.isLoadingMore ? 1 : 0) +
             (data.hasReachedMax && data.users.isNotEmpty ? 1 : 0);
 
@@ -269,7 +278,20 @@ class _DesktopTabletTable extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    UsersTableHeader(config: config),
+                    BlocSelector<UsersBloc, UsersState, UsersLocationSortOrder>(
+                      selector: (state) => state is UsersLoaded
+                          ? state.locationSort
+                          : UsersLocationSortOrder.none,
+                      builder: (context, locationSort) {
+                        return UsersTableHeader(
+                          config: config,
+                          locationSort: locationSort,
+                          onLocationSortTap: () => context
+                              .read<UsersBloc>()
+                              .add(SortUsersLocationEvent()),
+                        );
+                      },
+                    ),
                     Expanded(
                       child: _TableBody(
                         config: config,
@@ -348,7 +370,7 @@ class _TableBody extends StatelessWidget {
       builder: (context, data) {
         final trailingCount = useInfiniteScroll
             ? (data.isLoadingMore ? 1 : 0) +
-                (data.hasReachedMax && data.users.isNotEmpty ? 1 : 0)
+                  (data.hasReachedMax && data.users.isNotEmpty ? 1 : 0)
             : 0;
 
         return ListView.separated(
@@ -375,9 +397,8 @@ class _TableBody extends StatelessWidget {
                 striped: index.isOdd,
                 isSelected: data.selectedUserIds.contains(user.id),
                 selectionEnabled: data.selectionEnabled,
-                onToggleSelection: (id) => context
-                    .read<UsersBloc>()
-                    .add(ToggleUserSelectionEvent(id)),
+                onToggleSelection: (id) =>
+                    context.read<UsersBloc>().add(ToggleUserSelectionEvent(id)),
                 onUserTap: () => onUserTap(user),
               );
             }
@@ -404,11 +425,11 @@ class _UsersListData {
   });
 
   const _UsersListData.empty()
-      : users = const [],
-        selectedUserIds = const {},
-        selectionEnabled = true,
-        isLoadingMore = false,
-        hasReachedMax = true;
+    : users = const [],
+      selectedUserIds = const {},
+      selectionEnabled = true,
+      isLoadingMore = false,
+      hasReachedMax = true;
 
   final List<UserEntity> users;
   final Set<String> selectedUserIds;
@@ -428,12 +449,12 @@ class _UsersListData {
 
   @override
   int get hashCode => Object.hash(
-        users,
-        selectedUserIds,
-        selectionEnabled,
-        isLoadingMore,
-        hasReachedMax,
-      );
+    users,
+    selectedUserIds,
+    selectionEnabled,
+    isLoadingMore,
+    hasReachedMax,
+  );
 }
 
 class _PaginationData {
@@ -445,11 +466,11 @@ class _PaginationData {
   }) : visible = true;
 
   const _PaginationData.empty()
-      : currentPage = 1,
-        lastPage = 1,
-        total = 0,
-        itemCount = 0,
-        visible = false;
+    : currentPage = 1,
+      lastPage = 1,
+      total = 0,
+      itemCount = 0,
+      visible = false;
 
   final int currentPage;
   final int lastPage;

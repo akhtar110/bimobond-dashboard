@@ -12,6 +12,7 @@ class GetUsers {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    String? location,
   }) {
     return repository.getUsers(
       page: page,
@@ -19,6 +20,7 @@ class GetUsers {
       search: search,
       isVerified: isVerified,
       isBanned: isBanned,
+      location: location,
     );
   }
 }
