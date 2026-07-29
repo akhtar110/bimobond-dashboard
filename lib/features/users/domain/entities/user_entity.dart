@@ -150,6 +150,14 @@ class UserEntity {
 
   /// Latest GPS point from admin list/detail (`UserLocationHistory` or profile fallback).
   final UserLastLocationEntity? lastLocation;
+
+  bool get isAdminRole => roles.contains(UserRole.admin);
+
+  bool get isModeratorRole =>
+      roles.contains(UserRole.moderator) && !isAdminRole;
+
+  /// Standard / regular user (not admin and not moderator).
+  bool get isStandardRole => !isAdminRole && !isModeratorRole;
 }
 
 class UsersPageEntity {

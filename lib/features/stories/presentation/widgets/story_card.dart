@@ -165,20 +165,26 @@ class _StoryCardState extends State<StoryCard> {
                                 PositionedDirectional(
                                   top: 6,
                                   end: 6,
-                                  child: GestureDetector(
-                                    onTap: () {},
+                                  child: Material(
+                                    color: Colors.black.withValues(alpha: 0.62),
+                                    shape: const CircleBorder(),
+                                    elevation: 1,
+                                    shadowColor: Colors.black.withValues(
+                                      alpha: 0.35,
+                                    ),
                                     child: PopupMenuButton<StoryCardActionType>(
                                       padding: EdgeInsets.zero,
-                                      icon: Icon(
+                                      tooltip: MaterialLocalizations.of(
+                                        context,
+                                      ).moreButtonTooltip,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      icon: const Icon(
                                         Icons.more_vert_rounded,
-                                        color: scheme.onPrimary,
-                                        shadows: [
-                                          Shadow(
-                                            blurRadius: 8,
-                                            color: scheme.scrim
-                                                .withValues(alpha: 0.65),
-                                          ),
-                                        ],
+                                        color: Colors.white,
+                                        size: 18,
                                       ),
                                       onSelected: (action) =>
                                           widget.onAction?.call(action),

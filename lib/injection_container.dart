@@ -106,6 +106,12 @@ import 'features/search_history/domain/repositories/search_history_repository.da
 import 'features/search_history/domain/usecases/search_history_usecases.dart';
 import 'features/search_history/presentation/bloc/search_history_bloc.dart';
 
+import 'features/user_history/data/datasources/user_history_remote_datasource.dart';
+import 'features/user_history/data/repositories/user_history_repository_impl.dart';
+import 'features/user_history/domain/repositories/user_history_repository.dart';
+import 'features/user_history/domain/usecases/get_user_history_usecase.dart';
+import 'features/user_history/presentation/bloc/user_history_bloc.dart';
+
 import 'features/search_management/data/datasources/search_management_remote_datasource.dart';
 import 'features/search_management/data/repositories/search_management_repository_impl.dart';
 import 'features/search_management/domain/repositories/search_management_repository.dart';
@@ -692,6 +698,7 @@ Future<void> init() async {
       promoteUser: sl<PromoteUser>(),
       demoteUser: sl<DemoteUser>(),
       deleteUser: sl<DeleteUser>(),
+      updateUserRoles: sl<UpdateUserRoles>(),
       setUserIsPrivate: sl<SetUserIsPrivate>(),
       setUserMessagePermission: sl<SetUserMessagePermission>(),
     ),
@@ -854,6 +861,23 @@ Future<void> init() async {
       clearSearchHistory: sl<ClearSearchHistoryUseCase>(),
       bulkSearchHistory: sl<BulkSearchHistoryUseCase>(),
     ),
+  );
+
+  // =========================================================
+  // USER HISTORY MODULE (Activity Admin timeline)
+  // =========================================================
+
+  sl.registerLazySingleton<UserHistoryRemoteDataSource>(
+    () => UserHistoryRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<UserHistoryRepository>(
+    () => UserHistoryRepositoryImpl(sl<UserHistoryRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(
+    () => GetUserHistoryUseCase(sl<UserHistoryRepository>()),
+  );
+  sl.registerFactory(
+    () => UserHistoryBloc(getUserHistory: sl<GetUserHistoryUseCase>()),
   );
 
   // =========================================================
