@@ -23,46 +23,30 @@ class WalletsPageHeader extends StatelessWidget {
   });
 
   final String title;
+  /// Kept for call-site compatibility; not shown (more vertical room for data).
   final String? subtitle;
   final Widget? trailing;
   final WalletsLayoutMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final compact = metrics.isMobile;
-
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                title,
-                style: (compact
-                        ? Theme.of(context).textTheme.titleLarge
-                        : Theme.of(context).textTheme.headlineSmall)
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              if (subtitle != null) ...[
-                SizedBox(height: metrics.toolbarFilterGap),
-                Text(
-                  subtitle!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: metrics.headerTitleFontSize,
+                  height: 1.15,
                 ),
-              ],
-            ],
           ),
         ),
         if (trailing != null) ...[
-          const SizedBox(width: 12),
+          SizedBox(width: metrics.isMobile ? 8 : 12),
           trailing!,
         ],
       ],

@@ -60,6 +60,8 @@ class SidebarMenuGroup extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,

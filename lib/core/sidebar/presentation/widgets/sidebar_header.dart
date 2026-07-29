@@ -53,6 +53,7 @@ class SidebarHeader extends StatelessWidget {
                     l10n.t('bimoBondAdmin'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    softWrap: false,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
@@ -62,6 +63,7 @@ class SidebarHeader extends StatelessWidget {
                     l10n.tOr('adminDashboard', 'Admin Dashboard'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    softWrap: false,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                       fontSize: 11,

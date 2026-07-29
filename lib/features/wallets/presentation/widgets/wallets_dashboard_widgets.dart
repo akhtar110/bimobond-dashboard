@@ -102,36 +102,48 @@ class WalletsMetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final metrics = walletsMetricsOf(context);
     return WalletsDashboardCard(
+      padding: EdgeInsets.all(metrics.analyticsCardPadding),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: metrics.analyticsIconBoxSize,
+            height: metrics.analyticsIconBoxSize,
             decoration: BoxDecoration(
               color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(metrics.compactCardRadius),
             ),
-            child: Icon(icon, color: scheme.onPrimaryContainer, size: 20),
+            child: Icon(
+              icon,
+              color: scheme.onPrimaryContainer,
+              size: metrics.analyticsIconSize,
+            ),
           ),
-          const SizedBox(width: WalletsSpace.md),
+          SizedBox(width: metrics.statsGridSpacing),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
+                        fontSize: metrics.analyticsLabelFontSize,
+                        height: 1.2,
                       ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
+                        fontSize: metrics.analyticsValueFontSize,
+                        height: 1.15,
                       ),
                 ),
               ],

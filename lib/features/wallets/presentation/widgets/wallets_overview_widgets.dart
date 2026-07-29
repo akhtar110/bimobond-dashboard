@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
 import '../../../../core/utils/money_format.dart';
-import '../../../../core/widgets/dashboard/analytics_card.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../../../../core/widgets/dashboard/responsive_data_table.dart';
 import '../../../../core/widgets/dashboard/responsive_stats_grid.dart';
@@ -20,9 +19,12 @@ List<Widget> walletOverviewKpiCards(
   WalletOverviewEntity overview, {
   bool showPackageStat = false,
 }) {
+  final metrics = walletsMetricsOf(context);
+
   if (showPackageStat) {
     return [
-      AnalyticsCard(
+      WalletKpiCard(
+        metrics: metrics,
         label: walletL10nOr(context, 'walletKpiCoinPackages', 'Coin packages'),
         value: walletL10nArgs(
           context,
@@ -30,40 +32,39 @@ List<Widget> walletOverviewKpiCards(
           {'active': '${overview.packagesActive}'},
           '${overview.packagesActive} active',
         ),
-        subtitle: walletL10nArgs(
-          context,
-          'walletKpiPackagesTotal',
-          {'total': '${overview.packagesTotal}'},
-          '${overview.packagesTotal} total in catalog',
-        ),
         icon: Icons.inventory_2_outlined,
       ),
     ];
   }
 
   return [
-    AnalyticsCard(
+    WalletKpiCard(
+      metrics: metrics,
       label: walletL10nOr(context, 'walletKpiTotalWallets', 'Total wallets'),
       value: '${overview.walletsTotal}',
       icon: Icons.account_balance_wallet_outlined,
     ),
-    AnalyticsCard(
+    WalletKpiCard(
+      metrics: metrics,
       label: walletL10nOr(context, 'walletKpiTotalBalance', 'Total balance'),
       value: CoinFormat.coins(overview.totalBalanceCoins),
       icon: Icons.monetization_on_outlined,
       highlight: true,
     ),
-    AnalyticsCard(
+    WalletKpiCard(
+      metrics: metrics,
       label: walletL10nOr(context, 'walletKpiFiatPurchases', 'Fiat purchases'),
       value: '${overview.fiatPurchasesTotal}',
       icon: Icons.shopping_cart_outlined,
     ),
-    AnalyticsCard(
+    WalletKpiCard(
+      metrics: metrics,
       label: walletL10nOr(context, 'walletKpiPurchaseVolume', 'Purchase volume'),
       value: CoinFormat.purchaseVolume(overview.completedPurchaseVolume),
       icon: Icons.payments_outlined,
     ),
-    AnalyticsCard(
+    WalletKpiCard(
+      metrics: metrics,
       label: walletL10nOr(
         context,
         'walletKpiPendingWithdrawals',
@@ -72,7 +73,8 @@ List<Widget> walletOverviewKpiCards(
       value: '${overview.withdrawalsPending}',
       icon: Icons.hourglass_top_outlined,
     ),
-    AnalyticsCard(
+    WalletKpiCard(
+      metrics: metrics,
       label: walletL10nOr(
         context,
         'walletKpiLedgerEntries24h',
@@ -82,6 +84,100 @@ List<Widget> walletOverviewKpiCards(
       icon: Icons.receipt_long_outlined,
     ),
   ];
+}
+
+/// Dense KPI tile sized from [WalletsLayoutMetrics] (wallet module only).
+class WalletKpiCard extends StatelessWidget {
+  const WalletKpiCard({
+    super.key,
+    required this.metrics,
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.highlight = false,
+  });
+
+  final WalletsLayoutMetrics metrics;
+  final String label;
+  final String value;
+  final IconData icon;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bg = highlight ? scheme.primaryContainer : scheme.surface;
+    final fg = highlight ? scheme.onPrimaryContainer : scheme.onSurface;
+
+    return Material(
+      color: bg,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(metrics.compactCardRadius),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.55)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(metrics.analyticsCardPadding),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: metrics.analyticsIconBoxSize,
+              height: metrics.analyticsIconBoxSize,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: highlight
+                    ? scheme.primary.withValues(alpha: 0.14)
+                    : scheme.primaryContainer.withValues(alpha: 0.65),
+                borderRadius:
+                    BorderRadius.circular(metrics.compactCardRadius - 2),
+              ),
+              child: Icon(
+                icon,
+                size: metrics.analyticsIconSize,
+                color: scheme.primary,
+              ),
+            ),
+            SizedBox(width: metrics.statsGridSpacing),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: metrics.analyticsLabelFontSize,
+                          height: 1.2,
+                        ),
+                  ),
+                  const SizedBox(height: 1),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: fg,
+                            fontSize: metrics.analyticsValueFontSize,
+                            height: 1.1,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class WalletOverviewHeader extends StatelessWidget {
@@ -101,7 +197,6 @@ class WalletOverviewHeader extends StatelessWidget {
     return WalletsPageHeader(
       metrics: metrics,
       title: title,
-      subtitle: subtitle,
     );
   }
 }
@@ -151,9 +246,7 @@ class WalletLedgerByTypeSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
-    final l10n = context.l10n;
 
-    final scheme = Theme.of(context).colorScheme;
     final maxAmount = items.isEmpty
         ? 0.0
         : items.map((e) => e.amountCoins).reduce((a, b) => a > b ? a : b);
@@ -165,34 +258,17 @@ class WalletLedgerByTypeSection extends StatelessWidget {
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
-              metrics.cardPadding + 4,
+              metrics.cardPadding + 2,
               metrics.cardPadding,
-              metrics.cardPadding + 4,
-              6,
+              metrics.cardPadding + 2,
+              4,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  walletL10nOr(context, 'walletSectionLedgerByType24h', title),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: metrics.sectionTitleFontSize,
-                      ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  walletL10nOr(context,
-                    'walletSubtitleLedgerByType24h',
-                    'Entry count and coin volume per ledger type in the last 24 hours.',
+            child: Text(
+              walletL10nOr(context, 'walletSectionLedgerByType24h', title),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: metrics.sectionTitleFontSize,
                   ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: metrics.sectionSubtitleFontSize,
-                        height: 1.3,
-                      ),
-                ),
-              ],
             ),
           ),
           if (items.isEmpty)
@@ -469,7 +545,6 @@ class WalletEconomySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final metrics = walletsMetricsOf(context);
 
     return Column(
@@ -482,18 +557,7 @@ class WalletEconomySection extends StatelessWidget {
                 fontSize: metrics.sectionTitleFontSize,
               ),
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 3),
-          Text(
-            subtitle!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: metrics.sectionSubtitleFontSize,
-                  height: 1.3,
-                ),
-          ),
-        ],
-        SizedBox(height: metrics.sectionGap + 6),
+        SizedBox(height: metrics.sectionGap),
         WalletsDashboardCard(padding: EdgeInsets.zero, child: child),
       ],
     );
