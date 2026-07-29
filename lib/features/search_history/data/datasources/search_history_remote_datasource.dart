@@ -199,9 +199,12 @@ class SearchHistoryPageModel extends PaginatedResult<SearchHistoryEntity> {
         total: _int(metaJson['total']),
         page: _int(metaJson['page']) == 0 ? 1 : _int(metaJson['page']),
         limit: _int(metaJson['limit']) == 0 ? 25 : _int(metaJson['limit']),
-        totalPages: _int(metaJson['totalPages']) == 0
-            ? 1
-            : _int(metaJson['totalPages']),
+        totalPages: () {
+          final last = _int(metaJson['lastPage']);
+          final total = _int(metaJson['totalPages']);
+          final pages = last == 0 ? total : last;
+          return pages == 0 ? 1 : pages;
+        }(),
       ),
     );
   }

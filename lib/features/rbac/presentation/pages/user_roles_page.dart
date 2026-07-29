@@ -6,6 +6,7 @@ import '../../domain/entities/role_entity.dart';
 import '../bloc/rbac_bloc.dart';
 import '../bloc/rbac_event.dart';
 import '../utils/permission_manager.dart';
+import '../utils/rbac_responsive.dart';
 import '../widgets/rbac_ui.dart';
 
 class UserRolesPage extends StatefulWidget {
@@ -103,14 +104,27 @@ class _UserRolesPageState extends State<UserRolesPage> {
                       <String>{}
                 : <String>{});
         final visibleRoles = _visibleRoles(state.roles);
+        final metrics = RbacLayoutMetrics(
+          getRbacDeviceType(MediaQuery.sizeOf(context).width),
+        );
         return RbacPageFrame(
-          title: context.l10n.tOr('userRoles', 'User roles'),
-          subtitle: widget.userLabel ?? widget.userId,
+          title: widget.userLabel == null || widget.userLabel!.trim().isEmpty
+              ? context.l10n.tOr('userRoles', 'User roles')
+              : '${context.l10n.tOr('userRoles', 'User roles')} · ${widget.userLabel}',
+          metrics: metrics,
           onBack: widget.onBack,
           actions: [
             PermissionGate(
               allOf: RbacPermissionKeys.assignmentKeys,
-              child: FilledButton.icon(
+              child: RbacHeaderAction(
+                compact: metrics.useIconActions,
+                icon: Icons.save_outlined,
+                label: context.l10n.tOr(
+                  'saveAssignments',
+                  'Save assignments',
+                ),
+                outlined: false,
+                isLoading: state.isSubmitting,
                 onPressed: state.isSubmitting
                     ? null
                     : () => context.read<RbacBloc>().add(
@@ -119,15 +133,6 @@ class _UserRolesPageState extends State<UserRolesPage> {
                           selected.toList(growable: false),
                         ),
                       ),
-                icon: state.isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(
-                  context.l10n.tOr('saveAssignments', 'Save assignments'),
-                ),
               ),
             ),
           ],

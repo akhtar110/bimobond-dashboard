@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/users_bloc.dart';
 import '../utils/selected_users_actions.dart';
 import '../utils/responsive.dart';
@@ -150,23 +151,32 @@ class UsersSelectionHeader extends StatelessWidget {
                           if (narrow)
                             _BulkActionsMenu(l10n: l10n, actions: actions)
                           else ...[
-                            if (actions.showBan) ...[
+                            if (actions.showBan &&
+                                PermissionManager.canBanUsers(context)) ...[
                               _BanButton(l10n: l10n, compact: false),
                               const SizedBox(width: 6),
                             ],
-                            if (actions.showUnban) ...[
+                            if (actions.showUnban &&
+                                PermissionManager.canBanUsers(context)) ...[
                               _UnbanButton(l10n: l10n, compact: false),
                               const SizedBox(width: 6),
                             ],
-                            if (actions.showPromote) ...[
+                            if (actions.showPromote &&
+                                PermissionManager.canAssignUserLegacyRoles(
+                                  context,
+                                )) ...[
                               _PromoteButton(l10n: l10n, compact: false),
                               const SizedBox(width: 6),
                             ],
-                            if (actions.showDemote) ...[
+                            if (actions.showDemote &&
+                                PermissionManager.canAssignUserLegacyRoles(
+                                  context,
+                                )) ...[
                               _DemoteButton(l10n: l10n, compact: false),
                               const SizedBox(width: 6),
                             ],
-                            _DeleteButton(l10n: l10n, compact: false),
+                            if (PermissionManager.canUpdateUsers(context))
+                              _DeleteButton(l10n: l10n, compact: false),
                           ],
                         ],
                       );
@@ -225,7 +235,7 @@ class _BulkActionsMenu extends StatelessWidget {
         }
       },
       itemBuilder: (_) => [
-        if (actions.showBan)
+        if (actions.showBan && PermissionManager.canBanUsers(context))
           PopupMenuItem(
             value: 'ban',
             child: Row(
@@ -236,7 +246,7 @@ class _BulkActionsMenu extends StatelessWidget {
               ],
             ),
           ),
-        if (actions.showUnban)
+        if (actions.showUnban && PermissionManager.canBanUsers(context))
           PopupMenuItem(
             value: 'unban',
             child: Row(
@@ -247,7 +257,8 @@ class _BulkActionsMenu extends StatelessWidget {
               ],
             ),
           ),
-        if (actions.showPromote)
+        if (actions.showPromote &&
+            PermissionManager.canAssignUserLegacyRoles(context))
           PopupMenuItem(
             value: 'promote',
             child: Row(
@@ -258,7 +269,8 @@ class _BulkActionsMenu extends StatelessWidget {
               ],
             ),
           ),
-        if (actions.showDemote)
+        if (actions.showDemote &&
+            PermissionManager.canAssignUserLegacyRoles(context))
           PopupMenuItem(
             value: 'demote',
             child: Row(
@@ -269,16 +281,17 @@ class _BulkActionsMenu extends StatelessWidget {
               ],
             ),
           ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, size: 18, color: scheme.error),
-              const SizedBox(width: 10),
-              Text(l10n.t('delete'), style: TextStyle(color: scheme.error)),
-            ],
+        if (PermissionManager.canUpdateUsers(context))
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, size: 18, color: scheme.error),
+                const SizedBox(width: 10),
+                Text(l10n.t('delete'), style: TextStyle(color: scheme.error)),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

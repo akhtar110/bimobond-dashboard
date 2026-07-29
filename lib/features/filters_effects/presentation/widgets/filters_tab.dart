@@ -19,7 +19,6 @@ import '../dialogs/filter_form_dialog.dart';
 import '../utils/fe_display_filters.dart';
 import '../utils/filters_effects_responsive.dart';
 import 'fe_filter_form_fields.dart';
-import 'fe_selected_category_banner.dart';
 import 'fe_tab_scaffold.dart';
 
 Future<void> _openEditor(BuildContext context, {String? filterId}) async {
@@ -27,21 +26,14 @@ Future<void> _openEditor(BuildContext context, {String? filterId}) async {
   if (!context.mounted) return;
   if (saved == true) {
     context.read<FiltersEffectsBloc>().add(const LoadCameraFilters());
-    final l10n = context.l10n;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            filterId == null
-                ? l10n.t('feFilterCreatedSuccess')
-                : l10n.t('feFilterUpdatedSuccess'),
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    context.read<FiltersEffectsBloc>().add(
+      ShowFiltersEffectsMessage(
+        filterId == null
+            ? 'feFilterCreatedSuccess'
+            : 'feFilterUpdatedSuccess',
+        isError: false,
+      ),
+    );
   }
 }
 
@@ -72,16 +64,6 @@ class FiltersTab extends StatelessWidget {
     final selectionEnabled = canManage && !loaded.isBulkDeleting;
     final categorySelected = selectedCategoryId != null;
 
-    CameraFilterCategoryEntity? selectedCategory;
-    if (categorySelected) {
-      for (final c in loaded.filterCategories) {
-        if (c.id == selectedCategoryId) {
-          selectedCategory = c;
-          break;
-        }
-      }
-    }
-
     final allVisibleSelected = items.isNotEmpty &&
         items.every((f) => loaded.selectedFilterIds.contains(f.id));
     final someVisibleSelected = items.any(
@@ -90,41 +72,17 @@ class FiltersTab extends StatelessWidget {
         !allVisibleSelected;
 
     if (items.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (selectedCategory != null) ...[
-            FeSelectedCategoryBanner(
-              label: selectedCategory.displayLabel,
-              itemCount: 0,
-              isEffectCategory: false,
-              onClear: onClearCategory ?? () {},
-            ),
-            const SizedBox(height: 12),
-          ],
-          Expanded(
-            child: Center(
-              child: EmptyView(
-                message: l10n.tOr(
-                  'feNoFilters',
-                  'No filters match your filters.',
-                ),
-              ),
-            ),
+      return Center(
+        child: EmptyView(
+          message: l10n.tOr(
+            'feNoFilters',
+            'No filters match your filters.',
           ),
-        ],
+        ),
       );
     }
 
     return FeTabScaffold(
-      header: selectedCategory == null
-          ? null
-          : FeSelectedCategoryBanner(
-              label: selectedCategory.displayLabel,
-              itemCount: items.length,
-              isEffectCategory: false,
-              onClear: onClearCategory ?? () {},
-            ),
       footer: categorySelected
           ? null
           : AppPaginationBar(

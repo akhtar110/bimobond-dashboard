@@ -8,11 +8,11 @@ class BanUser {
   Future<void> call({
     required String userId,
     required String reason,
-    required DateTime until,
+    DateTime? until,
   }) {
     return repository.blockUser(
       userId: userId,
-      reason: reason,
+      reason: reason.trim().isEmpty ? 'Banned by admin' : reason.trim(),
       until: until,
     );
   }

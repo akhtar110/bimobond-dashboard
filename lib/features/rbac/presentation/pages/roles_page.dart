@@ -7,6 +7,7 @@ import '../../domain/entities/role_entity.dart';
 import '../bloc/rbac_bloc.dart';
 import '../bloc/rbac_event.dart';
 import '../utils/permission_manager.dart';
+import '../utils/rbac_responsive.dart';
 import '../widgets/rbac_ui.dart';
 
 class RolesPage extends StatefulWidget {
@@ -68,17 +69,15 @@ class _RolesPageState extends State<RolesPage> {
         context.read<RbacBloc>().add(const ClearRbacFeedback());
       },
       builder: (context, state) {
-        final isCompact = MediaQuery.sizeOf(context).width < 600;
+        final metrics = RbacLayoutMetrics(
+          getRbacDeviceType(MediaQuery.sizeOf(context).width),
+        );
+        final isCompact = metrics.useIconActions;
         return RbacPageFrame(
           title: context.l10n.tOr('roles', 'Roles'),
-          subtitle: isCompact
-              ? null
-              : context.l10n.tOr(
-                  'rolesSubtitle',
-                  'Manage access roles and their permissions.',
-                ),
+          metrics: metrics,
           actions: [
-            _ToolbarAction(
+            RbacHeaderAction(
               compact: isCompact,
               icon: Icons.policy_outlined,
               label: context.l10n.tOr(
@@ -91,7 +90,7 @@ class _RolesPageState extends State<RolesPage> {
             PermissionGate(
               allOf: RbacPermissionKeys.assignmentKeys,
               allowLegacyAdmin: true,
-              child: _ToolbarAction(
+              child: RbacHeaderAction(
                 compact: isCompact,
                 icon: Icons.person_add_alt_1_outlined,
                 label: context.l10n.tOr('assignUserRoles', 'Assign user roles'),
@@ -102,7 +101,7 @@ class _RolesPageState extends State<RolesPage> {
             PermissionGate(
               permission: RbacPermissionKeys.manageRoles,
               allowLegacyAdmin: true,
-              child: _ToolbarAction(
+              child: RbacHeaderAction(
                 compact: isCompact,
                 icon: Icons.add_rounded,
                 label: context.l10n.tOr('createRole', 'Create role'),
@@ -120,52 +119,6 @@ class _RolesPageState extends State<RolesPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _ToolbarAction extends StatelessWidget {
-  const _ToolbarAction({
-    required this.compact,
-    required this.icon,
-    required this.label,
-    required this.outlined,
-    required this.onPressed,
-  });
-
-  final bool compact;
-  final IconData icon;
-  final String label;
-  final bool outlined;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    if (compact) {
-      final button = outlined
-          ? IconButton.outlined(
-              onPressed: onPressed,
-              tooltip: label,
-              icon: Icon(icon, size: 20),
-            )
-          : IconButton.filled(
-              onPressed: onPressed,
-              tooltip: label,
-              icon: Icon(icon, size: 20),
-            );
-      return button;
-    }
-    if (outlined) {
-      return OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-      );
-    }
-    return FilledButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
     );
   }
 }
@@ -300,22 +253,35 @@ class _RolesToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bloc = context.read<RbacBloc>();
+    final scheme = Theme.of(context).colorScheme;
+    InputDecoration denseDecoration(String label, {Widget? prefixIcon}) {
+      return InputDecoration(
+        labelText: label,
+        prefixIcon: prefixIcon,
+        isDense: true,
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final search = TextField(
-          decoration: InputDecoration(
-            labelText: context.l10n.tOr('searchRoles', 'Search roles'),
-            prefixIcon: const Icon(Icons.search_rounded),
-            border: const OutlineInputBorder(),
+          decoration: denseDecoration(
+            context.l10n.tOr('searchRoles', 'Search roles'),
+            prefixIcon: const Icon(Icons.search_rounded, size: 20),
           ),
           onChanged: (query) => bloc.add(SearchRoles(query)),
         );
         final typeFilter = DropdownButtonFormField<RoleTypeFilter>(
           initialValue: state.typeFilter,
-          decoration: InputDecoration(
-            labelText: context.l10n.tOr('roleType', 'Type'),
-            border: const OutlineInputBorder(),
-          ),
+          decoration: denseDecoration(context.l10n.tOr('roleType', 'Type')),
           items: [
             DropdownMenuItem(
               value: RoleTypeFilter.all,
@@ -338,10 +304,7 @@ class _RolesToolbar extends StatelessWidget {
         );
         final statusFilter = DropdownButtonFormField<RoleStatusFilter>(
           initialValue: state.statusFilter,
-          decoration: InputDecoration(
-            labelText: context.l10n.tOr('status', 'Status'),
-            border: const OutlineInputBorder(),
-          ),
+          decoration: denseDecoration(context.l10n.tOr('status', 'Status')),
           items: [
             DropdownMenuItem(
               value: RoleStatusFilter.all,
@@ -366,11 +329,11 @@ class _RolesToolbar extends StatelessWidget {
           return Column(
             children: [
               search,
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(child: typeFilter),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(child: statusFilter),
                 ],
               ),
@@ -380,10 +343,10 @@ class _RolesToolbar extends StatelessWidget {
         return Row(
           children: [
             Expanded(child: search),
-            const SizedBox(width: 12),
-            SizedBox(width: 190, child: typeFilter),
-            const SizedBox(width: 12),
-            SizedBox(width: 190, child: statusFilter),
+            const SizedBox(width: 10),
+            SizedBox(width: 180, child: typeFilter),
+            const SizedBox(width: 10),
+            SizedBox(width: 180, child: statusFilter),
           ],
         );
       },

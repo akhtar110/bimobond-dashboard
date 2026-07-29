@@ -100,12 +100,16 @@ class _EffectEditorPreviewContent extends StatelessWidget {
         _SummaryCard(
           children: [
             _SummaryRow(
-              label: l10n.tOr('feFieldRenderType', 'Render type'),
-              value: feEffectRenderTypeLabel(context, form.renderType),
+              label: l10n.tOr('feFieldName', 'Name'),
+              value: form.label.trim().isEmpty ? '—' : form.label.trim(),
             ),
             _SummaryRow(
               label: l10n.tOr('feFieldSlug', 'Slug'),
               value: form.slug.trim().isEmpty ? '—' : form.slug.trim(),
+            ),
+            _SummaryRow(
+              label: l10n.tOr('feFieldRenderType', 'Render type'),
+              value: feEffectRenderTypeLabel(context, form.renderType),
             ),
             if (isDistortion)
               _SummaryRow(

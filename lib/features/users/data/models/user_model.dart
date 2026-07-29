@@ -1,5 +1,6 @@
 import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/user_wallet_entity.dart';
 
 class UserModel extends UserEntity {
   const UserModel({
@@ -16,6 +17,29 @@ class UserModel extends UserEntity {
     required super.isVerified,
     super.instagramUrl,
     super.youtubeUrl,
+    super.websiteUrl,
+    super.tiktokUrl,
+    super.twitterUrl,
+    super.snapchatUrl,
+    super.spotifyUrl,
+    super.pronouns,
+    super.creatorCategory,
+    super.accountType,
+    super.verificationBadge,
+    super.likedVideosVisibility,
+    super.followersListVisibility,
+    super.followingListVisibility,
+    super.discoverable,
+    super.suggestToContacts,
+    super.profileViewHistoryEnabled,
+    super.showActivityStatus,
+    super.restrictedMode,
+    super.showShopOnProfile,
+    super.allowDuetsDefault,
+    super.allowStitchDefault,
+    super.allowDownloadsDefault,
+    super.allowRepostsDefault,
+    super.showRepostsOnProfile,
     required super.isPrivate,
     super.isProfileLocked,
     required super.allowComments,
@@ -38,6 +62,8 @@ class UserModel extends UserEntity {
     super.createdAt,
     super.updatedAt,
     required super.roles,
+    super.wallet,
+    super.relationCounts,
   });
 
   factory UserModel.fromJson(
@@ -50,6 +76,8 @@ class UserModel extends UserEntity {
             : json['counts'] is Map
                 ? Map<String, dynamic>.from(json['counts'] as Map)
                 : null);
+    final relationCounts = UserRelationCountsEntity.tryParse(resolvedCounts);
+    final wallet = UserWalletEntity.tryParse(json['wallet']);
 
     return UserModel(
       id: json['id'],
@@ -62,11 +90,34 @@ class UserModel extends UserEntity {
       avatarUrl: json['avatarUrl'],
       gender: json['gender'],
       dateOfBirth: json['dateOfBirth'] != null
-          ? DateTime.parse(json['dateOfBirth'])
+          ? DateTime.tryParse(json['dateOfBirth'].toString())
           : null,
       isVerified: json['isVerified'] ?? false,
       instagramUrl: json['instagramUrl'],
       youtubeUrl: json['youtubeUrl'],
+      websiteUrl: json['websiteUrl'],
+      tiktokUrl: json['tiktokUrl'],
+      twitterUrl: json['twitterUrl'],
+      snapchatUrl: json['snapchatUrl'],
+      spotifyUrl: json['spotifyUrl'],
+      pronouns: json['pronouns'],
+      creatorCategory: json['creatorCategory'],
+      accountType: json['accountType']?.toString(),
+      verificationBadge: json['verificationBadge']?.toString(),
+      likedVideosVisibility: json['likedVideosVisibility']?.toString(),
+      followersListVisibility: json['followersListVisibility']?.toString(),
+      followingListVisibility: json['followingListVisibility']?.toString(),
+      discoverable: json['discoverable'] as bool?,
+      suggestToContacts: json['suggestToContacts'] as bool?,
+      profileViewHistoryEnabled: json['profileViewHistoryEnabled'] as bool?,
+      showActivityStatus: json['showActivityStatus'] as bool?,
+      restrictedMode: json['restrictedMode'] as bool?,
+      showShopOnProfile: json['showShopOnProfile'] as bool?,
+      allowDuetsDefault: json['allowDuetsDefault'] as bool?,
+      allowStitchDefault: json['allowStitchDefault'] as bool?,
+      allowDownloadsDefault: json['allowDownloadsDefault'] as bool?,
+      allowRepostsDefault: json['allowRepostsDefault'] as bool?,
+      showRepostsOnProfile: json['showRepostsOnProfile'] as bool?,
       isPrivate: json['isPrivate'] ?? false,
       isProfileLocked: json['isProfileLocked'] ?? false,
       allowComments: json['allowComments'] ?? true,
@@ -83,20 +134,22 @@ class UserModel extends UserEntity {
       city: json['city'],
       followerCount: readInt(
             json['followerCount'] ??
+                relationCounts?.followers ??
                 resolvedCounts?['followers'] ??
                 resolvedCounts?['follower']) ??
           0,
       followingCount: readInt(
             json['followingCount'] ??
+                relationCounts?.following ??
                 resolvedCounts?['following'] ??
                 resolvedCounts?['followings']) ??
           0,
       postCount: readInt(
             json['postCount'] ??
+                relationCounts?.posts ??
                 resolvedCounts?['posts'] ??
                 resolvedCounts?['post']) ??
           0,
-      // Denormalized totalLikes is often stale/0; also accept count aliases.
       totalLikes: readInt(
             json['totalLikes'] ??
                 json['likesCount'] ??
@@ -111,14 +164,14 @@ class UserModel extends UserEntity {
       isBanned: json['isBanned'] ?? false,
       banReason: json['banReason'],
       bannedUntil: json['bannedUntil'] != null
-          ? DateTime.parse(json['bannedUntil'])
+          ? DateTime.tryParse(json['bannedUntil'].toString())
           : null,
       fcmToken: json['fcmToken'],
       createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
       updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
+          ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
       roles: json['roles'] is List
           ? (json['roles'] as List).map((e) => _mapRole(e.toString())).toList()
@@ -130,6 +183,8 @@ class UserModel extends UserEntity {
                   return _mapRole(entry.value.toString());
                 }).toList()
               : [],
+      wallet: wallet,
+      relationCounts: relationCounts,
     );
   }
 
@@ -146,6 +201,8 @@ class UserModel extends UserEntity {
     int? followingCount,
     int? postCount,
     int? totalLikes,
+    UserWalletEntity? wallet,
+    UserRelationCountsEntity? relationCounts,
   }) {
     return UserModel(
       id: id,
@@ -161,6 +218,29 @@ class UserModel extends UserEntity {
       isVerified: isVerified,
       instagramUrl: instagramUrl,
       youtubeUrl: youtubeUrl,
+      websiteUrl: websiteUrl,
+      tiktokUrl: tiktokUrl,
+      twitterUrl: twitterUrl,
+      snapchatUrl: snapchatUrl,
+      spotifyUrl: spotifyUrl,
+      pronouns: pronouns,
+      creatorCategory: creatorCategory,
+      accountType: accountType,
+      verificationBadge: verificationBadge,
+      likedVideosVisibility: likedVideosVisibility,
+      followersListVisibility: followersListVisibility,
+      followingListVisibility: followingListVisibility,
+      discoverable: discoverable,
+      suggestToContacts: suggestToContacts,
+      profileViewHistoryEnabled: profileViewHistoryEnabled,
+      showActivityStatus: showActivityStatus,
+      restrictedMode: restrictedMode,
+      showShopOnProfile: showShopOnProfile,
+      allowDuetsDefault: allowDuetsDefault,
+      allowStitchDefault: allowStitchDefault,
+      allowDownloadsDefault: allowDownloadsDefault,
+      allowRepostsDefault: allowRepostsDefault,
+      showRepostsOnProfile: showRepostsOnProfile,
       isPrivate: isPrivate,
       isProfileLocked: isProfileLocked,
       allowComments: allowComments,
@@ -183,6 +263,8 @@ class UserModel extends UserEntity {
       createdAt: createdAt,
       updatedAt: updatedAt,
       roles: roles,
+      wallet: wallet ?? this.wallet,
+      relationCounts: relationCounts ?? this.relationCounts,
     );
   }
 
@@ -201,6 +283,29 @@ class UserModel extends UserEntity {
       'isVerified': isVerified,
       'instagramUrl': instagramUrl,
       'youtubeUrl': youtubeUrl,
+      'websiteUrl': websiteUrl,
+      'tiktokUrl': tiktokUrl,
+      'twitterUrl': twitterUrl,
+      'snapchatUrl': snapchatUrl,
+      'spotifyUrl': spotifyUrl,
+      'pronouns': pronouns,
+      'creatorCategory': creatorCategory,
+      'accountType': accountType,
+      'verificationBadge': verificationBadge,
+      'likedVideosVisibility': likedVideosVisibility,
+      'followersListVisibility': followersListVisibility,
+      'followingListVisibility': followingListVisibility,
+      'discoverable': discoverable,
+      'suggestToContacts': suggestToContacts,
+      'profileViewHistoryEnabled': profileViewHistoryEnabled,
+      'showActivityStatus': showActivityStatus,
+      'restrictedMode': restrictedMode,
+      'showShopOnProfile': showShopOnProfile,
+      'allowDuetsDefault': allowDuetsDefault,
+      'allowStitchDefault': allowStitchDefault,
+      'allowDownloadsDefault': allowDownloadsDefault,
+      'allowRepostsDefault': allowRepostsDefault,
+      'showRepostsOnProfile': showRepostsOnProfile,
       'isPrivate': isPrivate,
       'isProfileLocked': isProfileLocked,
       'allowComments': allowComments,
@@ -222,9 +327,18 @@ class UserModel extends UserEntity {
       'fcmToken': fcmToken,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
-      'roles': roles.map((e) => e.name.toUpperCase()).toList(),
+      // Legacy Role enum only — never emit SUPER_ADMIN.
+      'roles': roles.map(_legacyRoleApiValue).toList(),
     };
   }
+
+  /// Maps dashboard roles to the coarse `Role` enum (`USER`/`MODERATOR`/`ADMIN`).
+  /// Legacy `ADMIN` maps to RBAC `admin` on the server — never `super_admin`.
+  static String _legacyRoleApiValue(UserRole role) => switch (role) {
+        UserRole.admin => 'ADMIN',
+        UserRole.moderator => 'MODERATOR',
+        UserRole.user => 'USER',
+      };
 
   static UserRole _mapRole(String role) {
     switch (role.toUpperCase().replaceAll('-', '_')) {
@@ -232,8 +346,7 @@ class UserModel extends UserEntity {
         return UserRole.admin;
       case 'SUPER_ADMIN':
       case 'SUPERADMIN':
-        // Legacy directory may label platform owners this way; treat as admin
-        // for dashboard access while RBAC resolves the precise super-admin role.
+        // Display/access only — never assign SUPER_ADMIN via legacy role APIs.
         return UserRole.admin;
       case 'MODERATOR':
         return UserRole.moderator;

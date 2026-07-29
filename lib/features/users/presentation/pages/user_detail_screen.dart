@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/user_wallet_entity.dart';
 import '../bloc/user_detail_bloc.dart';
 import '../bloc/user_detail_event.dart';
 import '../bloc/user_detail_state.dart';
@@ -256,12 +257,12 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     ),
                     SizedBox(height: metrics.sectionSpacing),
                     BlocSelector<UserDetailBloc, UserDetailState,
-                        ({UserEntity user, Map<String, dynamic>? wallet})?>(
+                        ({UserEntity user, UserWalletEntity? wallet})?>(
                       selector: (s) {
                         if (s is! UserDetailLoaded) return null;
                         return (
                           user: s.userDetail.user,
-                          wallet: s.userDetail.wallet,
+                          wallet: s.userDetail.wallet ?? s.userDetail.user.wallet,
                         );
                       },
                       builder: (context, data) {

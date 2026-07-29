@@ -6,6 +6,7 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/entities/permission_entity.dart';
 import '../bloc/rbac_bloc.dart';
 import '../bloc/rbac_event.dart';
+import '../utils/rbac_responsive.dart';
 import '../widgets/rbac_ui.dart';
 
 /// Layout buckets for the catalog rows.
@@ -105,10 +106,11 @@ class _PermissionCatalogPageState extends State<PermissionCatalogPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-    final compact = width < 700;
+    final scheme = Theme.of(context).colorScheme;
+    final metrics = RbacLayoutMetrics(
+      getRbacDeviceType(MediaQuery.sizeOf(context).width),
+    );
+    final compact = metrics.isCompact;
 
     return BlocBuilder<RbacBloc, RbacState>(
       builder: (context, state) {
@@ -120,22 +122,21 @@ class _PermissionCatalogPageState extends State<PermissionCatalogPage> {
 
         return RbacPageFrame(
           title: l10n.tOr('permissionCatalog', 'Permission catalog'),
-          subtitle: l10n.tOr(
-            'permissionCatalogSubtitle',
-            'Browse permissions available for role assignment.',
-          ),
+          metrics: metrics,
           onBack: widget.onBack,
           actions: [
             if (!isLoading && groups.isNotEmpty) ...[
-              TextButton.icon(
+              RbacHeaderAction(
+                compact: metrics.useIconActions,
+                icon: Icons.unfold_more_rounded,
+                label: l10n.tOr('expandAll', 'Expand all'),
                 onPressed: () => _expandAll(groups.keys),
-                icon: const Icon(Icons.unfold_more_rounded, size: 18),
-                label: Text(l10n.tOr('expandAll', 'Expand all')),
               ),
-              TextButton.icon(
+              RbacHeaderAction(
+                compact: metrics.useIconActions,
+                icon: Icons.unfold_less_rounded,
+                label: l10n.tOr('collapseAll', 'Collapse all'),
                 onPressed: () => _collapseAll(groups.keys),
-                icon: const Icon(Icons.unfold_less_rounded, size: 18),
-                label: Text(l10n.tOr('collapseAll', 'Collapse all')),
               ),
             ],
             IconButton.filledTonal(
@@ -143,6 +144,13 @@ class _PermissionCatalogPageState extends State<PermissionCatalogPage> {
                   context.read<RbacBloc>().add(const LoadPermissions()),
               icon: const Icon(Icons.refresh_rounded),
               tooltip: l10n.tOr('refresh', 'Refresh'),
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                minimumSize: Size(
+                  metrics.useIconActions ? 36 : 40,
+                  metrics.useIconActions ? 36 : 40,
+                ),
+              ),
             ),
           ],
           child: Column(
@@ -154,68 +162,47 @@ class _PermissionCatalogPageState extends State<PermissionCatalogPage> {
                 visible: permissions.length,
                 compact: compact,
               ),
-              const SizedBox(height: 14),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: scheme.outlineVariant),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.shadow.withValues(alpha: 0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(compact ? 12 : 14),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (value) => setState(() => _query = value),
-                    decoration: InputDecoration(
-                      hintText: l10n.tOr(
-                        'searchPermissions',
-                        'Search by label, key, group, or action…',
-                      ),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                      suffixIcon: _query.isNotEmpty
-                          ? IconButton(
-                              tooltip: l10n.tOr('clear', 'Clear'),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                setState(() => _query = '');
-                              },
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: scheme.surfaceContainerLowest,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: scheme.outlineVariant),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: scheme.outlineVariant),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: scheme.primary,
-                          width: 1.4,
-                        ),
-                      ),
-                    ),
+              SizedBox(height: metrics.sectionGap),
+              TextField(
+                controller: _searchCtrl,
+                onChanged: (value) => setState(() => _query = value),
+                decoration: InputDecoration(
+                  hintText: l10n.tOr(
+                    'searchPermissions',
+                    'Search by label, key, group, or action…',
+                  ),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          tooltip: l10n.tOr('clear', 'Clear'),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: scheme.surfaceContainerLow,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: scheme.outlineVariant),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: scheme.primary, width: 1.4),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: metrics.sectionGap),
               Expanded(child: _body(context, state, permissions, groups)),
             ],
           ),

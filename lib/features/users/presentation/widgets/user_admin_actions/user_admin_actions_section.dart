@@ -35,10 +35,20 @@ class UserAdminActionsSection extends StatelessWidget {
       buildWhen: (previous, current) =>
           previous.authContext != current.authContext,
       builder: (context, rbacState) {
-        final canResetPassword = PermissionManager.hasPermission(
-          context,
-          RbacPermissionKeys.resetUserPassword,
-        );
+        final canResetPassword = PermissionManager.canResetUserPassword(context);
+        final canBan = PermissionManager.canBanUsers(context);
+        final canUpdate = PermissionManager.canUpdateUsers(context);
+        final canAssignRoles = PermissionManager.canAssignUserLegacyRoles(context);
+
+        final gatedActions = actions.where((action) {
+          return switch (action) {
+            UserAdminActionType.ban || UserAdminActionType.unban => canBan,
+            UserAdminActionType.promote ||
+            UserAdminActionType.demote =>
+              canAssignRoles,
+            UserAdminActionType.delete => canUpdate,
+          };
+        }).toList(growable: false);
 
         return MenuAnchor(
       style: MenuStyle(
@@ -98,7 +108,7 @@ class UserAdminActionsSection extends StatelessWidget {
         );
       },
       menuChildren: [
-        for (final action in actions)
+        for (final action in gatedActions)
           _AdminActionMenuItem(
             action: action,
             user: user,

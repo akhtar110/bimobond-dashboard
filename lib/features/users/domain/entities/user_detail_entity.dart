@@ -1,12 +1,13 @@
 import 'user_entity.dart';
 import 'user_post_entity.dart';
+import 'user_wallet_entity.dart';
 
 class UserDetailEntity {
   final UserEntity user;
   final List<UserPostEntity> posts;
-  final Map<String, dynamic>? wallet;
+  final UserWalletEntity? wallet;
   final List<Map<String, dynamic>>? devices;
-  final Map<String, dynamic>? counts;
+  final UserRelationCountsEntity? counts;
 
   const UserDetailEntity({
     required this.user,
@@ -16,12 +17,26 @@ class UserDetailEntity {
     this.counts,
   });
 
+  /// Raw map view for widgets that still read `wallet['balanceCoins']`.
+  Map<String, dynamic>? get walletMap {
+    final w = wallet ?? user.wallet;
+    if (w == null) return null;
+    return {
+      'id': w.id,
+      'userId': w.userId,
+      'kind': w.kind,
+      'balanceCoins': w.balanceCoins,
+      'createdAt': w.createdAt?.toIso8601String(),
+      'updatedAt': w.updatedAt?.toIso8601String(),
+    };
+  }
+
   UserDetailEntity copyWith({
     UserEntity? user,
     List<UserPostEntity>? posts,
-    Map<String, dynamic>? wallet,
+    UserWalletEntity? wallet,
     List<Map<String, dynamic>>? devices,
-    Map<String, dynamic>? counts,
+    UserRelationCountsEntity? counts,
   }) {
     return UserDetailEntity(
       user: user ?? this.user,

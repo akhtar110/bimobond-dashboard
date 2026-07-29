@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/role_entity.dart';
 import '../utils/permission_manager.dart';
+import '../utils/rbac_responsive.dart';
 import '../widgets/access_denied_view.dart';
 import '../widgets/assign_user_roles_dialog.dart';
 import '../widgets/role_users_dialog.dart';
@@ -126,26 +127,34 @@ class _RbacRolesDashboardPageState extends State<RbacRolesDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final horizontalPad = width < 480
-        ? 8.0
-        : width < 900
-        ? 12.0
-        : 16.0;
-
     return FeatureAccessBoundary(
       canAccess: PermissionManager.canManageRoles,
       deniedMessage: context.l10n.tOr(
         'rbacInsufficientPermissionsBody',
         'You need the role management permission to open this section. Contact an administrator if you believe this is a mistake.',
       ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPad),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: _currentPage(),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1680),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final metrics = RbacLayoutMetrics(
+                getRbacDeviceType(constraints.maxWidth),
+              );
+              return Padding(
+                padding: EdgeInsetsDirectional.symmetric(
+                  horizontal: metrics.pageHorizontalPadding,
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: _currentPage(),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

@@ -45,25 +45,36 @@ class _StorySkeletonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AspectRatio(
-          aspectRatio: kPostCardThumbnailAspect,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(12),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 170;
+        final radius = compact ? 10.0 : 12.0;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AspectRatio(
+              aspectRatio: compact
+                  ? kPostCardThumbnailAspectCompact
+                  : kPostCardThumbnailAspect,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(radius),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(height: 12, width: 120, color: color),
-        const SizedBox(height: 6),
-        Container(height: 10, color: color),
-        const SizedBox(height: 6),
-        Container(height: 10, width: 180, color: color),
-      ],
+            SizedBox(height: compact ? 5 : 6),
+            Container(height: compact ? 11 : 12, width: 100, color: color),
+            const SizedBox(height: 4),
+            Container(height: 10, width: 72, color: color),
+            const SizedBox(height: 6),
+            Container(height: 16, width: 120, color: color),
+            const SizedBox(height: 6),
+            Container(height: 10, width: 64, color: color),
+          ],
+        );
+      },
     );
   }
 }

@@ -40,7 +40,7 @@ class UsersRepositoryImpl implements UsersRepository {
   Future<void> blockUser({
     required String userId,
     required String reason,
-    required DateTime until,
+    DateTime? until,
   }) {
     return remoteDataSource.blockUser(
       userId: userId,
@@ -111,6 +111,22 @@ class UsersRepositoryImpl implements UsersRepository {
   }
 
   @override
+  Future<AdminBulkUsersResultEntity> bulkUpdateUsers(
+    List<String> userIds, {
+    required Map<String, dynamic> data,
+  }) {
+    return remoteDataSource.bulkUpdateUsers(userIds, data: data);
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> bulkUpdateUserRoles(
+    List<String> userIds, {
+    required List<UserRole> roles,
+  }) {
+    return remoteDataSource.bulkUpdateUserRoles(userIds, roles: roles);
+  }
+
+  @override
   Future<void> verifyUser(String userId) {
     return remoteDataSource.verifyUser(userId);
   }
@@ -131,8 +147,8 @@ class UsersRepositoryImpl implements UsersRepository {
   }
 
   @override
-  Future<void> banUser(String userId) {
-    return remoteDataSource.banUser(userId);
+  Future<void> banUser(String userId, {String? reason, DateTime? until}) {
+    return remoteDataSource.banUser(userId, reason: reason, until: until);
   }
 
   @override
@@ -159,6 +175,14 @@ class UsersRepositoryImpl implements UsersRepository {
       userId: userId,
       newPassword: newPassword,
     );
+  }
+
+  @override
+  Future<void> updateAdminUser(
+    String userId, {
+    required Map<String, dynamic> data,
+  }) {
+    return remoteDataSource.updateAdminUser(userId, data: data);
   }
 
   @override
@@ -193,7 +217,11 @@ class UsersRepositoryImpl implements UsersRepository {
   }
 
   @override
-  Future<UserPostsResponseEntity> getUserPosts(String userId, {int page = 1, int limit = 20}) {
+  Future<UserPostsResponseEntity> getUserPosts(
+    String userId, {
+    int page = 1,
+    int limit = 20,
+  }) {
     return remoteDataSource.getUserPosts(userId, page: page, limit: limit);
   }
 

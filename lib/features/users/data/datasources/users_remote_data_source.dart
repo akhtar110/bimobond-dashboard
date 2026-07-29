@@ -25,7 +25,7 @@ abstract class UsersRemoteDataSource {
   Future<void> blockUser({
     required String userId,
     required String reason,
-    required DateTime until,
+    DateTime? until,
   });
 
   Future<void> unblockUser(String userId);
@@ -48,17 +48,29 @@ abstract class UsersRemoteDataSource {
   Future<AdminBulkUsersResultEntity> deleteUsers(List<String> userIds);
   Future<AdminBulkUsersResultEntity> promoteUsers(List<String> userIds);
   Future<AdminBulkUsersResultEntity> demoteUsers(List<String> userIds);
+  Future<AdminBulkUsersResultEntity> bulkUpdateUsers(
+    List<String> userIds, {
+    required Map<String, dynamic> data,
+  });
+  Future<AdminBulkUsersResultEntity> bulkUpdateUserRoles(
+    List<String> userIds, {
+    required List<UserRole> roles,
+  });
   Future<void> verifyUser(String userId);
   Future<void> unverifyUser(String userId);
   Future<void> suspendUser(String userId);
   Future<void> unsuspendUser(String userId);
-  Future<void> banUser(String userId);
+  Future<void> banUser(String userId, {String? reason, DateTime? until});
   Future<void> unbanUser(String userId);
   Future<void> activateUser(String userId);
   Future<void> deactivateUser(String userId);
   Future<void> resetUserPassword({
     required String userId,
     required String newPassword,
+  });
+  Future<void> updateAdminUser(
+    String userId, {
+    required Map<String, dynamic> data,
   });
   Future<void> setUserCanPost(String userId, {required bool canPost});
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
@@ -125,8 +137,6 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     );
 
     final data = response.data as Map<String, dynamic>;
-
-    print("Data Response $data");
 
     var users = (data['users'] as List).map((e) {
       final map = Map<String, dynamic>.from(e as Map);
@@ -225,12 +235,15 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   Future<void> blockUser({
     required String userId,
     required String reason,
-    required DateTime until,
+    DateTime? until,
   }) async {
-    await _dio.patch(
-      '/users/$userId/ban',
-      data: {'reason': reason, 'until': until.toIso8601String()},
-    );
+    final body = <String, dynamic>{
+      'reason': reason.trim().isEmpty ? 'Banned by admin' : reason.trim(),
+    };
+    if (until != null) {
+      body['until'] = until.toUtc().toIso8601String();
+    }
+    await _dio.patch('/users/$userId/ban', data: body);
   }
 
   @override
@@ -243,9 +256,18 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     required String userId,
     required List<UserRole> roles,
   }) async {
+    // Legacy Role enum only — never send SUPER_ADMIN.
+    final legacyRoles = roles
+        .map((e) => switch (e) {
+              UserRole.admin => 'ADMIN',
+              UserRole.moderator => 'MODERATOR',
+              UserRole.user => 'USER',
+            })
+        .toSet()
+        .toList();
     await _dio.patch(
       '/users/$userId/role',
-      data: {'roles': roles.map((e) => e.name.toUpperCase()).toList()},
+      data: {'roles': legacyRoles},
     );
   }
 
@@ -271,6 +293,8 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     required AdminBulkUserAction action,
     String? reason,
     DateTime? until,
+    Map<String, dynamic>? data,
+    List<String>? roles,
   }) async {
     if (userIds.isEmpty) {
       return AdminBulkUsersResultModel(
@@ -289,16 +313,32 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     };
 
     if (action == AdminBulkUserAction.ban) {
-      body['reason'] = reason ?? 'Bulk admin action';
+      body['reason'] = (reason == null || reason.trim().isEmpty)
+          ? 'Bulk admin action'
+          : reason.trim();
       if (until != null) {
         body['until'] = until.toUtc().toIso8601String();
       }
     }
 
+    if (action == AdminBulkUserAction.update) {
+      if (data == null || data.isEmpty) {
+        throw ArgumentError('Bulk UPDATE requires a non-empty data object');
+      }
+      body['data'] = data;
+    }
+
+    if (action == AdminBulkUserAction.updateRoles) {
+      if (roles == null || roles.isEmpty) {
+        throw ArgumentError('Bulk UPDATE_ROLES requires a non-empty roles list');
+      }
+      body['roles'] = roles;
+    }
+
     final response = await _dio.post(_bulkPath, data: body);
-    final data = response.data;
-    if (data is Map<String, dynamic>) {
-      return AdminBulkUsersResultModel.fromJson(data, action);
+    final responseData = response.data;
+    if (responseData is Map<String, dynamic>) {
+      return AdminBulkUsersResultModel.fromJson(responseData, action);
     }
 
     return _allSucceeded(userIds, action);
@@ -432,6 +472,44 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   }
 
   @override
+  Future<AdminBulkUsersResultEntity> bulkUpdateUsers(
+    List<String> userIds, {
+    required Map<String, dynamic> data,
+  }) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.update);
+    }
+    return _bulkUsers(
+      userIds: userIds,
+      action: AdminBulkUserAction.update,
+      data: data,
+    );
+  }
+
+  @override
+  Future<AdminBulkUsersResultEntity> bulkUpdateUserRoles(
+    List<String> userIds, {
+    required List<UserRole> roles,
+  }) async {
+    if (userIds.isEmpty) {
+      return _allSucceeded(userIds, AdminBulkUserAction.updateRoles);
+    }
+    final legacyRoles = roles
+        .map((e) => switch (e) {
+              UserRole.admin => 'ADMIN',
+              UserRole.moderator => 'MODERATOR',
+              UserRole.user => 'USER',
+            })
+        .toSet()
+        .toList();
+    return _bulkUsers(
+      userIds: userIds,
+      action: AdminBulkUserAction.updateRoles,
+      roles: legacyRoles,
+    );
+  }
+
+  @override
   Future<void> verifyUser(String userId) async {
     await _dio.patch('/users/$userId/verify');
   }
@@ -456,11 +534,15 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   }
 
   @override
-  Future<void> banUser(String userId) async {
+  Future<void> banUser(
+    String userId, {
+    String? reason,
+    DateTime? until,
+  }) async {
     await blockUser(
       userId: userId,
-      reason: 'Banned by admin',
-      until: DateTime.now().add(const Duration(days: 3650)),
+      reason: reason ?? 'Banned by admin',
+      until: until,
     );
   }
 
@@ -479,7 +561,6 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     await blockUser(
       userId: userId,
       reason: 'Deactivated by admin',
-      until: DateTime.now().add(const Duration(days: 3650)),
     );
   }
 
@@ -495,11 +576,17 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   }
 
   @override
+  Future<void> updateAdminUser(
+    String userId, {
+    required Map<String, dynamic> data,
+  }) async {
+    if (data.isEmpty) return;
+    await _dio.patch('/users/admin/$userId', data: data);
+  }
+
+  @override
   Future<void> setUserCanPost(String userId, {required bool canPost}) async {
-    await _dio.patch(
-      '/users/$userId/admin/settings',
-      data: {'canPost': canPost},
-    );
+    await updateAdminUser(userId, data: {'canPost': canPost});
   }
 
   @override
@@ -507,18 +594,12 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     String userId, {
     required bool allow,
   }) async {
-    await _dio.patch(
-      '/users/$userId/admin/settings',
-      data: {'allowDirectMsgs': allow},
-    );
+    await updateAdminUser(userId, data: {'allowDirectMsgs': allow});
   }
 
   @override
   Future<void> setUserIsPrivate(String userId, {required bool isPrivate}) async {
-    await _dio.patch(
-      '/users/$userId/admin/settings',
-      data: {'isPrivate': isPrivate},
-    );
+    await updateAdminUser(userId, data: {'isPrivate': isPrivate});
   }
 
   @override
@@ -526,8 +607,8 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     String userId, {
     required MessagePermission permission,
   }) async {
-    await _dio.patch(
-      '/users/$userId/admin/settings',
+    await updateAdminUser(
+      userId,
       data: {'messagePermission': permission.apiValue},
     );
   }
@@ -535,8 +616,6 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
   @override
   Future<UserDetailModel> getUserById(String userId) async {
     final response = await _dio.get('/users/$userId');
-    print('response data for user id $userId ${response.data}');
-    
     return UserDetailModel.fromJson(response.data as Map<String, dynamic>);
   }
 
@@ -547,8 +626,6 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
       'page': page,
       'limit': limit,
     });
-    print('posts response data for user id $userId ${response.data}');
-    
     return UserPostsResponseModel.fromJson(response.data);
   }
 

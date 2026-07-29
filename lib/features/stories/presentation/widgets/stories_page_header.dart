@@ -84,34 +84,36 @@ class _StoriesHeaderTitle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Flexible(
-          child: Text(
-            StoriesAdminL10n.pageTitle(context),
-            style: titleStyle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+        Text(
+          StoriesAdminL10n.pageTitle(context),
+          style: titleStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(width: 8),
         BlocSelector<StoriesBloc, StoriesState, int?>(
           selector: (state) => switch (state) {
             StoriesLoaded(:final total) => total,
+            // Keep count chrome stable on empty search/filter results — never
+            // fall back to the long page subtitle (it pushes filter fields).
+            StoriesEmpty() => 0,
             _ => null,
           },
           builder: (context, total) {
-            final label = total != null
-                ? context.l10n
-                    .tOr('storiesTotalCount', '$total stories')
-                    .replaceAll('{count}', '$total')
-                : StoriesAdminL10n.pageSubtitle(context);
-            return Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                height: 1.1,
-                fontWeight: FontWeight.w500,
+            if (total == null) return const SizedBox.shrink();
+            final label = context.l10n
+                .tOr('storiesTotalCount', '$total stories')
+                .replaceAll('{count}', '$total');
+            return Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  height: 1.1,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             );
           },

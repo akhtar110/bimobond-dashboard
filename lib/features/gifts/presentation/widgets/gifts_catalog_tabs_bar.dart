@@ -416,7 +416,7 @@ class _GroupTabChipState extends State<_GroupTabChip> {
                 ),
                 PopupMenuItem(
                   value: 'viewDetails',
-                  child: Text(l10n.tOr('giftGroupViewDetails', 'View details')),
+                  child: Text(l10n.tOr('giftGroupViewDetails', 'Manage Gifts')),
                 ),
                 const PopupMenuDivider(),
                 PopupMenuItem(

@@ -72,10 +72,7 @@ class _AnalyticsViewState extends State<_AnalyticsView> {
       width: double.infinity,
       height: double.infinity,
       color: scheme.surfaceContainerLowest,
-      child: const Align(
-        alignment: Alignment.topCenter,
-        child: AnalyticsDashboardBody(),
-      ),
+      child: const AnalyticsDashboardBody(),
     );
   }
 }

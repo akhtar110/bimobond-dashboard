@@ -290,7 +290,7 @@ class GiftAnimationUploadSection extends StatelessWidget {
       children: [
         // Live Preview Frame
         SizedBox(
-          height: 150,
+          height: 240,
           child: GiftAnimationPreview(
             key: ValueKey('animation-upload-preview-${animationUrl ?? animationName}'),
             compact: true,

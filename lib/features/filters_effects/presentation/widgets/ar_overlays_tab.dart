@@ -157,36 +157,7 @@ class _ArOverlaysTabState extends State<ArOverlaysTab> {
     final scheme = Theme.of(context).colorScheme;
     final canManage = PermissionManager.canManageCameraStudio(context);
 
-    return BlocConsumer<ArOverlaysBloc, ArOverlaysState>(
-      listenWhen: (p, c) =>
-          c is ArOverlaysLoaded &&
-          (c.successMessage != null || c.errorMessage != null) &&
-          (p is! ArOverlaysLoaded ||
-              p.successMessage != c.successMessage ||
-              p.errorMessage != c.errorMessage),
-      listener: (context, state) {
-        if (state is! ArOverlaysLoaded) return;
-        final isError = state.errorMessage != null;
-        final msg = state.errorMessage ?? state.successMessage ?? '';
-        if (msg.isEmpty) return;
-
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                msg,
-                style: TextStyle(
-                  color: isError ? scheme.onError : Colors.white,
-                ),
-              ),
-              backgroundColor:
-                  isError ? scheme.error : const Color(0xFF2E7D32),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        context.read<ArOverlaysBloc>().add(const ClearArOverlaysMessageEvent());
-      },
+    return BlocBuilder<ArOverlaysBloc, ArOverlaysState>(
       builder: (context, state) {
         if (state is ArOverlaysError) {
           return Center(

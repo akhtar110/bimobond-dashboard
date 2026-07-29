@@ -17,7 +17,7 @@ abstract class UsersRepository {
   Future<void> blockUser({
     required String userId,
     required String reason,
-    required DateTime until,
+    DateTime? until,
   });
 
   Future<void> unblockUser(String userId);
@@ -33,13 +33,17 @@ abstract class UsersRepository {
   Future<void> unverifyUser(String userId);
   Future<void> suspendUser(String userId);
   Future<void> unsuspendUser(String userId);
-  Future<void> banUser(String userId);
+  Future<void> banUser(String userId, {String? reason, DateTime? until});
   Future<void> unbanUser(String userId);
   Future<void> activateUser(String userId);
   Future<void> deactivateUser(String userId);
   Future<void> resetUserPassword({
     required String userId,
     required String newPassword,
+  });
+  Future<void> updateAdminUser(
+    String userId, {
+    required Map<String, dynamic> data,
   });
   Future<void> setUserCanPost(String userId, {required bool canPost});
   Future<void> setUserAllowDirectMsgs(String userId, {required bool allow});
@@ -58,6 +62,14 @@ abstract class UsersRepository {
   Future<AdminBulkUsersResultEntity> deleteUsers(List<String> userIds);
   Future<AdminBulkUsersResultEntity> promoteUsers(List<String> userIds);
   Future<AdminBulkUsersResultEntity> demoteUsers(List<String> userIds);
+  Future<AdminBulkUsersResultEntity> bulkUpdateUsers(
+    List<String> userIds, {
+    required Map<String, dynamic> data,
+  });
+  Future<AdminBulkUsersResultEntity> bulkUpdateUserRoles(
+    List<String> userIds, {
+    required List<UserRole> roles,
+  });
   Future<UserDetailEntity> getUserById(String userId);
   Future<UserPostsResponseEntity> getUserPosts(String userId, {int page = 1, int limit = 20});
   Future<UserFollowListPageEntity> getUserFollowList({
