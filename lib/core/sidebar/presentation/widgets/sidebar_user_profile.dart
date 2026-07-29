@@ -85,6 +85,7 @@ class _SidebarUserProfileState extends State<SidebarUserProfile> {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        softWrap: false,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -94,6 +95,7 @@ class _SidebarUserProfileState extends State<SidebarUserProfile> {
                         role,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        softWrap: false,
                         style: TextStyle(
                           fontSize: 11,
                           color: scheme.onSurfaceVariant,
@@ -109,6 +111,10 @@ class _SidebarUserProfileState extends State<SidebarUserProfile> {
                     color: scheme.onSurfaceVariant,
                   ),
                   padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                   onOpened: () => setState(() => _menuOpen = true),
                   onCanceled: () => setState(() => _menuOpen = false),
                   onSelected: (value) {

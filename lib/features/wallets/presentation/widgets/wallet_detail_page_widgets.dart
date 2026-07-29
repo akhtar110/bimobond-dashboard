@@ -37,33 +37,43 @@ class WalletDetailSummaryCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              WalletUserAvatar(user: user, size: metrics.isMobile ? 44 : 52),
-              SizedBox(width: metrics.isMobile ? 10 : 14),
+              WalletUserAvatar(user: user, size: metrics.isMobile ? 40 : 46),
+              SizedBox(width: metrics.isMobile ? 8 : 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       user?.displayName ?? detail.userId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
+                            fontSize: metrics.isMobile ? 15 : 16,
+                            height: 1.2,
                           ),
                     ),
                     if (user != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         '@${user.username}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
+                              fontSize: metrics.analyticsLabelFontSize,
                             ),
                       ),
                     ],
                     if (user?.email != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         user!.email!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
+                              fontSize: metrics.sectionSubtitleFontSize,
                             ),
                       ),
                     ],
@@ -78,24 +88,27 @@ class WalletDetailSummaryCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
+                          fontSize: metrics.analyticsLabelFontSize,
                         ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     CoinFormat.coins(detail.balanceCoins),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: scheme.primary,
+                          fontSize: metrics.isMobile ? 18 : 20,
+                          height: 1.1,
                         ),
                   ),
                 ],
               ),
             ],
           ),
-          SizedBox(height: metrics.sectionGap + 4),
+          SizedBox(height: metrics.sectionGap),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: metrics.statsGridSpacing,
+            runSpacing: metrics.statsGridSpacing,
             children: [
               _SummaryChip(
                 icon: Icons.receipt_long_outlined,

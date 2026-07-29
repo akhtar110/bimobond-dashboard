@@ -197,32 +197,43 @@ class _GiftsPageViewState extends State<_GiftsPageView> {
                           ),
                         );
                     }
+                    ctx.read<GiftsBloc>().add(ClearGiftsFeedbackEvent());
                   },
                 ),
                 BlocListener<GiftGroupsBloc, GiftGroupsState>(
                   listenWhen: (previous, current) =>
                       current is GiftGroupsLoaded &&
-                      current.feedbackMessage != null,
+                      current.feedbackMessage != null &&
+                      (previous is! GiftGroupsLoaded ||
+                          previous.feedbackMessage != current.feedbackMessage),
                   listener: (context, state) {
                     if (state is! GiftGroupsLoaded ||
                         state.feedbackMessage == null) {
                       return;
                     }
                     final l10n = context.l10n;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          l10n.tOr(
-                            state.feedbackMessage!,
-                            state.feedbackMessage!,
-                          ),
+                    final key = state.feedbackMessage!;
+                    final fallback = switch (key) {
+                      'giftGroupCreatedSuccess' => 'Gift group created successfully',
+                      'giftGroupUpdatedSuccess' => 'Gift group updated successfully',
+                      'giftGroupDeletedSuccess' => 'Gift group deleted successfully',
+                      'giftGroupReorderedSuccess' =>
+                        'Gift groups reordered successfully',
+                      'giftGroupGiftsUpdatedSuccess' =>
+                        'Group gifts updated successfully',
+                      _ => key,
+                    };
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.tOr(key, fallback)),
+                          backgroundColor: state.feedbackIsError
+                              ? scheme.error
+                              : scheme.primary,
+                          behavior: SnackBarBehavior.floating,
                         ),
-                        backgroundColor: state.feedbackIsError
-                            ? scheme.error
-                            : null,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                      );
                     context.read<GiftGroupsBloc>().add(
                       const ClearGiftGroupsFeedbackEvent(),
                     );

@@ -352,9 +352,9 @@ class _WalletsTopNav extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           metrics.pageHorizontalPadding,
-          metrics.isMobile ? 8 : 12,
+          metrics.isMobile ? 6 : 8,
           metrics.pageHorizontalPadding,
-          metrics.isMobile ? 8 : 10,
+          metrics.isMobile ? 6 : 8,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -365,11 +365,13 @@ class _WalletsTopNav extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: scheme.onSurface,
+                    fontSize: metrics.isMobile ? 15 : 16,
+                    height: 1.15,
                   ),
             ),
-            SizedBox(height: metrics.isMobile ? 8 : 10),
+            SizedBox(height: metrics.isMobile ? 6 : 8),
             SizedBox(
-              height: metrics.isMobile ? 36 : 40,
+              height: metrics.isMobile ? 34 : 38,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: items.length,

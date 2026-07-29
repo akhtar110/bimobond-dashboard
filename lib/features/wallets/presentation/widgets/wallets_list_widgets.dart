@@ -24,35 +24,10 @@ class WalletsListHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
-    final l10n = context.l10n;
 
-    final scheme = Theme.of(context).colorScheme;
-    final compact = metrics.isMobile;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          walletL10nOr(context, 'walletTitleWalletsList', 'Wallets'),
-          style: (compact
-                  ? Theme.of(context).textTheme.titleLarge
-                  : Theme.of(context).textTheme.headlineSmall)
-              ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        SizedBox(height: metrics.toolbarFilterGap),
-        Text(
-          walletL10nOr(context,
-            'walletSubtitleWalletsList',
-            'Search users and filter by balance. Tap a row to open wallet details.',
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-        ),
-      ],
+    return WalletsPageHeader(
+      metrics: metrics,
+      title: walletL10nOr(context, 'walletTitleWalletsList', 'Wallets'),
     );
   }
 }

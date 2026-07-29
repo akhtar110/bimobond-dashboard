@@ -52,10 +52,6 @@ class WithdrawalsPage extends StatelessWidget {
               WalletsPageHeader(
                 metrics: metrics,
                 title: walletL10nOr(context, 'walletTitleWithdrawals', 'Withdrawals'),
-                subtitle: walletL10nOr(context,
-                  'walletSubtitleWithdrawals',
-                  'Read-only — approve/reject API not available yet.',
-                ),
               ),
               SizedBox(height: metrics.sectionGap),
               WithdrawalsToolbar(
