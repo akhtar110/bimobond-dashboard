@@ -14,6 +14,7 @@ class GiftAudioPreview extends StatefulWidget {
     this.fileName,
     this.onClear,
     this.compact = true,
+    this.autoPlay = false,
   });
 
   final String? networkUrl;
@@ -21,6 +22,7 @@ class GiftAudioPreview extends StatefulWidget {
   final String? fileName;
   final VoidCallback? onClear;
   final bool compact;
+  final bool autoPlay;
 
   @override
   State<GiftAudioPreview> createState() => _GiftAudioPreviewState();
@@ -67,7 +69,8 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
   void didUpdateWidget(covariant GiftAudioPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.networkUrl != widget.networkUrl ||
-        oldWidget.bytes != widget.bytes) {
+        oldWidget.bytes != widget.bytes ||
+        oldWidget.autoPlay != widget.autoPlay) {
       _loadSource();
     }
   }
@@ -99,15 +102,16 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
       final bytes = widget.bytes;
       if (bytes != null && bytes.isNotEmpty) {
         await _player.setAudioSource(
-          AudioSource.uri(
-            Uri.dataFromBytes(bytes, mimeType: 'audio/mpeg'),
-          ),
+          AudioSource.uri(Uri.dataFromBytes(bytes, mimeType: 'audio/mpeg')),
         );
       } else {
         await _player.setUrl(widget.networkUrl!.trim());
       }
       if (!mounted) return;
       setState(() => _loading = false);
+      if (widget.autoPlay) {
+        await _player.play();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -151,8 +155,11 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
           padding: EdgeInsets.all(pad),
           child: Row(
             children: [
-              Icon(Icons.audiotrack_rounded,
-                  size: 18, color: scheme.onSurfaceVariant),
+              Icon(
+                Icons.audiotrack_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -177,9 +184,7 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
       decoration: BoxDecoration(
         color: scheme.secondaryContainer.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: scheme.secondary.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: scheme.secondary.withValues(alpha: 0.35)),
       ),
       child: Padding(
         padding: EdgeInsets.all(pad),
@@ -189,7 +194,11 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
           children: [
             Row(
               children: [
-                Icon(Icons.audiotrack_rounded, size: 16, color: scheme.secondary),
+                Icon(
+                  Icons.audiotrack_rounded,
+                  size: 16,
+                  color: scheme.secondary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -210,8 +219,11 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
                       await _player.stop();
                       widget.onClear!();
                     },
-                    icon: Icon(Icons.close_rounded,
-                        size: 18, color: scheme.error),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: scheme.error,
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
               ],
@@ -249,9 +261,8 @@ class _GiftAudioPreviewState extends State<GiftAudioPreview> {
                       max: maxMs,
                       onChanged: _loading || _duration == Duration.zero
                           ? null
-                          : (v) => _player.seek(
-                                Duration(milliseconds: v.round()),
-                              ),
+                          : (v) =>
+                                _player.seek(Duration(milliseconds: v.round())),
                     ),
                   ),
                   Text(

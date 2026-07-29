@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/localization/localization.dart';
+import 'investigation_theme.dart';
 
 class InvestigationHeader extends StatelessWidget {
-  const InvestigationHeader({
-    super.key,
-    required this.onBack,
-  });
+  const InvestigationHeader({super.key, required this.onBack});
 
   final VoidCallback onBack;
 
@@ -15,13 +13,21 @@ class InvestigationHeader extends StatelessWidget {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+      padding: EdgeInsets.fromLTRB(
+        width < InvestigationTheme.compact ? 12 : (width < InvestigationTheme.tablet ? 16 : 24),
+        12,
+        width < InvestigationTheme.compact ? 12 : (width < InvestigationTheme.tablet ? 16 : 24),
+        16,
+      ),
       decoration: BoxDecoration(
         color: scheme.surface,
         border: Border(
-          bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          bottom: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
         ),
       ),
       child: SafeArea(
@@ -37,6 +43,8 @@ class InvestigationHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 l10n.t('postManagementDetails'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,

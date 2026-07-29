@@ -35,7 +35,8 @@ class LoginView extends StatefulWidget {
   State<LoginView> createState() => _LoginViewState();
 }
 
-class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMixin {
+class _LoginViewState extends State<LoginView>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -59,7 +60,7 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
@@ -67,12 +68,13 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
       ),
     );
 
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+          ),
+        );
 
     _animationController.forward();
     listenWindowFocus(_onWindowFocus);
@@ -137,9 +139,9 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
           final message = state.message == LoginBloc.googleSignInCancelledKey
               ? context.l10n.t('googleSignInCancelled')
               : state.message;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
         }
       },
       child: Stack(
@@ -161,10 +163,7 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
                   child: Align(
                     alignment: AlignmentDirectional.topEnd,
                     child: Padding(
-                      padding: EdgeInsetsDirectional.only(
-                        top: 12,
-                        end: 16,
-                      ),
+                      padding: EdgeInsetsDirectional.only(top: 12, end: 16),
                       child: LoginAppearanceControls(),
                     ),
                   ),
@@ -181,7 +180,10 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
     );
   }
 
-  Widget _buildDesktopLayout(BuildContext context, _LoginLayoutMetrics metrics) {
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    _LoginLayoutMetrics metrics,
+  ) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
     return Row(
@@ -226,11 +228,12 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
                               Expanded(
                                 child: Text(
                                   l10n.t('bimoBondAdmin'),
-                                  style: theme.textTheme.headlineMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: metrics.brandTitleSize,
-                                  ),
+                                  style: theme.textTheme.headlineMedium
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: metrics.brandTitleSize,
+                                      ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -247,21 +250,25 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
                                   children: [
                                     Text(
                                       l10n.t('loginHeroTitle'),
-                                      style: theme.textTheme.displayMedium?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        height: 1.1,
-                                        fontSize: metrics.heroTitleSize,
-                                      ),
+                                      style: theme.textTheme.displayMedium
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            height: 1.1,
+                                            fontSize: metrics.heroTitleSize,
+                                          ),
                                     ),
                                     SizedBox(height: metrics.sectionGap / 2),
                                     Text(
                                       l10n.t('loginHeroSubtitle'),
-                                      style: theme.textTheme.titleLarge?.copyWith(
-                                        color: Colors.white.withValues(alpha: 0.9),
-                                        fontWeight: FontWeight.w400,
-                                        fontSize: metrics.heroSubtitleSize,
-                                      ),
+                                      style: theme.textTheme.titleLarge
+                                          ?.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.9,
+                                            ),
+                                            fontWeight: FontWeight.w400,
+                                            fontSize: metrics.heroSubtitleSize,
+                                          ),
                                     ),
                                     SizedBox(height: metrics.sectionGap),
                                   ],
@@ -463,15 +470,14 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
               return null;
             },
           ),
-     
+
           SizedBox(height: metrics.fieldGap),
-          
+
           SizedBox(
             height: metrics.buttonHeight,
             child: BlocBuilder<LoginBloc, LoginState>(
               builder: (context, state) {
-                final isLoading =
-                    state is LoginLoading && !state.isGoogle;
+                final isLoading = state is LoginLoading && !state.isGoogle;
                 return FilledButton(
                   onPressed: isLoading || _needsApiSetup
                       ? null
@@ -479,11 +485,11 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
                           final form = _formKey.currentState;
                           if (form == null || !form.validate()) return;
                           context.read<LoginBloc>().add(
-                                LoginSubmitted(
-                                  _emailController.text.trim(),
-                                  _passwordController.text.trim(),
-                                ),
-                              );
+                            LoginSubmitted(
+                              _emailController.text.trim(),
+                              _passwordController.text.trim(),
+                            ),
+                          );
                         },
                   child: isLoading
                       ? const SizedBox(
@@ -505,9 +511,9 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
               },
             ),
           ),
-          
+
           SizedBox(height: metrics.sectionGap),
-          
+
           Row(
             children: [
               Expanded(child: Divider(color: theme.dividerTheme.color)),
@@ -531,16 +537,15 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
               Expanded(child: Divider(color: theme.dividerTheme.color)),
             ],
           ),
-          
+
           SizedBox(height: metrics.sectionGap),
-          
+
           SizedBox(
             height: metrics.buttonHeight,
             width: double.infinity,
             child: BlocBuilder<LoginBloc, LoginState>(
               builder: (context, state) {
-                final isGoogleLoading =
-                    state is LoginLoading && state.isGoogle;
+                final isGoogleLoading = state is LoginLoading && state.isGoogle;
                 final isDisabled = _needsApiSetup || state is LoginLoading;
 
                 return OutlinedButton(
@@ -555,9 +560,9 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
                   onPressed: isDisabled
                       ? null
                       : () {
-                          context
-                              .read<LoginBloc>()
-                              .add(LoginWithGooglePressed());
+                          context.read<LoginBloc>().add(
+                            LoginWithGooglePressed(),
+                          );
                         },
                   child: Padding(
                     padding: EdgeInsets.symmetric(
@@ -613,7 +618,9 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
       decoration: BoxDecoration(
         color: theme.colorScheme.errorContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: theme.colorScheme.error.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -692,7 +699,9 @@ class _LoginViewState extends State<LoginView> with SingleTickerProviderStateMix
     if (lower == 'localhost' || lower == '127.0.0.1' || lower == '0.0.0.0') {
       return true;
     }
-    return RegExp(r'^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)').hasMatch(lower);
+    return RegExp(
+      r'^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)',
+    ).hasMatch(lower);
   }
 }
 
@@ -711,11 +720,8 @@ class _GoogleSignInIcon extends StatelessWidget {
       height: 22,
       fit: BoxFit.contain,
       gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) => Icon(
-        Icons.g_mobiledata,
-        size: 28,
-        color: color,
-      ),
+      errorBuilder: (context, error, stackTrace) =>
+          Icon(Icons.g_mobiledata, size: 28, color: color),
     );
   }
 }
@@ -754,7 +760,11 @@ class _AccessDeniedOverlay extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_person_rounded, color: scheme.error, size: 40),
+                    Icon(
+                      Icons.lock_person_rounded,
+                      color: scheme.error,
+                      size: 40,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       l10n.t('accessDeniedTitle'),
@@ -823,8 +833,7 @@ class _LoginLayoutMetrics {
       isCompactWidth ? 16 : (isMobileWidth ? 20 : 48);
   double get verticalPadding => isShortHeight ? 16 : (isMobileWidth ? 24 : 48);
   double get panelPadding => isShortHeight ? 24 : (isMobileWidth ? 32 : 48);
-  double get formMaxWidth =>
-      (width - horizontalPadding * 2).clamp(260, 420);
+  double get formMaxWidth => (width - horizontalPadding * 2).clamp(260, 420);
   double get appearanceControlsTopPadding => isShortHeight ? 8 : 12;
   double get mobileTopPadding =>
       viewPadding.top + appearanceControlsTopPadding + 52;
