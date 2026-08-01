@@ -51,6 +51,7 @@ import '../../features/rbac/presentation/bloc/rbac_event.dart';
 import '../../features/rbac/presentation/pages/rbac_dashboard_pages.dart';
 import '../../features/rbac/presentation/utils/permission_manager.dart';
 import '../../features/rbac/presentation/widgets/access_denied_view.dart';
+import '../../features/security_logs/presentation/pages/logs_page.dart';
 import '../../features/auction_reports/presentation/bloc/auction_report_detail_bloc.dart';
 import '../../features/auction_reports/presentation/pages/auction_report_detail_page.dart';
 import '../../features/user_reports/presentation/bloc/user_reports_bloc.dart';
@@ -292,7 +293,7 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const _tabCount = 19;
+  static const _tabCount = 20;
   int _index = 0;
 
   List<UserRole> _roles(BuildContext context) {
@@ -301,10 +302,17 @@ class _HomeShellState extends State<HomeShell> {
     return const [];
   }
 
-  bool _canAccessSecurity(List<UserRole> roles, Set<String> permissions) {
+  bool _canAccessRoles(List<UserRole> roles, Set<String> permissions) {
     // Prefer fine-grained RBAC; keep legacy admin fallback so the Security
     // menu still appears when /rbac/me has not loaded or is unavailable.
     if (permissions.contains(RbacPermissionKeys.manageRoles)) return true;
+    return roles.contains(UserRole.admin);
+  }
+
+  bool _canAccessLogs(List<UserRole> roles, Set<String> permissions) {
+    if (permissions.contains(RbacPermissionKeys.activityAdminRead)) {
+      return true;
+    }
     return roles.contains(UserRole.admin);
   }
 
@@ -340,7 +348,10 @@ class _HomeShellState extends State<HomeShell> {
       return _canAccessSounds(roles, permissions);
     }
     if (tabIndex == 18) {
-      return _canAccessSecurity(roles, permissions);
+      return _canAccessRoles(roles, permissions);
+    }
+    if (tabIndex == 19) {
+      return _canAccessLogs(roles, permissions);
     }
     if (tabIndex == 2) {
       return permissions.contains(RbacPermissionKeys.readUsers) ||
@@ -466,6 +477,10 @@ class _HomeShellChrome extends StatelessWidget {
         return permissions.contains(RbacPermissionKeys.manageRoles) ||
             roles.contains(UserRole.admin);
       }
+      if (tabIndex == 19) {
+        return permissions.contains(RbacPermissionKeys.activityAdminRead) ||
+            roles.contains(UserRole.admin);
+      }
       if (tabIndex == 2) {
         return permissions.contains(RbacPermissionKeys.readUsers) ||
             roles.contains(UserRole.admin);
@@ -577,6 +592,11 @@ class _HomeShellChrome extends StatelessWidget {
           selectedIcon: Icons.admin_panel_settings,
           label: l10n.tOr('rbacRoles', 'Roles'),
         ),
+        DashboardNavItem(
+          icon: Icons.receipt_long_outlined,
+          selectedIcon: Icons.receipt_long,
+          label: l10n.tOr('securityLogs', 'Logs'),
+        ),
       ],
     );
   }
@@ -592,7 +612,7 @@ class _DashboardTabStack extends StatefulWidget {
 }
 
 class _DashboardTabStackState extends State<_DashboardTabStack> {
-  static const _tabCount = 19;
+  static const _tabCount = 20;
   final List<Widget?> _tabCache = List<Widget?>.filled(_tabCount, null);
   Locale? _cachedLocale;
   Brightness? _cachedBrightness;
@@ -678,6 +698,7 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
       18 => RbacRolesDashboardPage(
         key: ValueKey('dashboard_tab_rbac_roles_$suffix'),
       ),
+      19 => LogsPage(key: ValueKey('dashboard_tab_security_logs_$suffix')),
       _ => SizedBox.shrink(key: ValueKey('dashboard_tab_empty_$suffix')),
     };
     return DashboardTabAccessBoundary(tabIndex: index, child: page);
