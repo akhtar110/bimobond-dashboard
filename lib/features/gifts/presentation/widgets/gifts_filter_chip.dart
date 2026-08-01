@@ -67,16 +67,15 @@ class _GiftsFilterChoiceChipState extends State<GiftsFilterChoiceChip> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                      color: selected ? scheme.onPrimary : scheme.onSurface,
-                    ),
+                Text(
+                  widget.label,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: selected ? scheme.onPrimary : scheme.onSurface,
                   ),
                 ),
                 if (widget.trailing != null) ...[

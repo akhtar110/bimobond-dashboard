@@ -247,6 +247,10 @@ abstract final class PermissionManager {
       return permissions.contains(RbacPermissionKeys.manageRoles) ||
           roles.contains(UserRole.admin);
     }
+    if (tabIndex == 19) {
+      return permissions.contains(RbacPermissionKeys.activityAdminRead) ||
+          roles.contains(UserRole.admin);
+    }
     if (tabIndex == 2) {
       return permissions.contains(RbacPermissionKeys.readUsers) ||
           roles.contains(UserRole.admin);

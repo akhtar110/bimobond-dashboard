@@ -112,6 +112,12 @@ import 'features/user_history/domain/repositories/user_history_repository.dart';
 import 'features/user_history/domain/usecases/get_user_history_usecase.dart';
 import 'features/user_history/presentation/bloc/user_history_bloc.dart';
 
+import 'features/security_logs/data/datasources/logs_remote_datasource.dart';
+import 'features/security_logs/data/repositories/logs_repository_impl.dart';
+import 'features/security_logs/domain/repositories/logs_repository.dart';
+import 'features/security_logs/domain/usecases/get_logs_usecase.dart';
+import 'features/security_logs/presentation/bloc/logs_bloc.dart';
+
 import 'features/search_management/data/datasources/search_management_remote_datasource.dart';
 import 'features/search_management/data/repositories/search_management_repository_impl.dart';
 import 'features/search_management/domain/repositories/search_management_repository.dart';
@@ -880,6 +886,19 @@ Future<void> init() async {
   sl.registerFactory(
     () => UserHistoryBloc(getUserHistory: sl<GetUserHistoryUseCase>()),
   );
+
+  // =========================================================
+  // SECURITY LOGS MODULE (GET /user-history/admin/logs)
+  // =========================================================
+
+  sl.registerLazySingleton<LogsRemoteDataSource>(
+    () => LogsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<LogsRepository>(
+    () => LogsRepositoryImpl(sl<LogsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(() => GetLogsUseCase(sl<LogsRepository>()));
+  sl.registerFactory(() => LogsBloc(getLogs: sl<GetLogsUseCase>()));
 
   // =========================================================
   // USER INTERESTS MODULE
