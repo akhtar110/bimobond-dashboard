@@ -16,7 +16,6 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../bloc/persistent_bloc_provider.dart';
 import '../localization/localization.dart';
-import '../settings/app_settings_wrapper.dart';
 import '../routing/admin_detail_page_route.dart';
 import '../sidebar/bloc/sidebar_bloc.dart';
 import '../widgets/web_dashboard_layout.dart';
@@ -306,31 +305,31 @@ class _HomeShellState extends State<HomeShell> {
     // Prefer fine-grained RBAC; keep legacy admin fallback so the Security
     // menu still appears when /rbac/me has not loaded or is unavailable.
     if (permissions.contains(RbacPermissionKeys.manageRoles)) return true;
-    return roles.contains(UserRole.admin);
+    return roles.includesAdmin;
   }
 
   bool _canAccessLogs(List<UserRole> roles, Set<String> permissions) {
     if (permissions.contains(RbacPermissionKeys.activityAdminRead)) {
       return true;
     }
-    return roles.contains(UserRole.admin);
+    return roles.includesAdmin;
   }
 
   bool _canAccessCameraStudio(List<UserRole> roles, Set<String> permissions) {
     if (permissions.contains(RbacPermissionKeys.manageCameraStudio)) {
       return true;
     }
-    return roles.contains(UserRole.admin);
+    return roles.includesAdmin;
   }
 
   bool _canAccessStories(List<UserRole> roles, Set<String> permissions) {
     if (permissions.contains(RbacPermissionKeys.readStories)) return true;
-    return roles.contains(UserRole.admin);
+    return roles.includesAdmin;
   }
 
   bool _canAccessSounds(List<UserRole> roles, Set<String> permissions) {
     if (permissions.contains(RbacPermissionKeys.manageSounds)) return true;
-    return roles.contains(UserRole.admin);
+    return roles.includesAdmin;
   }
 
   bool _tabVisible(
@@ -355,7 +354,7 @@ class _HomeShellState extends State<HomeShell> {
     }
     if (tabIndex == 2) {
       return permissions.contains(RbacPermissionKeys.readUsers) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     return canAccessDashboardTab(tabIndex, roles);
   }
@@ -463,27 +462,27 @@ class _HomeShellChrome extends StatelessWidget {
     bool tabVisible(int tabIndex) {
       if (tabIndex == 16) {
         return permissions.contains(RbacPermissionKeys.manageCameraStudio) ||
-            roles.contains(UserRole.admin);
+            roles.includesAdmin;
       }
       if (tabIndex == 6) {
         return permissions.contains(RbacPermissionKeys.readStories) ||
-            roles.contains(UserRole.admin);
+            roles.includesAdmin;
       }
       if (tabIndex == 13) {
         return permissions.contains(RbacPermissionKeys.manageSounds) ||
-            roles.contains(UserRole.admin);
+            roles.includesAdmin;
       }
       if (tabIndex == 18) {
         return permissions.contains(RbacPermissionKeys.manageRoles) ||
-            roles.contains(UserRole.admin);
+            roles.includesAdmin;
       }
       if (tabIndex == 19) {
         return permissions.contains(RbacPermissionKeys.activityAdminRead) ||
-            roles.contains(UserRole.admin);
+            roles.includesAdmin;
       }
       if (tabIndex == 2) {
         return permissions.contains(RbacPermissionKeys.readUsers) ||
-            roles.contains(UserRole.admin);
+            roles.includesAdmin;
       }
       return canAccessDashboardTab(tabIndex, roles);
     }
@@ -614,43 +613,10 @@ class _DashboardTabStack extends StatefulWidget {
 class _DashboardTabStackState extends State<_DashboardTabStack> {
   static const _tabCount = 20;
   final List<Widget?> _tabCache = List<Widget?>.filled(_tabCount, null);
-  Locale? _cachedLocale;
-  Brightness? _cachedBrightness;
-
-  void _invalidateTabCacheIfNeeded() {
-    final locale = Localizations.localeOf(context);
-    final brightness = Theme.of(context).brightness;
-    final localeChanged = _cachedLocale != null && _cachedLocale != locale;
-    final themeChanged =
-        _cachedBrightness != null && _cachedBrightness != brightness;
-
-    if (localeChanged || themeChanged) {
-      AppSettingsWrapper.releaseFocus();
-      for (var i = 0; i < _tabCount; i++) {
-        _tabCache[i] = null;
-      }
-    }
-
-    _cachedLocale = locale;
-    _cachedBrightness = brightness;
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _invalidateTabCacheIfNeeded();
-  }
-
-  String get _tabKeySuffix {
-    final locale = Localizations.localeOf(context).languageCode;
-    final brightness = Theme.of(context).brightness.name;
-    return '${locale}_$brightness';
-  }
 
   @override
   void didUpdateWidget(covariant _DashboardTabStack oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _invalidateTabCacheIfNeeded();
     if (widget.index == postsDashboardTabIndex &&
         oldWidget.index != widget.index &&
         _tabCache[postsDashboardTabIndex] != null) {
@@ -661,45 +627,46 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
   }
 
   Widget _buildTabPage(int index) {
-    final suffix = _tabKeySuffix;
+    // Stable keys: theme/locale updates must rebuild in place, not remount
+    // tabs (remount reloads blocs and makes the Settings header jump).
     final page = switch (index) {
-      0 => AnalyticsPage(key: ValueKey('dashboard_tab_analytics_$suffix')),
-      1 => SearchManagementPage(
-        key: ValueKey('dashboard_tab_search_management_$suffix'),
+      0 => const AnalyticsPage(key: ValueKey('dashboard_tab_analytics')),
+      1 => const SearchManagementPage(
+        key: ValueKey('dashboard_tab_search_management'),
       ),
-      2 => UsersPage(key: ValueKey('dashboard_tab_users_$suffix')),
-      3 => UserLocationsPage(
-        key: ValueKey('dashboard_tab_user_locations_$suffix'),
+      2 => const UsersPage(key: ValueKey('dashboard_tab_users')),
+      3 => const UserLocationsPage(
+        key: ValueKey('dashboard_tab_user_locations'),
       ),
-      4 => SearchHistoryPage(
-        key: ValueKey('dashboard_tab_search_history_$suffix'),
+      4 => const SearchHistoryPage(
+        key: ValueKey('dashboard_tab_search_history'),
       ),
-      5 => PostsPage(key: ValueKey('dashboard_tab_posts_$suffix')),
-      6 => StoriesManagementPage(
-        key: ValueKey('dashboard_tab_stories_$suffix'),
+      5 => const PostsPage(key: ValueKey('dashboard_tab_posts')),
+      6 => const StoriesManagementPage(
+        key: ValueKey('dashboard_tab_stories'),
       ),
-      7 => CategoriesPage(key: ValueKey('dashboard_tab_categories_$suffix')),
-      8 => ChatManagementPage(key: ValueKey('dashboard_tab_chat_$suffix')),
-      9 => AuctionsPage(key: ValueKey('dashboard_tab_auctions_$suffix')),
-      10 => GiftsPage(key: ValueKey('dashboard_tab_gifts_$suffix')),
-      11 => WalletsShellPage(key: ValueKey('dashboard_tab_wallets_$suffix')),
-      12 => PromotionsShellPage(
-        key: ValueKey('dashboard_tab_promotions_$suffix'),
+      7 => const CategoriesPage(key: ValueKey('dashboard_tab_categories')),
+      8 => const ChatManagementPage(key: ValueKey('dashboard_tab_chat')),
+      9 => const AuctionsPage(key: ValueKey('dashboard_tab_auctions')),
+      10 => const GiftsPage(key: ValueKey('dashboard_tab_gifts')),
+      11 => const WalletsShellPage(key: ValueKey('dashboard_tab_wallets')),
+      12 => const PromotionsShellPage(
+        key: ValueKey('dashboard_tab_promotions'),
       ),
-      13 => SoundManagementPage(key: ValueKey('dashboard_tab_sounds_$suffix')),
-      14 => ReportsPage(key: ValueKey('dashboard_tab_reports_$suffix')),
-      15 => NotificationsPage(
-        key: ValueKey('dashboard_tab_notifications_$suffix'),
+      13 => const SoundManagementPage(key: ValueKey('dashboard_tab_sounds')),
+      14 => const ReportsPage(key: ValueKey('dashboard_tab_reports')),
+      15 => const NotificationsPage(
+        key: ValueKey('dashboard_tab_notifications'),
       ),
-      16 => FiltersEffectsPage(
-        key: ValueKey('dashboard_tab_filters_effects_$suffix'),
+      16 => const FiltersEffectsPage(
+        key: ValueKey('dashboard_tab_filters_effects'),
       ),
-      17 => SettingsPage(key: ValueKey('dashboard_tab_settings_$suffix')),
-      18 => RbacRolesDashboardPage(
-        key: ValueKey('dashboard_tab_rbac_roles_$suffix'),
+      17 => const SettingsPage(key: ValueKey('dashboard_tab_settings')),
+      18 => const RbacRolesDashboardPage(
+        key: ValueKey('dashboard_tab_rbac_roles'),
       ),
-      19 => LogsPage(key: ValueKey('dashboard_tab_security_logs_$suffix')),
-      _ => SizedBox.shrink(key: ValueKey('dashboard_tab_empty_$suffix')),
+      19 => const LogsPage(key: ValueKey('dashboard_tab_security_logs')),
+      _ => const SizedBox.shrink(key: ValueKey('dashboard_tab_empty')),
     };
     return DashboardTabAccessBoundary(tabIndex: index, child: page);
   }

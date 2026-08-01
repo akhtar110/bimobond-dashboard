@@ -19,41 +19,23 @@ class _LogoutSectionState extends State<LogoutSection> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final danger = isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
-    final dangerBg = isDark
-        ? const Color(0xFF3B1D1D)
-        : const Color(0xFFFEF2F2);
+    final scheme = theme.colorScheme;
+    final danger = scheme.error;
+    final dangerBg = scheme.errorContainer;
 
     return SettingsSection(
       title: l10n.t('session'),
-      description: l10n.t('sessionDescription'),
       child: SettingsSurfaceCard(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final stackVertically = constraints.maxWidth < 560;
 
-            final info = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.t('logout'),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.t('sessionDescription'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: isDark
-                        ? Colors.grey.shade500
-                        : const Color(0xFF6B7280),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            final info = Text(
+              l10n.t('logout'),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
+              ),
             );
 
             final button = MouseRegion(
@@ -64,7 +46,9 @@ class _LogoutSectionState extends State<LogoutSection> {
                 duration: const Duration(milliseconds: 160),
                 curve: Curves.easeOut,
                 decoration: BoxDecoration(
-                  color: _hovered ? dangerBg : Colors.transparent,
+                  color: _hovered
+                      ? dangerBg.withValues(alpha: 0.55)
+                      : scheme.surface.withValues(alpha: 0),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: OutlinedButton.icon(
@@ -74,7 +58,7 @@ class _LogoutSectionState extends State<LogoutSection> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: danger,
                     side: BorderSide(
-                      color: danger.withValues(alpha: _hovered ? 0.85 : 0.55),
+                      color: danger.withValues(alpha: _hovered ? 0.9 : 0.55),
                       width: _hovered ? 1.5 : 1,
                     ),
                     padding: const EdgeInsets.symmetric(
@@ -99,7 +83,10 @@ class _LogoutSectionState extends State<LogoutSection> {
                 children: [
                   info,
                   const SizedBox(height: 16),
-                  Align(alignment: AlignmentDirectional.centerStart, child: button),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: button,
+                  ),
                 ],
               );
             }

@@ -93,7 +93,7 @@ Future<T?> showSettingsAdaptiveForm<T>({
         padding: EdgeInsets.only(bottom: viewInsets.bottom),
         child: Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          backgroundColor: Colors.transparent,
+          backgroundColor: Theme.of(ctx).colorScheme.surface.withValues(alpha: 0),
           elevation: 0,
           child: builder(ctx),
         ),

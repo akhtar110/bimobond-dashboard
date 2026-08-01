@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -130,6 +132,19 @@ class UpdateAdminBrandingEvent extends AdminSettingsEvent {
 
   @override
   List<Object?> get props => [appName, tagline, supportEmail, logoUrl];
+}
+
+class UploadAdminBrandingLogoEvent extends AdminSettingsEvent {
+  const UploadAdminBrandingLogoEvent({
+    required this.bytes,
+    required this.filename,
+  });
+
+  final List<int> bytes;
+  final String filename;
+
+  @override
+  List<Object?> get props => [bytes, filename];
 }
 
 class CreateAdminCurrencyEvent extends AdminSettingsEvent {
@@ -397,6 +412,7 @@ class AdminSettingsBloc extends Bloc<AdminSettingsEvent, AdminSettingsState> {
     required UpdateAppSettingUseCase updateSetting,
     required DeleteAppSettingUseCase deleteSetting,
     required UpdateBrandingUseCase updateBranding,
+    required UploadBrandingLogoUseCase uploadBrandingLogo,
     required CreateCurrencyUseCase createCurrency,
     required UpdateCurrencyUseCase updateCurrency,
     required DeleteCurrencyUseCase deleteCurrency,
@@ -406,6 +422,7 @@ class AdminSettingsBloc extends Bloc<AdminSettingsEvent, AdminSettingsState> {
         _updateSetting = updateSetting,
         _deleteSetting = deleteSetting,
         _updateBranding = updateBranding,
+        _uploadBrandingLogo = uploadBrandingLogo,
         _createCurrency = createCurrency,
         _updateCurrency = updateCurrency,
         _deleteCurrency = deleteCurrency,
@@ -420,6 +437,7 @@ class AdminSettingsBloc extends Bloc<AdminSettingsEvent, AdminSettingsState> {
     on<UpdateAdminSettingEvent>(_onUpdateSetting);
     on<DeleteAdminSettingEvent>(_onDeleteSetting);
     on<UpdateAdminBrandingEvent>(_onUpdateBranding);
+    on<UploadAdminBrandingLogoEvent>(_onUploadBrandingLogo);
     on<CreateAdminCurrencyEvent>(_onCreateCurrency);
     on<UpdateAdminCurrencyEvent>(_onUpdateCurrency);
     on<DeleteAdminCurrencyEvent>(_onDeleteCurrency);
@@ -432,6 +450,7 @@ class AdminSettingsBloc extends Bloc<AdminSettingsEvent, AdminSettingsState> {
   final UpdateAppSettingUseCase _updateSetting;
   final DeleteAppSettingUseCase _deleteSetting;
   final UpdateBrandingUseCase _updateBranding;
+  final UploadBrandingLogoUseCase _uploadBrandingLogo;
   final CreateCurrencyUseCase _createCurrency;
   final UpdateCurrencyUseCase _updateCurrency;
   final DeleteCurrencyUseCase _deleteCurrency;
@@ -665,6 +684,37 @@ class AdminSettingsBloc extends Bloc<AdminSettingsEvent, AdminSettingsState> {
           isSaving: false,
           branding: branding,
           message: 'brandingUpdated',
+          messageIsError: false,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          isSaving: false,
+          message: e.toString(),
+          messageIsError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onUploadBrandingLogo(
+    UploadAdminBrandingLogoEvent event,
+    Emitter<AdminSettingsState> emit,
+  ) async {
+    emit(state.copyWith(isSaving: true, clearMessage: true));
+    try {
+      final url = await _uploadBrandingLogo(
+        bytes: Uint8List.fromList(event.bytes),
+        filename: event.filename,
+      );
+      // Persist logo on branding record; keep other fields as currently saved.
+      final branding = await _updateBranding(logoUrl: url);
+      emit(
+        state.copyWith(
+          isSaving: false,
+          branding: branding,
+          message: 'brandingLogoUploaded',
           messageIsError: false,
         ),
       );

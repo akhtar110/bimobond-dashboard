@@ -58,7 +58,6 @@ class SettingsAdminTabs extends StatelessWidget {
         SettingsAdminL10n.tabLabel(context, 'uploads'),
       AdminSettingsTab.defaults =>
         SettingsAdminL10n.tabLabel(context, 'defaults'),
-      // Removed / legacy tabs — keep labels for safety.
       AdminSettingsTab.appSettings ||
       AdminSettingsTab.general ||
       AdminSettingsTab.overview =>
@@ -86,13 +85,18 @@ class SettingsAdminTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-    final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
 
     final tabs = _visibleTabs;
     if (tabs.isEmpty) return const SizedBox.shrink();
 
-    return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
+
+        return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
       buildWhen: (prev, next) => prev.tab != next.tab,
       builder: (context, state) {
         var effectiveTab = switch (state.tab) {
@@ -116,32 +120,30 @@ class SettingsAdminTabs extends StatelessWidget {
 
         return DecoratedBox(
           decoration: BoxDecoration(
-            color: scheme.surface,
+            color: scheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(metrics.panelRadius),
-            border: Border.all(color: scheme.outlineVariant),
           ),
-          child: SizedBox(
-            height: metrics.tabStripHeight + 16,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 8),
-              child: Row(
-                children: [
-                  for (var i = 0; i < tabs.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
-                    _AdminTabChip(
-                      label: tabLabel(context, tabs[i]),
-                      icon: tabIcon(tabs[i]),
-                      selected: effectiveTab == tabs[i],
-                      onTap: () => context.read<AdminSettingsBloc>().add(
-                            ChangeAdminSettingsTabEvent(tabs[i]),
-                          ),
-                    ),
-                  ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 8),
+            child: Row(
+              children: [
+                for (var i = 0; i < tabs.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  _AdminTabChip(
+                    label: tabLabel(context, tabs[i]),
+                    icon: tabIcon(tabs[i]),
+                    selected: effectiveTab == tabs[i],
+                    onTap: () => context.read<AdminSettingsBloc>().add(
+                          ChangeAdminSettingsTabEvent(tabs[i]),
+                        ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
+        );
+      },
         );
       },
     );
@@ -164,31 +166,50 @@ class _AdminTabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    final bg =
-        selected ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+    final fg = selected ? scheme.onPrimary : scheme.onSurfaceVariant;
+    final bg = selected ? scheme.primary : scheme.surface;
 
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: fg,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    ),
-              ),
-            ],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected ? scheme.primary : scheme.outlineVariant,
+        ),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.22),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: fg),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: fg,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

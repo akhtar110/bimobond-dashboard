@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/app_setting_entity.dart';
+import '../utils/settings_admin_l10n.dart';
 
 /// Modern card for a single admin setting row.
 class SettingItemCard extends StatelessWidget {
@@ -29,6 +30,9 @@ class SettingItemCard extends StatelessWidget {
     final updated = setting.updatedAt != null
         ? DateFormat.yMMMd().add_jm().format(setting.updatedAt!.toLocal())
         : l10n.tOr('settingsNotAvailable', '—');
+    final label = SettingsAdminL10n.settingLabel(context, setting);
+    final description =
+        SettingsAdminL10n.settingDescription(context, setting);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -56,16 +60,15 @@ class SettingItemCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        setting.displayLabel,
+                        label,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (setting.description != null &&
-                          setting.description!.trim().isNotEmpty) ...[
+                      if (description != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          setting.description!,
+                          description,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -106,7 +109,10 @@ class SettingItemCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _Badge(
-                  label: setting.type.toUpperCase(),
+                  label: SettingsAdminL10n.settingTypeLabel(
+                    context,
+                    setting.type,
+                  ),
                   color: scheme.secondaryContainer,
                   fg: scheme.onSecondaryContainer,
                 ),
@@ -123,7 +129,10 @@ class SettingItemCard extends StatelessWidget {
                 ),
                 if (setting.category != null)
                   _Badge(
-                    label: setting.category!,
+                    label: SettingsAdminL10n.categoryLabel(
+                      context,
+                      setting.category,
+                    ),
                     color: scheme.surfaceContainerHigh,
                     fg: scheme.onSurfaceVariant,
                   ),

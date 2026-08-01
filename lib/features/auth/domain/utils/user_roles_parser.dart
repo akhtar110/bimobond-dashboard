@@ -19,7 +19,7 @@ UserRole _mapRole(String role) {
       return UserRole.admin;
     case 'SUPER_ADMIN':
     case 'SUPERADMIN':
-      return UserRole.admin;
+      return UserRole.superAdmin;
     case 'MODERATOR':
       return UserRole.moderator;
     default:

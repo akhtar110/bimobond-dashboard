@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../domain/entities/app_setting_entity.dart';
 import '../../domain/entities/settings_admin_entities.dart';
 import '../../domain/repositories/app_settings_repository.dart';
@@ -54,6 +56,11 @@ class AppSettingsRepositoryImpl implements AppSettingsRepository {
       supportEmail: supportEmail,
       logoUrl: logoUrl,
     );
+  }
+
+  @override
+  Future<String> uploadBrandingLogo(Uint8List bytes, String filename) {
+    return _remote.uploadBrandingLogo(bytes, filename);
   }
 
   @override

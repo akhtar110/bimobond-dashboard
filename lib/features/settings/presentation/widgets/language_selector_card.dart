@@ -35,11 +35,12 @@ class _LanguageSelectorCardState extends State<LanguageSelectorCard> {
 
     return SettingsSection(
       title: l10n.t('languageAndRegion'),
-      description: l10n.t('languageAndRegionDescription'),
       child: SettingsSurfaceCard(
+        padding: const EdgeInsets.all(14),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final useRow = constraints.maxWidth >= 480;
+            // Keep options side-by-side even when this card is half-width.
+            final useRow = constraints.maxWidth >= 260;
 
             final englishOption = _LanguageOption(
               label: l10n.t('english'),
@@ -71,7 +72,7 @@ class _LanguageSelectorCardState extends State<LanguageSelectorCard> {
               return Row(
                 children: [
                   Expanded(child: englishOption),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(child: arabicOption),
                 ],
               );
@@ -80,7 +81,7 @@ class _LanguageSelectorCardState extends State<LanguageSelectorCard> {
             return Column(
               children: [
                 englishOption,
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 arabicOption,
               ],
             );
@@ -128,13 +129,13 @@ class _LanguageOptionState extends State<_LanguageOption> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: Duration.zero,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: selected
                 ? primary.withValues(alpha: 0.08)
                 : (_hovered
                     ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
-                    : Colors.transparent),
+                    : scheme.surface.withValues(alpha: 0)),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
@@ -146,33 +147,36 @@ class _LanguageOptionState extends State<_LanguageOption> {
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHigh,
+                  color: selected
+                      ? scheme.primaryContainer
+                      : scheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: scheme.outline.withValues(alpha: 0.15),
-                  ),
                 ),
                 child: Text(
                   widget.flag,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: selected ? primary : scheme.onSurface,
-                    letterSpacing: 0.5,
+                    color: selected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurface,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w600,
@@ -182,6 +186,8 @@ class _LanguageOptionState extends State<_LanguageOption> {
                     const SizedBox(height: 2),
                     Text(
                       widget.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                         fontSize: 12,
@@ -191,7 +197,7 @@ class _LanguageOptionState extends State<_LanguageOption> {
                 ),
               ),
               if (selected)
-                Icon(Icons.check_circle_rounded, size: 20, color: primary),
+                Icon(Icons.check_circle_rounded, size: 18, color: primary),
             ],
           ),
         ),

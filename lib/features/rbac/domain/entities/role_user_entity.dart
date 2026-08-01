@@ -63,9 +63,13 @@ extension SystemRoleKindX on SystemRoleKind {
         SystemRoleKind.superAdmin => 'Highest privilege operators',
       };
 
-  /// Slug matchers against RBAC role slugs from the API.
+  /// Slug matchers against RBAC role slugs / names from the API.
   bool matchesSlug(String slug) {
-    final s = slug.trim().toLowerCase().replaceAll('-', '_');
+    final s = slug
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(RegExp(r'\s+'), '_');
     return switch (this) {
       SystemRoleKind.superAdmin =>
         s == 'super_admin' ||
@@ -73,7 +77,10 @@ extension SystemRoleKindX on SystemRoleKind {
             s.contains('super_admin') ||
             s.contains('superadmin'),
       SystemRoleKind.admin =>
-        (s == 'admin' || s.endsWith('_admin') || s.startsWith('admin')) &&
+        (s == 'admin' ||
+                s == 'administrator' ||
+                s.endsWith('_admin') ||
+                s.startsWith('admin')) &&
             !s.contains('super'),
       SystemRoleKind.moderator =>
         s == 'moderator' || s == 'mod' || s.contains('moderator'),

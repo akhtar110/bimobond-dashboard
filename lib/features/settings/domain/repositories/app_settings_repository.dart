@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../entities/app_setting_entity.dart';
 import '../entities/settings_admin_entities.dart';
 
@@ -19,6 +21,8 @@ abstract class AppSettingsRepository {
     String? supportEmail,
     String? logoUrl,
   });
+
+  Future<String> uploadBrandingLogo(Uint8List bytes, String filename);
 
   Future<List<AppCurrencyEntity>> listCurrencies();
   Future<AppCurrencyEntity> createCurrency(AppCurrencyEntity currency);

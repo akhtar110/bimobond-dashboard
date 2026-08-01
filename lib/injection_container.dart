@@ -578,6 +578,9 @@ Future<void> init() async {
     () => UpdateBrandingUseCase(sl<AppSettingsRepository>()),
   );
   sl.registerLazySingleton(
+    () => UploadBrandingLogoUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerLazySingleton(
     () => ListCurrenciesUseCase(sl<AppSettingsRepository>()),
   );
   sl.registerLazySingleton(
@@ -608,6 +611,7 @@ Future<void> init() async {
       updateSetting: sl<UpdateAppSettingUseCase>(),
       deleteSetting: sl<DeleteAppSettingUseCase>(),
       updateBranding: sl<UpdateBrandingUseCase>(),
+      uploadBrandingLogo: sl<UploadBrandingLogoUseCase>(),
       createCurrency: sl<CreateCurrencyUseCase>(),
       updateCurrency: sl<UpdateCurrencyUseCase>(),
       deleteCurrency: sl<DeleteCurrencyUseCase>(),

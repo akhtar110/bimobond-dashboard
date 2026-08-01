@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../entities/app_setting_entity.dart';
 import '../entities/settings_admin_entities.dart';
 import '../repositories/app_settings_repository.dart';
@@ -84,6 +86,18 @@ class UpdateBrandingUseCase {
       supportEmail: supportEmail,
       logoUrl: logoUrl,
     );
+  }
+}
+
+class UploadBrandingLogoUseCase {
+  const UploadBrandingLogoUseCase(this._repository);
+  final AppSettingsRepository _repository;
+
+  Future<String> call({
+    required Uint8List bytes,
+    required String filename,
+  }) {
+    return _repository.uploadBrandingLogo(bytes, filename);
   }
 }
 

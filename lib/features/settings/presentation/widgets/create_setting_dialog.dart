@@ -172,11 +172,19 @@ class _CreateSettingDialogState extends State<CreateSettingDialog> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'STRING', child: Text('STRING')),
-                    DropdownMenuItem(value: 'NUMBER', child: Text('NUMBER')),
-                    DropdownMenuItem(value: 'BOOLEAN', child: Text('BOOLEAN')),
-                    DropdownMenuItem(value: 'JSON', child: Text('JSON')),
+                  items: [
+                    for (final t in const [
+                      'STRING',
+                      'NUMBER',
+                      'BOOLEAN',
+                      'JSON',
+                    ])
+                      DropdownMenuItem(
+                        value: t,
+                        child: Text(
+                          SettingsAdminL10n.settingTypeLabel(context, t),
+                        ),
+                      ),
                   ],
                   onChanged: isSaving
                       ? null

@@ -29,10 +29,15 @@ class SettingsAdminBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-    final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
 
-    return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
+
+        return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
       buildWhen: (prev, next) =>
           prev.tab != next.tab ||
           prev.isLoading != next.isLoading ||
@@ -97,20 +102,28 @@ class SettingsAdminBody extends StatelessWidget {
             border: Border.all(color: scheme.outlineVariant),
             boxShadow: [
               BoxShadow(
-                color: scheme.shadow.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+                color: scheme.shadow.withValues(alpha: 0.04),
+                blurRadius: 14,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: Padding(
-            padding: EdgeInsets.all(metrics.panelPadding),
+            padding: EdgeInsets.all(metrics.panelPadding + 2),
             child: state.isLoading &&
                     state.settings.isEmpty &&
                     state.currencies.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : content,
+                ? const SizedBox(
+                    height: 240,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : KeyedSubtree(
+                    key: ValueKey(tab),
+                    child: content,
+                  ),
           ),
+        );
+      },
         );
       },
     );

@@ -1,3 +1,4 @@
+import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/utils/user_roles_parser.dart';
 
@@ -11,6 +12,13 @@ class DashboardUserModel extends DashboardUserEntity {
     required super.isProfileIncomplete,
     super.roles = const [],
   });
+
+  static String _roleApiValue(UserRole role) => switch (role) {
+        UserRole.superAdmin => 'SUPER_ADMIN',
+        UserRole.admin => 'ADMIN',
+        UserRole.moderator => 'MODERATOR',
+        UserRole.user => 'USER',
+      };
 
   factory DashboardUserModel.fromJson(Map<String, dynamic> json) {
     return DashboardUserModel(
@@ -32,7 +40,7 @@ class DashboardUserModel extends DashboardUserEntity {
       'isVerified': isVerified,
       'isNewUser': isNewUser,
       'isProfileIncomplete': isProfileIncomplete,
-      'roles': roles.map((role) => role.name.toUpperCase()).toList(),
+      'roles': roles.map(_roleApiValue).toList(),
     };
   }
 }
