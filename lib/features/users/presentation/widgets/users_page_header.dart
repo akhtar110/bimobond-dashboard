@@ -2,136 +2,213 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../utils/responsive.dart';
+import 'users_page_toolbar.dart';
 
-/// Compact users top bar — title + search + filters on one responsive row.
-/// No subtitle; filter state stays on [UsersBloc] via the provided widgets.
+/// Users top bar — title, refresh, and posts-style filter toolbar.
 class UsersPageHeader extends StatelessWidget {
   const UsersPageHeader({
     super.key,
     required this.onRefresh,
     required this.metrics,
-    required this.searchBar,
-    required this.locationFilter,
-    required this.filters,
   });
 
   final VoidCallback onRefresh;
   final UsersLayoutMetrics metrics;
-  final Widget searchBar;
-  final Widget locationFilter;
-  final Widget filters;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final wide = width >= 900;
+        final compact = metrics.isMobile;
+        final controlHeight = metrics.filterControlHeight;
+        final gap = metrics.filterGap + 2;
+
+        if (wide) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _UsersHeaderToolbarRow(
+                metrics: metrics,
+                controlHeight: controlHeight,
+                gap: gap,
+                showTitle: true,
+                inlineActions: true,
+                onRefresh: onRefresh,
+                compact: compact,
+              ),
+              const UsersActiveFilterChips(),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _UsersHeaderToolbarRow(
+              metrics: metrics,
+              controlHeight: controlHeight,
+              gap: gap,
+              showTitle: true,
+              inlineActions: false,
+              onRefresh: onRefresh,
+              compact: compact,
+            ),
+            SizedBox(height: gap),
+            _UsersHeaderToolbarRow(
+              metrics: metrics,
+              controlHeight: controlHeight,
+              gap: gap,
+              showTitle: false,
+              inlineActions: true,
+              onRefresh: onRefresh,
+              compact: compact,
+            ),
+            const UsersActiveFilterChips(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UsersHeaderToolbarRow extends StatelessWidget {
+  const _UsersHeaderToolbarRow({
+    required this.metrics,
+    required this.controlHeight,
+    required this.gap,
+    required this.showTitle,
+    required this.inlineActions,
+    required this.onRefresh,
+    required this.compact,
+  });
+
+  final UsersLayoutMetrics metrics;
+  final double controlHeight;
+  final double gap;
+  final bool showTitle;
+  final bool inlineActions;
+  final VoidCallback onRefresh;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final refreshBtn = _UsersRefreshButton(
+      onRefresh: onRefresh,
+      size: controlHeight,
+      compact: compact,
+    );
+
+    final toolbar = inlineActions
+        ? (showTitle
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Expanded(
+                    child: UsersPageToolbar(metrics: metrics),
+                  ),
+                  SizedBox(width: gap),
+                  refreshBtn,
+                ],
+              )
+            : UsersPageToolbar(metrics: metrics))
+        : null;
+
+    if (!showTitle && inlineActions) {
+      return toolbar!;
+    }
+
+    if (showTitle && !inlineActions) {
+      return Row(
+        children: [
+          const Expanded(child: _UsersHeaderTitle()),
+          refreshBtn,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const _UsersHeaderTitle(),
+        SizedBox(width: gap + 8),
+        Expanded(child: UsersPageToolbar(metrics: metrics)),
+        SizedBox(width: gap),
+        refreshBtn,
+      ],
+    );
+  }
+}
+
+class _UsersHeaderTitle extends StatelessWidget {
+  const _UsersHeaderTitle();
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final compact = metrics.isMobile;
+    final width = MediaQuery.sizeOf(context).width;
+    final fontSize = width < 480 ? 18.0 : width < 900 ? 19.0 : 20.0;
 
-    final title = Text(
+    return Text(
       l10n.t('users'),
-      style: (compact ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-          ?.copyWith(
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.45,
-        color: scheme.onSurface,
-        height: 1.05,
-      ),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-    );
-
-    final refreshBtn = IconButton.filledTonal(
-      onPressed: onRefresh,
-      tooltip: l10n.t('retry'),
-      icon: Icon(Icons.refresh_rounded, size: compact ? 18 : 20),
-      style: IconButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        minimumSize: Size(compact ? 34 : 36, compact ? 34 : 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+      style: theme.textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.4,
+        color: scheme.onSurface,
+        height: 1.1,
+        fontSize: fontSize,
       ),
     );
+  }
+}
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        // Keep search + filters on one horizontal line whenever possible.
-        final inlineAll = width >= 1100;
-        final titleAbove = width < 640;
+class _UsersRefreshButton extends StatelessWidget {
+  const _UsersRefreshButton({
+    required this.onRefresh,
+    required this.size,
+    required this.compact,
+  });
 
-        final searchFilters = Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(flex: 4, child: searchBar),
-            SizedBox(width: metrics.chipSpacing),
-            Expanded(flex: 3, child: locationFilter),
-            SizedBox(width: metrics.chipSpacing + 2),
-            Flexible(
-              flex: 3,
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: filters,
-              ),
+  final VoidCallback onRefresh;
+  final double size;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final border = scheme.outline.withValues(alpha: 0.22);
+
+    return Tooltip(
+      message: context.l10n.t('refresh'),
+      child: Material(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: onRefresh,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: border),
             ),
-          ],
-        );
-
-        if (inlineAll) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                title,
-                SizedBox(width: metrics.headerTitleGap),
-                Expanded(child: searchFilters),
-                SizedBox(width: metrics.chipSpacing),
-                refreshBtn,
-              ],
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.refresh_rounded,
+              size: compact ? 18 : 20,
+              color: scheme.onSurfaceVariant,
             ),
-          );
-        }
-
-        if (titleAbove) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: title),
-                    refreshBtn,
-                  ],
-                ),
-                SizedBox(height: metrics.chipSpacing),
-                searchBar,
-                SizedBox(height: metrics.chipSpacing),
-                locationFilter,
-                SizedBox(height: metrics.chipSpacing),
-                filters,
-              ],
-            ),
-          );
-        }
-
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              title,
-              SizedBox(width: metrics.headerTitleGap),
-              Expanded(child: searchFilters),
-              SizedBox(width: metrics.chipSpacing),
-              refreshBtn,
-            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

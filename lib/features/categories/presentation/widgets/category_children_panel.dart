@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/category_entity.dart';
 import '../bloc/categories_bloc.dart';
+import '../utils/categories_page_layout.dart';
 import 'category_callbacks.dart';
 import 'category_icon.dart';
 import 'category_ui_primitives.dart';
@@ -87,36 +88,50 @@ class _CategoryChildrenPanelState extends State<CategoryChildrenPanel> {
                         hasSearch: data.searchQuery.trim().isNotEmpty,
                         hasAnyChildren: data.totalCount > 0,
                       )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SubcategoryTableHeader(showParentColumn: false),
-                          Expanded(
-                            child: ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.only(bottom: 8),
-                              itemCount: data.children.length,
-                              itemBuilder: (context, index) {
-                                final sub = data.children[index];
-                                return RepaintBoundary(
-                                  key: ValueKey(sub.id),
-                                  child: SubcategoryRow(
-                                    subcategory: sub,
-                                    parentName: widget.root.name,
-                                    childrenCount: 0,
-                                    highlighted: data.highlightedIds
-                                        .contains(sub.id),
-                                    selected:
-                                        data.selectedIds.contains(sub.id),
-                                    showParentColumn: false,
-                                    onFormRequest: widget.onFormRequest,
-                                    onDeleteRequest: widget.onDeleteRequest,
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final panelMetrics =
+                              CategoriesPanelMetrics(constraints.maxWidth);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SubcategoryTableHeader(
+                                showParentColumn: false,
+                              ),
+                              Expanded(
+                                child: ListView.builder(
+                                  controller: _scrollController,
+                                  padding: EdgeInsets.only(
+                                    top: panelMetrics.useSubcategoryCards
+                                        ? 6
+                                        : 0,
+                                    bottom: panelMetrics.listHorizontalPadding,
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                                  itemCount: data.children.length,
+                                  itemBuilder: (context, index) {
+                                    final sub = data.children[index];
+                                    return RepaintBoundary(
+                                      key: ValueKey(sub.id),
+                                      child: SubcategoryRow(
+                                        subcategory: sub,
+                                        parentName: widget.root.name,
+                                        childrenCount: 0,
+                                        highlighted: data.highlightedIds
+                                            .contains(sub.id),
+                                        selected: data.selectedIds
+                                            .contains(sub.id),
+                                        showParentColumn: false,
+                                        onFormRequest: widget.onFormRequest,
+                                        onDeleteRequest:
+                                            widget.onDeleteRequest,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
               ),
             ],
@@ -182,13 +197,20 @@ class _ChildrenPanelHeader extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final hasSearch = searchQuery.trim().isNotEmpty;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 520;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelWidth = constraints.maxWidth;
+        final narrow = panelWidth < 520;
+        final ultraNarrow = panelWidth < 320;
 
-          return Row(
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            narrow ? 8 : 12,
+            narrow ? 8 : 12,
+            narrow ? 8 : 12,
+            narrow ? 8 : 10,
+          ),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (showBackButton) ...[
@@ -198,27 +220,27 @@ class _ChildrenPanelHeader extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   onPressed: onBack,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: ultraNarrow ? 0 : 4),
               ],
               CategoryIcon(
                 category: root,
-                size: narrow ? 34 : 40,
+                size: ultraNarrow ? 30 : (narrow ? 34 : 40),
                 borderRadius: BorderRadius.circular(10),
                 backgroundColor: accent.withValues(alpha: 0.12),
                 iconColor: accent,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: ultraNarrow ? 8 : 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       root.name,
-                      maxLines: 1,
+                      maxLines: ultraNarrow ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                            fontSize: narrow ? 15 : null,
+                            fontSize: ultraNarrow ? 14 : (narrow ? 15 : null),
                           ),
                     ),
                     const SizedBox(height: 2),
@@ -232,17 +254,18 @@ class _ChildrenPanelHeader extends StatelessWidget {
                               'subcategoriesCount',
                               '${formatCategoryCount(totalCount)} subcategories',
                             ),
-                      maxLines: 1,
+                      maxLines: ultraNarrow ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
+                            fontSize: ultraNarrow ? 11 : null,
                           ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              if (narrow)
+              if (narrow || ultraNarrow)
                 Tooltip(
                   message: l10n.t('addSubcategory'),
                   child: IconButton(
@@ -258,9 +281,9 @@ class _ChildrenPanelHeader extends StatelessWidget {
                   onPressed: onAddSubcategory,
                 ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

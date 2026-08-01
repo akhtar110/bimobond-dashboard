@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../gifts/presentation/widgets/gifts_active_filters.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_chip.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_footer.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
 import '../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../create_post/domain/entities/create_post_location_entity.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
 import '../../../post_management/presentation/utils/post_detail_labels.dart';
 import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../../domain/entities/post_filters.dart';
@@ -18,11 +14,17 @@ import '../utils/post_sort_labels.dart';
 import '../utils/posts_datetime_filter_utils.dart';
 import '../utils/posts_time_filter_utils.dart';
 import 'posts_category_filter.dart';
-import 'posts_datetime_filter.dart';
-import 'posts_time_range_filter.dart';
+import 'posts_filter_panel_ui.dart';
 import 'posts_location_filter.dart';
 import 'posts_location_picker.dart';
 import 'posts_location_search_field.dart';
+import 'posts_time_range_filter.dart';
+
+double _postsFilterPanelWidth(BuildContext context, double? preferred) {
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  if (preferred == null) return screenWidth;
+  return preferred.clamp(280.0, screenWidth - 24.0);
+}
 
 /// Opens the adaptive filter panel for posts.
 Future<void> showPostsFilterPopup({
@@ -58,8 +60,9 @@ Future<void> showPostsFilterPopup({
           PostsFilterPopup(
             appliedFilters: filters,
             maxHeight: MediaQuery.sizeOf(ctx).height * 0.88,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             showDragHandle: true,
+            fullWidth: true,
           ),
         ),
       ),
@@ -67,18 +70,22 @@ Future<void> showPostsFilterPopup({
   }
 
   if (width < 900) {
+    final dialogWidth = _postsFilterPanelWidth(context, 440);
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: width < 640 ? 12 : 20,
+          vertical: 20,
+        ),
         child: Align(
           alignment: Alignment.center,
           child: wrap(
             PostsFilterPopup(
               appliedFilters: filters,
-              width: 420,
+              width: dialogWidth,
               maxHeight: MediaQuery.sizeOf(ctx).height * 0.82,
             ),
           ),
@@ -87,7 +94,7 @@ Future<void> showPostsFilterPopup({
     );
   }
 
-  const panelWidth = 400.0;
+  final panelWidth = _postsFilterPanelWidth(context, 440);
   final media = MediaQuery.sizeOf(context);
   final padding = MediaQuery.paddingOf(context);
   final isRtl = Directionality.of(context) == TextDirection.rtl;
@@ -107,7 +114,7 @@ Future<void> showPostsFilterPopup({
     context: context,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.black.withValues(alpha: 0.15),
+    barrierColor: Colors.black.withValues(alpha: 0.22),
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (ctx, animation, secondaryAnimation) {
       return Stack(
@@ -141,7 +148,7 @@ Future<void> showPostsFilterPopup({
   );
 }
 
-/// Modern filter panel — grouped sections, chip selectors, sticky footer.
+/// Premium filter panel — glass shell, compact sections, sticky footer.
 class PostsFilterPopup extends StatelessWidget {
   const PostsFilterPopup({
     super.key,
@@ -150,6 +157,7 @@ class PostsFilterPopup extends StatelessWidget {
     this.maxHeight = 560,
     this.borderRadius,
     this.showDragHandle = false,
+    this.fullWidth = false,
   });
 
   final PostFilters appliedFilters;
@@ -157,6 +165,7 @@ class PostsFilterPopup extends StatelessWidget {
   final double maxHeight;
   final BorderRadius? borderRadius;
   final bool showDragHandle;
+  final bool fullWidth;
 
   void _close(BuildContext context) {
     final navigator = Navigator.of(context);
@@ -177,17 +186,16 @@ class PostsFilterPopup extends StatelessWidget {
     _close(context);
   }
 
-  String _sectionTitle(
-    AppLocalizations l10n,
-    String key,
-    BuildContext context,
+  void _applyDatePreset(
+    PostsFilterDraftCubit cubit,
+    PostsDateTimePreset preset,
   ) {
-    return _sectionTitleFromLabel(l10n.tOr(key, key), context);
-  }
-
-  String _sectionTitleFromLabel(String text, BuildContext context) {
-    if (context.isRtl) return text;
-    return text.toUpperCase();
+    if (preset == PostsDateTimePreset.all) {
+      cubit.clearDateRange();
+      return;
+    }
+    final next = postsDateTimePresetValue(preset);
+    cubit.setDateRange(from: next.from, to: next.to);
   }
 
   @override
@@ -195,367 +203,359 @@ class PostsFilterPopup extends StatelessWidget {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final radius = borderRadius ?? BorderRadius.circular(16);
+    final radius = borderRadius ?? BorderRadius.circular(14);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final panelWidth = fullWidth
+        ? screenWidth
+        : (width != null ? width!.clamp(280.0, screenWidth - 24.0) : 440.0);
 
     return Material(
-      color: scheme.surface,
-      elevation: 10,
-      shadowColor: scheme.shadow.withValues(alpha: 0.18),
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.75)),
-      ),
+      color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        width: width ?? 400,
-        height: maxHeight,
-        child: Column(
-          children: [
-            if (showDragHandle) const _PostsFilterDragHandle(),
-            _PostsFilterHeader(onClose: () => _close(context)),
-            Expanded(
-              child: BlocBuilder<PostsFilterDraftCubit, PostsFilterDraftState>(
-                builder: (context, draft) {
-                  final cubit = context.read<PostsFilterDraftCubit>();
-                  final activeItems = postsDraftActiveFilterItems(
-                    draft,
-                    l10n,
-                    cubit,
-                    locale: Localizations.localeOf(context).languageCode,
-                  );
-                  final panelKey = ValueKey(
-                    'posts-filter-panel-${draft.revision}',
-                  );
+      borderRadius: radius,
+      child: PostsFilterGlassShell(
+        borderRadius: radius,
+        child: SizedBox(
+          width: panelWidth,
+          height: maxHeight,
+          child: Column(
+            children: [
+              if (showDragHandle) const _PostsFilterDragHandle(),
+              PostsFilterPanelHeader(onClose: () => _close(context)),
+              Expanded(
+                child: BlocBuilder<PostsFilterDraftCubit, PostsFilterDraftState>(
+                  builder: (context, draft) {
+                    final cubit = context.read<PostsFilterDraftCubit>();
+                    final activeItems = postsDraftActiveFilterItems(
+                      draft,
+                      l10n,
+                      cubit,
+                      locale: Localizations.localeOf(context).languageCode,
+                    );
+                    final dateValue = postsDateTimeFromFilters(
+                      from: draft.createdFrom,
+                      to: draft.createdTo,
+                    );
+                    final datePreset =
+                        dateValue.detectPreset() ?? PostsDateTimePreset.all;
 
-                  return ListView(
-                    key: panelKey,
-                    padding: const EdgeInsets.only(bottom: 8),
-                    children: [
-                      GiftsActiveFilters(items: activeItems),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterAuthorSection',
-                          context,
-                        ),
-                        child: AdminUserSearchField(
-                          key: ValueKey('posts-filter-user-${draft.revision}'),
-                          compact: true,
-                          selectedUser: draft.user,
-                          hintText: l10n.t('filterPostsByUser'),
-                          onUserSelected: cubit.setUser,
-                          onUserConfirmed: () => _apply(context),
-                        ),
+                    return ListView(
+                      key: ValueKey('posts-filter-panel-${draft.revision}'),
+                      padding: const EdgeInsets.only(
+                        bottom: PostsFilterPanelTokens.spacing,
                       ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterDateTimeSection',
-                          context,
-                        ),
-                        initiallyExpanded:
-                            draft.createdFrom != null ||
-                            draft.createdTo != null,
-                        child: PostsDateTimeFilterPanel(
-                          value: postsDateTimeFromFilters(
-                            from: draft.createdFrom,
-                            to: draft.createdTo,
-                          ),
-                          onChanged: (value) {
-                            if (!value.hasDateRange) {
-                              cubit.clearDateRange();
-                            } else {
-                              cubit.setDateRange(
-                                from: value.from,
-                                to: value.to,
-                              );
-                            }
+                      children: [
+                        PostsFilterActiveTags(
+                          labels: [
+                            for (final item in activeItems)
+                              (id: item.id, label: item.label),
+                          ],
+                          onRemove: (id) {
+                            final item =
+                                activeItems.firstWhere((i) => i.id == id);
+                            item.onRemove();
                           },
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitleFromLabel(
-                          postsTimeRangeTitle(l10n),
-                          context,
-                        ),
-                        initiallyExpanded:
-                            draft.createdTimeFromMinutes != null ||
-                            draft.createdTimeToMinutes != null,
-                        child: PostsTimeRangeFilterPanel(
-                          fromMinutes: draft.createdTimeFromMinutes,
-                          toMinutes: draft.createdTimeToMinutes,
-                          onChanged: (from, to) => cubit.setTimeRange(
-                            fromMinutes: from,
-                            toMinutes: to,
+                        PostsFilterSection(
+                          title: l10n.tOr('postFilterAuthorSection', 'Author'),
+                          icon: Icons.person_outline_rounded,
+                          showDivider: false,
+                          child: AdminUserSearchField(
+                            key: ValueKey('posts-filter-user-${draft.revision}'),
+                            compact: true,
+                            selectedUser: draft.user,
+                            hintText: l10n.t('filterPostsByUser'),
+                            onUserSelected: cubit.setUser,
+                            onUserConfirmed: () => _apply(context),
                           ),
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterPostType',
-                          context,
-                        ),
-                        child: GiftsFilterChipWrap(
-                          children: [
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterAuctionAll'),
-                              selected: draft.postType == PostTypeFilter.all,
-                              onTap: () =>
-                                  cubit.setPostType(PostTypeFilter.all),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterAuctionOnly'),
-                              selected:
-                                  draft.postType == PostTypeFilter.auction,
-                              onTap: () =>
-                                  cubit.setPostType(PostTypeFilter.auction),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: context.trOr(
-                                'postFilterAdsOnly',
-                                'Ads only',
+                        PostsFilterSection(
+                          title: l10n.tOr('postFilterDateTimeSection', 'Date'),
+                          icon: Icons.calendar_today_outlined,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              PostsFilterDatePresets(
+                                selected: datePreset,
+                                onPreset: (preset) =>
+                                    _applyDatePreset(cubit, preset),
                               ),
-                              selected: draft.postType == PostTypeFilter.ads,
-                              onTap: () =>
-                                  cubit.setPostType(PostTypeFilter.ads),
-                            ),
-                          ],
+                              const SizedBox(
+                                height: PostsFilterPanelTokens.spacing,
+                              ),
+                              PostsFilterInlineDateRange(
+                                from: draft.createdFrom,
+                                to: draft.createdTo,
+                                onChanged: (from, to) {
+                                  if (from == null && to == null) {
+                                    cubit.clearDateRange();
+                                  } else {
+                                    cubit.setDateRange(from: from, to: to);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(l10n, 'postFilterType', context),
-                        initiallyExpanded: draft.type != null,
-                        child: GiftsFilterChipWrap(
-                          children: [
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterTypeAll'),
-                              selected: draft.type == null,
-                              onTap: () => cubit.setType(null),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterTypeVideo'),
-                              selected: draft.type == 'VIDEO',
-                              onTap: () => cubit.setType('VIDEO'),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterTypeImage'),
-                              selected: draft.type == 'IMAGE',
-                              onTap: () => cubit.setType('IMAGE'),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterTypeCarousel'),
-                              selected: draft.type == 'CAROUSEL',
-                              onTap: () => cubit.setType('CAROUSEL'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(l10n, 'postStatus', context),
-                        initiallyExpanded: draft.status != null,
-                        child: DropdownButtonFormField<String?>(
-                          key: ValueKey('posts-filter-status-${draft.revision}'),
-                          initialValue: draft.status,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                        PostsFilterSection(
+                          title: postsTimeRangeTitle(l10n),
+                          icon: Icons.schedule_outlined,
+                          child: PostsFilterInlineTimeRange(
+                            fromMinutes: draft.createdTimeFromMinutes,
+                            toMinutes: draft.createdTimeToMinutes,
+                            onChanged: (from, to) => cubit.setTimeRange(
+                              fromMinutes: from,
+                              toMinutes: to,
                             ),
                           ),
-                          items: [
-                            DropdownMenuItem<String?>(
-                              value: null,
-                              child: Text(l10n.t('postFilterStatusAll')),
+                        ),
+                        PostsFilterSection(
+                          title: l10n.tOr('postFilterPostType', 'Post type'),
+                          icon: Icons.category_outlined,
+                          child: PostsFilterChipGrid(
+                            children: [
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterAuctionAll'),
+                                selected: draft.postType == PostTypeFilter.all,
+                                onTap: () =>
+                                    cubit.setPostType(PostTypeFilter.all),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterAuctionOnly'),
+                                selected:
+                                    draft.postType == PostTypeFilter.auction,
+                                onTap: () =>
+                                    cubit.setPostType(PostTypeFilter.auction),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: context.trOr(
+                                  'postFilterAdsOnly',
+                                  'Ads only',
+                                ),
+                                selected: draft.postType == PostTypeFilter.ads,
+                                onTap: () =>
+                                    cubit.setPostType(PostTypeFilter.ads),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PostsFilterSection(
+                          title: l10n.tOr('postFilterType', 'Media type'),
+                          icon: Icons.perm_media_outlined,
+                          child: PostsFilterChipGrid(
+                            children: [
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterTypeAll'),
+                                selected: draft.type == null,
+                                onTap: () => cubit.setType(null),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterTypeVideo'),
+                                selected: draft.type == 'VIDEO',
+                                onTap: () => cubit.setType('VIDEO'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterTypeImage'),
+                                selected: draft.type == 'IMAGE',
+                                onTap: () => cubit.setType('IMAGE'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterTypeCarousel'),
+                                selected: draft.type == 'CAROUSEL',
+                                onTap: () => cubit.setType('CAROUSEL'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PostsFilterSection(
+                          title: l10n.tOr('postStatus', 'Status'),
+                          icon: Icons.flag_outlined,
+                          child: DropdownButtonFormField<String?>(
+                            key: ValueKey(
+                              'posts-filter-status-${draft.revision}',
                             ),
-                            for (final status in kPostAdminStatuses)
+                            initialValue: draft.status,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            items: [
                               DropdownMenuItem<String?>(
-                                value: status,
-                                child: Text(postStatusLabel(l10n, status)),
+                                value: null,
+                                child: Text(l10n.t('postFilterStatusAll')),
                               ),
-                          ],
-                          onChanged: cubit.setStatus,
+                              for (final status in kPostAdminStatuses)
+                                DropdownMenuItem<String?>(
+                                  value: status,
+                                  child: Text(postStatusLabel(l10n, status)),
+                                ),
+                            ],
+                            onChanged: cubit.setStatus,
+                          ),
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(l10n, 'privacyStatus', context),
-                        initiallyExpanded: draft.privacyStatus != null,
-                        child: DropdownButtonFormField<String?>(
-                          key: ValueKey(
-                            'posts-filter-privacy-${draft.revision}',
-                          ),
-                          initialValue: draft.privacyStatus,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                        PostsFilterSection(
+                          title: l10n.tOr('privacyStatus', 'Privacy'),
+                          icon: Icons.lock_outline,
+                          child: DropdownButtonFormField<String?>(
+                            key: ValueKey(
+                              'posts-filter-privacy-${draft.revision}',
                             ),
-                          ),
-                          items: [
-                            DropdownMenuItem<String?>(
-                              value: null,
-                              child: Text(l10n.t('postFilterPrivacyAll')),
+                            initialValue: draft.privacyStatus,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            for (final privacy in PostFilters.privacyOptions)
+                            items: [
                               DropdownMenuItem<String?>(
-                                value: privacy,
-                                child: Text(privacyLabel(l10n, privacy)),
+                                value: null,
+                                child: Text(l10n.t('postFilterPrivacyAll')),
                               ),
-                          ],
-                          onChanged: cubit.setPrivacyStatus,
+                              for (final privacy in PostFilters.privacyOptions)
+                                DropdownMenuItem<String?>(
+                                  value: privacy,
+                                  child: Text(privacyLabel(l10n, privacy)),
+                                ),
+                            ],
+                            onChanged: cubit.setPrivacyStatus,
+                          ),
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(l10n, 'location', context),
-                        initiallyExpanded: draft.hasLocationFilter,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            PostsLocationAnchorButtons(
-                              filterUser: draft.user,
-                              onPlaceSelected: (place) {
-                                final label = locationFilterLabelFromPlace(place);
-                                cubit.setLocationFilter(
-                                  city: label,
-                                  clearAnchor: true,
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            PostsLocationSearchField(
-                              compact: true,
-                              selectedPlace:
-                                  draft.hasLocationFilter &&
-                                      draft.locationCity != null
-                                  ? CreatePostLocationEntity(
-                                      name: draft.locationCity!,
-                                      latitude: 0,
-                                      longitude: 0,
-                                      city: draft.locationCity,
-                                    )
-                                  : null,
-                              onPlaceSelected: (place) {
-                                final label = locationFilterLabelFromPlace(place);
-                                cubit.setLocationFilter(
-                                  city: label,
-                                  clearAnchor: true,
-                                );
-                              },
-                              onClear: () =>
-                                  cubit.setLocationFilter(clear: true),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              l10n.t('postFilterLocationSearchDescription'),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
+                        PostsFilterSection(
+                          title: l10n.tOr('location', 'Location'),
+                          icon: Icons.place_outlined,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              PostsLocationAnchorButtons(
+                                filterUser: draft.user,
+                                onPlaceSelected: (place) {
+                                  final label =
+                                      locationFilterLabelFromPlace(place);
+                                  cubit.setLocationFilter(
+                                    city: label,
+                                    clearAnchor: true,
+                                  );
+                                },
                               ),
-                            ),
-                          ],
+                              const SizedBox(
+                                height: PostsFilterPanelTokens.spacing,
+                              ),
+                              PostsLocationSearchField(
+                                compact: true,
+                                selectedPlace: draft.hasLocationFilter &&
+                                        draft.locationCity != null
+                                    ? CreatePostLocationEntity(
+                                        name: draft.locationCity!,
+                                        latitude: 0,
+                                        longitude: 0,
+                                        city: draft.locationCity,
+                                      )
+                                    : null,
+                                onPlaceSelected: (place) {
+                                  final label =
+                                      locationFilterLabelFromPlace(place);
+                                  cubit.setLocationFilter(
+                                    city: label,
+                                    clearAnchor: true,
+                                  );
+                                },
+                                onClear: () =>
+                                    cubit.setLocationFilter(clear: true),
+                              ),
+                              const SizedBox(
+                                height: PostsFilterPanelTokens.spacing,
+                              ),
+                              Text(
+                                l10n.t('postFilterLocationSearchDescription'),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 10.5,
+                                  color: scheme.onSurfaceVariant
+                                      .withValues(alpha: 0.85),
+                                  height: 1.25,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterSortByAuthor',
-                          context,
+                        PostsFilterSection(
+                          title: l10n.tOr('sort', 'Sort'),
+                          icon: Icons.sort_rounded,
+                          child: PostsFilterChipGrid(
+                            children: [
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterSortAuthorAsc'),
+                                selected:
+                                    draft.sort == PostFilters.sortAuthorAsc,
+                                onTap: () =>
+                                    cubit.setSort(PostFilters.sortAuthorAsc),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterSortAuthorDesc'),
+                                selected:
+                                    draft.sort == PostFilters.sortAuthorDesc,
+                                onTap: () =>
+                                    cubit.setSort(PostFilters.sortAuthorDesc),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterSortCreatedDesc'),
+                                selected: draft.sort == PostFilters.sortLatest,
+                                onTap: () =>
+                                    cubit.setSort(PostFilters.sortLatest),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterSortCreatedAsc'),
+                                selected:
+                                    draft.sort == PostFilters.sortCreatedAsc,
+                                onTap: () =>
+                                    cubit.setSort(PostFilters.sortCreatedAsc),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterSortPopular'),
+                                selected: draft.sort == PostFilters.sortPopular,
+                                onTap: () =>
+                                    cubit.setSort(PostFilters.sortPopular),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postFilterSortLatest'),
+                                selected: draft.sort == PostFilters.sortLatest,
+                                onTap: () =>
+                                    cubit.setSort(PostFilters.sortLatest),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: GiftsFilterChipWrap(
-                          children: [
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterSortAuthorAsc'),
-                              selected: draft.sort == PostFilters.sortAuthorAsc,
-                              onTap: () =>
-                                  cubit.setSort(PostFilters.sortAuthorAsc),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterSortAuthorDesc'),
-                              selected:
-                                  draft.sort == PostFilters.sortAuthorDesc,
-                              onTap: () =>
-                                  cubit.setSort(PostFilters.sortAuthorDesc),
-                            ),
-                          ],
+                        PostsFilterSection(
+                          title:
+                              l10n.tOr('postFilterCategorySection', 'Category'),
+                          icon: Icons.label_outline_rounded,
+                          child: PostsFilterCategorySection(
+                            selectedCategoryId: draft.categoryId,
+                            onCategorySelected:
+                                ({categoryId, categoryName, categorySlug}) =>
+                                    cubit.setCategory(
+                                      categoryId: categoryId,
+                                      categoryName: categoryName,
+                                      categorySlug: categorySlug,
+                                    ),
+                          ),
                         ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterSortByDate',
-                          context,
-                        ),
-                        child: GiftsFilterChipWrap(
-                          children: [
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterSortCreatedDesc'),
-                              selected: draft.sort == PostFilters.sortLatest,
-                              onTap: () =>
-                                  cubit.setSort(PostFilters.sortLatest),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterSortCreatedAsc'),
-                              selected:
-                                  draft.sort == PostFilters.sortCreatedAsc,
-                              onTap: () =>
-                                  cubit.setSort(PostFilters.sortCreatedAsc),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterSortPopular',
-                          context,
-                        ),
-                        child: GiftsFilterChipWrap(
-                          children: [
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterSortPopular'),
-                              selected: draft.sort == PostFilters.sortPopular,
-                              onTap: () =>
-                                  cubit.setSort(PostFilters.sortPopular),
-                            ),
-                            GiftsFilterChoiceChip(
-                              label: l10n.t('postFilterSortLatest'),
-                              selected: draft.sort == PostFilters.sortLatest,
-                              onTap: () =>
-                                  cubit.setSort(PostFilters.sortLatest),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GiftsFilterSection(
-                        title: _sectionTitle(
-                          l10n,
-                          'postFilterCategorySection',
-                          context,
-                        ),
-                        initiallyExpanded: draft.categoryId != null,
-                        child: PostsFilterCategorySection(
-                          selectedCategoryId: draft.categoryId,
-                          onCategorySelected:
-                              ({categoryId, categoryName, categorySlug}) =>
-                                  cubit.setCategory(
-                                    categoryId: categoryId,
-                                    categoryName: categoryName,
-                                    categorySlug: categorySlug,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                        const SizedBox(height: PostsFilterPanelTokens.spacing),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-            GiftsFilterFooter(
-              onReset: () => _resetDraft(context),
-              onCancel: () => _close(context),
-              onApply: () => _apply(context),
-            ),
-          ],
+              PostsFilterPanelFooter(
+                onReset: () => _resetDraft(context),
+                onApply: () => _apply(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -569,53 +569,16 @@ class _PostsFilterDragHandle extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 2),
+      padding: const EdgeInsets.only(top: 8, bottom: 2),
       child: Center(
         child: Container(
-          width: 36,
-          height: 4,
+          width: 32,
+          height: 3,
           decoration: BoxDecoration(
-            color: scheme.outlineVariant.withValues(alpha: 0.85),
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(999),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Title + close only — reset lives in the sticky footer.
-class _PostsFilterHeader extends StatelessWidget {
-  const _PostsFilterHeader({required this.onClose});
-
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              l10n.tOr('filters', 'Filters'),
-              textAlign: TextAlign.start,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: l10n.t('close'),
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded, size: 20),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
       ),
     );
   }

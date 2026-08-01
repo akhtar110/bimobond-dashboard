@@ -15,7 +15,7 @@ import '../utils/seller_verification_status_style.dart';
 import 'seller_verification_detail_sheet.dart';
 import 'seller_verification_reject_dialog.dart';
 
-class SellerVerificationPanel extends StatefulWidget {
+class SellerVerificationPanel extends StatelessWidget {
   const SellerVerificationPanel({
     super.key,
     required this.screenWidth,
@@ -27,22 +27,6 @@ class SellerVerificationPanel extends StatefulWidget {
   final bool useDesktopPagination;
   final double pageHorizontalPadding;
 
-  @override
-  State<SellerVerificationPanel> createState() =>
-      _SellerVerificationPanelState();
-}
-
-class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
-  final _searchCtrl = TextEditingController();
-  final _searchFocus = FocusNode();
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    _searchFocus.dispose();
-    super.dispose();
-  }
-
   int _columnsForWidth(double width) {
     if (width > 1200) return 3;
     if (width > 760) return 2;
@@ -50,8 +34,8 @@ class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
   }
 
   double _sideInset(double extent) {
-    final maxW = AuctionsLayoutMetrics.maxContentWidth;
-    final base = widget.pageHorizontalPadding;
+    const maxW = AuctionsLayoutMetrics.maxContentWidth;
+    final base = pageHorizontalPadding;
     if (extent > maxW) return ((extent - maxW) / 2) + base;
     return base;
   }
@@ -61,9 +45,7 @@ class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final canReview = PermissionManager.canReviewSellerVerification(context);
-    final compact = widget.screenWidth < 700;
-    final panelRadius = compact ? 12.0 : 16.0;
-    final panelPad = compact ? 12.0 : 16.0;
+    final compact = screenWidth < 700;
 
     return BlocConsumer<SellerVerificationBloc, SellerVerificationState>(
       listenWhen: (previous, current) =>
@@ -130,264 +112,8 @@ class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
         }
 
-        final filters = [
-          (null, l10n.t('all')),
-          ('PENDING', l10n.tOr('pending', 'Pending')),
-          ('APPROVED', l10n.tOr('approved', 'Approved')),
-          ('REJECTED', l10n.tOr('rejected', 'Rejected')),
-          ('REVOKED', l10n.tOr('revoked', 'Revoked')),
-        ];
-
         return SliverMainAxisGroup(
           slivers: [
-            // Filters panel
-            SliverLayoutBuilder(
-              builder: (context, constraints) {
-                final pad = _sideInset(constraints.crossAxisExtent);
-                return SliverPadding(
-                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.surface,
-                        borderRadius: BorderRadius.circular(panelRadius),
-                        border: Border.all(color: scheme.outlineVariant),
-                        boxShadow: [
-                          BoxShadow(
-                            color: scheme.shadow.withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(panelPad),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: scheme.primaryContainer
-                                        .withValues(alpha: 0.65),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    Icons.verified_user_rounded,
-                                    size: 20,
-                                    color: scheme.onPrimaryContainer,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        l10n.tOr(
-                                          'sellerVerificationTitle',
-                                          'Seller gate review',
-                                        ),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        l10n.tOr(
-                                          'sellerVerificationSubtitle',
-                                          'Review seller applications before they can host auctions.',
-                                        ),
-                                        maxLines: compact ? 2 : 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Material(
-                                  color: scheme.surfaceContainerHigh,
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(10),
-                                    onTap: state.isMutating || state.isFetching
-                                        ? null
-                                        : () => context
-                                            .read<SellerVerificationBloc>()
-                                            .add(
-                                              const LoadSellerVerificationsEvent(
-                                                refresh: true,
-                                              ),
-                                            ),
-                                    child: const SizedBox(
-                                      width: 36,
-                                      height: 36,
-                                      child: Icon(
-                                        Icons.refresh_rounded,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            TextField(
-                              controller: _searchCtrl,
-                              focusNode: _searchFocus,
-                              onChanged: (value) {
-                                context.read<SellerVerificationBloc>().add(
-                                      UpdateSellerVerificationSearchEvent(
-                                        value,
-                                      ),
-                                    );
-                                setState(() {});
-                              },
-                              decoration: InputDecoration(
-                                hintText: l10n.tOr(
-                                  'searchSellerVerification',
-                                  'Search by name or business…',
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.search_rounded,
-                                  size: 18,
-                                ),
-                                suffixIcon: _searchCtrl.text.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(
-                                          Icons.close_rounded,
-                                          size: 16,
-                                        ),
-                                        onPressed: () {
-                                          _searchCtrl.clear();
-                                          context
-                                              .read<SellerVerificationBloc>()
-                                              .add(
-                                                const UpdateSellerVerificationSearchEvent(
-                                                  '',
-                                                ),
-                                              );
-                                          setState(() {});
-                                        },
-                                      )
-                                    : null,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: scheme.outlineVariant,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(
-                                    color: scheme.primary,
-                                    width: 1.4,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: scheme.surfaceContainerLowest,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              height: 34,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: filters.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(width: 6),
-                                itemBuilder: (context, index) {
-                                  final (status, label) = filters[index];
-                                  final selected =
-                                      state.statusFilter == status;
-                                  return FilterChip(
-                                    label: Text(
-                                      label,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    selected: selected,
-                                    showCheckmark: false,
-                                    onSelected: (_) => context
-                                        .read<SellerVerificationBloc>()
-                                        .add(
-                                          FilterSellerVerificationsEvent(
-                                            status,
-                                          ),
-                                        ),
-                                    visualDensity: VisualDensity.compact,
-                                    backgroundColor:
-                                        scheme.surfaceContainerLowest,
-                                    side: BorderSide(
-                                      color: selected
-                                          ? scheme.primary
-                                          : scheme.outlineVariant,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            if (state.isFetching || state.isMutating) ...[
-                              const SizedBox(height: 10),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  minHeight: 2,
-                                  color: scheme.primary,
-                                  backgroundColor:
-                                      scheme.surfaceContainerHighest,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 10),
-                            Text(
-                              l10n
-                                  .tOr(
-                                    'showingResultsCount',
-                                    'Showing {shown} of {total}',
-                                  )
-                                  .replaceAll(
-                                    '{shown}',
-                                    '${state.applications.length}',
-                                  )
-                                  .replaceAll('{total}', '${state.total}'),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
             if (state.applications.isEmpty)
               _SliverEmptyApplications(
                 padBuilder: _sideInset,
@@ -406,7 +132,7 @@ class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
                     AuctionsLayoutMetrics.maxContentWidth,
                   );
                   final columns = _columnsForWidth(contentWidth);
-                  final gap = widget.screenWidth < 700 ? 8.0 : 12.0;
+                  final gap = screenWidth < 700 ? 8.0 : 12.0;
                   final items = state.applications;
 
                   return SliverPadding(
@@ -470,7 +196,7 @@ class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
                   );
                 },
               ),
-            if (widget.useDesktopPagination && state.total > 0)
+            if (useDesktopPagination && state.total > 0)
               SliverLayoutBuilder(
                 builder: (context, constraints) {
                   final pad = _sideInset(constraints.crossAxisExtent);
@@ -493,7 +219,7 @@ class _SellerVerificationPanelState extends State<SellerVerificationPanel> {
                   );
                 },
               ),
-            if (!widget.useDesktopPagination && state.isLoadingMore)
+            if (!useDesktopPagination && state.isLoadingMore)
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
