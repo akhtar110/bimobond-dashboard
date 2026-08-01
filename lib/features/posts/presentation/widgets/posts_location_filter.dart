@@ -10,21 +10,27 @@ import '../../../users/domain/entities/user_entity.dart';
 import '../../../users/domain/repositories/users_repository.dart';
 import '../../../users/presentation/utils/user_location_list_utils.dart';
 import '../../domain/entities/post_filters.dart';
-import '../../domain/utils/post_location_filter.dart';
 import '../bloc/posts_bloc.dart';
 
 String postsLocationProximityLabel(AppLocalizations l10n, PostFilters filters) {
   final place = filters.locationCity?.trim();
-  if (place != null && place.isNotEmpty) {
-    final localized = l10n.tArgs('postFilterLocationNear', {'place': place});
-    if (localized != 'postFilterLocationNear') return localized;
-    return 'Near $place';
-  }
+  if (place != null && place.isNotEmpty) return place;
   return l10n.t('postFilterLocationSearch');
 }
 
 PostFilters postsFiltersClearLocation(PostFilters base) {
   return base.copyWith(clearLocation: true);
+}
+
+/// Applies a place-name filter using the label shown on cards/chips.
+PostFilters postsFiltersWithPlaceName(PostFilters base, String placeLabel) {
+  final label = placeLabel.trim();
+  if (label.isEmpty) return postsFiltersClearLocation(base);
+  return base.copyWith(
+    locationCity: label,
+    locationLatitude: null,
+    locationLongitude: null,
+  );
 }
 
 ({double latitude, double longitude})? postsUserLocationCoordinates(
@@ -79,10 +85,7 @@ UserEntity? _resolveAnchorUser(BuildContext context) {
 
 void _showLocationSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      behavior: SnackBarBehavior.floating,
-    ),
+    SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
   );
 }
 
@@ -97,15 +100,15 @@ Future<UserEntity?> _resolveUserWithLocation(UserEntity? user) async {
   }
 }
 
-/// Applies a radius filter anchored at a post's resolved display location.
+/// Applies a place-name filter using the post's displayed location label.
 void applyPostLocationProximityFilter(
   BuildContext context,
   ManagedPostEntity post, {
   PostFilters? baseFilters,
   void Function(PostFilters filters)? onApplied,
 }) {
-  final coords = managedPostFilterCoordinates(post);
-  if (coords == null) {
+  final label = managedPostListLocationLabel(post)?.trim();
+  if (label == null || label.isEmpty) {
     _showLocationSnackBar(
       context,
       context.l10n.t('postFilterUserLocationUnavailable'),
@@ -114,16 +117,7 @@ void applyPostLocationProximityFilter(
   }
 
   final base = baseFilters ?? context.read<PostsBloc>().activeFilters;
-  final label = managedPostListLocationLabel(post);
-  final place = label != null && label.isNotEmpty
-      ? label
-      : '${coords.latitude.toStringAsFixed(4)}, ${coords.longitude.toStringAsFixed(4)}';
-
-  final next = base.copyWith(
-    locationLatitude: coords.latitude,
-    locationLongitude: coords.longitude,
-    locationCity: place,
-  );
+  final next = postsFiltersWithPlaceName(base, label);
 
   if (onApplied != null) {
     onApplied(next);
@@ -147,11 +141,11 @@ Future<void> applyUserLocationProximityFilter(
 
   final userCoords = postsUserLocationCoordinates(user);
   if (userCoords != null && user != null) {
-    final next = base.copyWith(
-      locationLatitude: userCoords.latitude,
-      locationLongitude: userCoords.longitude,
-      locationCity: postsUserLocationLabel(l10n, user),
-    );
+    final place = userListLocationLabel(user);
+    final label = place.isNotEmpty
+        ? place
+        : postsUserLocationLabel(l10n, user);
+    final next = postsFiltersWithPlaceName(base, label);
     if (onApplied != null) {
       onApplied(next);
       return;
@@ -182,10 +176,9 @@ Future<void> applyUserLocationProximityFilter(
     return;
   }
 
-  final next = base.copyWith(
-    locationLatitude: result.point.latitude,
-    locationLongitude: result.point.longitude,
-    locationCity: l10n.t('postFilterMyLocationAnchor'),
+  final next = postsFiltersWithPlaceName(
+    base,
+    l10n.t('postFilterMyLocationAnchor'),
   );
 
   if (onApplied != null) {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/localization/localization.dart';
-import '../../../../core/utils/coin_format.dart';
+import '../../../../core/localization/localization.dart';import '../../../../core/utils/coin_format.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_wallet_entity.dart';
 import '../utils/user_detail_layout_metrics.dart';
@@ -126,7 +126,17 @@ class UserDetailStatsGrid extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
-    final followListsEnabled = !user.isProfileLocked;
+    final followListsEnabled =
+        !user.isProfileLocked || PermissionManager.canReadUsers(context);
+
+    void openFollowConnections(int initialTab) {
+      showUserFollowConnectionsSheet(
+        context,
+        user,
+        initialTab: initialTab,
+      );
+    }
+
     final balance = _balanceCoins(wallet, user);
 
     final stats = [
@@ -135,26 +145,14 @@ class UserDetailStatsGrid extends StatelessWidget {
         user.followerCount.toString(),
         Icons.people_alt_rounded,
         scheme.primary,
-        followListsEnabled
-            ? () => showUserFollowConnectionsSheet(
-                  context,
-                  user,
-                  initialTab: 0,
-                )
-            : null,
+        followListsEnabled ? () => openFollowConnections(0) : null,
       ),
       (
         l10n.t('following'),
         user.followingCount.toString(),
         Icons.person_add_alt_1_rounded,
         scheme.tertiary,
-        followListsEnabled
-            ? () => showUserFollowConnectionsSheet(
-                  context,
-                  user,
-                  initialTab: 1,
-                )
-            : null,
+        followListsEnabled ? () => openFollowConnections(1) : null,
       ),
       (
         l10n.t('posts'),

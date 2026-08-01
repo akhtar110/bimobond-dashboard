@@ -197,7 +197,8 @@ class AppRouter {
       case AppRoutes.chatManagement:
         return MaterialPageRoute(
           builder: (_) => _guarded(
-            canAccess: PermissionManager.canAccessAdminDashboard,
+            canAccess: PermissionManager.canReadChatAdmin,
+            requireAuthContext: true,
             child: const ChatManagementPage(),
           ),
         );

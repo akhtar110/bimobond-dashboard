@@ -2,10 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../../post_management/data/utils/managed_post_location_hydration.dart';
 import '../../../post_management/domain/entities/managed_post_entity.dart';
-import '../../domain/utils/post_location_filter.dart';
 import '../utils/post_card_layout.dart';
 import '../utils/post_date_format.dart';
-import 'posts_location_filter.dart';
+
+/// Pure-black premium palette for post card content panels.
+abstract final class PostCardPremiumColors {
+  static const black = Color(0xFF000000);
+  static const textPrimary = Color(0xFFF5F5F4);
+  static const textSecondary = Color(0xA3FFFFFF);
+  static const textMuted = Color(0x66FFFFFF);
+  static const accentGold = Color(0xFFC9A962);
+  static const accentRose = Color(0xFFE8B4B8);
+  static const borderSubtle = Color(0x14FFFFFF);
+  static const borderSoft = Color(0x24FFFFFF);
+  static const surfaceInset = Color(0x0FFFFFFF);
+}
 
 String? postListLocationLabel(ManagedPostEntity post) =>
     managedPostListLocationLabel(post);
@@ -113,11 +124,13 @@ class PostListMetaRow extends StatelessWidget {
     required this.post,
     required this.metrics,
     this.hovered = false,
+    this.premiumBlack = false,
   });
 
   final ManagedPostEntity post;
   final PostCardMetrics metrics;
   final bool hovered;
+  final bool premiumBlack;
 
   String _fmt(int n) {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
@@ -138,39 +151,50 @@ class PostListMetaRow extends StatelessWidget {
     final metaSize = metrics.metaFontSize;
     final statSize = metrics.statFontSize;
 
+    final viewColor = premiumBlack ? PostCardPremiumColors.textSecondary : scheme.primary;
+    final likeColor = premiumBlack ? PostCardPremiumColors.accentRose : scheme.error;
+    final commentColor =
+        premiumBlack ? PostCardPremiumColors.textSecondary : scheme.tertiary;
+    final shareColor =
+        premiumBlack ? PostCardPremiumColors.textMuted : scheme.secondary;
+
     final stats = <Widget>[
       if (metrics.showViewStat)
         _InlineStat(
           icon: Icons.visibility_outlined,
           value: _fmt(post.viewCount),
-          color: scheme.primary,
+          color: viewColor,
           size: statSize,
+          premiumBlack: premiumBlack,
         ),
       if (metrics.showLikeStat) ...[
-        if (metrics.showViewStat) SizedBox(width: metrics.compact ? 4 : 6),
+        if (metrics.showViewStat) SizedBox(width: metrics.compact ? 6 : 8),
         _InlineStat(
           icon: Icons.favorite_border_rounded,
           value: _fmt(post.likeCount),
-          color: scheme.error,
+          color: likeColor,
           size: statSize,
+          premiumBlack: premiumBlack,
         ),
       ],
       if (metrics.showCommentStat) ...[
-        SizedBox(width: metrics.compact ? 4 : 6),
+        SizedBox(width: metrics.compact ? 6 : 8),
         _InlineStat(
           icon: Icons.chat_bubble_outline_rounded,
           value: _fmt(post.commentCount),
-          color: scheme.tertiary,
+          color: commentColor,
           size: statSize,
+          premiumBlack: premiumBlack,
         ),
       ],
       if (metrics.showShareStat) ...[
-        SizedBox(width: metrics.compact ? 4 : 6),
+        SizedBox(width: metrics.compact ? 6 : 8),
         _InlineStat(
           icon: Icons.share_outlined,
           value: _fmt(post.shareCount),
-          color: scheme.secondary,
+          color: shareColor,
           size: statSize,
+          premiumBlack: premiumBlack,
         ),
       ],
     ];
@@ -182,51 +206,44 @@ class PostListMetaRow extends StatelessWidget {
       style: TextStyle(
         fontSize: metaSize,
         fontWeight: FontWeight.w500,
-        color: scheme.onSurfaceVariant,
-        height: 1.1,
+        letterSpacing: premiumBlack ? 0.15 : 0,
+        color: premiumBlack
+            ? PostCardPremiumColors.textMuted
+            : scheme.onSurfaceVariant,
+        height: 1.2,
       ),
     );
 
-    final locationCoords = managedPostFilterCoordinates(post);
     final locationRow = location != null
-        ? Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: locationCoords == null
-                  ? null
-                  : () => applyPostLocationProximityFilter(context, post),
-              borderRadius: BorderRadius.circular(4),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 1),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_rounded,
-                      size: metaSize + 3,
-                      color: scheme.tertiary,
-                    ),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        location,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: metaSize + 0.5,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.tertiary,
-                          height: 1.1,
-                          decoration: locationCoords != null
-                              ? TextDecoration.underline
-                              : null,
-                          decorationColor:
-                              scheme.tertiary.withValues(alpha: 0.45),
-                        ),
-                      ),
-                    ),
-                  ],
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_on_rounded,
+                  size: metaSize + 2.5,
+                  color: premiumBlack
+                      ? PostCardPremiumColors.accentGold
+                      : scheme.tertiary,
                 ),
-              ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    location,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: metaSize + (premiumBlack ? 0.75 : 0.5),
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: premiumBlack ? 0.1 : 0,
+                      color: premiumBlack
+                          ? PostCardPremiumColors.accentGold
+                          : scheme.tertiary,
+                      height: 1.15,
+                    ),
+                  ),
+                ),
+              ],
             ),
           )
         : null;
@@ -237,18 +254,41 @@ class PostListMetaRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               dateRow,
-              SizedBox(height: metrics.compact ? 2 : 3),
+              SizedBox(height: metrics.compact ? 4 : 5),
               locationRow,
             ],
           );
 
+    final insetPadding = EdgeInsets.symmetric(
+      horizontal: metrics.compact ? 8 : 10,
+      vertical: metrics.compact ? 8 : 9,
+    );
+
+    final insetDecoration = BoxDecoration(
+      color: premiumBlack
+          ? PostCardPremiumColors.surfaceInset
+          : (hovered && metrics.enableHoverEffects
+              ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
+              : scheme.surfaceContainerLowest.withValues(alpha: 0.7)),
+      borderRadius: BorderRadius.circular(premiumBlack ? 10 : 8),
+      border: Border.all(
+        color: premiumBlack
+            ? (hovered && metrics.enableHoverEffects
+                ? PostCardPremiumColors.borderSoft
+                : PostCardPremiumColors.borderSubtle)
+            : scheme.outlineVariant.withValues(
+                alpha: hovered && metrics.enableHoverEffects ? 0.8 : 0.55,
+              ),
+      ),
+    );
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      padding: EdgeInsets.symmetric(
+      padding: premiumBlack ? insetPadding : EdgeInsets.symmetric(
         vertical: metrics.compact ? 3 : 4,
         horizontal: metrics.compact ? 4 : 6,
       ),
-      decoration: BoxDecoration(
+      decoration: premiumBlack ? insetDecoration : BoxDecoration(
         color: hovered && metrics.enableHoverEffects
             ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
             : scheme.surfaceContainerLowest.withValues(alpha: 0.7),
@@ -264,10 +304,17 @@ class PostListMetaRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 dateLocationRow,
-                SizedBox(height: metrics.compact ? 3 : 4),
+                SizedBox(height: metrics.compact ? 8 : 9),
+                if (premiumBlack)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: PostCardPremiumColors.borderSubtle,
+                  ),
+                if (premiumBlack) SizedBox(height: metrics.compact ? 7 : 8),
                 Wrap(
-                  spacing: metrics.compact ? 2 : 4,
-                  runSpacing: 2,
+                  spacing: metrics.compact ? 4 : 6,
+                  runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: stats,
                 ),
@@ -276,7 +323,7 @@ class PostListMetaRow extends StatelessWidget {
           : Row(
               children: [
                 Expanded(flex: 3, child: dateLocationRow),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 ...stats,
               ],
             ),
@@ -290,27 +337,35 @@ class _InlineStat extends StatelessWidget {
     required this.value,
     required this.color,
     required this.size,
+    this.premiumBlack = false,
   });
 
   final IconData icon;
   final String value;
   final Color color;
   final double size;
+  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: size + 1, color: color.withValues(alpha: 0.85)),
-        const SizedBox(width: 2),
+        Icon(
+          icon,
+          size: size + (premiumBlack ? 0.5 : 1),
+          color: color.withValues(alpha: premiumBlack ? 0.9 : 0.85),
+        ),
+        SizedBox(width: premiumBlack ? 3 : 2),
         Text(
           value,
           style: TextStyle(
             fontSize: size,
-            fontWeight: FontWeight.w700,
-            color: color,
+            fontWeight: FontWeight.w600,
+            letterSpacing: premiumBlack ? 0.2 : 0,
+            color: premiumBlack ? PostCardPremiumColors.textSecondary : color,
             height: 1,
+            fontFeatures: premiumBlack ? const [FontFeature.tabularFigures()] : null,
           ),
         ),
       ],

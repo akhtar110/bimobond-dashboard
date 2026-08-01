@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../domain/entities/chat_entities.dart';
 import '../../domain/entities/chat_queries.dart';
@@ -13,8 +12,8 @@ abstract class ChatManagementRemoteDataSource {
     ChatMessagesQuery query,
   );
   Future<ChatEntity> updateChat(String id, UpdateChatData data);
-  Future<void> deleteChat(String id);
-  Future<void> deleteMessage(String messageId);
+  Future<ChatDeleteResultEntity> deleteChat(String id);
+  Future<ChatMessageDeleteResultEntity> deleteMessage(String messageId);
   Future<ChatBulkResultEntity> bulkAction({
     required ChatBulkAction action,
     List<String> chatIds = const [],
@@ -28,47 +27,20 @@ class ChatManagementRemoteDataSourceImpl
 
   final Dio _dio;
 
-  Future<Options> _authorizedOptions({bool forceRefresh = false}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final idToken =
-        user != null ? await user.getIdToken(forceRefresh) : null;
-    if (idToken == null || idToken.isEmpty) {
-      throw Exception('Missing or invalid authorization header');
-    }
-    return Options(
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': 'application/json',
-      },
-    );
+  Map<String, dynamic>? _bodyMap(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    return null;
   }
 
-  Future<Response<dynamic>> _get(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-    bool forceRefresh = false,
-  }) async {
-    try {
-      return await _dio.get(
-        path,
-        queryParameters: queryParameters,
-        options: await _authorizedOptions(forceRefresh: forceRefresh),
-      );
-    } on DioException catch (e) {
-      if (!forceRefresh && e.response?.statusCode == 401) {
-        return _get(
-          path,
-          queryParameters: queryParameters,
-          forceRefresh: true,
-        );
-      }
-      rethrow;
-    }
+  Map<String, dynamic> _unwrapPayload(Map<String, dynamic> body) {
+    final nested = body['data'];
+    if (nested is Map<String, dynamic>) return nested;
+    return body;
   }
 
   @override
   Future<ChatListPageEntity> getAllChats(ChatListQuery query) async {
-    final response = await _get(
+    final response = await _dio.get<Map<String, dynamic>>(
       '/chats/admin/all',
       queryParameters: query.toQueryParameters(),
     );
@@ -77,15 +49,10 @@ class ChatManagementRemoteDataSourceImpl
 
   @override
   Future<ChatEntity> getChatById(String id) async {
-    final response = await _get('/chats/admin/$id');
-    final data = response.data;
-    if (data is Map<String, dynamic>) {
-      final payload = data['data'] is Map<String, dynamic>
-          ? data['data'] as Map<String, dynamic>
-          : data;
-      return ChatModel.fromJson(payload);
-    }
-    throw Exception('Invalid chat response');
+    final response = await _dio.get<Map<String, dynamic>>('/chats/admin/$id');
+    final body = _bodyMap(response.data);
+    if (body == null) throw Exception('Invalid chat response');
+    return ChatModel.fromJson(_unwrapPayload(body));
   }
 
   @override
@@ -93,7 +60,7 @@ class ChatManagementRemoteDataSourceImpl
     String chatId,
     ChatMessagesQuery query,
   ) async {
-    final response = await _get(
+    final response = await _dio.get<Map<String, dynamic>>(
       '/chats/admin/$chatId/messages',
       queryParameters: query.toQueryParameters(),
     );
@@ -102,34 +69,35 @@ class ChatManagementRemoteDataSourceImpl
 
   @override
   Future<ChatEntity> updateChat(String id, UpdateChatData data) async {
-    final response = await _dio.patch(
+    final response = await _dio.patch<Map<String, dynamic>>(
       '/chats/admin/$id',
       data: data.toJson(),
-      options: await _authorizedOptions(),
     );
-    final body = response.data;
-    if (body is Map<String, dynamic>) {
-      final payload = body['data'] is Map<String, dynamic>
-          ? body['data'] as Map<String, dynamic>
-          : body;
-      return ChatModel.fromJson(payload);
-    }
-    throw Exception('Invalid chat update response');
+    final body = _bodyMap(response.data);
+    if (body == null) throw Exception('Invalid chat update response');
+    return ChatModel.fromJson(_unwrapPayload(body));
   }
 
   @override
-  Future<void> deleteChat(String id) async {
-    await _dio.delete(
+  Future<ChatDeleteResultEntity> deleteChat(String id) async {
+    final response = await _dio.delete<Map<String, dynamic>>(
       '/chats/admin/$id',
-      options: await _authorizedOptions(),
     );
+    final body = _bodyMap(response.data);
+    if (body == null) throw Exception('Invalid delete chat response');
+    return ChatDeleteResultModel.fromJson(body, fallbackChatId: id);
   }
 
   @override
-  Future<void> deleteMessage(String messageId) async {
-    await _dio.delete(
+  Future<ChatMessageDeleteResultEntity> deleteMessage(String messageId) async {
+    final response = await _dio.delete<Map<String, dynamic>>(
       '/chats/admin/messages/$messageId',
-      options: await _authorizedOptions(),
+    );
+    final body = _bodyMap(response.data);
+    if (body == null) throw Exception('Invalid delete message response');
+    return ChatMessageDeleteResultModel.fromJson(
+      body,
+      fallbackMessageId: messageId,
     );
   }
 
@@ -148,15 +116,12 @@ class ChatManagementRemoteDataSourceImpl
     if (chatIds.isNotEmpty) body['chatIds'] = chatIds;
     if (messageIds.isNotEmpty) body['messageIds'] = messageIds;
 
-    final response = await _dio.post(
+    final response = await _dio.post<Map<String, dynamic>>(
       '/chats/admin/bulk',
       data: body,
-      options: await _authorizedOptions(),
     );
-    final data = response.data;
-    if (data is Map<String, dynamic>) {
-      return ChatBulkResultModel.fromJson(data, action);
-    }
-    throw Exception('Invalid bulk response');
+    final data = _bodyMap(response.data);
+    if (data == null) throw Exception('Invalid bulk response');
+    return ChatBulkResultModel.fromJson(data, action);
   }
 }

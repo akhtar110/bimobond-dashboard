@@ -71,14 +71,15 @@ class ChatParticipantModel extends ChatParticipantEntity {
   });
 
   factory ChatParticipantModel.fromJson(Map<String, dynamic> json) {
+    final userId = json['userId']?.toString() ?? '';
     return ChatParticipantModel(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ?? userId,
       chatId: json['chatId']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
+      userId: userId,
       role: json['role']?.toString() ?? 'MEMBER',
       isMuted: json['isMuted'] == true,
       isPinned: json['isPinned'] == true,
-      joinedAt: _date(json['joinedAt']) ?? DateTime.now(),
+      joinedAt: _date(json['joinedAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
       user: json['user'] is Map<String, dynamic>
           ? ChatUserSummaryModel.fromJson(json['user'] as Map<String, dynamic>)
           : null,
@@ -99,17 +100,18 @@ class ChatPreviewMessageModel extends ChatPreviewMessage {
   });
 
   factory ChatPreviewMessageModel.fromJson(Map<String, dynamic> json) {
+    final sender = json['sender'] is Map<String, dynamic>
+        ? ChatUserSummaryModel.fromJson(json['sender'] as Map<String, dynamic>)
+        : null;
     return ChatPreviewMessageModel(
       id: json['id']?.toString() ?? '',
       chatId: json['chatId']?.toString() ?? '',
-      senderId: json['senderId']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? sender?.id ?? '',
       type: chatMessageTypeFromApi(json['type']?.toString()),
       content: json['content']?.toString(),
       isDeleted: json['isDeleted'] == true,
       createdAt: _date(json['createdAt']) ?? DateTime.now(),
-      sender: json['sender'] is Map<String, dynamic>
-          ? ChatUserSummaryModel.fromJson(json['sender'] as Map<String, dynamic>)
-          : null,
+      sender: sender,
     );
   }
 }
@@ -173,15 +175,18 @@ class ChatMessageReactionModel extends ChatMessageReaction {
   });
 
   factory ChatMessageReactionModel.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] is Map<String, dynamic>
+        ? ChatUserSummaryModel.fromJson(json['user'] as Map<String, dynamic>)
+        : null;
+    final userId = json['userId']?.toString() ?? user?.id ?? '';
+    final emoji = json['emoji']?.toString() ?? '';
     return ChatMessageReactionModel(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ?? '$userId-$emoji',
       messageId: json['messageId']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
-      emoji: json['emoji']?.toString() ?? '',
+      userId: userId,
+      emoji: emoji,
       createdAt: _date(json['createdAt']) ?? DateTime.now(),
-      user: json['user'] is Map<String, dynamic>
-          ? ChatUserSummaryModel.fromJson(json['user'] as Map<String, dynamic>)
-          : null,
+      user: user,
     );
   }
 }
@@ -196,14 +201,16 @@ class ChatReadReceiptModel extends ChatReadReceipt {
   });
 
   factory ChatReadReceiptModel.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] is Map<String, dynamic>
+        ? ChatUserSummaryModel.fromJson(json['user'] as Map<String, dynamic>)
+        : null;
+    final userId = json['userId']?.toString() ?? user?.id ?? '';
     return ChatReadReceiptModel(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ?? userId,
       messageId: json['messageId']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
+      userId: userId,
       readAt: _date(json['readAt']) ?? DateTime.now(),
-      user: json['user'] is Map<String, dynamic>
-          ? ChatUserSummaryModel.fromJson(json['user'] as Map<String, dynamic>)
-          : null,
+      user: user,
     );
   }
 }
@@ -252,7 +259,11 @@ class ChatMessageModel extends ChatMessageEntity {
     return ChatMessageModel(
       id: json['id']?.toString() ?? '',
       chatId: json['chatId']?.toString() ?? '',
-      senderId: json['senderId']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ??
+          (json['sender'] is Map<String, dynamic>
+              ? json['sender']['id']?.toString()
+              : null) ??
+          '',
       type: resolvedType,
       content: json['content']?.toString(),
       mediaUrl: json['mediaUrl']?.toString(),
@@ -395,6 +406,42 @@ class ChatBulkResultModel extends ChatBulkResultEntity {
   static List<String> _ids(dynamic value) {
     if (value is! List) return const [];
     return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+  }
+}
+
+class ChatDeleteResultModel extends ChatDeleteResultEntity {
+  const ChatDeleteResultModel({
+    required super.success,
+    required super.chatId,
+  });
+
+  factory ChatDeleteResultModel.fromJson(
+    Map<String, dynamic> json, {
+    required String fallbackChatId,
+  }) {
+    return ChatDeleteResultModel(
+      success: json['success'] == true,
+      chatId: json['chatId']?.toString() ?? fallbackChatId,
+    );
+  }
+}
+
+class ChatMessageDeleteResultModel extends ChatMessageDeleteResultEntity {
+  const ChatMessageDeleteResultModel({
+    required super.success,
+    required super.messageId,
+    required super.chatId,
+  });
+
+  factory ChatMessageDeleteResultModel.fromJson(
+    Map<String, dynamic> json, {
+    required String fallbackMessageId,
+  }) {
+    return ChatMessageDeleteResultModel(
+      success: json['success'] == true,
+      messageId: json['messageId']?.toString() ?? fallbackMessageId,
+      chatId: json['chatId']?.toString() ?? '',
+    );
   }
 }
 

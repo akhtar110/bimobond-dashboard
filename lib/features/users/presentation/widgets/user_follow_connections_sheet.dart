@@ -6,9 +6,14 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../injection_container.dart' as di;
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_follow_entity.dart';
+import '../bloc/user_detail_bloc.dart';
+import '../bloc/user_detail_event.dart';
+import '../bloc/user_detail_state.dart';
 import '../cubit/user_follow_list_cubit.dart';
+import '../utils/user_follow_remove.dart';
 import 'permission_denied_state.dart';
 
 void showUserFollowConnectionsSheet(
@@ -16,17 +21,34 @@ void showUserFollowConnectionsSheet(
   UserEntity user, {
   required int initialTab,
 }) {
+  UserDetailBloc? detailBloc;
+  try {
+    detailBloc = context.read<UserDetailBloc>();
+  } on ProviderNotFoundException {
+    detailBloc = null;
+  }
+
   showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: false,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => UserFollowConnectionsSheet(
-      userId: user.id,
-      followerCount: user.followerCount,
-      followingCount: user.followingCount,
-      initialTab: initialTab,
-    ),
+    builder: (sheetContext) {
+      final sheet = UserFollowConnectionsSheet(
+        userId: user.id,
+        followerCount: user.followerCount,
+        followingCount: user.followingCount,
+        initialTab: initialTab,
+      );
+
+      if (detailBloc == null) return sheet;
+
+      return BlocProvider<UserDetailBloc>.value(
+        value: detailBloc,
+        child: sheet,
+      );
+    },
   );
 }
 
@@ -51,10 +73,14 @@ class UserFollowConnectionsSheet extends StatefulWidget {
 class UserFollowConnectionsSheetState extends State<UserFollowConnectionsSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late int _followerCount;
+  late int _followingCount;
 
   @override
   void initState() {
     super.initState();
+    _followerCount = widget.followerCount;
+    _followingCount = widget.followingCount;
     _tabController = TabController(
       length: 2,
       vsync: this,
@@ -68,8 +94,39 @@ class UserFollowConnectionsSheetState extends State<UserFollowConnectionsSheet>
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  void _onFollowEdgeRemoved(UserFollowListKind kind) {
+    setState(() {
+      switch (kind) {
+        case UserFollowListKind.followers:
+          if (_followerCount > 0) _followerCount--;
+        case UserFollowListKind.following:
+          if (_followingCount > 0) _followingCount--;
+      }
+    });
+
+    try {
+      context
+          .read<UserDetailBloc>()
+          .add(AdjustUserFollowCountsEvent(kind: kind));
+    } on ProviderNotFoundException {
+      // Sheet opened outside user detail scope.
+    }
+  }
+
+  (int followerCount, int followingCount) _countsFromDetailState(
+    UserDetailState? state,
+  ) {
+    if (state is UserDetailLoaded && state.userDetail.user.id == widget.userId) {
+      final user = state.userDetail.user;
+      return (user.followerCount, user.followingCount);
+    }
+    return (_followerCount, _followingCount);
+  }
+
+  Widget _buildSheet({
+    required int followerCount,
+    required int followingCount,
+  }) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
@@ -104,7 +161,7 @@ class UserFollowConnectionsSheetState extends State<UserFollowConnectionsSheet>
                     children: [
                       Text(l10n.t('followers')),
                       const SizedBox(width: 6),
-                      UserFollowCountBadge(count: widget.followerCount),
+                      UserFollowCountBadge(count: followerCount),
                     ],
                   ),
                 ),
@@ -114,7 +171,7 @@ class UserFollowConnectionsSheetState extends State<UserFollowConnectionsSheet>
                     children: [
                       Text(l10n.t('following')),
                       const SizedBox(width: 6),
-                      UserFollowCountBadge(count: widget.followingCount),
+                      UserFollowCountBadge(count: followingCount),
                     ],
                   ),
                 ),
@@ -128,10 +185,14 @@ class UserFollowConnectionsSheetState extends State<UserFollowConnectionsSheet>
                   UserFollowListTab(
                     userId: widget.userId,
                     kind: UserFollowListKind.followers,
+                    onFollowEdgeRemoved: () =>
+                        _onFollowEdgeRemoved(UserFollowListKind.followers),
                   ),
                   UserFollowListTab(
                     userId: widget.userId,
                     kind: UserFollowListKind.following,
+                    onFollowEdgeRemoved: () =>
+                        _onFollowEdgeRemoved(UserFollowListKind.following),
                   ),
                 ],
               ),
@@ -139,6 +200,39 @@ class UserFollowConnectionsSheetState extends State<UserFollowConnectionsSheet>
           ],
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDetailBloc = context.findAncestorWidgetOfExactType<
+            BlocProvider<UserDetailBloc>>() !=
+        null;
+
+    if (!hasDetailBloc) {
+      return _buildSheet(
+        followerCount: _followerCount,
+        followingCount: _followingCount,
+      );
+    }
+
+    return BlocBuilder<UserDetailBloc, UserDetailState>(
+      buildWhen: (previous, current) {
+        if (current is! UserDetailLoaded) return previous != current;
+        if (previous is! UserDetailLoaded) return true;
+        final prev = previous.userDetail.user;
+        final next = current.userDetail.user;
+        return prev.followerCount != next.followerCount ||
+            prev.followingCount != next.followingCount;
+      },
+      builder: (context, detailState) {
+        final (followerCount, followingCount) =
+            _countsFromDetailState(detailState);
+        return _buildSheet(
+          followerCount: followerCount,
+          followingCount: followingCount,
+        );
+      },
     );
   }
 }
@@ -173,31 +267,46 @@ class UserFollowListTab extends StatelessWidget {
   const UserFollowListTab({
     required this.userId,
     required this.kind,
+    this.onFollowEdgeRemoved,
   });
 
   final String userId;
   final UserFollowListKind kind;
+  final VoidCallback? onFollowEdgeRemoved;
 
   @override
   Widget build(BuildContext context) {
+    final canForceRemove = PermissionManager.canUpdateUsers(context);
+
     return BlocProvider(
       create: (_) => UserFollowListCubit(
         getUserFollowList: di.sl(),
+        forceRemoveFollower: canForceRemove ? di.sl() : null,
         userId: userId,
         kind: kind,
       )..load(),
-      child: const UserFollowListTabBody(),
+      child: UserFollowListTabBody(
+        kind: kind,
+        onFollowEdgeRemoved: onFollowEdgeRemoved,
+      ),
     );
   }
 }
 
 class UserFollowListTabBody extends StatelessWidget {
-  const UserFollowListTabBody();
+  const UserFollowListTabBody({
+    required this.kind,
+    this.onFollowEdgeRemoved,
+  });
+
+  final UserFollowListKind kind;
+  final VoidCallback? onFollowEdgeRemoved;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final canForceRemove = PermissionManager.canUpdateUsers(context);
 
     return BlocBuilder<UserFollowListCubit, UserFollowListState>(
       builder: (context, state) {
@@ -238,7 +347,22 @@ class UserFollowListTabBody extends StatelessWidget {
                   itemCount: state.users.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    return UserFollowUserListTile(user: state.users[index]);
+                    final user = state.users[index];
+                    return UserFollowUserListTile(
+                      user: user,
+                      kind: kind,
+                      showRemoveAction: canForceRemove,
+                      isRemoving: state.removingFollowerId == user.id,
+                      onRemove: canForceRemove
+                          ? () => confirmAndForceRemoveFollowEdge(
+                                context: context,
+                                kind: kind,
+                                user: user,
+                                cubit: context.read<UserFollowListCubit>(),
+                                onRemoved: onFollowEdgeRemoved,
+                              )
+                          : null,
+                    );
                   },
                 ),
               ),
@@ -279,9 +403,19 @@ class UserFollowListTabBody extends StatelessWidget {
 }
 
 class UserFollowUserListTile extends StatelessWidget {
-  const UserFollowUserListTile({required this.user});
+  const UserFollowUserListTile({
+    required this.user,
+    required this.kind,
+    this.showRemoveAction = false,
+    this.isRemoving = false,
+    this.onRemove,
+  });
 
   final UserFollowSummaryEntity user;
+  final UserFollowListKind kind;
+  final bool showRemoveAction;
+  final bool isRemoving;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -378,7 +512,34 @@ class UserFollowUserListTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+              if (showRemoveAction && onRemove != null) ...[
+                isRemoving
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.error,
+                        ),
+                      )
+                    : IconButton(
+                        tooltip: context.l10n.tOr(
+                          kind == UserFollowListKind.followers
+                              ? 'removeFollower'
+                              : 'removeFollowing',
+                          kind == UserFollowListKind.followers
+                              ? 'Remove follower'
+                              : 'Remove following',
+                        ),
+                        onPressed: onRemove,
+                        icon: Icon(
+                          Icons.person_remove_outlined,
+                          color: scheme.error,
+                        ),
+                      ),
+              ] else
+                Icon(Icons.chevron_right_rounded,
+                    color: scheme.onSurfaceVariant),
             ],
           ),
         ),

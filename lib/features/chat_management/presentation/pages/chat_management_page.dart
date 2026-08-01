@@ -5,8 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
+import '../../../rbac/presentation/utils/permission_manager.dart';
+import '../../../rbac/presentation/widgets/access_denied_view.dart';
 import '../bloc/chat_management_bloc.dart';
 import '../widgets/chat_list_panel.dart';
+import '../widgets/chat_management_header.dart';
 import '../widgets/chat_messages_panel.dart';
 import '../widgets/chat_moderation_sidebar.dart';
 
@@ -16,11 +19,15 @@ class ChatManagementPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kDebugMode) debugPrint('ChatManagementPage rebuilt');
-    return PersistentBlocProvider<ChatManagementBloc>(
-      debugLabel: 'ChatManagementPage',
-      create: () =>
-          di.sl<ChatManagementBloc>()..add(const ChatManagementStarted()),
-      child: const _ChatManagementPageView(),
+    return FeatureAccessBoundary(
+      canAccess: PermissionManager.canReadChatAdmin,
+      requireAuthContext: true,
+      child: PersistentBlocProvider<ChatManagementBloc>(
+        debugLabel: 'ChatManagementPage',
+        create: () =>
+            di.sl<ChatManagementBloc>()..add(const ChatManagementStarted()),
+        child: const _ChatManagementPageView(),
+      ),
     );
   }
 }
@@ -78,51 +85,44 @@ class _ChatManagementPageViewState extends State<_ChatManagementPageView> {
       },
       builder: (context, state) {
         if (state is! ChatManagementLoaded) {
-          return const SizedBox.shrink();
+          return Center(
+            child: CircularProgressIndicator(
+              color: scheme.primary,
+            ),
+          );
         }
 
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                scheme.surfaceContainerLowest,
-                scheme.surface,
-                Color.alphaBlend(
-                  scheme.primary.withValues(alpha: 0.05),
-                  scheme.surfaceContainerLow,
-                ),
-              ],
+        return ColoredBox(
+          color: scheme.surfaceContainerLowest,
+          child: SizedBox.expand(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final useDesktopPagination = width >= 1200;
+                if (width >= 1400) {
+                  return _DesktopLayout(
+                    state: state,
+                    chatsScroll: _chatsScroll,
+                    messagesScroll: _messagesScroll,
+                    useDesktopPagination: useDesktopPagination,
+                  );
+                }
+                if (width >= 900) {
+                  return _TabletLayout(
+                    state: state,
+                    chatsScroll: _chatsScroll,
+                    messagesScroll: _messagesScroll,
+                    useDesktopPagination: useDesktopPagination,
+                  );
+                }
+                return _MobileLayout(
+                  state: state,
+                  chatsScroll: _chatsScroll,
+                  messagesScroll: _messagesScroll,
+                  useDesktopPagination: useDesktopPagination,
+                );
+              },
             ),
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final useDesktopPagination = width >= 1200;
-              if (width >= 1400) {
-                return _DesktopLayout(
-                  state: state,
-                  chatsScroll: _chatsScroll,
-                  messagesScroll: _messagesScroll,
-                  useDesktopPagination: useDesktopPagination,
-                );
-              }
-              if (width >= 900) {
-                return _TabletLayout(
-                  state: state,
-                  chatsScroll: _chatsScroll,
-                  messagesScroll: _messagesScroll,
-                  useDesktopPagination: useDesktopPagination,
-                );
-              }
-              return _MobileLayout(
-                state: state,
-                chatsScroll: _chatsScroll,
-                messagesScroll: _messagesScroll,
-                useDesktopPagination: useDesktopPagination,
-              );
-            },
           ),
         );
       },
@@ -172,12 +172,13 @@ class _DesktopLayout extends StatelessWidget {
     final bloc = context.read<ChatManagementBloc>();
     return Column(
       children: [
+        ChatManagementHeader(state: state),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                width: 380,
+                width: 320,
                 child: ChatListPanel(
                   state: state,
                   scrollController: chatsScroll,
@@ -190,13 +191,8 @@ class _DesktopLayout extends StatelessWidget {
                   state: state,
                   scrollController: messagesScroll,
                   useDesktopPagination: false,
-                  onLoadMore: () =>
-                      bloc.add(const MessagesLoadMoreRequested()),
+                  onLoadMore: () => bloc.add(const MessagesLoadMoreRequested()),
                 ),
-              ),
-              SizedBox(
-                width: 320,
-                child: ChatModerationSidebar(state: state),
               ),
             ],
           ),
@@ -222,59 +218,37 @@ class _TabletLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final bloc = context.read<ChatManagementBloc>();
-    return DefaultTabController(
-      length: 3,
-      child: Column(
-        children: [
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 340,
-                  child: ChatListPanel(
-                    state: state,
-                    scrollController: chatsScroll,
-                    useDesktopPagination: useDesktopPagination,
-                    onLoadMore: () => bloc.add(const ChatsLoadMoreRequested()),
-                  ),
+    return Column(
+      children: [
+        ChatManagementHeader(state: state),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 300,
+                child: ChatListPanel(
+                  state: state,
+                  scrollController: chatsScroll,
+                  useDesktopPagination: useDesktopPagination,
+                  onLoadMore: () => bloc.add(const ChatsLoadMoreRequested()),
                 ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      TabBar(
-                        tabs: [
-                          Tab(text: l10n.t('messages')),
-                          Tab(text: l10n.t('participants')),
-                          Tab(text: l10n.t('chatAnalytics')),
-                        ],
-                      ),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            ChatMessagesPanel(
-                              state: state,
-                              scrollController: messagesScroll,
-                              useDesktopPagination: false,
-                              onLoadMore: () => bloc
-                                  .add(const MessagesLoadMoreRequested()),
-                            ),
-                            ChatModerationSidebar(state: state),
-                            ChatModerationSidebar(state: state),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+              ),
+              Expanded(
+                child: ChatMessagesPanel(
+                  state: state,
+                  scrollController: messagesScroll,
+                  useDesktopPagination: false,
+                  onLoadMore: () =>
+                      bloc.add(const MessagesLoadMoreRequested()),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          ChatBulkActionToolbar(state: state),
-        ],
-      ),
+        ),
+        ChatBulkActionToolbar(state: state),
+      ],
     );
   }
 }
@@ -298,6 +272,7 @@ class _MobileLayout extends StatelessWidget {
     if (state.selectedChat == null) {
       return Column(
         children: [
+          ChatManagementHeader(state: state),
           Expanded(
             child: ChatListPanel(
               state: state,
@@ -313,6 +288,7 @@ class _MobileLayout extends StatelessWidget {
 
     return Column(
       children: [
+        ChatManagementHeader(state: state),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -331,10 +307,6 @@ class _MobileLayout extends StatelessWidget {
             useDesktopPagination: false,
             onLoadMore: () => bloc.add(const MessagesLoadMoreRequested()),
           ),
-        ),
-        SizedBox(
-          height: (MediaQuery.sizeOf(context).height * 0.26).clamp(140.0, 220.0),
-          child: ChatModerationSidebar(state: state),
         ),
         ChatBulkActionToolbar(state: state),
       ],

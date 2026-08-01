@@ -257,12 +257,20 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     ),
                     SizedBox(height: metrics.sectionSpacing),
                     BlocSelector<UserDetailBloc, UserDetailState,
-                        ({UserEntity user, UserWalletEntity? wallet})?>(
+                        ({
+                          UserEntity user,
+                          UserWalletEntity? wallet,
+                          int followerCount,
+                          int followingCount,
+                        })?>(
                       selector: (s) {
                         if (s is! UserDetailLoaded) return null;
+                        final user = s.userDetail.user;
                         return (
-                          user: s.userDetail.user,
-                          wallet: s.userDetail.wallet ?? s.userDetail.user.wallet,
+                          user: user,
+                          wallet: s.userDetail.wallet ?? user.wallet,
+                          followerCount: user.followerCount,
+                          followingCount: user.followingCount,
                         );
                       },
                       builder: (context, data) {

@@ -89,12 +89,12 @@ import 'features/users/domain/usecases/delete_user.dart';
 import 'features/users/domain/usecases/demote_user.dart';
 import 'features/users/domain/usecases/get_user_by_id.dart';
 import 'features/users/domain/usecases/get_user_follow_list.dart';
+import 'features/users/domain/usecases/force_remove_follower.dart';
 import 'features/users/domain/usecases/get_user_posts.dart';
 import 'features/users/domain/usecases/get_users.dart';
 import 'features/users/domain/usecases/promote_to_admin.dart';
 import 'features/users/domain/usecases/reset_user_password_usecase.dart';
-import 'features/users/domain/usecases/set_user_is_private.dart';
-import 'features/users/domain/usecases/set_user_message_permission.dart';
+import 'features/users/domain/usecases/update_user_privacy_settings.dart';
 import 'features/users/domain/usecases/updte_role.dart';
 import 'features/users/domain/usecases/unban_user.dart';
 import 'features/users/presentation/bloc/users_bloc.dart';
@@ -671,6 +671,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetUserById(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUserPosts(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUserFollowList(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => ForceRemoveFollower(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BanUser(sl<UsersRepository>()));
   sl.registerLazySingleton(() => UnbanUser(sl<UsersRepository>()));
@@ -684,9 +685,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => BulkPromoteUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BulkDemoteUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => ResetUserPasswordUseCase(sl<UsersRepository>()));
-  sl.registerLazySingleton(() => SetUserIsPrivate(sl<UsersRepository>()));
   sl.registerLazySingleton(
-    () => SetUserMessagePermission(sl<UsersRepository>()),
+    () => UpdateUserPrivacySettings(sl<UsersRepository>()),
   );
 
   /// BLOC
@@ -700,8 +700,7 @@ Future<void> init() async {
       demoteUser: sl<DemoteUser>(),
       deleteUser: sl<DeleteUser>(),
       updateUserRoles: sl<UpdateUserRoles>(),
-      setUserIsPrivate: sl<SetUserIsPrivate>(),
-      setUserMessagePermission: sl<SetUserMessagePermission>(),
+      updateUserPrivacySettings: sl<UpdateUserPrivacySettings>(),
     ),
   );
 

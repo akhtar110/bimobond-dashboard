@@ -21,6 +21,7 @@ import 'posts_category_filter.dart';
 import 'posts_datetime_filter.dart';
 import 'posts_time_range_filter.dart';
 import 'posts_location_filter.dart';
+import 'posts_location_picker.dart';
 import 'posts_location_search_field.dart';
 
 /// Opens the adaptive filter panel for posts.
@@ -415,18 +416,10 @@ class PostsFilterPopup extends StatelessWidget {
                             PostsLocationAnchorButtons(
                               filterUser: draft.user,
                               onPlaceSelected: (place) {
-                                final label =
-                                    place.city?.trim().isNotEmpty == true
-                                        ? place.city!.trim()
-                                        : (place.name.trim().isNotEmpty
-                                            ? place.name.trim()
-                                            : l10n.t(
-                                                'postFilterMyLocationAnchor',
-                                              ));
+                                final label = locationFilterLabelFromPlace(place);
                                 cubit.setLocationFilter(
                                   city: label,
-                                  latitude: place.latitude,
-                                  longitude: place.longitude,
+                                  clearAnchor: true,
                                 );
                               },
                             ),
@@ -435,24 +428,19 @@ class PostsFilterPopup extends StatelessWidget {
                               compact: true,
                               selectedPlace:
                                   draft.hasLocationFilter &&
-                                      draft.locationLatitude != null &&
-                                      draft.locationLongitude != null
+                                      draft.locationCity != null
                                   ? CreatePostLocationEntity(
-                                      name: draft.locationCity ?? '',
-                                      latitude: draft.locationLatitude!,
-                                      longitude: draft.locationLongitude!,
+                                      name: draft.locationCity!,
+                                      latitude: 0,
+                                      longitude: 0,
                                       city: draft.locationCity,
                                     )
                                   : null,
                               onPlaceSelected: (place) {
-                                final label =
-                                    place.city?.trim().isNotEmpty == true
-                                    ? place.city!.trim()
-                                    : place.name.trim();
+                                final label = locationFilterLabelFromPlace(place);
                                 cubit.setLocationFilter(
                                   city: label,
-                                  latitude: place.latitude,
-                                  longitude: place.longitude,
+                                  clearAnchor: true,
                                 );
                               },
                               onClear: () =>
@@ -748,18 +736,13 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
     );
   }
 
-  if (draft.hasLocationAnchor) {
+  if (draft.hasLocationFilter) {
     items.add(
       GiftsActiveFilterItem(
         id: 'locationProximity',
         label: postsLocationProximityLabel(
           l10n,
-          PostFilters(
-            locationCity: draft.locationCity,
-            locationLatitude: draft.locationLatitude,
-            locationLongitude: draft.locationLongitude,
-            locationRadiusKm: draft.locationRadiusKm,
-          ),
+          PostFilters(locationCity: draft.locationCity),
         ),
         onRemove: () => cubit.setLocationFilter(clear: true),
       ),
@@ -774,12 +757,10 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
           l10n,
           draft.sort,
           anchorUser: draft.user,
-          filters: draft.hasLocationAnchor
+          filters: draft.hasLocationFilter
               ? PostFilters(
                   sort: draft.sort,
                   locationCity: draft.locationCity,
-                  locationLatitude: draft.locationLatitude,
-                  locationLongitude: draft.locationLongitude,
                 )
               : null,
         ),

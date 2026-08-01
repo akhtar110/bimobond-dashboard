@@ -175,26 +175,36 @@ class _VerticalCardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _MediaPreview(
-          post: post,
-          metrics: metrics,
-          isDark: isDark,
-          hovered: hovered,
-        ),
-        Padding(
-          padding: metrics.bodyPadding,
-          child: _CardContent(
+    final overlap = metrics.premiumBlendOverlap;
+    final avatarOverlap = metrics.premiumAvatarOverlap;
+
+    return ColoredBox(
+      color: PostCardPremiumColors.black,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MediaPreview(
             post: post,
             metrics: metrics,
             isDark: isDark,
             hovered: hovered,
+            blendToBlackFooter: true,
           ),
-        ),
-      ],
+          Transform.translate(
+            offset: Offset(0, -overlap),
+            child: _CardContent(
+              post: post,
+              metrics: metrics,
+              isDark: isDark,
+              hovered: hovered,
+              premiumBlack: true,
+              seamlessFooter: true,
+              avatarOverlap: avatarOverlap,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -217,9 +227,14 @@ class _HorizontalCardBody extends StatelessWidget {
     final thumbSize = metrics.horizontalThumbSize;
 
     return Padding(
-      padding: metrics.bodyPadding,
+      padding: EdgeInsets.fromLTRB(
+        metrics.bodyPadding.left,
+        metrics.bodyPadding.top,
+        metrics.bodyPadding.right,
+        metrics.bodyPadding.bottom,
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
             width: thumbSize,
@@ -239,6 +254,7 @@ class _HorizontalCardBody extends StatelessWidget {
               metrics: metrics,
               isDark: isDark,
               hovered: hovered,
+              premiumBlack: true,
             ),
           ),
         ],
@@ -253,33 +269,80 @@ class _CardContent extends StatelessWidget {
     required this.metrics,
     required this.isDark,
     required this.hovered,
+    this.premiumBlack = false,
+    this.seamlessFooter = false,
+    this.avatarOverlap = 0,
   });
 
   final ManagedPostEntity post;
   final PostCardMetrics metrics;
   final bool isDark;
   final bool hovered;
+  final bool premiumBlack;
+  final bool seamlessFooter;
+  final double avatarOverlap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final authorRow = Transform.translate(
+      offset: seamlessFooter && avatarOverlap > 0
+          ? Offset(0, -avatarOverlap)
+          : Offset.zero,
+      child: _AuthorRow(
+        post: post,
+        isDark: isDark,
+        metrics: metrics,
+        premiumBlack: premiumBlack,
+      ),
+    );
+
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _AuthorRow(
+        authorRow,
+        SizedBox(height: premiumBlack ? metrics.sectionGap + 2 : metrics.sectionGap),
+        _CategoryStatusRow(
           post: post,
-          isDark: isDark,
           metrics: metrics,
+          premiumBlack: premiumBlack,
         ),
-        SizedBox(height: metrics.sectionGap),
-        _CategoryStatusRow(post: post, metrics: metrics),
-        SizedBox(height: metrics.sectionGap),
+        SizedBox(height: premiumBlack ? metrics.sectionGap + 2 : metrics.sectionGap),
         PostListMetaRow(
           post: post,
           metrics: metrics,
           hovered: hovered,
+          premiumBlack: premiumBlack,
         ),
       ],
+    );
+
+    if (!premiumBlack) return content;
+
+    final bodyPadding = seamlessFooter
+        ? metrics.premiumBodyPadding.copyWith(
+            top: (metrics.premiumBodyPadding.top - avatarOverlap * 0.35)
+                .clamp(4.0, double.infinity),
+          )
+        : metrics.premiumBodyPadding;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: PostCardPremiumColors.black,
+        border: seamlessFooter
+            ? null
+            : metrics.isHorizontal
+                ? const Border(
+                    left: BorderSide(color: PostCardPremiumColors.borderSubtle),
+                  )
+                : const Border(
+                    top: BorderSide(color: PostCardPremiumColors.borderSubtle),
+                  ),
+      ),
+      child: Padding(
+        padding: bodyPadding,
+        child: content,
+      ),
     );
   }
 }
@@ -288,6 +351,48 @@ class _CardContent extends StatelessWidget {
 // Media preview
 // ─────────────────────────────────────────────────────────────
 
+/// Premium fade painted only on the image (bottom ~40%), not on the card.
+abstract final class _PremiumImageBlendOverlay {
+  static const zoneHeightFactor = 0.40;
+
+  static const colors = [
+    Color(0x00000000),
+    Color(0x26000000), // rgba(0,0,0,0.15)
+    Color(0x73000000), // rgba(0,0,0,0.45)
+    Color(0xBF000000), // rgba(0,0,0,0.75)
+    PostCardPremiumColors.black,
+  ];
+
+  static const stops = [0.0, 0.5, 0.7, 0.85, 1.0];
+}
+
+class _PremiumImageGradientLayer extends StatelessWidget {
+  const _PremiumImageGradientLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: FractionallySizedBox(
+          heightFactor: _PremiumImageBlendOverlay.zoneHeightFactor,
+          widthFactor: 1,
+          child: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: _PremiumImageBlendOverlay.colors,
+                stops: _PremiumImageBlendOverlay.stops,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MediaPreview extends StatelessWidget {
   const _MediaPreview({
     required this.post,
@@ -295,6 +400,7 @@ class _MediaPreview extends StatelessWidget {
     required this.isDark,
     required this.hovered,
     this.fixedSize,
+    this.blendToBlackFooter = false,
   });
 
   final ManagedPostEntity post;
@@ -302,6 +408,7 @@ class _MediaPreview extends StatelessWidget {
   final bool isDark;
   final bool hovered;
   final double? fixedSize;
+  final bool blendToBlackFooter;
 
   String? get _mediaUrl => post.previewThumbnailUrl;
   bool get _isVideo => post.containsVideoMedia;
@@ -328,26 +435,28 @@ class _MediaPreview extends StatelessWidget {
           )
         else
           _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
-        IgnorePointer(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  scheme.scrim.withValues(alpha: hovered ? 0.08 : 0.04),
-                  Colors.transparent,
-                  Colors.transparent,
-                  scheme.scrim.withValues(
-                    alpha: hovered ? 0.28 : 0.18,
-                  ),
-                ],
-                stops: const [0, 0.35, 0.65, 1],
+        if (blendToBlackFooter)
+          const _PremiumImageGradientLayer()
+        else
+          IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    scheme.scrim.withValues(alpha: hovered ? 0.08 : 0.04),
+                    Colors.transparent,
+                    Colors.transparent,
+                    scheme.scrim.withValues(
+                      alpha: hovered ? 0.28 : 0.18,
+                    ),
+                  ],
+                  stops: const [0, 0.35, 0.65, 1],
+                ),
               ),
             ),
           ),
-        ),
         if (_isVideo) Center(child: _GlassPlayBadge(compact: compact)),
         if (_isCarousel)
           Positioned(
@@ -465,11 +574,13 @@ class _AuthorRow extends StatelessWidget {
     required this.post,
     required this.isDark,
     required this.metrics,
+    this.premiumBlack = false,
   });
 
   final ManagedPostEntity post;
   final bool isDark;
   final PostCardMetrics metrics;
+  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {
@@ -477,7 +588,7 @@ class _AuthorRow extends StatelessWidget {
     final name = postDisplayAuthor(post);
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _Avatar(
           url: post.userProfileImage,
@@ -485,8 +596,9 @@ class _AuthorRow extends StatelessWidget {
           isDark: isDark,
           radius: metrics.avatarRadius,
           fontSize: metrics.compact ? 10 : 11,
+          premiumBlack: premiumBlack,
         ),
-        SizedBox(width: metrics.compact ? 5 : 6),
+        SizedBox(width: metrics.compact ? 8 : 10),
         Expanded(
           child: Text(
             name,
@@ -494,11 +606,13 @@ class _AuthorRow extends StatelessWidget {
             softWrap: true,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: metrics.authorFontSize,
-              height: 1.2,
-              letterSpacing: -0.1,
-              color: scheme.onSurface,
+              fontWeight: FontWeight.w600,
+              fontSize: metrics.authorFontSize + (premiumBlack ? 0.5 : 0),
+              height: 1.25,
+              letterSpacing: premiumBlack ? 0.15 : -0.1,
+              color: premiumBlack
+                  ? PostCardPremiumColors.textPrimary
+                  : scheme.onSurface,
             ),
           ),
         ),
@@ -514,6 +628,7 @@ class _Avatar extends StatelessWidget {
     required this.isDark,
     required this.radius,
     required this.fontSize,
+    this.premiumBlack = false,
   });
 
   final String? url;
@@ -521,39 +636,57 @@ class _Avatar extends StatelessWidget {
   final bool isDark;
   final double radius;
   final double fontSize;
+  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final ringColor = premiumBlack
+        ? PostCardPremiumColors.accentGold.withValues(alpha: 0.55)
+        : scheme.primary.withValues(alpha: 0.22);
 
     return Container(
       padding: const EdgeInsets.all(1.5),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: scheme.primary.withValues(alpha: 0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: ringColor, width: premiumBlack ? 1.2 : 1),
+        boxShadow: premiumBlack
+            ? [
+                BoxShadow(
+                  color: PostCardPremiumColors.accentGold.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: 0.06),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: url != null && url!.isNotEmpty
           ? CircleAvatar(
               radius: radius,
               backgroundImage: CachedNetworkImageProvider(url!),
-              backgroundColor: scheme.surfaceContainerHighest,
+              backgroundColor: premiumBlack
+                  ? const Color(0xFF1A1A1A)
+                  : scheme.surfaceContainerHighest,
             )
           : CircleAvatar(
               radius: radius,
-              backgroundColor: scheme.primaryContainer,
+              backgroundColor: premiumBlack
+                  ? const Color(0xFF1A1A1A)
+                  : scheme.primaryContainer,
               child: Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: FontWeight.w700,
-                  color: scheme.onPrimaryContainer,
+                  color: premiumBlack
+                      ? PostCardPremiumColors.accentGold
+                      : scheme.onPrimaryContainer,
                 ),
               ),
             ),
@@ -566,16 +699,21 @@ class _Avatar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 
 class _CategoryStatusRow extends StatelessWidget {
-  const _CategoryStatusRow({required this.post, required this.metrics});
+  const _CategoryStatusRow({
+    required this.post,
+    required this.metrics,
+    this.premiumBlack = false,
+  });
 
   final ManagedPostEntity post;
   final PostCardMetrics metrics;
+  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: metrics.compact ? 4 : 6,
-      runSpacing: metrics.compact ? 3 : 4,
+      spacing: metrics.compact ? 6 : 8,
+      runSpacing: metrics.compact ? 4 : 5,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (post.categoryEntity != null || post.category != null)
@@ -583,18 +721,28 @@ class _CategoryStatusRow extends StatelessWidget {
             category: post.categoryEntity,
             fallbackName: post.category,
             fontSize: metrics.badgeFontSize,
+            premiumBlack: premiumBlack,
           ),
-        _StatusBadge(status: post.status, fontSize: metrics.badgeFontSize),
+        _StatusBadge(
+          status: post.status,
+          fontSize: metrics.badgeFontSize,
+          premiumBlack: premiumBlack,
+        ),
       ],
     );
   }
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, required this.fontSize});
+  const _StatusBadge({
+    required this.status,
+    required this.fontSize,
+    this.premiumBlack = false,
+  });
 
   final String status;
   final double fontSize;
+  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {
@@ -603,29 +751,37 @@ class _StatusBadge extends StatelessWidget {
     final fg = postStatusColor(status, scheme);
     final label = postStatusLabel(l10n, status);
     final icon = postStatusIcon(status);
+    final displayColor =
+        premiumBlack ? PostCardPremiumColors.accentGold : fg;
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: fontSize < 10 ? 6 : 7,
-        vertical: 3,
+        horizontal: fontSize < 10 ? 7 : 8,
+        vertical: premiumBlack ? 4 : 3,
       ),
       decoration: BoxDecoration(
-        color: fg.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: fg.withValues(alpha: 0.28)),
+        color: premiumBlack
+            ? displayColor.withValues(alpha: 0.1)
+            : fg.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(premiumBlack ? 20 : 8),
+        border: Border.all(
+          color: premiumBlack
+              ? displayColor.withValues(alpha: 0.38)
+              : fg.withValues(alpha: 0.28),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: fontSize + 1, color: fg),
+          Icon(icon, size: fontSize + 1, color: displayColor),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w700,
-              color: fg,
-              letterSpacing: 0.1,
+              fontWeight: FontWeight.w600,
+              color: displayColor,
+              letterSpacing: premiumBlack ? 0.25 : 0.1,
             ),
           ),
         ],
@@ -639,11 +795,13 @@ class _CategoryBadge extends StatelessWidget {
     this.category,
     this.fallbackName,
     required this.fontSize,
+    this.premiumBlack = false,
   });
 
   final CategoryEntity? category;
   final String? fallbackName;
   final double fontSize;
+  final bool premiumBlack;
 
   static const _palette = [
     Color(0xFF6366F1),
@@ -667,16 +825,24 @@ class _CategoryBadge extends StatelessWidget {
     final name = category?.name ?? fallbackName ?? l10n.t('uncategorized');
     final slug = category?.slug ?? name.toLowerCase();
     final color = _colorFor(slug);
+    final displayColor =
+        premiumBlack ? PostCardPremiumColors.textSecondary : color;
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: fontSize < 10 ? 6 : 7,
-        vertical: 3,
+        horizontal: fontSize < 10 ? 7 : 8,
+        vertical: premiumBlack ? 4 : 3,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.26)),
+        color: premiumBlack
+            ? PostCardPremiumColors.surfaceInset
+            : color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(premiumBlack ? 20 : 8),
+        border: Border.all(
+          color: premiumBlack
+              ? PostCardPremiumColors.borderSoft
+              : color.withValues(alpha: 0.26),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -687,8 +853,10 @@ class _CategoryBadge extends StatelessWidget {
             name: name,
             size: fontSize + 4,
             borderRadius: BorderRadius.circular(4),
-            backgroundColor: color.withValues(alpha: 0.15),
-            iconColor: color,
+            backgroundColor: premiumBlack
+                ? PostCardPremiumColors.borderSubtle
+                : color.withValues(alpha: 0.15),
+            iconColor: displayColor,
             fallbackIcon: Icons.label_outline_rounded,
           ),
           const SizedBox(width: 4),
@@ -699,8 +867,9 @@ class _CategoryBadge extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                color: color,
+                fontWeight: FontWeight.w500,
+                letterSpacing: premiumBlack ? 0.15 : 0,
+                color: displayColor,
               ),
             ),
           ),
@@ -824,7 +993,22 @@ class _PostCardSkeletonBody extends StatelessWidget {
             ),
             SizedBox(width: metrics.sectionGap + 2),
             Expanded(
-              child: _SkeletonContent(base: base, metrics: metrics),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: PostCardPremiumColors.black,
+                  border: Border(
+                    left: BorderSide(color: PostCardPremiumColors.borderSubtle),
+                  ),
+                ),
+                child: Padding(
+                  padding: metrics.premiumBodyPadding,
+                  child: _SkeletonContent(
+                    base: const Color(0xFF1A1A1A),
+                    metrics: metrics,
+                    premiumBlack: true,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -845,29 +1029,48 @@ class _PostCardSkeletonBody extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AspectRatio(
-            aspectRatio: metrics.thumbnailAspect,
-            child: _ShimmerBox(isDark: isDark),
-          ),
-          Padding(
-            padding: metrics.bodyPadding,
-            child: _SkeletonContent(base: base, metrics: metrics),
-          ),
-        ],
+      child: ColoredBox(
+        color: PostCardPremiumColors.black,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AspectRatio(
+              aspectRatio: metrics.thumbnailAspect,
+              child: _ShimmerBox(isDark: isDark),
+            ),
+            Transform.translate(
+              offset: Offset(0, -metrics.premiumBlendOverlap),
+              child: DecoratedBox(
+                decoration:
+                    const BoxDecoration(color: PostCardPremiumColors.black),
+                child: Padding(
+                  padding: metrics.premiumBodyPadding,
+                  child: _SkeletonContent(
+                    base: const Color(0xFF1A1A1A),
+                    metrics: metrics,
+                    premiumBlack: true,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _SkeletonContent extends StatelessWidget {
-  const _SkeletonContent({required this.base, required this.metrics});
+  const _SkeletonContent({
+    required this.base,
+    required this.metrics,
+    this.premiumBlack = false,
+  });
 
   final Color base;
   final PostCardMetrics metrics;
+  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {

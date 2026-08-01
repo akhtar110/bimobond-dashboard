@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_entity.dart';
+import '../bloc/user_detail_bloc.dart';
+import '../bloc/user_detail_state.dart';
 import '../utils/user_location_list_utils.dart';
-
+import 'user_privacy_settings_sheet.dart';
 class UserDetailSectionTitle extends StatelessWidget {
   const UserDetailSectionTitle(this.title, {super.key, this.color});
 
@@ -164,7 +168,7 @@ class UserDetailPersonalInfo extends StatelessWidget {
           ),
 
           Divider(height: 20, color: scheme.outlineVariant),
-          UserDetailSectionTitle(l10n.t('privacyAndSettings')),
+          _PrivacySettingsHeader(user: user),
           const SizedBox(height: 10),
           UserDetailInfoItem(
             l10n.t('accountPrivacy'),
@@ -183,6 +187,11 @@ class UserDetailPersonalInfo extends StatelessWidget {
               user.messagePermission.name,
             ),
             Icons.message_outlined,
+          ),
+          UserDetailInfoItem(
+            l10n.t('allowDirectMsgsLabel'),
+            user.allowDirectMsgs ? l10n.t('yes') : l10n.t('no'),
+            Icons.mail_outline,
           ),
           UserDetailInfoItem(
             l10n.t('language'),
@@ -228,6 +237,70 @@ class UserDetailPersonalInfo extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _PrivacySettingsHeader extends StatelessWidget {
+  const _PrivacySettingsHeader({required this.user});
+
+  final UserEntity user;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final canEdit = PermissionManager.canUpdateUsers(context);
+
+    return BlocSelector<UserDetailBloc, UserDetailState, bool>(
+      selector: (state) =>
+          state is UserDetailLoaded && state.isSavingPrivacy,
+      builder: (context, isSaving) {
+        return Row(
+          children: [
+            Expanded(
+              child: UserDetailSectionTitle(l10n.t('privacyAndSettings')),
+            ),
+            if (canEdit)
+              TextButton.icon(
+                onPressed: isSaving
+                    ? null
+                    : () => UserPrivacySettingsSheet.show(
+                          context,
+                          user: user,
+                        ),
+                icon: isSaving
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.primary,
+                        ),
+                      )
+                    : Icon(
+                        Icons.edit_outlined,
+                        size: 16,
+                        color: scheme.primary,
+                      ),
+                label: Text(
+                  l10n.t('editPrivacySettings'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.primary,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

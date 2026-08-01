@@ -2593,6 +2593,7 @@
   "privateAccountToggle": "Private account",
   "privateAccountToggleDescription": "Only followers can see the full profile and posts",
   "whoCanMessageLabel": "Who can message this user",
+  "allowDirectMsgsLabel": "Allow direct messages",
   "adminSuccessPrivacyUpdated": "Privacy settings updated successfully",
   "walletNavPlatformProfit": "Platform Profit & Revenue",
   "walletProfitTitle": "Platform Profit & Revenue",
