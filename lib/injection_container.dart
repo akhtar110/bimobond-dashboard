@@ -1094,6 +1094,12 @@ Future<void> init() async {
     () => UpdateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
   );
   sl.registerLazySingleton(
+    () => ActivateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeactivateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
     () => DeleteAdminOverlayUseCase(sl<ArOverlaysRepository>()),
   );
   sl.registerLazySingleton(
@@ -1106,6 +1112,8 @@ Future<void> init() async {
       getOverlayById: sl<GetAdminOverlayByIdUseCase>(),
       createOverlay: sl<CreateAdminOverlayUseCase>(),
       updateOverlay: sl<UpdateAdminOverlayUseCase>(),
+      activateOverlay: sl<ActivateAdminOverlayUseCase>(),
+      deactivateOverlay: sl<DeactivateAdminOverlayUseCase>(),
       deleteOverlay: sl<DeleteAdminOverlayUseCase>(),
     ),
   );

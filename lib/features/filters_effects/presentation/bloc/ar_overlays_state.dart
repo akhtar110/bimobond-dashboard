@@ -23,6 +23,7 @@ class ArOverlaysLoaded extends ArOverlaysState {
     required this.overlays,
     required this.meta,
     this.searchQuery = '',
+    this.statusFilter = ArOverlayStatusFilter.all,
     this.viewType = GiftsViewType.grid,
     this.isActioning = false,
     this.successMessage,
@@ -33,28 +34,41 @@ class ArOverlaysLoaded extends ArOverlaysState {
   final List<ArOverlayEntity> overlays;
   final ArOverlayMetaEntity meta;
   final String searchQuery;
+  final ArOverlayStatusFilter statusFilter;
   final GiftsViewType viewType;
   final bool isActioning;
   final String? successMessage;
   final String? errorMessage;
   final ArOverlayEntity? selectedOverlay;
 
-  /// Returns locally filtered list of overlays based on search query.
+  /// Locally filtered list based on search + status filter.
   List<ArOverlayEntity> get filteredOverlays {
-    if (searchQuery.trim().isEmpty) return overlays;
+    Iterable<ArOverlayEntity> items = overlays;
+
+    switch (statusFilter) {
+      case ArOverlayStatusFilter.active:
+        items = items.where((item) => item.isActive);
+      case ArOverlayStatusFilter.inactive:
+        items = items.where((item) => !item.isActive);
+      case ArOverlayStatusFilter.all:
+        break;
+    }
+
+    if (searchQuery.trim().isEmpty) return items.toList(growable: false);
     final q = searchQuery.trim().toLowerCase();
-    return overlays.where((item) {
+    return items.where((item) {
       final idMatch = item.id.toLowerCase().contains(q);
       final labelMatch = item.label.toLowerCase().contains(q);
       final emojiMatch = (item.emoji ?? '').toLowerCase().contains(q);
       return idMatch || labelMatch || emojiMatch;
-    }).toList();
+    }).toList(growable: false);
   }
 
   ArOverlaysLoaded copyWith({
     List<ArOverlayEntity>? overlays,
     ArOverlayMetaEntity? meta,
     String? searchQuery,
+    ArOverlayStatusFilter? statusFilter,
     GiftsViewType? viewType,
     bool? isActioning,
     String? successMessage,
@@ -67,11 +81,15 @@ class ArOverlaysLoaded extends ArOverlaysState {
       overlays: overlays ?? this.overlays,
       meta: meta ?? this.meta,
       searchQuery: searchQuery ?? this.searchQuery,
+      statusFilter: statusFilter ?? this.statusFilter,
       viewType: viewType ?? this.viewType,
       isActioning: isActioning ?? this.isActioning,
-      successMessage: clearMessages ? null : (successMessage ?? this.successMessage),
+      successMessage:
+          clearMessages ? null : (successMessage ?? this.successMessage),
       errorMessage: clearMessages ? null : (errorMessage ?? this.errorMessage),
-      selectedOverlay: clearSelectedOverlay ? null : (selectedOverlay ?? this.selectedOverlay),
+      selectedOverlay: clearSelectedOverlay
+          ? null
+          : (selectedOverlay ?? this.selectedOverlay),
     );
   }
 
@@ -80,6 +98,7 @@ class ArOverlaysLoaded extends ArOverlaysState {
         overlays,
         meta,
         searchQuery,
+        statusFilter,
         viewType,
         isActioning,
         successMessage,

@@ -9,6 +9,7 @@ import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
 import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
 import '../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../create_post/domain/entities/create_post_location_entity.dart';
+import '../../../post_management/presentation/utils/post_detail_labels.dart';
 import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../../domain/entities/post_filters.dart';
 import '../bloc/posts_bloc.dart';
@@ -350,6 +351,62 @@ class PostsFilterPopup extends StatelessWidget {
                         ),
                       ),
                       GiftsFilterSection(
+                        title: _sectionTitle(l10n, 'postStatus', context),
+                        initiallyExpanded: draft.status != null,
+                        child: DropdownButtonFormField<String?>(
+                          key: ValueKey('posts-filter-status-${draft.revision}'),
+                          initialValue: draft.status,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(l10n.t('postFilterStatusAll')),
+                            ),
+                            for (final status in kPostAdminStatuses)
+                              DropdownMenuItem<String?>(
+                                value: status,
+                                child: Text(postStatusLabel(l10n, status)),
+                              ),
+                          ],
+                          onChanged: cubit.setStatus,
+                        ),
+                      ),
+                      GiftsFilterSection(
+                        title: _sectionTitle(l10n, 'privacyStatus', context),
+                        initiallyExpanded: draft.privacyStatus != null,
+                        child: DropdownButtonFormField<String?>(
+                          key: ValueKey(
+                            'posts-filter-privacy-${draft.revision}',
+                          ),
+                          initialValue: draft.privacyStatus,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(l10n.t('postFilterPrivacyAll')),
+                            ),
+                            for (final privacy in PostFilters.privacyOptions)
+                              DropdownMenuItem<String?>(
+                                value: privacy,
+                                child: Text(privacyLabel(l10n, privacy)),
+                              ),
+                          ],
+                          onChanged: cubit.setPrivacyStatus,
+                        ),
+                      ),
+                      GiftsFilterSection(
                         title: _sectionTitle(l10n, 'location', context),
                         initiallyExpanded: draft.hasLocationFilter,
                         child: Column(
@@ -667,6 +724,26 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
         id: 'mediaType',
         label: label,
         onRemove: () => cubit.setType(null),
+      ),
+    );
+  }
+
+  if (draft.status != null && draft.status!.isNotEmpty) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'status',
+        label: postStatusLabel(l10n, draft.status!),
+        onRemove: () => cubit.setStatus(null),
+      ),
+    );
+  }
+
+  if (draft.privacyStatus != null && draft.privacyStatus!.isNotEmpty) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'privacy',
+        label: privacyLabel(l10n, draft.privacyStatus!),
+        onRemove: () => cubit.setPrivacyStatus(null),
       ),
     );
   }

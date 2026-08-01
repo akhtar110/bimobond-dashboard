@@ -7,6 +7,13 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../core/widgets/state_widgets.dart';
 import '../../../gifts/domain/enums/gifts_view_type.dart';
+import '../../../gifts/presentation/widgets/gifts_active_filters.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_button.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_chip.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_footer.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_header.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
+import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/ar_overlay_entities.dart';
 import '../bloc/ar_overlays_bloc.dart';
@@ -270,11 +277,50 @@ class _ArOverlaysTabState extends State<ArOverlaysTab> {
                           )
                         : const SizedBox.shrink();
 
+                    final statusFilter = loaded?.statusFilter ?? ArOverlayStatusFilter.all;
+                    final filterActiveCount =
+                        statusFilter == ArOverlayStatusFilter.all ? 0 : 1;
+
+                    final filterButton = Builder(
+                      builder: (buttonContext) {
+                        return GiftsFilterButton(
+                          activeCount: filterActiveCount,
+                          height: 42,
+                          onPressed: () {
+                            final box =
+                                buttonContext.findRenderObject() as RenderBox?;
+                            final origin =
+                                box?.localToGlobal(Offset.zero) ?? Offset.zero;
+                            final size = box?.size ?? Size.zero;
+                            showArOverlayFilterPopup(
+                              context: buttonContext,
+                              statusFilter: statusFilter,
+                              anchorRect: Rect.fromLTWH(
+                                origin.dx,
+                                origin.dy,
+                                size.width,
+                                size.height,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+
                     if (isCompact) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          searchField,
+                          SizedBox(
+                            height: 42,
+                            child: Row(
+                              children: [
+                                Expanded(child: searchField),
+                                const SizedBox(width: 10),
+                                filterButton,
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 10),
                           Row(
                             children: [
@@ -287,9 +333,13 @@ class _ArOverlaysTabState extends State<ArOverlaysTab> {
                       );
                     }
 
+                    // Match Filters tab: search + filter popup button on one row.
                     return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(child: searchField),
+                        const SizedBox(width: 10),
+                        filterButton,
                         const SizedBox(width: 12),
                         viewToggle,
                         if (canManage) ...[
@@ -460,6 +510,16 @@ class _ArOverlaysTabState extends State<ArOverlaysTab> {
               onPreview: () => _handlePreviewOverlay(context, overlay),
               onEdit:
                   canManage ? () => _handleEditOverlay(context, overlay) : null,
+              onActivate: canManage && !overlay.isActive
+                  ? () => context
+                      .read<ArOverlaysBloc>()
+                      .add(ActivateArOverlayEvent(overlay.id))
+                  : null,
+              onDeactivate: canManage && overlay.isActive
+                  ? () => context
+                      .read<ArOverlaysBloc>()
+                      .add(DeactivateArOverlayEvent(overlay.id))
+                  : null,
               onDelete: canManage
                   ? () => _handleDeleteOverlay(context, overlay)
                   : null,
@@ -496,6 +556,16 @@ class _ArOverlaysTabState extends State<ArOverlaysTab> {
               onPreview: () => _handlePreviewOverlay(context, overlay),
               onEdit:
                   canManage ? () => _handleEditOverlay(context, overlay) : null,
+              onActivate: canManage && !overlay.isActive
+                  ? () => context
+                      .read<ArOverlaysBloc>()
+                      .add(ActivateArOverlayEvent(overlay.id))
+                  : null,
+              onDeactivate: canManage && overlay.isActive
+                  ? () => context
+                      .read<ArOverlaysBloc>()
+                      .add(DeactivateArOverlayEvent(overlay.id))
+                  : null,
               onDelete: canManage
                   ? () => _handleDeleteOverlay(context, overlay)
                   : null,
@@ -549,6 +619,235 @@ class _ViewIconButton extends StatelessWidget {
             size: 18,
             color: selected ? scheme.primary : scheme.onSurfaceVariant,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> showArOverlayFilterPopup({
+  required BuildContext context,
+  required ArOverlayStatusFilter statusFilter,
+  required Rect anchorRect,
+}) {
+  final bloc = context.read<ArOverlaysBloc>();
+  final width = MediaQuery.sizeOf(context).width;
+
+  Widget wrap(Widget child) => BlocProvider<ArOverlaysBloc>.value(
+        value: bloc,
+        child: child,
+      );
+
+  Widget popup({
+    double? width,
+    required double maxHeight,
+    BorderRadius? borderRadius,
+  }) =>
+      _ArOverlayFilterPopup(
+        statusFilter: statusFilter,
+        bloc: bloc,
+        width: width,
+        maxHeight: maxHeight,
+        borderRadius: borderRadius,
+      );
+
+  if (width < 600) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: wrap(
+          popup(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.72,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  if (width < 900) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+        child: Align(
+          alignment: Alignment.center,
+          child: wrap(
+            popup(
+              width: 380,
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  const panelWidth = 380.0;
+  final media = MediaQuery.sizeOf(context);
+  final padding = MediaQuery.paddingOf(context);
+  final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+  var left = isRtl ? anchorRect.right - panelWidth : anchorRect.left;
+  left = left.clamp(12.0, media.width - panelWidth - 12);
+  var top = anchorRect.bottom + 8;
+  final maxPanelHeight = media.height * 0.68;
+  if (top + 320 > media.height - padding.bottom) {
+    top = (anchorRect.top - 8 - maxPanelHeight)
+        .clamp(padding.top + 12.0, media.height - 320.0);
+  }
+
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: 0.18),
+    transitionDuration: const Duration(milliseconds: 180),
+    pageBuilder: (ctx, animation, secondaryAnimation) {
+      return Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            child: FadeTransition(
+              opacity: animation,
+              child: wrap(
+                popup(width: panelWidth, maxHeight: maxPanelHeight),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _ArOverlayFilterPopup extends StatefulWidget {
+  const _ArOverlayFilterPopup({
+    required this.statusFilter,
+    required this.bloc,
+    this.width,
+    this.maxHeight = 480,
+    this.borderRadius,
+  });
+
+  final ArOverlayStatusFilter statusFilter;
+  final ArOverlaysBloc bloc;
+  final double? width;
+  final double maxHeight;
+  final BorderRadius? borderRadius;
+
+  @override
+  State<_ArOverlayFilterPopup> createState() => _ArOverlayFilterPopupState();
+}
+
+class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
+  late ArOverlayStatusFilter _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.statusFilter;
+  }
+
+  void _reset() {
+    setState(() => _status = ArOverlayStatusFilter.all);
+  }
+
+  void _close() {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) nav.pop();
+  }
+
+  void _apply() {
+    widget.bloc.add(FilterArOverlaysByStatusEvent(_status));
+    _close();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final radius = widget.borderRadius ?? BorderRadius.circular(20);
+
+    final activeItems = <GiftsActiveFilterItem>[
+      if (_status != ArOverlayStatusFilter.all)
+        GiftsActiveFilterItem(
+          id: 'status',
+          label: switch (_status) {
+            ArOverlayStatusFilter.active => l10n.tOr('feActive', 'Active'),
+            ArOverlayStatusFilter.inactive =>
+              l10n.tOr('feInactive', 'Inactive'),
+            ArOverlayStatusFilter.all =>
+              l10n.tOr('feStatusAll', 'All statuses'),
+          },
+          onRemove: () => setState(() => _status = ArOverlayStatusFilter.all),
+        ),
+    ];
+
+    return Material(
+      color: scheme.surface,
+      elevation: 10,
+      shadowColor: scheme.shadow.withValues(alpha: 0.22),
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        width: widget.width ?? 380,
+        height: widget.maxHeight,
+        child: Column(
+          children: [
+            GiftsFilterHeader(onResetAll: _reset, onClose: _close),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 8),
+                children: [
+                  GiftsFilterSection(
+                    title: l10n.tOr('status', 'Status').toUpperCase(),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('feStatusAll', 'All statuses'),
+                          selected: _status == ArOverlayStatusFilter.all,
+                          onTap: () => setState(
+                            () => _status = ArOverlayStatusFilter.all,
+                          ),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('feActive', 'Active'),
+                          selected: _status == ArOverlayStatusFilter.active,
+                          onTap: () => setState(
+                            () => _status = ArOverlayStatusFilter.active,
+                          ),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: l10n.tOr('feInactive', 'Inactive'),
+                          selected: _status == ArOverlayStatusFilter.inactive,
+                          onTap: () => setState(
+                            () => _status = ArOverlayStatusFilter.inactive,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GiftsActiveFilters(items: activeItems),
+                ],
+              ),
+            ),
+            GiftsFilterFooter(
+              onReset: _reset,
+              onCancel: _close,
+              onApply: _apply,
+            ),
+          ],
         ),
       ),
     );

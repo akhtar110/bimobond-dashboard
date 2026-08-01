@@ -39,6 +39,16 @@ class _UserDeviceCardState extends State<UserDeviceCard> {
     return Icons.devices_other;
   }
 
+  void _copy(BuildContext context, String value, String successMessage) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(successMessage),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -47,6 +57,11 @@ class _UserDeviceCardState extends State<UserDeviceCard> {
     final device = widget.device;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
     final typeColor = _typeColor(scheme, device.deviceType);
+    final deviceName = device.deviceName?.trim();
+    final hasDeviceName = deviceName != null && deviceName.isNotEmpty;
+    final macAddress = device.macAddress?.trim();
+    final hasMac = macAddress != null && macAddress.isNotEmpty;
+    final hasDeviceId = device.deviceId.trim().isNotEmpty;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -102,25 +117,55 @@ class _UserDeviceCardState extends State<UserDeviceCard> {
                     ),
                   ),
                   const Spacer(),
-                  if (device.fcmToken != null && device.fcmToken!.isNotEmpty)
+                  if (hasDeviceId)
+                    IconButton(
+                      tooltip: l10n.tOr('copyDeviceId', 'Copy device ID'),
+                      icon: const Icon(Icons.fingerprint_outlined, size: 20),
+                      onPressed: () => _copy(
+                        context,
+                        device.deviceId,
+                        l10n.tOr(
+                          'deviceIdCopied',
+                          'Device ID copied to clipboard',
+                        ),
+                      ),
+                    ),
+                  if (device.hasPushToken)
                     IconButton(
                       tooltip: l10n.t('copyFcmToken'),
                       icon: const Icon(Icons.copy_outlined, size: 20),
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: device.fcmToken!),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.t('fcmTokenCopied')),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
+                      onPressed: () => _copy(
+                        context,
+                        device.fcmToken!,
+                        l10n.t('fcmTokenCopied'),
+                      ),
                     ),
                 ],
               ),
+              if (hasDeviceName) ...[
+                const SizedBox(height: 12),
+                Text(
+                  deviceName,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
+              if (hasDeviceId)
+                _InfoRow(
+                  label: l10n.t('deviceId'),
+                  value: device.deviceId,
+                  scheme: scheme,
+                  monospace: true,
+                ),
+              if (hasMac)
+                _InfoRow(
+                  label: l10n.tOr('macAddress', 'MAC address'),
+                  value: macAddress,
+                  scheme: scheme,
+                  monospace: true,
+                ),
               _InfoRow(
                 label: l10n.t('osVersion'),
                 value: device.osVersion ?? l10n.t('notAvailable'),
@@ -168,7 +213,20 @@ class _UserDeviceCardState extends State<UserDeviceCard> {
                 value: dateFormat.format(device.createdAt),
                 scheme: scheme,
               ),
-              if (device.fcmToken != null && device.fcmToken!.isNotEmpty) ...[
+              _InfoRow(
+                label: l10n.tOr('pushNotifications', 'Push notifications'),
+                value: device.hasPushToken
+                    ? l10n.tOr(
+                        'pushNotificationsActive',
+                        'Active (FCM token present)',
+                      )
+                    : l10n.tOr(
+                        'pushNotificationsCleared',
+                        'Cleared (no FCM token)',
+                      ),
+                scheme: scheme,
+              ),
+              if (device.hasPushToken) ...[
                 const SizedBox(height: 8),
                 Text(
                   l10n.t('fcmToken'),
@@ -201,12 +259,14 @@ class _InfoRow extends StatelessWidget {
     required this.value,
     required this.scheme,
     this.trailing,
+    this.monospace = false,
   });
 
   final String label;
   final String value;
   final ColorScheme scheme;
   final Widget? trailing;
+  final bool monospace;
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +276,7 @@ class _InfoRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 120,
             child: Text(
               label,
               style: TextStyle(
@@ -233,6 +293,7 @@ class _InfoRow extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: scheme.onSurface,
+                fontFamily: monospace ? 'monospace' : null,
               ),
             ),
           ),

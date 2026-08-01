@@ -182,6 +182,16 @@ class PostListRepositoryImpl implements PostListRepository {
           .toList(growable: false);
     }
 
+    final privacy = filters.privacyStatus?.trim();
+    if (privacy != null && privacy.isNotEmpty) {
+      final normalized = privacy.toUpperCase();
+      output = output
+          .where(
+            (post) => post.privacyStatus.trim().toUpperCase() == normalized,
+          )
+          .toList(growable: false);
+    }
+
     return output;
   }
 
@@ -193,9 +203,11 @@ class PostListRepositoryImpl implements PostListRepository {
     required bool filteredCountChanged,
   }) {
     final userId = filters.userId?.trim();
+    final privacy = filters.privacyStatus?.trim();
     if ((userId != null && userId.isNotEmpty && filteredCountChanged) ||
         ((filters.hasDateRange || filters.hasTimeRange) &&
-            filteredCountChanged)) {
+            filteredCountChanged) ||
+        (privacy != null && privacy.isNotEmpty && filteredCountChanged)) {
       return filteredCount;
     }
     return modelTotal;

@@ -313,6 +313,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         createdTimeToMinutes: _filters.createdTimeToMinutes,
         type: _filters.type,
         sort: _filters.sort,
+        status: _filters.status,
+        privacyStatus: _filters.privacyStatus,
         isAuctionable: _filters.isAuctionable,
         isAd: _filters.isAd,
       );
