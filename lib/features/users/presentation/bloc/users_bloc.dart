@@ -66,6 +66,11 @@ class ClearUsersListFiltersEvent extends UsersEvent {}
 
 class SortUsersLocationEvent extends UsersEvent {}
 
+class SetUsersLocationSortEvent extends UsersEvent {
+  SetUsersLocationSortEvent(this.order);
+  final UsersLocationSortOrder order;
+}
+
 class ToggleBanUserEvent extends UsersEvent {
   ToggleBanUserEvent(this.userId);
   final String userId;
@@ -255,6 +260,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<FilterUsersByLocationEvent>(_onLocationFilter);
     on<ClearUsersListFiltersEvent>(_onClearListFilters);
     on<SortUsersLocationEvent>(_onLocationSort);
+    on<SetUsersLocationSortEvent>(_onSetLocationSort);
     on<FilterUsersEvent>(_onFilter);
     on<ToggleBanUserEvent>(_onToggleBan);
     on<PromoteUserEvent>(_onPromote);
@@ -535,7 +541,22 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   }
 
   void _onLocationSort(SortUsersLocationEvent event, Emitter<UsersState> emit) {
-    _locationSort = _locationSort.next;
+    _setLocationSort(_locationSort.next, emit);
+  }
+
+  void _onSetLocationSort(
+    SetUsersLocationSortEvent event,
+    Emitter<UsersState> emit,
+  ) {
+    if (_locationSort == event.order) return;
+    _setLocationSort(event.order, emit);
+  }
+
+  void _setLocationSort(
+    UsersLocationSortOrder order,
+    Emitter<UsersState> emit,
+  ) {
+    _locationSort = order;
     if (_locationSort == UsersLocationSortOrder.none) {
       add(LoadUsersEvent(refresh: true));
       return;
