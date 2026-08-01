@@ -134,6 +134,35 @@ class UsersLayoutMetrics {
         DeviceType.desktop => 8,
       };
 
+  static const double toolbarInlineBreakpoint = 640;
+
+  double get filterGap => chipSpacing;
+
+  double get filterControlHeight => switch (deviceType) {
+        DeviceType.mobileSmall => 32,
+        DeviceType.mobileLarge => 34,
+        DeviceType.tablet => 36,
+        DeviceType.desktop => 36,
+      };
+
+  double get searchMaxWidth => switch (deviceType) {
+        DeviceType.mobileSmall => 200,
+        DeviceType.mobileLarge => 220,
+        DeviceType.tablet => 240,
+        DeviceType.desktop => 260,
+      };
+
+  bool toolbarInlineAt(double width) => width >= toolbarInlineBreakpoint;
+
+  double inlineSearchWidthFor(double availableWidth) {
+    final actionsWidth = (filterControlHeight * 2) + (filterGap + 2) * 2 + 16;
+    final maxSearch = (availableWidth - actionsWidth).clamp(120.0, 420.0);
+    if (availableWidth < toolbarInlineBreakpoint) {
+      return availableWidth;
+    }
+    return maxSearch.clamp(searchMaxWidth * 0.85, searchMaxWidth * 1.35);
+  }
+
   bool get compactSelectionBar => deviceType != DeviceType.desktop;
 
   ScrollPhysics get listScrollPhysics => switch (deviceType) {

@@ -89,12 +89,12 @@ import 'features/users/domain/usecases/delete_user.dart';
 import 'features/users/domain/usecases/demote_user.dart';
 import 'features/users/domain/usecases/get_user_by_id.dart';
 import 'features/users/domain/usecases/get_user_follow_list.dart';
+import 'features/users/domain/usecases/force_remove_follower.dart';
 import 'features/users/domain/usecases/get_user_posts.dart';
 import 'features/users/domain/usecases/get_users.dart';
 import 'features/users/domain/usecases/promote_to_admin.dart';
 import 'features/users/domain/usecases/reset_user_password_usecase.dart';
-import 'features/users/domain/usecases/set_user_is_private.dart';
-import 'features/users/domain/usecases/set_user_message_permission.dart';
+import 'features/users/domain/usecases/update_user_privacy_settings.dart';
 import 'features/users/domain/usecases/updte_role.dart';
 import 'features/users/domain/usecases/unban_user.dart';
 import 'features/users/presentation/bloc/users_bloc.dart';
@@ -111,6 +111,12 @@ import 'features/user_history/data/repositories/user_history_repository_impl.dar
 import 'features/user_history/domain/repositories/user_history_repository.dart';
 import 'features/user_history/domain/usecases/get_user_history_usecase.dart';
 import 'features/user_history/presentation/bloc/user_history_bloc.dart';
+
+import 'features/security_logs/data/datasources/logs_remote_datasource.dart';
+import 'features/security_logs/data/repositories/logs_repository_impl.dart';
+import 'features/security_logs/domain/repositories/logs_repository.dart';
+import 'features/security_logs/domain/usecases/get_logs_usecase.dart';
+import 'features/security_logs/presentation/bloc/logs_bloc.dart';
 
 import 'features/search_management/data/datasources/search_management_remote_datasource.dart';
 import 'features/search_management/data/repositories/search_management_repository_impl.dart';
@@ -156,6 +162,7 @@ import 'features/user_activity/presentation/bloc/user_likes_bloc.dart';
 import 'features/user_activity/presentation/bloc/user_mentions_bloc.dart';
 import 'features/user_activity/presentation/bloc/user_unified_activity_bloc.dart';
 
+import 'features/post_management/data/datasources/managed_post_location_remote_data_source.dart';
 import 'features/post_management/data/datasources/post_management_remote_datasource.dart';
 import 'features/post_management/data/repositories/post_management_repository_impl.dart';
 import 'features/post_management/domain/repositories/post_management_repository.dart';
@@ -571,6 +578,9 @@ Future<void> init() async {
     () => UpdateBrandingUseCase(sl<AppSettingsRepository>()),
   );
   sl.registerLazySingleton(
+    () => UploadBrandingLogoUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerLazySingleton(
     () => ListCurrenciesUseCase(sl<AppSettingsRepository>()),
   );
   sl.registerLazySingleton(
@@ -601,6 +611,7 @@ Future<void> init() async {
       updateSetting: sl<UpdateAppSettingUseCase>(),
       deleteSetting: sl<DeleteAppSettingUseCase>(),
       updateBranding: sl<UpdateBrandingUseCase>(),
+      uploadBrandingLogo: sl<UploadBrandingLogoUseCase>(),
       createCurrency: sl<CreateCurrencyUseCase>(),
       updateCurrency: sl<UpdateCurrencyUseCase>(),
       deleteCurrency: sl<DeleteCurrencyUseCase>(),
@@ -670,6 +681,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetUserById(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUserPosts(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUserFollowList(sl<UsersRepository>()));
+  sl.registerLazySingleton(() => ForceRemoveFollower(sl<UsersRepository>()));
   sl.registerLazySingleton(() => GetUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BanUser(sl<UsersRepository>()));
   sl.registerLazySingleton(() => UnbanUser(sl<UsersRepository>()));
@@ -683,9 +695,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => BulkPromoteUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => BulkDemoteUsers(sl<UsersRepository>()));
   sl.registerLazySingleton(() => ResetUserPasswordUseCase(sl<UsersRepository>()));
-  sl.registerLazySingleton(() => SetUserIsPrivate(sl<UsersRepository>()));
   sl.registerLazySingleton(
-    () => SetUserMessagePermission(sl<UsersRepository>()),
+    () => UpdateUserPrivacySettings(sl<UsersRepository>()),
   );
 
   /// BLOC
@@ -699,8 +710,7 @@ Future<void> init() async {
       demoteUser: sl<DemoteUser>(),
       deleteUser: sl<DeleteUser>(),
       updateUserRoles: sl<UpdateUserRoles>(),
-      setUserIsPrivate: sl<SetUserIsPrivate>(),
-      setUserMessagePermission: sl<SetUserMessagePermission>(),
+      updateUserPrivacySettings: sl<UpdateUserPrivacySettings>(),
     ),
   );
 
@@ -879,6 +889,19 @@ Future<void> init() async {
   sl.registerFactory(
     () => UserHistoryBloc(getUserHistory: sl<GetUserHistoryUseCase>()),
   );
+
+  // =========================================================
+  // SECURITY LOGS MODULE (GET /user-history/admin/logs)
+  // =========================================================
+
+  sl.registerLazySingleton<LogsRemoteDataSource>(
+    () => LogsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<LogsRepository>(
+    () => LogsRepositoryImpl(sl<LogsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(() => GetLogsUseCase(sl<LogsRepository>()));
+  sl.registerFactory(() => LogsBloc(getLogs: sl<GetLogsUseCase>()));
 
   // =========================================================
   // USER INTERESTS MODULE
@@ -1093,6 +1116,12 @@ Future<void> init() async {
     () => UpdateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
   );
   sl.registerLazySingleton(
+    () => ActivateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeactivateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
     () => DeleteAdminOverlayUseCase(sl<ArOverlaysRepository>()),
   );
   sl.registerLazySingleton(
@@ -1105,6 +1134,8 @@ Future<void> init() async {
       getOverlayById: sl<GetAdminOverlayByIdUseCase>(),
       createOverlay: sl<CreateAdminOverlayUseCase>(),
       updateOverlay: sl<UpdateAdminOverlayUseCase>(),
+      activateOverlay: sl<ActivateAdminOverlayUseCase>(),
+      deactivateOverlay: sl<DeactivateAdminOverlayUseCase>(),
       deleteOverlay: sl<DeleteAdminOverlayUseCase>(),
     ),
   );
@@ -1113,8 +1144,15 @@ Future<void> init() async {
   // POST MANAGEMENT MODULE (admin edit/moderate user posts)
   // =========================================================
 
+  sl.registerLazySingleton<ManagedPostLocationRemoteDataSource>(
+    () => ManagedPostLocationRemoteDataSourceImpl(sl<Dio>()),
+  );
+
   sl.registerLazySingleton<PostManagementRemoteDataSource>(
-    () => PostManagementRemoteDataSourceImpl(sl<Dio>()),
+    () => PostManagementRemoteDataSourceImpl(
+      sl<Dio>(),
+      sl<ManagedPostLocationRemoteDataSource>(),
+    ),
   );
 
   sl.registerLazySingleton<PostManagementRepository>(
@@ -1207,7 +1245,11 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<PostListRepository>(
-    () => PostListRepositoryImpl(sl<PostsRemoteDataSource>()),
+    () => PostListRepositoryImpl(
+      sl<PostsRemoteDataSource>(),
+      sl<ManagedPostLocationRemoteDataSource>(),
+      sl<UsersRepository>(),
+    ),
   );
 
   sl.registerLazySingleton(() => GetAllPosts(sl<PostListRepository>()));

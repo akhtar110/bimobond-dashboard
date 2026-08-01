@@ -341,6 +341,8 @@ class UserModel extends UserEntity {
   /// Legacy `ADMIN` maps to RBAC `admin` on the server — never `super_admin`.
   static String _legacyRoleApiValue(UserRole role) => switch (role) {
         UserRole.admin => 'ADMIN',
+        // Legacy Role enum has no SUPER_ADMIN — coarsen for PATCH payloads.
+        UserRole.superAdmin => 'ADMIN',
         UserRole.moderator => 'MODERATOR',
         UserRole.user => 'USER',
       };
@@ -351,8 +353,7 @@ class UserModel extends UserEntity {
         return UserRole.admin;
       case 'SUPER_ADMIN':
       case 'SUPERADMIN':
-        // Display/access only — never assign SUPER_ADMIN via legacy role APIs.
-        return UserRole.admin;
+        return UserRole.superAdmin;
       case 'MODERATOR':
         return UserRole.moderator;
       default:

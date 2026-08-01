@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../core/localization/localization.dart';
+import '../../../../posts/presentation/utils/post_date_format.dart';
 import '../../../domain/entities/managed_post_entity.dart';
 import '../../utils/post_detail_labels.dart';
 import 'investigation_theme.dart';
@@ -10,57 +10,67 @@ import 'post_surface_card.dart';
 
 /// Social-style post preview for moderator context.
 class PostPreviewCard extends StatelessWidget {
-  const PostPreviewCard({super.key, required this.post});
+  const PostPreviewCard({super.key, required this.post, this.dense = false});
 
   final ManagedPostEntity post;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
+    final createdLabel = formatPostCreatedDateTime(
+      post.createdAt,
+      locale: Localizations.localeOf(context).languageCode,
+      compact: dense,
+    );
     final displayName = post.userFullName?.isNotEmpty == true
         ? post.userFullName!
         : (post.userName ?? post.userId);
     final statusColor = postStatusColorFromScheme(scheme, post.status);
+    final avatarRadius = dense ? 16.0 : 20.0;
 
     return PostSurfaceCard(
+      dense: dense,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Text(
-                l10n.tOr('postPreview', 'Post Preview'),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.35)),
-                ),
-                child: Text(
-                  postStatusLabel(l10n, post.status),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
+          if (!dense)
+            Row(
+              children: [
+                Text(
+                  l10n.tOr('postPreview', 'Post Preview'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: InvestigationTheme.s12),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border:
+                        Border.all(color: statusColor.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    postStatusLabel(l10n, post.status),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (!dense) const SizedBox(height: InvestigationTheme.s12),
           Row(
             children: [
               CircleAvatar(
-                radius: 20,
+                radius: avatarRadius,
                 backgroundColor: scheme.primaryContainer,
                 backgroundImage: post.userProfileImage != null &&
                         post.userProfileImage!.isNotEmpty
@@ -117,7 +127,7 @@ class PostPreviewCard extends StatelessWidget {
                 ),
               ),
               Text(
-                dateFormat.format(post.createdAt),
+                createdLabel,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),

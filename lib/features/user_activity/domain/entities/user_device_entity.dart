@@ -3,6 +3,8 @@ class UserDeviceEntity {
     required this.id,
     required this.userId,
     required this.deviceId,
+    this.deviceName,
+    this.macAddress,
     this.fcmToken,
     required this.deviceType,
     this.osVersion,
@@ -14,7 +16,17 @@ class UserDeviceEntity {
 
   final String id;
   final String userId;
+
+  /// Stable device/install id from login / logout.
   final String deviceId;
+
+  /// Human-readable label (e.g. "Hazem's iPhone").
+  final String? deviceName;
+
+  /// Client-reported hardware id when available.
+  final String? macAddress;
+
+  /// Cleared to null by server-side logout for this install.
   final String? fcmToken;
   final String deviceType;
   final String? osVersion;
@@ -22,4 +34,6 @@ class UserDeviceEntity {
   final String? lastActiveIp;
   final DateTime? lastActiveAt;
   final DateTime createdAt;
+
+  bool get hasPushToken => fcmToken != null && fcmToken!.trim().isNotEmpty;
 }

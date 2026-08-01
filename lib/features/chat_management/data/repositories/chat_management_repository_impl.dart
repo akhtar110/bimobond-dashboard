@@ -28,10 +28,11 @@ class ChatManagementRepositoryImpl implements ChatManagementRepository {
       remoteDataSource.updateChat(id, data);
 
   @override
-  Future<void> deleteChat(String id) => remoteDataSource.deleteChat(id);
+  Future<ChatDeleteResultEntity> deleteChat(String id) =>
+      remoteDataSource.deleteChat(id);
 
   @override
-  Future<void> deleteMessage(String messageId) =>
+  Future<ChatMessageDeleteResultEntity> deleteMessage(String messageId) =>
       remoteDataSource.deleteMessage(messageId);
 
   @override

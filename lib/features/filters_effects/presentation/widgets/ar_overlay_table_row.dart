@@ -10,12 +10,16 @@ class ArOverlayTableRow extends StatelessWidget {
     required this.overlay,
     this.onPreview,
     this.onEdit,
+    this.onActivate,
+    this.onDeactivate,
     this.onDelete,
   });
 
   final ArOverlayEntity overlay;
   final VoidCallback? onPreview;
   final VoidCallback? onEdit;
+  final VoidCallback? onActivate;
+  final VoidCallback? onDeactivate;
   final VoidCallback? onDelete;
 
   Color _parseColorHex(String? input) {
@@ -33,6 +37,11 @@ class ArOverlayTableRow extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final color = _parseColorHex(overlay.previewColorHex);
+    final statusBg = overlay.isActive
+        ? scheme.tertiaryContainer
+        : scheme.errorContainer.withValues(alpha: 0.7);
+    final statusFg =
+        overlay.isActive ? scheme.onTertiaryContainer : scheme.onErrorContainer;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -42,133 +51,183 @@ class ArOverlayTableRow extends StatelessWidget {
           bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
         ),
       ),
-      child: Row(
-        children: [
-          // Avatar / Thumbnail
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: overlay.thumbnailUrl != null && overlay.thumbnailUrl!.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: overlay.thumbnailUrl!,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => _fallbackAvatar(overlay, color),
-                  )
-                : _fallbackAvatar(overlay, color),
-          ),
-          const SizedBox(width: 14),
-
-          // Title & ID
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 720;
+          return Row(
+            children: [
+              Container(
+                width: compact ? 40 : 44,
+                height: compact ? 40 : 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: overlay.thumbnailUrl != null &&
+                        overlay.thumbnailUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: overlay.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) =>
+                            _fallbackAvatar(overlay, color),
+                      )
+                    : _fallbackAvatar(overlay, color),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (overlay.emoji != null && overlay.emoji!.isNotEmpty) ...[
-                      Text(overlay.emoji!, style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 6),
-                    ],
-                    Expanded(
-                      child: Text(
-                        overlay.label,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Row(
+                      children: [
+                        if (overlay.emoji != null &&
+                            overlay.emoji!.isNotEmpty) ...[
+                          Text(
+                            overlay.emoji!,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(
+                            overlay.label,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'ID: ${overlay.id}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                          ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'ID: ${overlay.id}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                      ),
-                ),
-              ],
-            ),
-          ),
-
-          // Sort Order Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              'Sort: #${overlay.sortOrder}',
-              style: TextStyle(
-                color: scheme.onSurfaceVariant,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Lottie Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.animation_rounded, size: 13, color: Colors.amber),
-                SizedBox(width: 4),
-                Text(
-                  'Lottie',
-                  style: TextStyle(
-                    color: Colors.amber,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+              if (!compact) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Sort: #${overlay.sortOrder}',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 12),
               ],
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Action Buttons
-          if (onPreview != null)
-            IconButton(
-              onPressed: onPreview,
-              icon: const Icon(Icons.visibility_outlined, size: 18),
-              tooltip: l10n.tOr('previewOverlay', 'Preview overlay'),
-            ),
-          if (onEdit != null)
-            IconButton(
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_rounded, size: 18),
-              tooltip: l10n.t('edit'),
-            ),
-          if (onDelete != null)
-            IconButton(
-              onPressed: onDelete,
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                size: 18,
-                color: scheme.error,
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  overlay.isActive
+                      ? l10n.tOr('feActive', 'Active')
+                      : l10n.tOr('feInactive', 'Inactive'),
+                  style: TextStyle(
+                    color: statusFg,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-              tooltip: l10n.t('delete'),
-            ),
-        ],
+              const SizedBox(width: 10),
+              if (!compact) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.animation_rounded,
+                        size: 13,
+                        color: Colors.amber,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Lottie',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              if (onPreview != null)
+                IconButton(
+                  onPressed: onPreview,
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  tooltip: l10n.tOr('previewOverlay', 'Preview overlay'),
+                ),
+              if (onEdit != null)
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_rounded, size: 18),
+                  tooltip: l10n.t('edit'),
+                ),
+              if (overlay.isActive && onDeactivate != null)
+                IconButton(
+                  onPressed: onDeactivate,
+                  icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),
+                  tooltip: l10n.tOr('feDeactivate', 'Deactivate'),
+                ),
+              if (!overlay.isActive && onActivate != null)
+                IconButton(
+                  onPressed: onActivate,
+                  icon: Icon(
+                    Icons.play_circle_outline_rounded,
+                    size: 18,
+                    color: scheme.tertiary,
+                  ),
+                  tooltip: l10n.tOr('feActivate', 'Activate'),
+                ),
+              if (onDelete != null)
+                IconButton(
+                  onPressed: onDelete,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: scheme.error,
+                  ),
+                  tooltip: l10n.t('delete'),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -180,7 +239,11 @@ class ArOverlayTableRow extends StatelessWidget {
       );
     }
     return Center(
-      child: Icon(Icons.layers_outlined, size: 20, color: Colors.white.withValues(alpha: 0.9)),
+      child: Icon(
+        Icons.layers_outlined,
+        size: 20,
+        color: Colors.white.withValues(alpha: 0.9),
+      ),
     );
   }
 }

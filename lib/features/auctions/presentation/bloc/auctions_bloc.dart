@@ -212,6 +212,12 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
   DateTimeRange? _dateRange;
   int _currentPage = 1;
 
+  String get activeSearchQuery => _searchQuery;
+  String? get activeStatusFilter => _statusFilter;
+  AuctionSortOption get activeSortOption => _sortOption;
+  AuctionTypeFilter get activeTypeFilter => _typeFilter;
+  DateTimeRange? get activeDateRange => _dateRange;
+
   AdminAuctionsSortOrder _mapSort(AuctionSortOption sort) => switch (sort) {
         AuctionSortOption.newestFirst => AdminAuctionsSortOrder.newest,
         AuctionSortOption.oldestFirst => AdminAuctionsSortOrder.oldest,

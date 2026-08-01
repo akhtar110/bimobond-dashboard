@@ -12,11 +12,14 @@ class ArOverlayModel extends ArOverlayEntity {
     super.emoji,
     super.thumbnailUrl,
     super.previewColorHex,
+    super.isActive = true,
   });
 
   factory ArOverlayModel.fromJson(Map<String, dynamic> json) {
     final rawSort = json['sortOrder'];
-    final int sortOrder = rawSort is num ? rawSort.toInt() : int.tryParse(rawSort?.toString() ?? '') ?? 0;
+    final int sortOrder = rawSort is num
+        ? rawSort.toInt()
+        : int.tryParse(rawSort?.toString() ?? '') ?? 0;
 
     return ArOverlayModel(
       id: json['id']?.toString() ?? '',
@@ -26,7 +29,19 @@ class ArOverlayModel extends ArOverlayEntity {
       emoji: json['emoji']?.toString(),
       thumbnailUrl: json['thumbnailUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
+      isActive: _readBool(json['isActive'] ?? json['active'], fallback: true),
     );
+  }
+
+  static bool _readBool(dynamic value, {required bool fallback}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1') return true;
+      if (normalized == 'false' || normalized == '0') return false;
+    }
+    return fallback;
   }
 
   Map<String, dynamic> toJson() {
@@ -38,6 +53,7 @@ class ArOverlayModel extends ArOverlayEntity {
       if (emoji != null) 'emoji': emoji,
       if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
       if (previewColorHex != null) 'previewColorHex': previewColorHex,
+      'isActive': isActive,
     };
   }
 }
@@ -112,6 +128,7 @@ class ArOverlayCategoryModel extends ArOverlayCategoryEntity {
           if (e.emoji != null) 'emoji': e.emoji,
           if (e.thumbnailUrl != null) 'thumbnailUrl': e.thumbnailUrl,
           if (e.previewColorHex != null) 'previewColorHex': e.previewColorHex,
+          'isActive': e.isActive,
         };
       }).toList(),
     };
@@ -187,6 +204,7 @@ class ArOverlayListResponseModel extends ArOverlayListResponseEntity {
           if (e.emoji != null) 'emoji': e.emoji,
           if (e.thumbnailUrl != null) 'thumbnailUrl': e.thumbnailUrl,
           if (e.previewColorHex != null) 'previewColorHex': e.previewColorHex,
+          'isActive': e.isActive,
         };
       }).toList(),
       'meta': meta is ArOverlayMetaModel

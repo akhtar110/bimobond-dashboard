@@ -34,8 +34,11 @@ class UsersTableRow extends StatelessWidget {
 
   String _roleLabel(BuildContext context) {
     final l10n = context.l10n;
-    if (user.roles.contains(UserRole.admin)) return l10n.t('roleAdmin');
-    if (user.roles.contains(UserRole.moderator)) return l10n.t('roleModerator');
+    if (user.roles.contains(UserRole.superAdmin)) {
+      return l10n.t('roleSuperAdmin');
+    }
+    if (user.roles.includesAdmin) return l10n.t('roleAdmin');
+    if (user.roles.includesModerator) return l10n.t('roleModerator');
     return l10n.t('roleUser');
   }
 
@@ -43,7 +46,7 @@ class UsersTableRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isAdmin = user.roles.contains(UserRole.admin);
+    final isAdmin = user.roles.includesAdmin;
     final cellStyle = theme.textTheme.bodySmall?.copyWith(
       fontSize: 11.5,
       height: 1.25,

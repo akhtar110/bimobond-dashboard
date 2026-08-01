@@ -14,6 +14,9 @@ enum ChatBulkAction { deleteChats, deleteMessages }
 
 enum ChatTypeFilter { all, group, direct }
 
+/// Client-side chat list ordering by last activity date.
+enum ChatDateSort { newest, oldest }
+
 enum ChatMessageTypeFilter { all, text, image, video, audio, postShare, location }
 
 enum ChatDeletedFilter { all, deletedOnly, activeOnly }
@@ -427,6 +430,34 @@ class ChatBulkResultEntity extends Equatable {
   @override
   List<Object?> get props =>
       [action, successCount, failedCount, notFoundCount, chatIds, messageIds, notFoundIds];
+}
+
+class ChatDeleteResultEntity extends Equatable {
+  const ChatDeleteResultEntity({
+    required this.success,
+    required this.chatId,
+  });
+
+  final bool success;
+  final String chatId;
+
+  @override
+  List<Object?> get props => [success, chatId];
+}
+
+class ChatMessageDeleteResultEntity extends Equatable {
+  const ChatMessageDeleteResultEntity({
+    required this.success,
+    required this.messageId,
+    required this.chatId,
+  });
+
+  final bool success;
+  final String messageId;
+  final String chatId;
+
+  @override
+  List<Object?> get props => [success, messageId, chatId];
 }
 
 class ChatMessageAnalytics extends Equatable {

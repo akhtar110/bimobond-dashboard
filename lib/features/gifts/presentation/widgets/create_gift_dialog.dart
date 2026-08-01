@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -20,6 +21,7 @@ import 'gift_color_picker_field.dart';
 import 'gift_dialog_layout.dart';
 import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
+import 'gift_thumbnail_image.dart';
 import 'gift_type_selector.dart';
 
 void showCreateGiftDialog(BuildContext pageContext) {
@@ -553,11 +555,18 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
+              // Avoid clipping platform views on web (native SVG <img>).
+              clipBehavior: kIsWeb ? Clip.none : Clip.antiAlias,
               child: hasImage
-                  ? Image.memory(
-                      state.pendingImageBytes!,
+                  ? GiftThumbnailImage(
+                      key: ValueKey(
+                        'create-gift-img-${state.pendingImageName}-'
+                        '${state.pendingImageBytes?.length ?? 0}',
+                      ),
+                      bytes: state.pendingImageBytes,
+                      fileName: state.pendingImageName,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => _errorPlaceholder(scheme),
+                      errorWidget: _errorPlaceholder(scheme),
                     )
                   : Center(
                       child: Column(

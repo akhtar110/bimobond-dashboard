@@ -32,28 +32,31 @@ class SettingsPlatformTabs extends StatelessWidget {
     // Rebuild labels when language changes.
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final l10n = context.l10n;
-    final width = MediaQuery.sizeOf(context).width;
-    final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
 
     return BlocProvider(
       create: (_) => di.sl<EconomySettingsBloc>(),
-      child: SettingsSection(
-        title: l10n.tOr('settingsAdminSection', 'Platform administration'),
-        description: l10n.tOr(
-          'settingsAdminSectionDescription',
-          'Manage economy, branding, currencies, feature flags, and more.',
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SettingsAdminTabs(
-              canReadAdmin: canReadAdmin,
-              canManageCurrencies: canManageCurrencies,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width;
+          final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
+
+          return SettingsSection(
+            title: l10n.tOr('settingsAdminSection', 'Platform administration'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SettingsAdminTabs(
+                  canReadAdmin: canReadAdmin,
+                  canManageCurrencies: canManageCurrencies,
+                ),
+                SizedBox(height: metrics.sectionGap + 4),
+                SettingsAdminBody(canManage: canManage),
+              ],
             ),
-            SizedBox(height: metrics.sectionGap),
-            SettingsAdminBody(canManage: canManage),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

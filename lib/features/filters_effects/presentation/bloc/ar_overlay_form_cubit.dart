@@ -29,6 +29,7 @@ class ArOverlayFormState extends Equatable {
     this.emoji = '',
     this.thumbnailUrl = '',
     this.previewColorHex = '#1E88E5',
+    this.isActive = true,
     this.thumbnailSnackError,
     this.submitResult,
   });
@@ -50,6 +51,7 @@ class ArOverlayFormState extends Equatable {
   final String emoji;
   final String thumbnailUrl;
   final String previewColorHex;
+  final bool isActive;
 
   /// One-shot snackbar for thumbnail upload failures.
   final String? thumbnailSnackError;
@@ -83,6 +85,7 @@ class ArOverlayFormState extends Equatable {
       emoji: emojiTrim.isEmpty ? null : emojiTrim,
       thumbnailUrl: thumbTrim.isEmpty ? null : thumbTrim,
       previewColorHex: colorTrim.isEmpty ? null : colorTrim,
+      isActive: isActive,
     );
   }
 
@@ -101,6 +104,7 @@ class ArOverlayFormState extends Equatable {
     String? emoji,
     String? thumbnailUrl,
     String? previewColorHex,
+    bool? isActive,
     String? thumbnailSnackError,
     Object? submitResult,
     bool clearLottieBytes = false,
@@ -134,6 +138,7 @@ class ArOverlayFormState extends Equatable {
       emoji: emoji ?? this.emoji,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       previewColorHex: previewColorHex ?? this.previewColorHex,
+      isActive: isActive ?? this.isActive,
       thumbnailSnackError: clearThumbnailSnackError
           ? null
           : (thumbnailSnackError ?? this.thumbnailSnackError),
@@ -160,6 +165,7 @@ class ArOverlayFormState extends Equatable {
         emoji,
         thumbnailUrl,
         previewColorHex,
+        isActive,
         thumbnailSnackError,
         submitResult,
       ];
@@ -181,6 +187,7 @@ class ArOverlayFormCubit extends Cubit<ArOverlayFormState> {
             emoji: overlay?.emoji ?? '',
             thumbnailUrl: overlay?.thumbnailUrl ?? '',
             previewColorHex: overlay?.previewColorHex ?? '#1E88E5',
+            isActive: overlay?.isActive ?? true,
           ),
         );
 

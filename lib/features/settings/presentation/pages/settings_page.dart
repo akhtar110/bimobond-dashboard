@@ -8,12 +8,9 @@ import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/admin_settings_bloc.dart';
 import '../utils/settings_responsive.dart';
-import '../widgets/language_selector_card.dart';
 import '../widgets/logout_section.dart';
-import '../widgets/profile_card.dart';
 import '../widgets/settings_header.dart';
 import '../widgets/settings_platform_tabs.dart';
-import '../widgets/theme_selector_card.dart';
 
 /// Settings screen with admin module, profile, appearance, and logout.
 class SettingsPage extends StatefulWidget {
@@ -29,7 +26,8 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => di.sl<AdminSettingsBloc>()..add(const LoadAdminSettingsEvent()),
+      create: (_) =>
+          di.sl<AdminSettingsBloc>()..add(const LoadAdminSettingsEvent()),
       child: BlocListener<AdminSettingsBloc, AdminSettingsState>(
         listenWhen: (prev, next) =>
             next.message != null && next.message != prev.message,
@@ -42,11 +40,12 @@ class _SettingsPageState extends State<SettingsPage> {
             SnackBar(
               content: Text(text),
               backgroundColor: state.messageIsError ? scheme.error : null,
+              behavior: SnackBarBehavior.floating,
             ),
           );
-          context
-              .read<AdminSettingsBloc>()
-              .add(const ClearAdminSettingsFeedbackEvent());
+          context.read<AdminSettingsBloc>().add(
+                const ClearAdminSettingsFeedbackEvent(),
+              );
         },
         child: _SettingsBackground(
           child: _SettingsScrollBody(onLogout: _handleLogout),
@@ -67,6 +66,8 @@ class _SettingsPageState extends State<SettingsPage> {
       'settingUpdated' => l10n.tOr('settingUpdated', 'Setting updated'),
       'settingDeleted' => l10n.tOr('settingDeleted', 'Setting deleted'),
       'brandingUpdated' => l10n.tOr('brandingUpdated', 'Branding updated'),
+      'brandingLogoUploaded' =>
+          l10n.tOr('brandingLogoUploaded', 'Logo uploaded'),
       'currencyCreated' => l10n.tOr('currencyCreated', 'Currency created'),
       'currencyUpdated' => l10n.tOr('currencyUpdated', 'Currency updated'),
       'currencyDeleted' => l10n.tOr('currencyDeleted', 'Currency deleted'),
@@ -77,32 +78,21 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _confirmLogout(BuildContext context) async {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final danger =
-        isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
-
-    final dialogContent = (
-      title: l10n.t('logout'),
-      message: l10n.t('logoutConfirmMessage'),
-      cancelLabel: l10n.t('cancel'),
-      confirmLabel: l10n.t('logout'),
-      titleStyle: theme.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      bodyStyle: theme.textTheme.bodyMedium,
-    );
+    final scheme = theme.colorScheme;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: scheme.scrim.withValues(alpha: 0.5),
       builder: (_) => _LogoutConfirmDialog(
-        danger: danger,
-        title: dialogContent.title,
-        message: dialogContent.message,
-        cancelLabel: dialogContent.cancelLabel,
-        confirmLabel: dialogContent.confirmLabel,
-        titleStyle: dialogContent.titleStyle,
-        bodyStyle: dialogContent.bodyStyle,
+        danger: scheme.error,
+        title: l10n.t('logout'),
+        message: l10n.t('logoutConfirmMessage'),
+        cancelLabel: l10n.t('cancel'),
+        confirmLabel: l10n.t('logout'),
+        titleStyle: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+        bodyStyle: theme.textTheme.bodyMedium,
       ),
     );
 
@@ -133,15 +123,15 @@ class _LogoutConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
           Icon(Icons.logout_rounded, color: danger, size: 22),
           const SizedBox(width: 10),
-          Text(title, style: titleStyle),
+          Expanded(child: Text(title, style: titleStyle)),
         ],
       ),
       content: Text(message, style: bodyStyle),
@@ -153,7 +143,7 @@ class _LogoutConfirmDialog extends StatelessWidget {
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: danger,
-            foregroundColor: Colors.white,
+            foregroundColor: scheme.onError,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
@@ -173,12 +163,12 @@ class _SettingsBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
     return ColoredBox(
-      color: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF7F9FC),
-      child: child,
+      color: scheme.surfaceContainerLowest,
+      // Fill the dashboard pane so alignment uses the real available size.
+      child: SizedBox.expand(child: child),
     );
   }
 }
@@ -190,74 +180,61 @@ class _SettingsScrollBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final metrics = SettingsLayoutMetrics(getSettingsDeviceType(width));
-    final sectionGap = metrics.sectionGap;
     final canReadAdmin = PermissionManager.canReadSettings(context);
     final canManage = PermissionManager.canWriteSettings(context);
     final canManageCurrencies = PermissionManager.canManageCurrencies(context);
     final showAdmin = canReadAdmin || canManageCurrencies;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: SettingsLayoutMetrics.maxContentWidth,
-        ),
-        child: SingleChildScrollView(
-          padding: EdgeInsetsDirectional.fromSTEB(
-            metrics.pageHorizontalPadding,
-            metrics.pageTopPadding + 12,
-            metrics.pageHorizontalPadding,
-            40,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              RepaintBoundary(
-                child: SettingsHeader(compact: metrics.isCompact),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use the dashboard content width (not full window) so breakpoints
+        // and centering stay stable when the sidebar is present.
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final contentWidth = availableWidth.clamp(
+          0.0,
+          SettingsLayoutMetrics.maxContentWidth,
+        );
+        final metrics =
+            SettingsLayoutMetrics(getSettingsDeviceType(contentWidth));
+        final sectionGap = metrics.sectionGap;
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: contentWidth,
+            child: SingleChildScrollView(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                metrics.pageHorizontalPadding,
+                metrics.pageTopPadding + 8,
+                metrics.pageHorizontalPadding,
+                40,
               ),
-              SizedBox(height: sectionGap + 8),
-              const RepaintBoundary(child: ProfileCard()),
-              SizedBox(height: sectionGap + 8),
-              const RepaintBoundary(child: _AppearanceSection()),
-              if (showAdmin) ...[
-                SizedBox(height: sectionGap + 8),
-                RepaintBoundary(
-                  child: SettingsPlatformTabs(
-                    canManage: canManage,
-                    canReadAdmin: canReadAdmin,
-                    canManageCurrencies: canManageCurrencies,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  RepaintBoundary(
+                    child: SettingsHeader(compact: metrics.isCompact),
                   ),
-                ),
-              ],
-              SizedBox(height: sectionGap + 8),
-              RepaintBoundary(
-                child: LogoutSection(onLogout: onLogout),
+                  if (showAdmin) ...[
+                    SizedBox(height: sectionGap + 10),
+                    RepaintBoundary(
+                      child: SettingsPlatformTabs(
+                        canManage: canManage,
+                        canReadAdmin: canReadAdmin,
+                        canManageCurrencies: canManageCurrencies,
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: sectionGap + 10),
+                  RepaintBoundary(child: LogoutSection(onLogout: onLogout)),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AppearanceSection extends StatelessWidget {
-  const _AppearanceSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final gap = SettingsLayoutMetrics(
-      getSettingsDeviceType(MediaQuery.sizeOf(context).width),
-    ).sectionGap;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const ThemeSelectorCard(),
-        SizedBox(height: gap + 8),
-        const LanguageSelectorCard(),
-      ],
+        );
+      },
     );
   }
 }

@@ -152,6 +152,8 @@ class _CategoriesPageBody extends StatelessWidget {
               isDark: isDark,
               state: state,
               compact: compactHeader,
+              showToolbar: hasTree,
+              metrics: metrics,
             );
 
             final paginationWidget = showDesktopPagination

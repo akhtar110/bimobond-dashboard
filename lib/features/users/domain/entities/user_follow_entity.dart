@@ -31,3 +31,15 @@ class UserFollowListPageEntity {
 }
 
 enum UserFollowListKind { followers, following }
+
+class ForceRemoveFollowResultEntity {
+  const ForceRemoveFollowResultEntity({
+    required this.removed,
+    required this.followerId,
+    required this.followingId,
+  });
+
+  final bool removed;
+  final String followerId;
+  final String followingId;
+}

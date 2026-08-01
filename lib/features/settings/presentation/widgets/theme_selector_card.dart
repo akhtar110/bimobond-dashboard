@@ -37,20 +37,16 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
 
     return SettingsSection(
       title: l10n.t('appearance'),
-      description: l10n.t('appearanceDescription'),
       child: SettingsSurfaceCard(
+        padding: const EdgeInsets.all(14),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final useRow = constraints.maxWidth >= 480;
+            // Keep options side-by-side even when this card is half-width.
+            final useRow = constraints.maxWidth >= 260;
 
             final lightOption = _ThemeOption(
               label: l10n.t('lightMode'),
               icon: Icons.light_mode_rounded,
-              previewColors: const [
-                Color(0xFFF8FAFC),
-                Color(0xFFE2E8F0),
-                Color(0xFFCBD5E1),
-              ],
               selected: effectiveMode == ThemeMode.light,
               onTap: () {
                 if (effectiveMode != ThemeMode.light) {
@@ -63,11 +59,6 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
             final darkOption = _ThemeOption(
               label: l10n.t('darkMode'),
               icon: Icons.dark_mode_rounded,
-              previewColors: const [
-                Color(0xFF0F172A),
-                Color(0xFF1E293B),
-                Color(0xFF334155),
-              ],
               selected: effectiveMode == ThemeMode.dark,
               onTap: () {
                 if (effectiveMode != ThemeMode.dark) {
@@ -81,7 +72,7 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
               return Row(
                 children: [
                   Expanded(child: lightOption),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(child: darkOption),
                 ],
               );
@@ -90,7 +81,7 @@ class _ThemeSelectorCardState extends State<ThemeSelectorCard> {
             return Column(
               children: [
                 lightOption,
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 darkOption,
               ],
             );
@@ -105,14 +96,12 @@ class _ThemeOption extends StatefulWidget {
   const _ThemeOption({
     required this.label,
     required this.icon,
-    required this.previewColors,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
   final IconData icon;
-  final List<Color> previewColors;
   final bool selected;
   final VoidCallback onTap;
 
@@ -126,7 +115,8 @@ class _ThemeOptionState extends State<_ThemeOption> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final primary = scheme.primary;
     final selected = widget.selected;
 
     return MouseRegion(
@@ -136,63 +126,54 @@ class _ThemeOptionState extends State<_ThemeOption> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: Duration.zero,
-          padding: const EdgeInsets.all(14),
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: selected
                 ? primary.withValues(alpha: 0.08)
                 : (_hovered
-                    ? theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5)
-                    : Colors.transparent),
+                    ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                    : scheme.surface.withValues(alpha: 0)),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
                   ? primary.withValues(alpha: 0.55)
-                  : theme.colorScheme.outline.withValues(
-                      alpha: _hovered ? 0.35 : 0.2,
-                    ),
+                  : scheme.outline.withValues(alpha: _hovered ? 0.35 : 0.2),
               width: selected ? 1.5 : 1,
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  height: 56,
-                  child: Row(
-                    children: [
-                      for (final color in widget.previewColors)
-                        Expanded(child: ColoredBox(color: color)),
-                    ],
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? scheme.primaryContainer
+                      : scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  widget.icon,
+                  size: 18,
+                  color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: selected ? primary : null,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    widget.icon,
-                    size: 18,
-                    color: selected ? primary : theme.iconTheme.color,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.label,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? primary : null,
-                      ),
-                    ),
-                  ),
-                  if (selected)
-                    Icon(Icons.check_circle_rounded, size: 18, color: primary),
-                ],
-              ),
+              if (selected)
+                Icon(Icons.check_circle_rounded, size: 18, color: primary),
             ],
           ),
         ),

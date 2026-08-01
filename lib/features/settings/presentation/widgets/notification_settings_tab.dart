@@ -6,7 +6,10 @@ import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/admin_settings_bloc.dart';
+import '../utils/settings_admin_l10n.dart';
 import 'settings_header.dart';
+import 'settings_section.dart';
+import 'settings_switch_tile.dart';
 
 /// Switches for NOTIFICATIONS_* settings with immediate patch on toggle.
 class NotificationSettingsTab extends StatelessWidget {
@@ -15,7 +18,6 @@ class NotificationSettingsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
     final canWrite = PermissionManager.canWriteSettings(context);
 
     return BlocBuilder<AdminSettingsBloc, AdminSettingsState>(
@@ -57,27 +59,25 @@ class NotificationSettingsTab extends StatelessWidget {
           );
         }
 
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.outlineVariant),
+        return SettingsSection(
+          title: l10n.tOr('tabNotifications', 'Notifications'),
+          description: l10n.tOr(
+            'settingsNotificationsDescription',
+            'Control global and channel notification delivery.',
           ),
-          child: Column(
+          child: SettingsSwitchGroupCard(
             children: [
               for (var i = 0; i < settings.length; i++)
-                SwitchListTile(
-                  title: Text(settings[i].displayLabel),
-                  subtitle: settings[i].description != null
-                      ? Text(settings[i].description!)
-                      : Text(
-                          settings[i].key,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontFamily: 'monospace',
-                                color: scheme.onSurfaceVariant,
-                              ),
-                        ),
+                SettingsSwitchTile(
+                  title: SettingsAdminL10n.settingLabel(context, settings[i]),
+                  subtitle: SettingsAdminL10n.settingDescription(
+                        context,
+                        settings[i],
+                      ) ??
+                      settings[i].key,
                   value: settings[i].boolValue,
+                  enabled: canWrite && !state.isSaving,
+                  showDivider: i < settings.length - 1,
                   onChanged: !canWrite || state.isSaving
                       ? null
                       : (value) {

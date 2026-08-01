@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +8,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gifts_page_layout.dart';
+import 'gift_thumbnail_image.dart';
 
 const double kGiftsTableHeaderHeight = 40;
 const double _kRowVPadWide = 10;
@@ -427,16 +427,14 @@ class _GiftTableThumb extends StatelessWidget {
         child: gift.thumbnailUrl.isNotEmpty
             ? ColoredBox(
                 color: scheme.surfaceContainerHighest,
-                child: CachedNetworkImage(
-                  imageUrl: gift.thumbnailUrl,
+                child: GiftThumbnailImage(
+                  networkUrl: gift.thumbnailUrl,
                   fit: BoxFit.contain,
                   memCacheWidth: (size *
                           MediaQuery.devicePixelRatioOf(context))
                       .round(),
-                  fadeInDuration: Duration.zero,
-                  fadeOutDuration: Duration.zero,
-                  placeholder: (_, _) => _placeholder(scheme),
-                  errorWidget: (_, _, _) => _placeholder(scheme),
+                  placeholder: _placeholder(scheme),
+                  errorWidget: _placeholder(scheme),
                 ),
               )
             : _placeholder(scheme),

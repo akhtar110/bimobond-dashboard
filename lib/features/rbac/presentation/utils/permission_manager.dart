@@ -78,6 +78,12 @@ abstract final class RbacPermissionKeys {
   /// Currencies CRUD (`/settings/admin/currencies`).
   static const manageCurrencies = 'settings.admin.currencies';
 
+  /// Chat admin list / search / messages (`GET /chats/admin/*`).
+  static const readChat = 'chat.admin.read';
+
+  /// Chat moderation (soft-delete messages, update groups, delete chats, bulk).
+  static const moderateChat = 'chat.admin.moderate';
+
   static const assignmentKeys = [assignRoles, manageRoles];
 }
 
@@ -104,7 +110,7 @@ abstract final class PermissionManager {
   static bool isLegacyAdmin(BuildContext context) {
     try {
       final auth = context.read<AuthBloc>().state;
-      return auth is Authenticated && auth.user.roles.contains(UserRole.admin);
+      return auth is Authenticated && auth.user.roles.includesAdmin;
     } on ProviderNotFoundException {
       return false;
     }
@@ -225,6 +231,19 @@ abstract final class PermissionManager {
       hasPermission(context, RbacPermissionKeys.manageCurrencies) ||
       isLegacyAdmin(context);
 
+  /// Chat admin read (`GET /chats/admin/all`, detail, messages).
+  static bool canReadChatAdmin(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.readChat) ||
+      hasPermission(context, RbacPermissionKeys.moderateChat) ||
+      isLegacyAdmin(context) ||
+      isLegacyModerator(context);
+
+  /// Chat moderation (delete messages/chats, bulk, PATCH group metadata).
+  static bool canModerateChatAdmin(BuildContext context) =>
+      hasPermission(context, RbacPermissionKeys.moderateChat) ||
+      isLegacyAdmin(context) ||
+      isLegacyModerator(context);
+
   /// Mirrors HomeShell tab visibility: fine-grained RBAC keys where defined,
   /// otherwise legacy admin / moderator dashboard tab rules.
   static bool canAccessDashboardTab(BuildContext context, int tabIndex) {
@@ -233,26 +252,36 @@ abstract final class PermissionManager {
 
     if (tabIndex == 16) {
       return permissions.contains(RbacPermissionKeys.manageCameraStudio) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 6) {
       return permissions.contains(RbacPermissionKeys.readStories) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 13) {
       return permissions.contains(RbacPermissionKeys.manageSounds) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 18) {
       return permissions.contains(RbacPermissionKeys.manageRoles) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
+    }
+    if (tabIndex == 19) {
+      return permissions.contains(RbacPermissionKeys.activityAdminRead) ||
+          roles.includesAdmin;
     }
     if (tabIndex == 2) {
       return permissions.contains(RbacPermissionKeys.readUsers) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
+    }
+    if (tabIndex == 8) {
+      return permissions.contains(RbacPermissionKeys.readChat) ||
+          permissions.contains(RbacPermissionKeys.moderateChat) ||
+          roles.includesAdmin ||
+          roles.contains(UserRole.moderator);
     }
 
-    if (roles.contains(UserRole.admin)) return true;
+    if (roles.includesAdmin) return true;
     if (!roles.contains(UserRole.moderator)) return false;
     return switch (tabIndex) {
       0 => true, // analytics

@@ -6,9 +6,11 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../injection_container.dart' as di;
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_follow_entity.dart';
 import '../cubit/user_follow_list_cubit.dart';
+import '../utils/user_follow_remove.dart';
 import 'permission_denied_state.dart';
 
 Future<void> showUserFollowListSheet({
@@ -16,6 +18,7 @@ Future<void> showUserFollowListSheet({
   required String userId,
   required UserFollowListKind kind,
   required int count,
+  VoidCallback? onFollowEdgeRemoved,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -23,13 +26,20 @@ Future<void> showUserFollowListSheet({
     useSafeArea: true,
     showDragHandle: true,
     builder: (sheetContext) {
+      final canForceRemove = PermissionManager.canUpdateUsers(sheetContext);
+
       return BlocProvider(
         create: (_) => UserFollowListCubit(
           getUserFollowList: di.sl(),
+          forceRemoveFollower: canForceRemove ? di.sl() : null,
           userId: userId,
           kind: kind,
         )..load(),
-        child: UserFollowListSheet(kind: kind, count: count),
+        child: UserFollowListSheet(
+          kind: kind,
+          count: count,
+          onFollowEdgeRemoved: onFollowEdgeRemoved,
+        ),
       );
     },
   );
@@ -40,10 +50,17 @@ class UserFollowListSheet extends StatelessWidget {
     super.key,
     required this.kind,
     required this.count,
+    this.onFollowEdgeRemoved,
   });
 
   final UserFollowListKind kind;
   final int count;
+  final VoidCallback? onFollowEdgeRemoved;
+
+  int _displayCount(UserFollowListState state) {
+    if (state is UserFollowListLoaded) return state.total;
+    return count;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,148 +70,195 @@ class UserFollowListSheet extends StatelessWidget {
         ? l10n.t('followers')
         : l10n.t('following');
     final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
+    final canForceRemove = PermissionManager.canUpdateUsers(context);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: SizedBox(
-        height: maxHeight,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: scheme.onPrimaryContainer,
+    return BlocBuilder<UserFollowListCubit, UserFollowListState>(
+      builder: (context, state) {
+        final displayCount = _displayCount(state);
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SizedBox(
+            height: maxHeight,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$displayCount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: _FollowListBody(
+                    kind: kind,
+                    canForceRemove: canForceRemove,
+                    onFollowEdgeRemoved: onFollowEdgeRemoved,
+                  ),
+                ),
+              ],
             ),
-            const Divider(height: 1),
-            Expanded(
-              child: BlocBuilder<UserFollowListCubit, UserFollowListState>(
-                builder: (context, state) {
-                  if (state is UserFollowListLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+          ),
+        );
+      },
+    );
+  }
+}
 
-                  if (state is UserFollowListError) {
-                    return PermissionDeniedState(
-                      message: state.isPrivateAccount
-                          ? l10n.tOr(
-                              'privateAccountFollowToSeeMore',
-                              'This account is private. Follow to see more.',
-                            )
-                          : state.message,
-                      icon: state.isPrivateAccount
-                          ? Icons.lock_outline_rounded
-                          : Icons.people_outline_rounded,
-                      onRetry: state.isPrivateAccount
-                          ? null
-                          : () => context.read<UserFollowListCubit>().load(),
+class _FollowListBody extends StatelessWidget {
+  const _FollowListBody({
+    required this.kind,
+    required this.canForceRemove,
+    this.onFollowEdgeRemoved,
+  });
+
+  final UserFollowListKind kind;
+  final bool canForceRemove;
+  final VoidCallback? onFollowEdgeRemoved;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return BlocBuilder<UserFollowListCubit, UserFollowListState>(
+      builder: (context, state) {
+        if (state is UserFollowListLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is UserFollowListError) {
+          return PermissionDeniedState(
+            message: state.isPrivateAccount
+                ? l10n.tOr(
+                    'privateAccountFollowToSeeMore',
+                    'This account is private. Follow to see more.',
+                  )
+                : state.message,
+            icon: state.isPrivateAccount
+                ? Icons.lock_outline_rounded
+                : Icons.people_outline_rounded,
+            onRetry: state.isPrivateAccount
+                ? null
+                : () => context.read<UserFollowListCubit>().load(),
+          );
+        }
+
+        if (state is UserFollowListLoaded) {
+          if (state.users.isEmpty) {
+            return _EmptyFollowList(
+              message: l10n.tOr('noUsersFound', 'No users found'),
+              onRetry: () => context.read<UserFollowListCubit>().load(),
+            );
+          }
+
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: state.users.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final user = state.users[index];
+                    return _FollowUserTile(
+                      user: user,
+                      kind: kind,
+                      showRemoveAction: canForceRemove,
+                      isRemoving: state.removingFollowerId == user.id,
+                      onRemove: canForceRemove
+                          ? () => confirmAndForceRemoveFollowEdge(
+                                context: context,
+                                kind: kind,
+                                user: user,
+                                cubit: context.read<UserFollowListCubit>(),
+                                onRemoved: onFollowEdgeRemoved,
+                              )
+                          : null,
                     );
-                  }
-
-                  if (state is UserFollowListLoaded) {
-                    if (state.users.isEmpty) {
-                      return _EmptyFollowList(
-                        message: l10n.tOr(
-                          'noUsersFound',
-                          'No users found',
-                        ),
-                        onRetry: () =>
-                            context.read<UserFollowListCubit>().load(),
-                      );
-                    }
-
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: state.users.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              return _FollowUserTile(user: state.users[index]);
-                            },
-                          ),
-                        ),
-                        if (state.error != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              state.error!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: scheme.error,
-                              ),
-                            ),
-                          ),
-                        if (state.hasMore)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            child: OutlinedButton.icon(
-                              onPressed: state.isLoadingMore
-                                  ? null
-                                  : () => context
-                                      .read<UserFollowListCubit>()
-                                      .loadMore(),
-                              icon: state.isLoadingMore
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.expand_more_rounded,
-                                      size: 18),
-                              label: Text(l10n.t('loadMoreComments')),
-                            ),
-                          ),
-                      ],
-                    );
-                  }
-
-                  return const SizedBox.shrink();
-                },
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+              if (state.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    state.error!,
+                    style: TextStyle(fontSize: 12, color: scheme.error),
+                  ),
+                ),
+              if (state.hasMore)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: OutlinedButton.icon(
+                    onPressed: state.isLoadingMore
+                        ? null
+                        : () =>
+                            context.read<UserFollowListCubit>().loadMore(),
+                    icon: state.isLoadingMore
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.expand_more_rounded, size: 18),
+                    label: Text(l10n.t('loadMoreComments')),
+                  ),
+                ),
+            ],
+          );
+        }
+
+        return const SizedBox.shrink();
+      },
     );
   }
 }
 
 class _FollowUserTile extends StatelessWidget {
-  const _FollowUserTile({required this.user});
+  const _FollowUserTile({
+    required this.user,
+    required this.kind,
+    this.showRemoveAction = false,
+    this.isRemoving = false,
+    this.onRemove,
+  });
 
   final UserFollowSummaryEntity user;
+  final UserFollowListKind kind;
+  final bool showRemoveAction;
+  final bool isRemoving;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +354,34 @@ class _FollowUserTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+              if (showRemoveAction && onRemove != null) ...[
+                isRemoving
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.error,
+                        ),
+                      )
+                    : IconButton(
+                        tooltip: context.l10n.tOr(
+                          kind == UserFollowListKind.followers
+                              ? 'removeFollower'
+                              : 'removeFollowing',
+                          kind == UserFollowListKind.followers
+                              ? 'Remove follower'
+                              : 'Remove following',
+                        ),
+                        onPressed: onRemove,
+                        icon: Icon(
+                          Icons.person_remove_outlined,
+                          color: scheme.error,
+                        ),
+                      ),
+              ] else
+                Icon(Icons.chevron_right_rounded,
+                    color: scheme.onSurfaceVariant),
             ],
           ),
         ),

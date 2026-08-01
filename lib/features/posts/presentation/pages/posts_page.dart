@@ -13,7 +13,6 @@ import '../bloc/posts_bloc.dart';
 import '../utils/posts_page_refresh.dart';
 import '../utils/posts_responsive.dart';
 import '../widgets/bulk_selection_toolbar.dart';
-import '../widgets/posts_category_filter.dart';
 import '../widgets/posts_content.dart';
 import '../widgets/posts_keyboard_intents.dart';
 import '../widgets/posts_page_header.dart';
@@ -180,17 +179,15 @@ class _PostsPageViewState extends State<_PostsPageView> {
                       return Padding(
                         padding: EdgeInsetsDirectional.fromSTEB(
                           metrics.pageHorizontalPadding,
-                          metrics.isMobile ? 6 : 8,
+                          metrics.isMobile ? 4 : 6,
                           metrics.pageHorizontalPadding,
-                          metrics.isMobile ? 10 : 12,
+                          metrics.isMobile ? 8 : 10,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             PostsPageHeader(metrics: metrics),
-                            SizedBox(height: metrics.isMobile ? 6 : 8),
-                            PostsCategoryFilter(metrics: metrics),
-                            SizedBox(height: metrics.filterGap),
+                            SizedBox(height: metrics.isMobile ? 4 : 6),
                             const BulkSelectionToolbar(),
                             SizedBox(height: metrics.isMobile ? 6 : 8),
                             Expanded(
@@ -200,6 +197,9 @@ class _PostsPageViewState extends State<_PostsPageView> {
                                     (prev is PostsLoaded &&
                                         next is PostsLoaded &&
                                         (prev.posts != next.posts ||
+                                            prev.filters != next.filters ||
+                                            prev.filterUser?.id !=
+                                                next.filterUser?.id ||
                                             prev.viewType != next.viewType ||
                                             prev.selectedPostIds !=
                                                 next.selectedPostIds ||

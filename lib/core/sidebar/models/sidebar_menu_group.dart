@@ -22,11 +22,11 @@ const kDefaultExpandedSidebarGroups = {
   'security',
 };
 
-/// Current tab indices (19 tabs):
+/// Current tab indices (20 tabs):
 /// 0 Analytics, 1 Search Mgmt, 2 Users, 3 Locations, 4 Search History,
 /// 5 Posts, 6 Stories, 7 Categories, 8 Chat, 9 Auctions, 10 Gifts,
 /// 11 Wallets, 12 Promotions, 13 Sounds, 14 Reports, 15 Notifications,
-/// 16 Filters & Effects, 17 Settings, 18 Roles
+/// 16 Filters & Effects, 17 Settings, 18 Roles, 19 Logs
 const kSidebarMenuGroups = <SidebarMenuGroupConfig>[
   SidebarMenuGroupConfig(
     id: 'overview',
@@ -59,6 +59,7 @@ const kSidebarMenuGroups = <SidebarMenuGroupConfig>[
     id: 'security',
     titleL10nKey: 'sidebarGroupSecurity',
     fallbackTitle: 'Security',
-    itemIndices: [18],
+    // Roles → Logs
+    itemIndices: [18, 19],
   ),
 ];

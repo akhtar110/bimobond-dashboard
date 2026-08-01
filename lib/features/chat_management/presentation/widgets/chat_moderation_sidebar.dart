@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/chat_management_bloc.dart';
 import 'chat_ui_shared.dart';
 
@@ -249,6 +250,9 @@ class ChatBulkActionToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!state.hasChatSelection) return const SizedBox.shrink();
+    if (!PermissionManager.canModerateChatAdmin(context)) {
+      return const SizedBox.shrink();
+    }
 
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
@@ -261,19 +265,14 @@ class ChatBulkActionToolbar extends StatelessWidget {
         duration: const Duration(milliseconds: 220),
         opacity: 1,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
-            boxShadow: [
-              BoxShadow(
-                color: scheme.shadow.withValues(alpha: 0.08),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: scheme.primary.withValues(alpha: 0.2),
+            ),
           ),
           child: Wrap(
             spacing: 8,

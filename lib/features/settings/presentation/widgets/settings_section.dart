@@ -7,43 +7,56 @@ class SettingsSection extends StatelessWidget {
     required this.title,
     this.description,
     required this.child,
+    this.trailing,
   });
 
   final String title;
   final String? description;
   final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : const Color(0xFF111827);
-    final subtitleColor =
-        isDark ? Colors.grey.shade500 : const Color(0xFF6B7280);
+    final scheme = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            letterSpacing: -0.2,
-            color: titleColor,
-          ),
-        ),
-        if (description != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            description!,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: subtitleColor,
-              fontSize: 13,
-              height: 1.35,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  if (description != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ],
+            if (trailing != null) ...[
+              const SizedBox(width: 12),
+              trailing!,
+            ],
+          ],
+        ),
         const SizedBox(height: 12),
         child,
       ],
@@ -71,34 +84,27 @@ class _SettingsSurfaceCardState extends State<SettingsSurfaceCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final outlineBorder =
-        theme.colorScheme.outline.withValues(alpha: 0.2);
+    final scheme = Theme.of(context).colorScheme;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1F2E) : Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _hovered
-                ? theme.colorScheme.primary.withValues(alpha: 0.25)
-                : outlineBorder,
+                ? scheme.primary.withValues(alpha: 0.28)
+                : scheme.outlineVariant,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(
-                alpha: isDark
-                    ? (_hovered ? 0.22 : 0.1)
-                    : (_hovered ? 0.06 : 0.03),
-              ),
-              blurRadius: _hovered ? 16 : 10,
-              offset: Offset(0, _hovered ? 4 : 2),
+              color: scheme.shadow.withValues(alpha: _hovered ? 0.08 : 0.04),
+              blurRadius: _hovered ? 18 : 12,
+              offset: Offset(0, _hovered ? 5 : 2),
             ),
           ],
         ),

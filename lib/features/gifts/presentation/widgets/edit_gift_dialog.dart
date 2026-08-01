@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -23,6 +23,7 @@ import 'gift_dialog_layout.dart';
 import 'gift_preview_dialog.dart';
 import 'gift_price_coins_field.dart';
 import 'gift_published_at_picker.dart';
+import 'gift_thumbnail_image.dart';
 import 'gift_type_selector.dart';
 
 void showEditGiftDialog(BuildContext pageContext, GiftEntity gift) {
@@ -636,18 +637,27 @@ class EditGiftDialogState extends State<EditGiftDialog> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
+              clipBehavior: kIsWeb ? Clip.none : Clip.antiAlias,
               child: hasNewImage
-                  ? Image.memory(
-                      _newImageBytes!,
+                  ? GiftThumbnailImage(
+                      key: ValueKey(
+                        'edit-gift-img-${_newImageName ?? widget.gift.id}-'
+                        '${_newImageBytes?.length ?? widget.gift.thumbnailUrl}',
+                      ),
+                      bytes: _newImageBytes,
+                      fileName: _newImageName,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                      errorWidget: _imagePlaceholder(),
                     )
                   : (widget.gift.thumbnailUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.gift.thumbnailUrl,
+                      ? GiftThumbnailImage(
+                          key: ValueKey(
+                            'edit-gift-url-${widget.gift.thumbnailUrl}',
+                          ),
+                          networkUrl: widget.gift.thumbnailUrl,
                           fit: BoxFit.contain,
-                          placeholder: (_, __) => _imagePlaceholder(),
-                          errorWidget: (_, __, ___) => _imagePlaceholder(),
+                          placeholder: _imagePlaceholder(),
+                          errorWidget: _imagePlaceholder(),
                         )
                       : _imagePlaceholder()),
             ),

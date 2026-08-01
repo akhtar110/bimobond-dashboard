@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/app_setting_entity.dart';
 
-/// Localized labels for admin settings tabs and category chips.
+/// Localized labels for admin settings tabs, categories, and known keys.
 abstract final class SettingsAdminL10n {
   static String tabLabel(BuildContext context, String tabKey) {
     final l10n = context.l10n;
@@ -39,6 +39,49 @@ abstract final class SettingsAdminL10n {
       'FEATURES' => l10n.tOr('tabFeatures', 'Features'),
       _ => category!,
     };
+  }
+
+  /// Localized label for a known setting key; falls back to API/display label.
+  static String settingLabel(BuildContext context, AppSettingEntity setting) {
+    final l10n = context.l10n;
+    final key = 'settingLabel_${setting.key}';
+    final localized = l10n.t(key);
+    if (localized != key) return localized;
+    return setting.displayLabel;
+  }
+
+  /// Localized description for a known setting key; falls back to API text.
+  static String? settingDescription(
+    BuildContext context,
+    AppSettingEntity setting,
+  ) {
+    final l10n = context.l10n;
+    final key = 'settingDesc_${setting.key}';
+    final localized = l10n.t(key);
+    if (localized != key) return localized;
+    final desc = setting.description?.trim();
+    if (desc != null && desc.isNotEmpty) return desc;
+    return null;
+  }
+
+  static String settingTypeLabel(BuildContext context, String type) {
+    final l10n = context.l10n;
+    return switch (type.trim().toUpperCase()) {
+      'STRING' => l10n.tOr('settingsTypeString', 'String'),
+      'NUMBER' => l10n.tOr('settingsTypeNumber', 'Number'),
+      'BOOLEAN' => l10n.tOr('settingsTypeBoolean', 'Boolean'),
+      'JSON' => l10n.tOr('settingsTypeJson', 'JSON'),
+      _ => type.toUpperCase(),
+    };
+  }
+
+  /// Localized title for defaults / key-only rows.
+  static String settingKeyLabel(BuildContext context, String settingKey) {
+    final l10n = context.l10n;
+    final key = 'settingLabel_$settingKey';
+    final localized = l10n.t(key);
+    if (localized != key) return localized;
+    return settingKey;
   }
 
   static List<String> resolveCategories(List<String> fromApi) {

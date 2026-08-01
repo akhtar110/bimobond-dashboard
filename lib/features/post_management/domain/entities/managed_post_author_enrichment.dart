@@ -97,7 +97,7 @@ ManagedPostEntity enrichManagedPostAuthor(
 
   final userId = pickId();
 
-  return enrichManagedPostContent(
+  final enriched = enrichManagedPostContent(
     primary.copyWith(
     userId: userId.isNotEmpty ? userId : primary.userId,
     userName: pickStr(
@@ -153,6 +153,24 @@ ManagedPostEntity enrichManagedPostAuthor(
     ),
     fallback: fallback,
   );
+
+  return enrichManagedPostLocationFromAuthor(
+    enriched,
+    author: author,
+  );
+}
+
+/// When the post has no place tag, falls back to the author's profile location.
+ManagedPostEntity enrichManagedPostLocationFromAuthor(
+  ManagedPostEntity post, {
+  UserEntity? author,
+}) {
+  if (post.location?.hasDisplayData == true || author == null) return post;
+
+  final fromAuthor = ManagedPostLocationEntity.fromUserEntity(author);
+  if (fromAuthor == null) return post;
+
+  return post.copyWith(location: fromAuthor);
 }
 
 /// Immutable copy of a feed row captured before opening post management.
@@ -417,6 +435,8 @@ ManagedPostEntity enrichManagedPostContent(
     fallback.sound,
     soundId: soundId,
   );
+  final location = primary.location ?? fallback.location;
+  final locationId = _pickNonEmptyStr(primary.locationId, fallback.locationId);
 
   if (description == primary.description &&
       category == primary.category &&
@@ -428,7 +448,9 @@ ManagedPostEntity enrichManagedPostContent(
       media == primary.media &&
       type == primary.type &&
       soundId == primary.soundId &&
-      sound == primary.sound) {
+      sound == primary.sound &&
+      location == primary.location &&
+      locationId == primary.locationId) {
     return hydrateManagedPostMedia(primary);
   }
 
@@ -445,6 +467,8 @@ ManagedPostEntity enrichManagedPostContent(
       type: type,
       soundId: soundId,
       sound: sound,
+      location: location,
+      locationId: locationId,
     ),
   );
 }

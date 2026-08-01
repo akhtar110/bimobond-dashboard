@@ -10,12 +10,16 @@ class ArOverlayCard extends StatefulWidget {
     required this.overlay,
     this.onPreview,
     this.onEdit,
+    this.onActivate,
+    this.onDeactivate,
     this.onDelete,
   });
 
   final ArOverlayEntity overlay;
   final VoidCallback? onPreview;
   final VoidCallback? onEdit;
+  final VoidCallback? onActivate;
+  final VoidCallback? onDeactivate;
   final VoidCallback? onDelete;
 
   @override
@@ -133,26 +137,34 @@ class _ArOverlayCardState extends State<ArOverlayCard> {
                       Positioned(
                         top: 6,
                         left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: scheme.surface.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: scheme.outlineVariant.withValues(alpha: 0.5),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.surface.withValues(alpha: 0.9),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: scheme.outlineVariant
+                                      .withValues(alpha: 0.5),
+                                ),
+                              ),
+                              child: Text(
+                                '#${item.sortOrder}',
+                                style: TextStyle(
+                                  color: scheme.onSurface,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            '#${item.sortOrder}',
-                            style: TextStyle(
-                              color: scheme.onSurface,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                            const SizedBox(width: 4),
+                            _StatusChip(isActive: item.isActive),
+                          ],
                         ),
                       ),
                       if (widget.onPreview != null)
@@ -230,8 +242,8 @@ class _ArOverlayCardState extends State<ArOverlayCard> {
                   ),
                   const SizedBox(height: 6),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      const Spacer(),
                       if (widget.onPreview != null) ...[
                         _CompactAction(
                           icon: Icons.visibility_outlined,
@@ -245,6 +257,23 @@ class _ArOverlayCardState extends State<ArOverlayCard> {
                           icon: Icons.edit_rounded,
                           tooltip: l10n.t('edit'),
                           onPressed: widget.onEdit,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (item.isActive && widget.onDeactivate != null) ...[
+                        _CompactAction(
+                          icon: Icons.pause_circle_outline_rounded,
+                          tooltip: l10n.tOr('feDeactivate', 'Deactivate'),
+                          onPressed: widget.onDeactivate,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (!item.isActive && widget.onActivate != null) ...[
+                        _CompactAction(
+                          icon: Icons.play_circle_outline_rounded,
+                          tooltip: l10n.tOr('feActivate', 'Activate'),
+                          onPressed: widget.onActivate,
+                          color: scheme.tertiary,
                         ),
                         const SizedBox(width: 4),
                       ],
@@ -277,6 +306,40 @@ class _ArOverlayCardState extends State<ArOverlayCard> {
         Icons.layers_outlined,
         size: 30,
         color: Colors.white.withValues(alpha: 0.9),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.isActive});
+
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final bg = isActive
+        ? scheme.tertiaryContainer
+        : scheme.errorContainer.withValues(alpha: 0.7);
+    final fg = isActive ? scheme.onTertiaryContainer : scheme.onErrorContainer;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        isActive
+            ? l10n.tOr('feActive', 'Active')
+            : l10n.tOr('feInactive', 'Inactive'),
+        style: TextStyle(
+          color: fg,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }

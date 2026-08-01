@@ -29,9 +29,12 @@ class UsersTableConfig {
       // Keep followers / posts / likes visible whenever the table is shown.
       showEngagement: true,
       showLocation: true,
-      // Inline action chips need ~320px+; laptop/MacBook content widths
-      // often leave a narrower actions column → use overflow menu.
-      compactActions: width < 1400,
+      // Inline action chips need room; collapse to overflow menu earlier
+      // on laptop/tablet content widths to avoid overlap.
+      compactActions: width < 1500 ||
+          device == DeviceType.tablet ||
+          device == DeviceType.mobileLarge ||
+          device == DeviceType.mobileSmall,
       minWidth: width,
       checkboxWidth: device == DeviceType.tablet ? 36 : 34,
     );

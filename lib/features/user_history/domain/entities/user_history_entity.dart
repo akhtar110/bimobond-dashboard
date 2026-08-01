@@ -102,6 +102,7 @@ abstract final class UserHistoryTypes {
   static const search = 'SEARCH';
   static const location = 'LOCATION';
   static const authLogin = 'AUTH_LOGIN';
+  static const authLogout = 'AUTH_LOGOUT';
 
   static const all = <String>[
     profileView,

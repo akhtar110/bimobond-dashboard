@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/app_setting_entity.dart';
 import '../bloc/admin_settings_bloc.dart';
+import '../utils/settings_admin_l10n.dart';
 
 /// Opens the settings filter panel as a centered popup dialog.
 Future<void> showSettingsFilterPanel(BuildContext context) {
@@ -149,7 +150,9 @@ class _SettingsFilterPanelState extends State<SettingsFilterPanel> {
                       for (final cat in categories)
                         DropdownMenuItem<String?>(
                           value: cat,
-                          child: Text(cat),
+                          child: Text(
+                            SettingsAdminL10n.categoryLabel(context, cat),
+                          ),
                         ),
                     ],
                     onChanged: (value) => setState(() => _category = value),
@@ -207,10 +210,17 @@ class _SettingsFilterPanelState extends State<SettingsFilterPanel> {
                         value: null,
                         child: Text(l10n.tOr('settingsFilterAll', 'All')),
                       ),
-                      for (final t in const ['STRING', 'NUMBER', 'BOOLEAN', 'JSON'])
+                      for (final t in const [
+                        'STRING',
+                        'NUMBER',
+                        'BOOLEAN',
+                        'JSON',
+                      ])
                         DropdownMenuItem<String?>(
                           value: t,
-                          child: Text(t),
+                          child: Text(
+                            SettingsAdminL10n.settingTypeLabel(context, t),
+                          ),
                         ),
                     ],
                     onChanged: (value) => setState(() => _type = value),

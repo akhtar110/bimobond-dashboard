@@ -32,13 +32,14 @@ class UpdateChat {
 class DeleteChat {
   const DeleteChat(this.repository);
   final ChatManagementRepository repository;
-  Future<void> call(String id) => repository.deleteChat(id);
+  Future<ChatDeleteResultEntity> call(String id) => repository.deleteChat(id);
 }
 
 class DeleteChatMessage {
   const DeleteChatMessage(this.repository);
   final ChatManagementRepository repository;
-  Future<void> call(String messageId) => repository.deleteMessage(messageId);
+  Future<ChatMessageDeleteResultEntity> call(String messageId) =>
+      repository.deleteMessage(messageId);
 }
 
 class BulkChatModeration {

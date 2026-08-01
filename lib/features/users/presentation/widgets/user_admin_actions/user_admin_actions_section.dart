@@ -10,6 +10,7 @@ import '../../bloc/user_detail_bloc.dart';
 import '../../bloc/user_detail_event.dart';
 import '../../utils/user_admin_action_presentation.dart';
 import '../reset_password_dialog.dart';
+import '../user_privacy_settings_sheet.dart';
 import 'admin_action_confirmation_dialog.dart';
 
 class UserAdminActionsSection extends StatelessWidget {
@@ -168,6 +169,32 @@ class UserAdminActionsSection extends StatelessWidget {
                 isLoading: executingAction == item.confirmAs,
                 isDisabled: isBusy && executingAction != item.confirmAs,
                 onSelected: () => _onRoleTap(context, item),
+              ),
+            if (canUpdate)
+              MenuItemButton(
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  padding: WidgetStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  ),
+                ),
+                onPressed: isBusy
+                    ? null
+                    : () => UserPrivacySettingsSheet.show(context, user: user),
+                leadingIcon: Icon(
+                  Icons.lock_outline_rounded,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+                child: Text(
+                  l10n.t('editPrivacySettings'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        isBusy ? scheme.onSurfaceVariant : scheme.onSurface,
+                  ),
+                ),
               ),
             if (canResetPassword)
               MenuItemButton(

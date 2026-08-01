@@ -46,9 +46,13 @@ class _UserActivityDevicesTabState extends State<UserActivityDevicesTab> {
     bloc.add(LoadMoreDevices());
   }
 
-  void _openLastActiveHistory(String userId) {
+  void _openLastActiveHistory(String userId, {String? deviceId}) {
     if (userId.isEmpty) return;
-    showLastActiveHistoryDialog(context, userId: userId);
+    showLastActiveHistoryDialog(
+      context,
+      userId: userId,
+      deviceId: deviceId,
+    );
   }
 
   @override
@@ -103,12 +107,16 @@ class _UserActivityDevicesTabState extends State<UserActivityDevicesTab> {
                       child: Center(child: CircularProgressIndicator()),
                     );
                   }
+                  final device = state.devices[index];
                   return UserDeviceCard(
-                    device: state.devices[index],
+                    device: device,
                     isDark: widget.isDark,
                     onViewLastActiveHistory: state.userId.isEmpty
                         ? null
-                        : () => _openLastActiveHistory(state.userId),
+                        : () => _openLastActiveHistory(
+                              state.userId,
+                              deviceId: device.deviceId,
+                            ),
                   );
                 },
               ),

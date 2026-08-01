@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../bloc/chat_management_bloc.dart';
 import 'chat_ui_shared.dart';
 
@@ -30,6 +31,7 @@ class MessagesSelectionHeader extends StatelessWidget {
       builder: (context, data) {
         if (!data.visible) return const SizedBox.shrink();
 
+        final canModerate = PermissionManager.canModerateChatAdmin(context);
         final bloc = context.read<ChatManagementBloc>();
 
         return Container(
@@ -60,7 +62,7 @@ class MessagesSelectionHeader extends StatelessWidget {
                             : data.someVisibleSelected
                                 ? null
                                 : false,
-                        onChanged: data.isSubmitting
+                        onChanged: !canModerate || data.isSubmitting
                             ? null
                             : (_) =>
                                 bloc.add(const MessagesSelectAllToggled()),
@@ -79,22 +81,23 @@ class MessagesSelectionHeader extends StatelessWidget {
                         ),
                       ),
                       if (!narrow) ...[
-                        _ToolbarLink(
-                          icon: Icons.select_all_rounded,
-                          label: l10n.t('selectAllMessages'),
-                          onPressed: data.isSubmitting
-                              ? null
-                              : () =>
-                                  bloc.add(const MessagesSelectAllVisible()),
-                        ),
-                        _ToolbarLink(
-                          icon: Icons.clear_all_rounded,
-                          label: l10n.t('clearSelection'),
-                          onPressed: data.isSubmitting || data.selectedCount == 0
-                              ? null
-                              : () => bloc.add(const MessageSelectionCleared()),
-                        ),
-                        FilledButton.tonalIcon(
+                        if (canModerate) ...[
+                          _ToolbarLink(
+                            icon: Icons.select_all_rounded,
+                            label: l10n.t('selectAllMessages'),
+                            onPressed: data.isSubmitting
+                                ? null
+                                : () =>
+                                    bloc.add(const MessagesSelectAllVisible()),
+                          ),
+                          _ToolbarLink(
+                            icon: Icons.clear_all_rounded,
+                            label: l10n.t('clearSelection'),
+                            onPressed: data.isSubmitting || data.selectedCount == 0
+                                ? null
+                                : () => bloc.add(const MessageSelectionCleared()),
+                          ),
+                          FilledButton.tonalIcon(
                           style: FilledButton.styleFrom(
                             backgroundColor: scheme.errorContainer,
                             foregroundColor: scheme.onErrorContainer,
@@ -120,8 +123,10 @@ class MessagesSelectionHeader extends StatelessWidget {
                           icon: const Icon(Icons.delete_outline_rounded, size: 18),
                           label: Text(l10n.t('delete')),
                         ),
+                        ],
                       ] else ...[
-                        IconButton(
+                        if (canModerate) ...[
+                          IconButton(
                           tooltip: l10n.t('selectAllMessages'),
                           icon: const Icon(Icons.select_all_rounded, size: 20),
                           visualDensity: VisualDensity.compact,
@@ -178,6 +183,7 @@ class MessagesSelectionHeader extends StatelessWidget {
                                   }
                                 },
                         ),
+                        ],
                       ],
                     ],
                   );
