@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/utils/search_debounce.dart';
 
 import '../../../../core/utils/api_error_messages.dart';
 import '../../domain/entities/bulk_gift_action_request.dart';
@@ -59,6 +62,11 @@ class ChangeGiftSortEvent extends GiftsEvent {
 /// Real-time search by gift name (case-insensitive).
 class SearchGiftsEvent extends GiftsEvent {
   SearchGiftsEvent(this.query);
+  final String query;
+}
+
+class _ApplyDebouncedGiftSearchEvent extends GiftsEvent {
+  _ApplyDebouncedGiftSearchEvent(this.query);
   final String query;
 }
 
@@ -591,6 +599,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     on<ChangeGiftTabFilterEvent>(_onChangeTab);
     on<ChangeGiftSortEvent>(_onChangeSort);
     on<SearchGiftsEvent>(_onSearch);
+    on<_ApplyDebouncedGiftSearchEvent>(_onApplyDebouncedSearch);
     on<SetDateRangeFilterEvent>(_onSetDateRange);
     on<UpdatePriceRangeFilterEvent>(_onUpdatePriceRange);
     on<SetGiftTypeFilterEvent>(_onSetTypeFilter);
@@ -627,6 +636,9 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   final GetGiftGroupsUseCase _getGiftGroups;
   final ReplaceGroupGiftsUseCase _replaceGroupGifts;
   final ReorderGiftsUseCase _reorderGifts;
+
+  final SearchDebouncer _searchDebouncer = SearchDebouncer();
+  String _pendingSearchQuery = '';
 
   static const pageLimit = 20;
 
@@ -879,6 +891,17 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   }
 
   void _onSearch(SearchGiftsEvent event, Emitter<GiftsState> emit) {
+    _pendingSearchQuery = event.query;
+    _searchDebouncer.run(() {
+      if (isClosed) return;
+      add(_ApplyDebouncedGiftSearchEvent(_pendingSearchQuery));
+    });
+  }
+
+  void _onApplyDebouncedSearch(
+    _ApplyDebouncedGiftSearchEvent event,
+    Emitter<GiftsState> emit,
+  ) {
     final c = state;
     if (c is GiftsLoaded) {
       emit(c.copyWith(
@@ -1294,5 +1317,11 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     }
 
     return looksLikeDuplicateName;
+  }
+
+  @override
+  Future<void> close() {
+    _searchDebouncer.dispose();
+    return super.close();
   }
 }

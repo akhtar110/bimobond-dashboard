@@ -12,6 +12,7 @@ abstract class ArOverlaysRemoteDataSource {
   Future<ArOverlayListResponseModel> getAdminOverlays({
     int page = 1,
     int limit = 20,
+    bool? isActive,
   });
   Future<ArOverlayModel> getAdminOverlayById(String id);
   Future<ArOverlayModel> createAdminOverlay(CreateArOverlayData data);
@@ -19,6 +20,8 @@ abstract class ArOverlaysRemoteDataSource {
     String id,
     UpdateArOverlayData data,
   );
+  Future<ArOverlayModel> activateAdminOverlay(String id);
+  Future<ArOverlayModel> deactivateAdminOverlay(String id);
   Future<void> deleteAdminOverlay(String id);
 }
 
@@ -310,10 +313,29 @@ class ArOverlaysRemoteDataSourceImpl implements ArOverlaysRemoteDataSource {
   }
 
   /// Admin List: `GET /camera-studio/ar-overlays/admin?page=1&limit=20`
+  ///
+  /// Backend defaults to active-only when `isActive` is omitted, so the
+  /// "All" filter (`isActive == null`) merges active + inactive results.
   @override
   Future<ArOverlayListResponseModel> getAdminOverlays({
     int page = 1,
     int limit = 20,
+    bool? isActive,
+  }) async {
+    if (isActive == null) {
+      return _getAdminOverlaysAllStatuses(page: page, limit: limit);
+    }
+    return _getAdminOverlaysPage(
+      page: page,
+      limit: limit,
+      isActive: isActive,
+    );
+  }
+
+  Future<ArOverlayListResponseModel> _getAdminOverlaysPage({
+    required int page,
+    required int limit,
+    required bool isActive,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -321,12 +343,77 @@ class ArOverlaysRemoteDataSourceImpl implements ArOverlaysRemoteDataSource {
         queryParameters: {
           'page': page,
           'limit': limit,
+          'isActive': isActive,
         },
       );
       return ArOverlayListResponseModel.fromJson(response.data ?? {});
     } on DioException catch (e) {
       throw _handleError(e);
     }
+  }
+
+  /// Fetches every page for a status, up to API max page size (100).
+  Future<List<ArOverlayModel>> _fetchAllAdminOverlaysForStatus({
+    required bool isActive,
+  }) async {
+    const pageSize = 100;
+    final first = await _getAdminOverlaysPage(
+      page: 1,
+      limit: pageSize,
+      isActive: isActive,
+    );
+    final items = <ArOverlayModel>[
+      ...first.data.whereType<ArOverlayModel>(),
+    ];
+    final totalPages = first.meta.totalPages < 1 ? 1 : first.meta.totalPages;
+    for (var page = 2; page <= totalPages; page++) {
+      final next = await _getAdminOverlaysPage(
+        page: page,
+        limit: pageSize,
+        isActive: isActive,
+      );
+      items.addAll(next.data.whereType<ArOverlayModel>());
+    }
+    return items;
+  }
+
+  Future<ArOverlayListResponseModel> _getAdminOverlaysAllStatuses({
+    required int page,
+    required int limit,
+  }) async {
+    final results = await Future.wait([
+      _fetchAllAdminOverlaysForStatus(isActive: true),
+      _fetchAllAdminOverlaysForStatus(isActive: false),
+    ]);
+    final byId = <String, ArOverlayModel>{};
+    for (final item in [...results[0], ...results[1]]) {
+      if (item.id.trim().isEmpty) continue;
+      byId[item.id] = item;
+    }
+    final merged = byId.values.toList()
+      ..sort((a, b) {
+        final bySort = a.sortOrder.compareTo(b.sortOrder);
+        if (bySort != 0) return bySort;
+        return a.id.compareTo(b.id);
+      });
+
+    final safeLimit = limit.clamp(1, 100);
+    final total = merged.length;
+    final totalPages = total == 0 ? 1 : ((total + safeLimit - 1) ~/ safeLimit);
+    final safePage = page.clamp(1, totalPages);
+    final start = (safePage - 1) * safeLimit;
+    final pageItems = merged.skip(start).take(safeLimit).toList(growable: false);
+
+    return ArOverlayListResponseModel(
+      version: '',
+      data: pageItems,
+      meta: ArOverlayMetaModel(
+        total: total,
+        page: safePage,
+        limit: safeLimit,
+        totalPages: totalPages,
+      ),
+    );
   }
 
   /// Admin Get One: `GET /camera-studio/ar-overlays/admin/:id`
@@ -446,6 +533,40 @@ class ArOverlaysRemoteDataSourceImpl implements ArOverlaysRemoteDataSource {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/camera-studio/ar-overlays/admin/$id',
         data: resolvedData.toJson(),
+      );
+      final json = response.data ?? {};
+      if (json.containsKey('data') && json['data'] is Map<String, dynamic>) {
+        return ArOverlayModel.fromJson(json['data'] as Map<String, dynamic>);
+      }
+      return ArOverlayModel.fromJson(json);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Admin Activate Overlay: `PATCH /camera-studio/ar-overlays/admin/:id/activate`
+  @override
+  Future<ArOverlayModel> activateAdminOverlay(String id) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/camera-studio/ar-overlays/admin/$id/activate',
+      );
+      final json = response.data ?? {};
+      if (json.containsKey('data') && json['data'] is Map<String, dynamic>) {
+        return ArOverlayModel.fromJson(json['data'] as Map<String, dynamic>);
+      }
+      return ArOverlayModel.fromJson(json);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Admin Deactivate Overlay: `PATCH /camera-studio/ar-overlays/admin/:id/deactivate`
+  @override
+  Future<ArOverlayModel> deactivateAdminOverlay(String id) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/camera-studio/ar-overlays/admin/$id/deactivate',
       );
       final json = response.data ?? {};
       if (json.containsKey('data') && json['data'] is Map<String, dynamic>) {

@@ -19,8 +19,13 @@ class ArOverlaysRepositoryImpl implements ArOverlaysRepository {
   Future<ArOverlayListResponseEntity> getAdminOverlays({
     int page = 1,
     int limit = 20,
+    bool? isActive,
   }) {
-    return _remoteDataSource.getAdminOverlays(page: page, limit: limit);
+    return _remoteDataSource.getAdminOverlays(
+      page: page,
+      limit: limit,
+      isActive: isActive,
+    );
   }
 
   @override
@@ -39,6 +44,16 @@ class ArOverlaysRepositoryImpl implements ArOverlaysRepository {
     UpdateArOverlayData data,
   ) {
     return _remoteDataSource.updateAdminOverlay(id, data);
+  }
+
+  @override
+  Future<ArOverlayEntity> activateAdminOverlay(String id) {
+    return _remoteDataSource.activateAdminOverlay(id);
+  }
+
+  @override
+  Future<ArOverlayEntity> deactivateAdminOverlay(String id) {
+    return _remoteDataSource.deactivateAdminOverlay(id);
   }
 
   @override

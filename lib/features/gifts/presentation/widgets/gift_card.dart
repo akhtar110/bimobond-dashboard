@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +8,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_schedule_label.dart';
+import 'gift_thumbnail_image.dart';
 
 // ─── Main card ────────────────────────────────────────────────────────────────
 
@@ -428,16 +428,13 @@ class _GiftThumbnail extends StatelessWidget {
                     ),
                   )
                 : (gift.thumbnailUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: gift.thumbnailUrl,
+                    ? GiftThumbnailImage(
+                        key: ValueKey('gift-card-img-${gift.id}-${gift.thumbnailUrl}'),
+                        networkUrl: gift.thumbnailUrl,
                         fit: BoxFit.contain,
                         memCacheWidth: cacheWidth,
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        placeholder: (context, url) =>
-                            _placeholder(scheme, compact),
-                        errorWidget: (context, url, error) =>
-                            _placeholder(scheme, compact),
+                        placeholder: _placeholder(scheme, compact),
+                        errorWidget: _placeholder(scheme, compact),
                       )
                     : _placeholder(scheme, compact)),
           ),

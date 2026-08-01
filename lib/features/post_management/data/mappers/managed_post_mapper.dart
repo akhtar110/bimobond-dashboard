@@ -182,10 +182,16 @@ ManagedPostEntity mapAdminPostJsonToManagedPost(
 ManagedPostEntity managedPostFromUserPost(
   UserPostEntity post, {
   UserEntity? author,
+  Map<String, dynamic>? rawJson,
 }) {
   final owner = resolveProfileUserAsPostOwner(post, author);
+  final adminJson = userPostEntityToAdminJson(post);
+  final location = rawJson?['location'];
+  if (location != null) {
+    adminJson['location'] = location;
+  }
   return mapAdminPostJsonToManagedPost(
-    userPostEntityToAdminJson(post),
+    adminJson,
     postOwner: owner,
   );
 }
@@ -419,6 +425,7 @@ ManagedPostEntity managedPostFromActivityItem(
       ? managedPostFromUserPost(
           UserPostModel.fromJson(nestedPost),
           author: postOwner,
+          rawJson: nestedPost,
         )
       : managedPostFromActivitySummary(summary, postOwner: postOwner);
 

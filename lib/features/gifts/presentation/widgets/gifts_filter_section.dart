@@ -32,10 +32,11 @@ class GiftsFilterSection extends StatelessWidget {
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
           maintainState: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          tilePadding: const EdgeInsetsDirectional.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsetsDirectional.fromSTEB(14, 0, 14, 14),
           title: Text(
             title,
+            textAlign: TextAlign.start,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               letterSpacing: 0.2,

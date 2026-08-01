@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../core/localization/localization.dart';
 import '../../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../../categories/presentation/widgets/category_icon.dart';
+import '../../../../posts/presentation/utils/post_date_format.dart';
 import '../../../domain/entities/managed_post_entity.dart';
 import '../../utils/post_detail_labels.dart';
 import 'engagement_metric_cards.dart';
 import 'investigation_theme.dart';
+import 'post_location_section.dart';
 import 'post_preview_card.dart';
 import 'post_surface_card.dart';
 
@@ -37,148 +38,186 @@ class PostContentSection extends StatelessWidget {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final locale = Localizations.localeOf(context).languageCode;
+    final width = MediaQuery.sizeOf(context).width;
+    final showPreview = width < InvestigationTheme.threeColumn;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PostPreviewCard(post: draft),
-        const SizedBox(height: InvestigationTheme.s12),
+        if (showPreview) ...[
+          PostPreviewCard(post: draft, dense: true),
+          const SizedBox(height: InvestigationTheme.s8),
+        ],
         PostSurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.t('postInformation'),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: InvestigationTheme.s12),
-              BlocBuilder<CategoriesBloc, CategoriesState>(
-                builder: (context, catState) {
-                  final categoryLabel = _resolveCategoryLabel(draft, catState);
-                  return Wrap(
-                    spacing: InvestigationTheme.s8,
-                    runSpacing: InvestigationTheme.s8,
-                    children: [
-                      if (categoryLabel != null && categoryLabel.isNotEmpty)
-                        _Badge(
-                          icon: Icons.category_outlined,
-                          label: categoryLabel,
-                          color: scheme.primary,
+          dense: true,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wideMeta = constraints.maxWidth >= 560;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.t('postInformation'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: InvestigationTheme.s8),
+                  BlocBuilder<CategoriesBloc, CategoriesState>(
+                    builder: (context, catState) {
+                      final categoryLabel =
+                          _resolveCategoryLabel(draft, catState);
+                      return Wrap(
+                        spacing: InvestigationTheme.s8,
+                        runSpacing: InvestigationTheme.s8,
+                        children: [
+                          if (categoryLabel != null &&
+                              categoryLabel.isNotEmpty)
+                            _Badge(
+                              icon: Icons.category_outlined,
+                              label: categoryLabel,
+                              color: scheme.primary,
+                            ),
+                          _Badge(
+                            icon: Icons.lock_outline_rounded,
+                            label: privacyLabel(l10n, draft.privacyStatus),
+                            color: scheme.secondary,
+                          ),
+                          _StatusBadge(status: draft.status, l10n: l10n),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: InvestigationTheme.s12),
+                  if (wideMeta)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _PostMetaFacts(
+                            draft: draft,
+                            locale: locale,
+                            l10n: l10n,
+                          ),
                         ),
-                      _Badge(
-                        icon: Icons.lock_outline_rounded,
-                        label: privacyLabel(l10n, draft.privacyStatus),
-                        color: scheme.secondary,
-                      ),
-                      _StatusBadge(status: draft.status, l10n: l10n),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: InvestigationTheme.s12),
-              _PostInfoRow(
-                icon: Icons.category_outlined,
-                label: l10n.t('type'),
-                // Image + attached sound is still IMAGE (not VIDEO).
-                value: draft.displayContentType,
-              ),
-              const SizedBox(height: InvestigationTheme.s8),
-              _PostInfoRow(
-                icon: Icons.calendar_today_outlined,
-                label: l10n.t('created'),
-                value: DateFormat(
-                  'MMM dd, yyyy · HH:mm',
-                ).format(draft.createdAt),
-              ),
-              if (draft.media.isNotEmpty) ...[
-                const SizedBox(height: InvestigationTheme.s8),
-                _PostInfoRow(
-                  icon: Icons.collections_outlined,
-                  label: l10n.tOr('mediaItems', 'Media items'),
-                  value: '${draft.media.length}',
-                ),
-              ],
-              const SizedBox(height: InvestigationTheme.s16),
-              TextField(
-                controller: captionController,
-                maxLines: 4,
-                enabled: !isBusy,
-                onChanged: (_) => onCaptionChanged(),
-                decoration: InvestigationTheme.fieldDecoration(
-                  context,
-                  labelText: l10n.t('caption'),
-                ),
-              ),
-              const SizedBox(height: InvestigationTheme.s12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final sideBySide =
-                      constraints.maxWidth >= InvestigationTheme.compact + 80;
-                  final category = _CategoryDropdown(
-                    draft: draft,
-                    isBusy: isBusy,
-                    onCategorySelected: onCategorySelected,
-                  );
-                  final privacy = DropdownButtonFormField<String>(
-                    initialValue:
-                        const [
-                          'PUBLIC',
-                          'PRIVATE',
-                          'FRIENDS',
-                        ].contains(draft.privacyStatus)
-                        ? draft.privacyStatus
-                        : 'PUBLIC',
+                        const SizedBox(width: InvestigationTheme.s16),
+                        Expanded(
+                          flex: 2,
+                          child: PostLocationSection(location: draft.location),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    _PostMetaFacts(
+                      draft: draft,
+                      locale: locale,
+                      l10n: l10n,
+                    ),
+                    const SizedBox(height: InvestigationTheme.s12),
+                    Divider(
+                      height: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.35),
+                    ),
+                    const SizedBox(height: InvestigationTheme.s12),
+                    PostLocationSection(location: draft.location),
+                  ],
+                  const SizedBox(height: InvestigationTheme.s12),
+                  TextField(
+                    controller: captionController,
+                    maxLines: 3,
+                    enabled: !isBusy,
+                    onChanged: (_) => onCaptionChanged(),
                     decoration: InvestigationTheme.fieldDecoration(
                       context,
-                      labelText: l10n.t('privacy'),
+                      labelText: l10n.t('caption'),
                     ),
-                    items: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
-                        .map(
-                          (v) => DropdownMenuItem(
-                            value: v,
-                            child: Text(privacyLabel(l10n, v)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: isBusy
-                        ? null
-                        : (v) => v != null ? onPrivacyChanged(v) : null,
-                  );
-                  if (!sideBySide) {
-                    return Column(
-                      children: [
-                        category,
-                        const SizedBox(height: InvestigationTheme.s12),
-                        privacy,
-                      ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(child: category),
-                      const SizedBox(width: InvestigationTheme.s12),
-                      Expanded(child: privacy),
-                    ],
-                  );
-                },
-              ),
-            ],
+                  ),
+                  const SizedBox(height: InvestigationTheme.s12),
+                  LayoutBuilder(
+                    builder: (context, fieldConstraints) {
+                      final sideBySide =
+                          fieldConstraints.maxWidth >=
+                          InvestigationTheme.compact + 80;
+                      final category = _CategoryDropdown(
+                        draft: draft,
+                        isBusy: isBusy,
+                        onCategorySelected: onCategorySelected,
+                      );
+                      final privacy = DropdownButtonFormField<String>(
+                        initialValue:
+                            const [
+                              'PUBLIC',
+                              'PRIVATE',
+                              'FRIENDS',
+                            ].contains(draft.privacyStatus)
+                            ? draft.privacyStatus
+                            : 'PUBLIC',
+                        decoration: InvestigationTheme.fieldDecoration(
+                          context,
+                          labelText: l10n.t('privacy'),
+                        ),
+                        items: const ['PUBLIC', 'PRIVATE', 'FRIENDS']
+                            .map(
+                              (v) => DropdownMenuItem(
+                                value: v,
+                                child: Text(privacyLabel(l10n, v)),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: isBusy
+                            ? null
+                            : (v) => v != null ? onPrivacyChanged(v) : null,
+                      );
+                      if (!sideBySide) {
+                        return Column(
+                          children: [
+                            category,
+                            const SizedBox(height: InvestigationTheme.s8),
+                            privacy,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: category),
+                          const SizedBox(width: InvestigationTheme.s12),
+                          Expanded(child: privacy),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         ),
-        const SizedBox(height: InvestigationTheme.s12),
+        const SizedBox(height: InvestigationTheme.s8),
         PostSurfaceCard(
+          dense: true,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                l10n.t('engagementSummary'),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.t('engagementSummary'),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _updatedLabel(l10n, draft, locale),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: InvestigationTheme.s12),
+              const SizedBox(height: InvestigationTheme.s8),
               EngagementMetricCards(
                 metrics: [
                   (
@@ -220,66 +259,137 @@ class PostContentSection extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: InvestigationTheme.s12),
-              Text(
-                context.tr('postTimestamps', {
-                  'created': DateFormat(
-                    'MMM dd, yyyy · HH:mm',
-                  ).format(draft.createdAt),
-                  'updated': DateFormat(
-                    'MMM dd, yyyy · HH:mm',
-                  ).format(draft.updatedAt),
-                }),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
             ],
           ),
         ),
       ],
     );
   }
+
+  String _updatedLabel(AppLocalizations l10n, ManagedPostEntity draft, String locale) {
+    final stamp = formatPostCreatedDateTime(
+      draft.updatedAt,
+      locale: locale,
+      compact: true,
+    );
+    if (draft.updatedAt.difference(draft.createdAt).inMinutes.abs() < 1) {
+      return l10n.tOr('createdAtShort', 'Created $stamp');
+    }
+    return l10n.tOr('updatedAtShort', 'Updated $stamp');
+  }
 }
 
-class _PostInfoRow extends StatelessWidget {
-  const _PostInfoRow({
+class _PostMetaFacts extends StatelessWidget {
+  const _PostMetaFacts({
+    required this.draft,
+    required this.locale,
+    required this.l10n,
+  });
+
+  final ManagedPostEntity draft;
+  final String locale;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final facts = <({IconData icon, String label, String value})>[
+      (
+        icon: Icons.category_outlined,
+        label: l10n.t('type'),
+        value: draft.displayContentType,
+      ),
+      (
+        icon: Icons.calendar_today_outlined,
+        label: l10n.t('created'),
+        value: formatPostCreatedDateTime(
+          draft.createdAt,
+          locale: locale,
+          compact: true,
+        ),
+      ),
+      if (draft.media.isNotEmpty)
+        (
+          icon: Icons.collections_outlined,
+          label: l10n.tOr('mediaItems', 'Media items'),
+          value: '${draft.media.length}',
+        ),
+    ];
+
+    return Wrap(
+      spacing: InvestigationTheme.s8,
+      runSpacing: InvestigationTheme.s8,
+      children: facts
+          .map(
+            (fact) => _MetaFactChip(
+              icon: fact.icon,
+              label: fact.label,
+              value: fact.value,
+              color: scheme.onSurfaceVariant,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
+class _MetaFactChip extends StatelessWidget {
+  const _MetaFactChip({
     required this.icon,
     required this.label,
     required this.value,
+    required this.color,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: scheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: scheme.onSurfaceVariant,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: InvestigationTheme.s8,
+        vertical: InvestigationTheme.s8,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(InvestigationTheme.radiusSm),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.4),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: scheme.onSurface,
-            ),
-            overflow: TextOverflow.ellipsis,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

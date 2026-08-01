@@ -546,8 +546,6 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   final UpdateCategory _update;
   final DeleteCategory _delete;
 
-  Timer? _searchDebounce;
-  static const _searchDebounceMs = 300;
   static const pageLimit = 20;
   static const _fullCatalogQuery = CategoriesAdminListQuery(includeInactive: true);
 
@@ -908,8 +906,6 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     final current = state;
     if (current is! CategoriesLoaded) return;
 
-    _searchDebounce?.cancel();
-
     final trimmed = event.query.trim();
     final next = current.copyWith(
       searchQuery: event.query,
@@ -921,20 +917,9 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
       return;
     }
 
-    final base = _useLocalCatalog(current)
-        ? current.catalogCategories
-        : current.categories;
-    emit(_emitWithFilters(next.copyWith(
-      categories: base,
-      isFetching: trimmed.length >= 2,
-    )));
-
     if (trimmed.length < 2) return;
 
-    _searchDebounce = Timer(
-      const Duration(milliseconds: _searchDebounceMs),
-      () => add(_RefetchCategoriesEvent(next)),
-    );
+    add(_RefetchCategoriesEvent(next));
   }
 
   Future<void> _onUpdateTypeFilter(
@@ -1481,11 +1466,5 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     }
 
     return looksLikeDuplicateName;
-  }
-
-  @override
-  Future<void> close() {
-    _searchDebounce?.cancel();
-    return super.close();
   }
 }

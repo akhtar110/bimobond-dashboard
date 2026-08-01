@@ -5,6 +5,8 @@ class UserDeviceModel extends UserDeviceEntity {
     required super.id,
     required super.userId,
     required super.deviceId,
+    super.deviceName,
+    super.macAddress,
     super.fcmToken,
     required super.deviceType,
     super.osVersion,
@@ -19,7 +21,9 @@ class UserDeviceModel extends UserDeviceEntity {
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
       deviceId: json['deviceId']?.toString() ?? '',
-      fcmToken: json['fcmToken'] as String?,
+      deviceName: _optionalString(json['deviceName']),
+      macAddress: _optionalString(json['macAddress']),
+      fcmToken: _optionalString(json['fcmToken']),
       deviceType: json['deviceType']?.toString() ?? 'Unknown',
       osVersion: json['osVersion'] as String?,
       appVersion: json['appVersion'] as String?,
@@ -27,6 +31,12 @@ class UserDeviceModel extends UserDeviceEntity {
       lastActiveAt: _parseDate(json['lastActiveAt']),
       createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
     );
+  }
+
+  static String? _optionalString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
   }
 
   static DateTime? _parseDate(dynamic v) {

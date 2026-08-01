@@ -1,10 +1,12 @@
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/domain/entities/category_entity.dart';
+import 'managed_post_location_entity.dart';
 import 'managed_post_sound_entity.dart';
 import 'post_engagement_user_item.dart';
 import 'post_media_entity.dart';
 
 export '../../../categories/domain/entities/category_entity.dart';
+export 'managed_post_location_entity.dart';
 export 'managed_post_sound_entity.dart';
 export 'post_engagement_user_item.dart';
 export 'post_media_entity.dart';
@@ -57,6 +59,7 @@ class ManagedPostEntity {
     required this.createdAt,
     required this.updatedAt,
     this.locationId,
+    this.location,
     this.playlistId,
     this.soundId,
     this.sound,
@@ -237,6 +240,7 @@ class ManagedPostEntity {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? locationId;
+  final ManagedPostLocationEntity? location;
   final String? playlistId;
   final String? soundId;
   final ManagedPostSoundEntity? sound;
@@ -289,6 +293,7 @@ class ManagedPostEntity {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? locationId,
+    ManagedPostLocationEntity? location,
     String? playlistId,
     String? soundId,
     ManagedPostSoundEntity? sound,
@@ -341,6 +346,7 @@ class ManagedPostEntity {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       locationId: locationId ?? this.locationId,
+      location: location ?? this.location,
       playlistId: playlistId ?? this.playlistId,
       soundId: soundId ?? this.soundId,
       sound: sound ?? this.sound,

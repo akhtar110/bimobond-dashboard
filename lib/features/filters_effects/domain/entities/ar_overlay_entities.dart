@@ -10,6 +10,7 @@ class ArOverlayEntity extends Equatable {
     this.emoji,
     this.thumbnailUrl,
     this.previewColorHex,
+    this.isActive = true,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class ArOverlayEntity extends Equatable {
   final String? emoji;
   final String? thumbnailUrl;
   final String? previewColorHex;
+  final bool isActive;
 
   ArOverlayEntity copyWith({
     String? id,
@@ -28,6 +30,7 @@ class ArOverlayEntity extends Equatable {
     String? emoji,
     String? thumbnailUrl,
     String? previewColorHex,
+    bool? isActive,
   }) {
     return ArOverlayEntity(
       id: id ?? this.id,
@@ -37,6 +40,7 @@ class ArOverlayEntity extends Equatable {
       emoji: emoji ?? this.emoji,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       previewColorHex: previewColorHex ?? this.previewColorHex,
+      isActive: isActive ?? this.isActive,
     );
   }
 
@@ -49,6 +53,7 @@ class ArOverlayEntity extends Equatable {
         emoji,
         thumbnailUrl,
         previewColorHex,
+        isActive,
       ];
 }
 
@@ -117,3 +122,7 @@ class ArOverlayListResponseEntity extends Equatable {
   @override
   List<Object?> get props => [version, data, meta];
 }
+
+/// Status filter for AR Overlays admin list (All / Active / Inactive).
+enum ArOverlayStatusFilter { all, active, inactive }
+

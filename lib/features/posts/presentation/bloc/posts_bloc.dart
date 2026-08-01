@@ -1,9 +1,12 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
+import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/bulk_post_action_request.dart';
 import '../../domain/entities/post_filters.dart';
+import '../../domain/utils/post_list_sort.dart';
 import '../../domain/enums/bulk_post_action_type.dart';
 import '../../domain/enums/posts_view_type.dart';
 import '../../domain/utils/bulk_post_local_update.dart';
@@ -24,6 +27,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<FilterPostsByCategoryEvent>(_onFilterCategory);
     on<FilterPostsByTypeEvent>(_onFilterByType);
     on<SearchPostsEvent>(_onSearch);
+    on<FilterPostsByUserEvent>(_onFilterByUser);
+    on<FilterPostsByDateRangeEvent>(_onFilterByDateRange);
     on<UpdatePostFiltersEvent>(_onUpdateFilters);
     on<ClearPostFiltersEvent>(_onClearFilters);
     on<PatchPostEvent>(_onPatchPost);
@@ -67,12 +72,17 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   bool _goToPageBusy = false;
 
   PostFilters _filters = const PostFilters();
+  UserEntity? _filterUser;
   PostsViewType _viewType = PostsViewType.grid;
   Set<String> _selectedPostIds = {};
 
   PostFilters get activeFilters => _filters;
+  UserEntity? get filterUser => _filterUser;
   PostsViewType get activeViewType => _viewType;
   Set<String> get selectedPostIds => Set.unmodifiable(_selectedPostIds);
+
+  List<ManagedPostEntity> _sortedPosts(List<ManagedPostEntity> posts) =>
+      sortPosts(posts, _filters.sort);
 
   // ── View & selection ─────────────────────────────────────────────────────
 
@@ -134,6 +144,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     return base.copyWith(
       viewType: _viewType,
       selectedPostIds: Set<String>.from(_selectedPostIds),
+      filterUser: _filterUser,
     );
   }
 
@@ -187,7 +198,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
               '${result.failedPostIds.length} post(s) failed';
 
       if (posts.isEmpty) {
-        emit(PostsEmpty(_filters));
+        emit(PostsEmpty(_filters, filterUser: _filterUser));
       } else {
         emit(
           _withUiState(
@@ -294,8 +305,16 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         categoryName: event.categoryName,
         categorySlug: event.categorySlug,
         search: _filters.search,
+        userId: _filters.userId,
+        userName: _filters.userName,
+        createdFrom: _filters.createdFrom,
+        createdTo: _filters.createdTo,
+        createdTimeFromMinutes: _filters.createdTimeFromMinutes,
+        createdTimeToMinutes: _filters.createdTimeToMinutes,
         type: _filters.type,
         sort: _filters.sort,
+        status: _filters.status,
+        privacyStatus: _filters.privacyStatus,
         isAuctionable: _filters.isAuctionable,
         isAd: _filters.isAd,
       );
@@ -334,12 +353,80 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     await _loadFirstPage(emit);
   }
 
+  Future<void> _onFilterByUser(
+    FilterPostsByUserEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    final nextUserId = event.user?.id.trim();
+    final hadUserId = _filters.userId?.trim();
+    if (nextUserId == hadUserId && _filterUser?.id == nextUserId) {
+      return;
+    }
+
+    _selectedPostIds = {};
+    _filterUser = event.user;
+    _filters = _filters.copyWith(
+      userId: (nextUserId == null || nextUserId.isEmpty) ? null : nextUserId,
+      userName: event.user?.username,
+      clearUser: event.user == null,
+    );
+
+    if (kDebugMode) {
+      debugPrint('[PostsBloc] filter by userId=${_filters.userId}');
+    }
+
+    await _loadFirstPage(emit);
+  }
+
+  Future<void> _onFilterByDateRange(
+    FilterPostsByDateRangeEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    var from = event.createdFrom == null
+        ? null
+        : DateTime(
+            event.createdFrom!.year,
+            event.createdFrom!.month,
+            event.createdFrom!.day,
+          );
+    var to = event.createdTo == null
+        ? null
+        : DateTime(
+            event.createdTo!.year,
+            event.createdTo!.month,
+            event.createdTo!.day,
+          );
+
+    if (from != null && to != null && from.isAfter(to)) {
+      final swap = from;
+      from = to;
+      to = swap;
+    }
+
+    final updated = _filters.copyWith(
+      createdFrom: from,
+      createdTo: to,
+    );
+    if (_filters == updated) return;
+    _filters = updated;
+    _selectedPostIds = {};
+    await _loadFirstPage(emit);
+  }
+
   Future<void> _onUpdateFilters(
     UpdatePostFiltersEvent event,
     Emitter<PostsState> emit,
   ) async {
-    if (_filters == event.filters) return;
+    final nextUserId = event.filters.userId;
+    final filtersEqual = _filters == event.filters;
+    final userEntityMatches =
+        event.filterUser?.id == _filterUser?.id ||
+        (event.filterUser == null && _filterUser == null);
+
+    if (filtersEqual && userEntityMatches) return;
+
     _filters = event.filters;
+    _filterUser = nextUserId == null ? null : event.filterUser;
     await _loadFirstPage(emit);
   }
 
@@ -347,22 +434,32 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     ClearPostFiltersEvent event,
     Emitter<PostsState> emit,
   ) async {
-    _filters = PostFilters(
-      categoryId: _filters.categoryId,
-      categoryName: _filters.categoryName,
-      categorySlug: _filters.categorySlug,
-    );
+    _filters = const PostFilters();
+    _filterUser = null;
     await _loadFirstPage(emit);
   }
 
   Future<void> _loadFirstPage(Emitter<PostsState> emit) async {
     final current = state;
-    if (current is PostsLoaded && current.filters != _filters) {
+    final filtersChanged =
+        current is PostsLoaded && current.filters != _filters;
+    final filterUserChanged =
+        current is PostsLoaded && current.filterUser?.id != _filterUser?.id;
+
+    if (current is PostsLoaded && (filtersChanged || filterUserChanged)) {
       emit(
         _withUiState(
-          current.copyWith(isApplyingFilters: true, filters: _filters),
+          current.copyWith(
+            isApplyingFilters: true,
+            filters: _filters,
+            filterUser: _filterUser,
+          ),
         ),
       );
+    } else if (current is PostsEmpty &&
+        (current.filters != _filters ||
+            current.filterUser?.id != _filterUser?.id)) {
+      emit(PostsLoading());
     } else if (current is! PostsLoaded) {
       emit(PostsLoading());
     }
@@ -380,16 +477,17 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       if (myId != _loadRequestId) return;
 
       if (page.posts.isEmpty) {
-        emit(PostsEmpty(_filters));
+        emit(PostsEmpty(_filters, filterUser: _filterUser));
       } else {
         emit(
           PostsLoaded(
-            posts: page.posts,
+            posts: _sortedPosts(page.posts),
             currentPage: page.currentPage,
             lastPage: page.lastPage,
             total: page.total,
             hasReachedMax: page.hasReachedMax,
             filters: _filters,
+            filterUser: _filterUser,
             isApplyingFilters: false,
             viewType: _viewType,
             selectedPostIds: Set<String>.from(_selectedPostIds),
@@ -423,7 +521,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       emit(
         _withUiState(
           current.copyWith(
-            posts: [...current.posts, ...page.posts],
+            posts: _sortedPosts([...current.posts, ...page.posts]),
             currentPage: page.currentPage,
             lastPage: page.lastPage,
             total: page.total,
@@ -477,16 +575,17 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       _selectedPostIds = {};
 
       if (page.posts.isEmpty) {
-        emit(PostsEmpty(_filters));
+        emit(PostsEmpty(_filters, filterUser: _filterUser));
       } else {
         emit(
           PostsLoaded(
-            posts: page.posts,
+            posts: _sortedPosts(page.posts),
             currentPage: page.currentPage,
             lastPage: page.lastPage,
             total: page.total,
             hasReachedMax: page.hasReachedMax,
             filters: _filters,
+            filterUser: _filterUser,
             isApplyingFilters: false,
             viewType: _viewType,
             selectedPostIds: const {},
@@ -527,7 +626,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     final remaining =
         current.posts.where((p) => p.id != event.postId).toList();
     if (remaining.isEmpty) {
-      emit(PostsEmpty(_filters));
+      emit(PostsEmpty(_filters, filterUser: _filterUser));
     } else {
       emit(_withUiState(current.copyWith(posts: remaining)));
     }

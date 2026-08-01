@@ -7,7 +7,7 @@ import 'dart:typed_data';
 /// Returns [null] if the user cancels.
 // ignore: avoid_web_libraries_in_flutter
 Future<({String name, Uint8List bytes})?> pickGiftImage() async {
-  return _pickFile(accept: 'image/*,.jpg,.jpeg,.png,.webp,.gif');
+  return _pickFile(accept: 'image/*,.jpg,.jpeg,.png,.webp,.gif,.svg,image/svg+xml');
 }
 
 /// Opens the native file dialog for gift animation assets

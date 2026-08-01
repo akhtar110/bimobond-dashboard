@@ -10,10 +10,14 @@ import '../../../user_history/domain/usecases/get_user_history_usecase.dart';
 Future<void> showLastActiveHistoryDialog(
   BuildContext context, {
   required String userId,
+  String? deviceId,
 }) {
   return showDialog<void>(
     context: context,
-    builder: (dialogContext) => LastActiveHistoryDialog(userId: userId),
+    builder: (dialogContext) => LastActiveHistoryDialog(
+      userId: userId,
+      deviceId: deviceId,
+    ),
   );
 }
 
@@ -21,9 +25,13 @@ class LastActiveHistoryDialog extends StatefulWidget {
   const LastActiveHistoryDialog({
     super.key,
     required this.userId,
+    this.deviceId,
   });
 
   final String userId;
+
+  /// When set, only show AUTH_LOGIN / AUTH_LOGOUT for this device.
+  final String? deviceId;
 
   @override
   State<LastActiveHistoryDialog> createState() =>
@@ -35,9 +43,11 @@ class _LastActiveHistoryDialogState extends State<LastActiveHistoryDialog> {
   final _scrollController = ScrollController();
 
   final List<UserHistoryEntity> _items = [];
+  final Set<String> _seenKeys = <String>{};
   UserHistoryMetaEntity? _meta;
   bool _loading = true;
   bool _loadingMore = false;
+  bool _requestInFlight = false;
   String? _error;
 
   @override
@@ -54,16 +64,74 @@ class _LastActiveHistoryDialogState extends State<LastActiveHistoryDialog> {
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients || _loadingMore || _loading) return;
+    if (!_scrollController.hasClients ||
+        _loadingMore ||
+        _loading ||
+        _requestInFlight) {
+      return;
+    }
     final meta = _meta;
     if (meta == null || meta.hasReachedMax) return;
     final pos = _scrollController.position;
+    if (pos.maxScrollExtent <= 0) return;
     if (pos.pixels < pos.maxScrollExtent - 120) return;
     _load(page: meta.page + 1, append: true);
   }
 
+  String? get _filterDeviceId {
+    final id = widget.deviceId?.trim();
+    if (id == null || id.isEmpty) return null;
+    return id;
+  }
+
+  String? _eventDeviceId(UserHistoryEntity item) {
+    return item.dataString('deviceId') ??
+        item.nestedString('device', 'deviceId') ??
+        item.dataString('targetId');
+  }
+
+  bool _matchesDeviceFilter(UserHistoryEntity item) {
+    final filterId = _filterDeviceId;
+    if (filterId == null) return true;
+    final eventDeviceId = _eventDeviceId(item)?.trim();
+    if (eventDeviceId == null || eventDeviceId.isEmpty) return false;
+    return eventDeviceId == filterId;
+  }
+
+  String _itemKey(UserHistoryEntity item) {
+    final id = item.dataString('id');
+    if (id != null && id.isNotEmpty) return 'id:$id';
+
+    final ip = item.dataString('ip') ??
+        item.dataString('lastActiveIp') ??
+        item.dataString('ipAddress') ??
+        item.dataString('clientIp') ??
+        '';
+    final deviceId = _eventDeviceId(item) ?? '';
+    final createdAt = item.createdAt.toUtc().millisecondsSinceEpoch;
+    return '${item.normalizedType}|$createdAt|$ip|$deviceId';
+  }
+
+  List<UserHistoryEntity> _uniqueItems(List<UserHistoryEntity> incoming) {
+    final unique = <UserHistoryEntity>[];
+    for (final item in incoming) {
+      final type = item.normalizedType;
+      if (type != UserHistoryTypes.authLogin &&
+          type != UserHistoryTypes.authLogout) {
+        continue;
+      }
+      if (!_matchesDeviceFilter(item)) continue;
+      final key = _itemKey(item);
+      if (_seenKeys.contains(key)) continue;
+      _seenKeys.add(key);
+      unique.add(item);
+    }
+    return unique;
+  }
+
   Future<void> _load({required int page, bool append = false}) async {
-    if (widget.userId.isEmpty) return;
+    if (widget.userId.isEmpty || _requestInFlight) return;
+    _requestInFlight = true;
 
     setState(() {
       if (append) {
@@ -71,6 +139,7 @@ class _LastActiveHistoryDialogState extends State<LastActiveHistoryDialog> {
       } else {
         _loading = true;
         _error = null;
+        _seenKeys.clear();
       }
     });
 
@@ -80,24 +149,40 @@ class _LastActiveHistoryDialogState extends State<LastActiveHistoryDialog> {
         query: UserHistoryQuery(
           page: page,
           limit: 30,
-          types: const [UserHistoryTypes.authLogin],
+          types: const [
+            UserHistoryTypes.authLogin,
+            UserHistoryTypes.authLogout,
+          ],
         ),
       );
 
       if (!mounted) return;
+
+      final unique = _uniqueItems(result.items);
       setState(() {
         if (append) {
-          _items.addAll(result.items);
+          _items.addAll(unique);
         } else {
           _items
             ..clear()
-            ..addAll(result.items);
+            ..addAll(unique);
         }
         _meta = result.meta;
         _loading = false;
         _loadingMore = false;
         _error = null;
       });
+
+      // Timeline is user-scoped; when filtering to one device, keep paging
+      // until we have enough matches or run out of pages.
+      if (_filterDeviceId != null &&
+          !result.meta.hasReachedMax &&
+          page < 20 &&
+          _items.length < 15) {
+        _requestInFlight = false;
+        await _load(page: page + 1, append: true);
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -105,6 +190,8 @@ class _LastActiveHistoryDialogState extends State<LastActiveHistoryDialog> {
         _loadingMore = false;
         _error = ApiErrorMessages.from(e);
       });
+    } finally {
+      _requestInFlight = false;
     }
   }
 
@@ -198,22 +285,21 @@ class _LastActiveHistoryDialogState extends State<LastActiveHistoryDialog> {
 
     return Column(
       children: [
-        if (_meta != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                l10n
-                    .tOr('lastActiveHistoryCount', '{count} events')
-                    .replaceAll('{count}', '${_meta!.total}'),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              l10n
+                  .tOr('lastActiveHistoryCount', '{count} events')
+                  .replaceAll('{count}', '${_items.length}'),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ),
+        ),
         Expanded(
           child: ListView.separated(
             controller: _scrollController,
@@ -254,15 +340,32 @@ class _LastActiveHistoryTile extends StatelessWidget {
     final l10n = context.l10n;
     final dateFormat = DateFormat('MMM d, yyyy · HH:mm');
 
+    final isLogout = item.normalizedType == UserHistoryTypes.authLogout;
+    final meta = item.dataMap('meta');
+    String? metaString(String key) {
+      final value = meta?[key];
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
     final ip = item.dataString('ip') ??
         item.dataString('lastActiveIp') ??
         item.dataString('ipAddress') ??
         item.dataString('clientIp');
     final deviceType = item.dataString('deviceType') ??
         item.dataString('platform') ??
-        item.nestedString('device', 'deviceType');
+        item.nestedString('device', 'deviceType') ??
+        metaString('deviceType');
     final deviceId = item.dataString('deviceId') ??
-        item.nestedString('device', 'deviceId');
+        item.nestedString('device', 'deviceId') ??
+        item.dataString('targetId');
+    final deviceName = item.dataString('deviceName') ??
+        item.nestedString('device', 'deviceName') ??
+        metaString('deviceName');
+    final macAddress = item.dataString('macAddress') ??
+        item.nestedString('device', 'macAddress') ??
+        metaString('macAddress');
     final osVersion = item.dataString('osVersion') ??
         item.nestedString('device', 'osVersion');
     final appVersion = item.dataString('appVersion') ??
@@ -271,15 +374,21 @@ class _LastActiveHistoryTile extends StatelessWidget {
 
     final details = <String>[
       if (ip != null) '${l10n.t('lastActiveIp')}: $ip',
+      if (deviceName != null)
+        '${l10n.tOr('deviceName', 'Device name')}: $deviceName',
       if (deviceType != null)
         '${l10n.tOr('deviceType', 'Device')}: $deviceType',
       if (deviceId != null)
         '${l10n.tOr('deviceId', 'Device ID')}: $deviceId',
+      if (macAddress != null)
+        '${l10n.tOr('macAddress', 'MAC address')}: $macAddress',
       if (osVersion != null) '${l10n.t('osVersion')}: $osVersion',
       if (appVersion != null) '${l10n.t('appVersion')}: $appVersion',
       if (userAgent != null)
         '${l10n.tOr('userAgent', 'User agent')}: $userAgent',
     ];
+
+    final accent = isLogout ? scheme.error : scheme.primary;
 
     return Material(
       color: scheme.surfaceContainerLow,
@@ -293,13 +402,13 @@ class _LastActiveHistoryTile extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.12),
+                color: accent.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.login_rounded,
+                isLogout ? Icons.logout_rounded : Icons.login_rounded,
                 size: 16,
-                color: scheme.primary,
+                color: accent,
               ),
             ),
             const SizedBox(width: 10),
@@ -308,7 +417,9 @@ class _LastActiveHistoryTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.tOr('authLoginEvent', 'Login'),
+                    isLogout
+                        ? l10n.tOr('authLogoutEvent', 'Logout')
+                        : l10n.tOr('authLoginEvent', 'Login'),
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

@@ -1,11 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../features/categories/presentation/widgets/category_icon.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
 import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
+import '../utils/post_card_layout.dart';
+import '../utils/posts_page_layout.dart';
+import '../utils/posts_responsive.dart';
+import 'post_list_location.dart';
 import 'post_list_thumbnail.dart';
 import 'posts_table_view.dart';
 
@@ -14,10 +17,18 @@ const double kPostCardThumbnailAspectCompact = 1.65;
 const double kPostCardThumbnailAspect = 1.75;
 
 class PostCard extends StatefulWidget {
-  const PostCard({super.key, required this.post, this.onTap});
+  const PostCard({
+    super.key,
+    required this.post,
+    this.onTap,
+    this.metrics,
+  });
 
   final ManagedPostEntity post;
   final VoidCallback? onTap;
+
+  /// When provided by the grid, skips [LayoutBuilder] during scroll.
+  final PostCardMetrics? metrics;
 
   @override
   State<PostCard> createState() => _PostCardState();
@@ -26,115 +37,249 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   bool _hovered = false;
 
+  PostCardMetrics _resolveMetrics(BoxConstraints constraints) {
+    return widget.metrics ??
+        PostCardMetrics(
+          cardWidth: constraints.maxWidth,
+          deviceType: getPostsDeviceType(MediaQuery.sizeOf(context).width),
+          columns: postsGridColumnCount(MediaQuery.sizeOf(context).width),
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    if (widget.metrics != null) {
+      return _buildCard(context, widget.metrics!, scheme, isDark);
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 170;
-        final bodyPadding = compact ? 6.0 : 8.0;
-        final radius = compact ? 10.0 : 12.0;
-
-        return MouseRegion(
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          cursor: widget.onTap != null
-              ? SystemMouseCursors.click
-              : SystemMouseCursors.basic,
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: AnimatedScale(
-              scale: _hovered ? 1.01 : 1.0,
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              child: AnimatedSlide(
-                offset: _hovered ? const Offset(0, -0.012) : Offset.zero,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(radius),
-                    border: Border.all(
-                      color: _hovered
-                          ? scheme.primary.withValues(alpha: 0.42)
-                          : scheme.outlineVariant.withValues(alpha: 0.85),
-                      width: _hovered ? 1.2 : 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(
-                          alpha: _hovered
-                              ? (isDark ? 0.45 : 0.12)
-                              : (isDark ? 0.28 : 0.05),
-                        ),
-                        blurRadius: _hovered ? 18 : 10,
-                        spreadRadius: _hovered ? 0.5 : 0,
-                        offset: Offset(0, _hovered ? 8 : 3),
-                      ),
-                      if (_hovered)
-                        BoxShadow(
-                          color: scheme.primary.withValues(alpha: 0.08),
-                          blurRadius: 12,
-                          offset: const Offset(0, 2),
-                        ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(radius),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _MediaPreview(
-                          post: widget.post,
-                          compact: compact,
-                          hovered: _hovered,
-                        ),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            bodyPadding,
-                            compact ? 5 : 6,
-                            bodyPadding,
-                            bodyPadding,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _UserDateRow(
-                                post: widget.post,
-                                isDark: isDark,
-                                compact: compact,
-                              ),
-                              SizedBox(height: compact ? 4 : 5),
-                              _CategoryStatusRow(
-                                post: widget.post,
-                                compact: compact,
-                              ),
-                              SizedBox(height: compact ? 4 : 5),
-                              _StatsRow(
-                                post: widget.post,
-                                isDark: isDark,
-                                compact: compact,
-                                hovered: _hovered,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        return _buildCard(
+          context,
+          _resolveMetrics(constraints),
+          scheme,
+          isDark,
         );
       },
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context,
+    PostCardMetrics metrics,
+    ColorScheme scheme,
+    bool isDark,
+  ) {
+    final card = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(metrics.borderRadius),
+        border: Border.all(
+          color: _hovered && metrics.enableHoverEffects
+              ? scheme.primary.withValues(alpha: 0.42)
+              : scheme.outlineVariant.withValues(alpha: 0.85),
+          width: _hovered && metrics.enableHoverEffects ? 1.2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(
+              alpha: _hovered && metrics.enableHoverEffects
+                  ? (isDark ? 0.45 : 0.12)
+                  : (isDark ? 0.28 : 0.05),
+            ),
+            blurRadius:
+                _hovered && metrics.enableHoverEffects ? 18 : 10,
+            spreadRadius: _hovered && metrics.enableHoverEffects ? 0.5 : 0,
+            offset: Offset(
+              0,
+              _hovered && metrics.enableHoverEffects ? 8 : 3,
+            ),
+          ),
+          if (_hovered && metrics.enableHoverEffects)
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
+            ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(metrics.borderRadius),
+        child: metrics.isHorizontal
+            ? _HorizontalCardBody(
+                post: widget.post,
+                metrics: metrics,
+                isDark: isDark,
+                hovered: _hovered,
+              )
+            : _VerticalCardBody(
+                post: widget.post,
+                metrics: metrics,
+                isDark: isDark,
+                hovered: _hovered,
+              ),
+      ),
+    );
+
+    Widget interactive = card;
+    if (metrics.enableHoverEffects) {
+      interactive = AnimatedScale(
+        scale: _hovered ? 1.01 : 1.0,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: AnimatedSlide(
+          offset: _hovered ? const Offset(0, -0.012) : Offset.zero,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          child: card,
+        ),
+      );
+    }
+
+    return MouseRegion(
+      onEnter: metrics.enableHoverEffects
+          ? (_) => setState(() => _hovered = true)
+          : null,
+      onExit: metrics.enableHoverEffects
+          ? (_) => setState(() => _hovered = false)
+          : null,
+      cursor: widget.onTap != null
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: interactive,
+      ),
+    );
+  }
+}
+
+class _VerticalCardBody extends StatelessWidget {
+  const _VerticalCardBody({
+    required this.post,
+    required this.metrics,
+    required this.isDark,
+    required this.hovered,
+  });
+
+  final ManagedPostEntity post;
+  final PostCardMetrics metrics;
+  final bool isDark;
+  final bool hovered;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _MediaPreview(
+          post: post,
+          metrics: metrics,
+          isDark: isDark,
+          hovered: hovered,
+        ),
+        Padding(
+          padding: metrics.bodyPadding,
+          child: _CardContent(
+            post: post,
+            metrics: metrics,
+            isDark: isDark,
+            hovered: hovered,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HorizontalCardBody extends StatelessWidget {
+  const _HorizontalCardBody({
+    required this.post,
+    required this.metrics,
+    required this.isDark,
+    required this.hovered,
+  });
+
+  final ManagedPostEntity post;
+  final PostCardMetrics metrics;
+  final bool isDark;
+  final bool hovered;
+
+  @override
+  Widget build(BuildContext context) {
+    final thumbSize = metrics.horizontalThumbSize;
+
+    return Padding(
+      padding: metrics.bodyPadding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: thumbSize,
+            height: thumbSize,
+            child: _MediaPreview(
+              post: post,
+              metrics: metrics,
+              isDark: isDark,
+              hovered: hovered,
+              fixedSize: thumbSize,
+            ),
+          ),
+          SizedBox(width: metrics.sectionGap + 2),
+          Expanded(
+            child: _CardContent(
+              post: post,
+              metrics: metrics,
+              isDark: isDark,
+              hovered: hovered,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardContent extends StatelessWidget {
+  const _CardContent({
+    required this.post,
+    required this.metrics,
+    required this.isDark,
+    required this.hovered,
+  });
+
+  final ManagedPostEntity post;
+  final PostCardMetrics metrics;
+  final bool isDark;
+  final bool hovered;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _AuthorRow(
+          post: post,
+          isDark: isDark,
+          metrics: metrics,
+        ),
+        SizedBox(height: metrics.sectionGap),
+        _CategoryStatusRow(post: post, metrics: metrics),
+        SizedBox(height: metrics.sectionGap),
+        PostListMetaRow(
+          post: post,
+          metrics: metrics,
+          hovered: hovered,
+        ),
+      ],
     );
   }
 }
@@ -146,13 +291,17 @@ class _PostCardState extends State<PostCard> {
 class _MediaPreview extends StatelessWidget {
   const _MediaPreview({
     required this.post,
-    required this.compact,
+    required this.metrics,
+    required this.isDark,
     required this.hovered,
+    this.fixedSize,
   });
 
   final ManagedPostEntity post;
-  final bool compact;
+  final PostCardMetrics metrics;
+  final bool isDark;
   final bool hovered;
+  final double? fixedSize;
 
   String? get _mediaUrl => post.previewThumbnailUrl;
   bool get _isVideo => post.containsVideoMedia;
@@ -161,60 +310,64 @@ class _MediaPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final mediaUrl = _mediaUrl;
+    final compact = metrics.compact;
 
-    return AspectRatio(
-      aspectRatio:
-          compact ? kPostCardThumbnailAspectCompact : kPostCardThumbnailAspect,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (mediaUrl != null && mediaUrl.isNotEmpty)
-            PostListThumbnail(
-              key: ValueKey('post_thumb_${post.id}_$mediaUrl'),
-              postId: post.id,
-              imageUrl: mediaUrl,
-              fit: BoxFit.cover,
-              placeholder: (context) => _ShimmerBox(isDark: isDark),
-              error: (context) =>
-                  _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
-            )
-          else
-            _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
-          // Subtle readability gradient
-          IgnorePointer(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    scheme.scrim.withValues(alpha: hovered ? 0.08 : 0.04),
-                    Colors.transparent,
-                    Colors.transparent,
-                    scheme.scrim.withValues(alpha: hovered ? 0.28 : 0.18),
-                  ],
-                  stops: const [0, 0.35, 0.65, 1],
-                ),
+    final media = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (mediaUrl != null && mediaUrl.isNotEmpty)
+          PostListThumbnail(
+            key: ValueKey('post_thumb_${post.id}_$mediaUrl'),
+            postId: post.id,
+            imageUrl: mediaUrl,
+            fit: BoxFit.cover,
+            placeholder: (context) => _ShimmerBox(isDark: isDark),
+            error: (context) =>
+                _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
+          )
+        else
+          _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
+        IgnorePointer(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  scheme.scrim.withValues(alpha: hovered ? 0.08 : 0.04),
+                  Colors.transparent,
+                  Colors.transparent,
+                  scheme.scrim.withValues(
+                    alpha: hovered ? 0.28 : 0.18,
+                  ),
+                ],
+                stops: const [0, 0.35, 0.65, 1],
               ),
             ),
           ),
-          if (_isVideo)
-            Center(
-              child: _GlassPlayBadge(compact: compact),
-            ),
-          if (_isCarousel)
-            Positioned(
-              top: compact ? 6 : 7,
-              right: compact ? 6 : 7,
-              child: const _GlassMediaBadge(
-                icon: Icons.collections_rounded,
-              ),
-            ),
-        ],
-      ),
+        ),
+        if (_isVideo) Center(child: _GlassPlayBadge(compact: compact)),
+        if (_isCarousel)
+          Positioned(
+            top: compact ? 6 : 7,
+            right: compact ? 6 : 7,
+            child: const _GlassMediaBadge(icon: Icons.collections_rounded),
+          ),
+      ],
+    );
+
+    if (fixedSize != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(metrics.compact ? 8 : 10),
+        child: media,
+      );
+    }
+
+    return AspectRatio(
+      aspectRatio: metrics.thumbnailAspect,
+      child: media,
     );
   }
 }
@@ -235,9 +388,7 @@ class _GlassPlayBadge extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: scheme.surface.withValues(alpha: 0.28),
-        border: Border.all(
-          color: scheme.onPrimary.withValues(alpha: 0.55),
-        ),
+        border: Border.all(color: scheme.onPrimary.withValues(alpha: 0.55)),
         boxShadow: [
           BoxShadow(
             color: scheme.scrim.withValues(alpha: 0.25),
@@ -269,9 +420,7 @@ class _GlassMediaBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: 0.28),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: scheme.onPrimary.withValues(alpha: 0.45),
-        ),
+        border: Border.all(color: scheme.onPrimary.withValues(alpha: 0.45)),
         boxShadow: [
           BoxShadow(
             color: scheme.scrim.withValues(alpha: 0.2),
@@ -280,11 +429,7 @@ class _GlassMediaBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(
-        icon,
-        color: scheme.onPrimary,
-        size: 12,
-      ),
+      child: Icon(icon, color: scheme.onPrimary, size: 12),
     );
   }
 }
@@ -292,7 +437,6 @@ class _GlassMediaBadge extends StatelessWidget {
 class _MediaPlaceholder extends StatelessWidget {
   const _MediaPlaceholder({required this.isDark, this.isVideo = false});
 
-  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
   final bool isVideo;
 
@@ -313,29 +457,24 @@ class _MediaPlaceholder extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// User + date
+// Author
 // ─────────────────────────────────────────────────────────────
 
-class _UserDateRow extends StatelessWidget {
-  const _UserDateRow({
+class _AuthorRow extends StatelessWidget {
+  const _AuthorRow({
     required this.post,
     required this.isDark,
-    this.compact = false,
+    required this.metrics,
   });
 
   final ManagedPostEntity post;
-
-  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
-  final bool compact;
+  final PostCardMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final name = postDisplayAuthor(post);
-    final dateStr = DateFormat('MMM d, yyyy').format(post.createdAt);
-    final nameSize = compact ? 10.5 : 11.5;
-    final dateSize = compact ? 9.0 : 10.0;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,40 +483,23 @@ class _UserDateRow extends StatelessWidget {
           url: post.userProfileImage,
           name: name,
           isDark: isDark,
-          compact: compact,
+          radius: metrics.avatarRadius,
+          fontSize: metrics.compact ? 10 : 11,
         ),
-        SizedBox(width: compact ? 5 : 6),
+        SizedBox(width: metrics.compact ? 5 : 6),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                maxLines: 2,
-                softWrap: true,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: nameSize,
-                      height: 1.2,
-                      letterSpacing: -0.1,
-                      color: scheme.onSurface,
-                    ),
-              ),
-              SizedBox(height: compact ? 2 : 3),
-              Text(
-                dateStr,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: dateSize,
-                  color: scheme.onSurfaceVariant,
-                  height: 1.1,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          child: Text(
+            name,
+            maxLines: metrics.isHorizontal ? 2 : (metrics.narrow ? 2 : 1),
+            softWrap: true,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: metrics.authorFontSize,
+              height: 1.2,
+              letterSpacing: -0.1,
+              color: scheme.onSurface,
+            ),
           ),
         ),
       ],
@@ -390,28 +512,25 @@ class _Avatar extends StatelessWidget {
     required this.url,
     required this.name,
     required this.isDark,
-    this.compact = false,
+    required this.radius,
+    required this.fontSize,
   });
 
   final String? url;
   final String name;
-
-  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
-  final bool compact;
+  final double radius;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final radius = compact ? 12.0 : 14.0;
 
     return Container(
       padding: const EdgeInsets.all(1.5),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: scheme.primary.withValues(alpha: 0.22),
-        ),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.22)),
         boxShadow: [
           BoxShadow(
             color: scheme.shadow.withValues(alpha: 0.06),
@@ -432,7 +551,7 @@ class _Avatar extends StatelessWidget {
               child: Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
                 style: TextStyle(
-                  fontSize: compact ? 10 : 11,
+                  fontSize: fontSize,
                   fontWeight: FontWeight.w700,
                   color: scheme.onPrimaryContainer,
                 ),
@@ -447,33 +566,35 @@ class _Avatar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 
 class _CategoryStatusRow extends StatelessWidget {
-  const _CategoryStatusRow({required this.post, this.compact = false});
+  const _CategoryStatusRow({required this.post, required this.metrics});
 
   final ManagedPostEntity post;
-  final bool compact;
+  final PostCardMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: compact ? 4 : 6,
-      runSpacing: compact ? 3 : 4,
+      spacing: metrics.compact ? 4 : 6,
+      runSpacing: metrics.compact ? 3 : 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (post.categoryEntity != null || post.category != null)
           _CategoryBadge(
             category: post.categoryEntity,
             fallbackName: post.category,
+            fontSize: metrics.badgeFontSize,
           ),
-        _StatusBadge(status: post.status),
+        _StatusBadge(status: post.status, fontSize: metrics.badgeFontSize),
       ],
     );
   }
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
+  const _StatusBadge({required this.status, required this.fontSize});
 
   final String status;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -484,7 +605,10 @@ class _StatusBadge extends StatelessWidget {
     final icon = postStatusIcon(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: fontSize < 10 ? 6 : 7,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
         color: fg.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
@@ -493,12 +617,12 @@ class _StatusBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: fg),
+          Icon(icon, size: fontSize + 1, color: fg),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: fontSize,
               fontWeight: FontWeight.w700,
               color: fg,
               letterSpacing: 0.1,
@@ -511,13 +635,16 @@ class _StatusBadge extends StatelessWidget {
 }
 
 class _CategoryBadge extends StatelessWidget {
-  const _CategoryBadge({this.category, this.fallbackName});
+  const _CategoryBadge({
+    this.category,
+    this.fallbackName,
+    required this.fontSize,
+  });
 
   final CategoryEntity? category;
   final String? fallbackName;
+  final double fontSize;
 
-  // Brand accent palette — intentionally not from ColorScheme so categories
-  // remain visually distinct regardless of the active theme.
   static const _palette = [
     Color(0xFF6366F1),
     Color(0xFF0EA5E9),
@@ -542,7 +669,10 @@ class _CategoryBadge extends StatelessWidget {
     final color = _colorFor(slug);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: fontSize < 10 ? 6 : 7,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -555,159 +685,26 @@ class _CategoryBadge extends StatelessWidget {
             category: category,
             iconUrl: category?.iconUrl,
             name: name,
-            size: 14,
+            size: fontSize + 4,
             borderRadius: BorderRadius.circular(4),
             backgroundColor: color.withValues(alpha: 0.15),
             iconColor: color,
             fallbackIcon: Icons.label_outline_rounded,
           ),
           const SizedBox(width: 4),
-          Text(
-            name,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Stats
-// ─────────────────────────────────────────────────────────────
-
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({
-    required this.post,
-    required this.isDark,
-    this.compact = false,
-    this.hovered = false,
-  });
-
-  final ManagedPostEntity post;
-
-  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
-  final bool isDark;
-  final bool compact;
-  final bool hovered;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      padding: EdgeInsets.symmetric(
-        vertical: compact ? 3 : 4,
-        horizontal: compact ? 2 : 3,
-      ),
-      decoration: BoxDecoration(
-        color: hovered
-            ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
-            : scheme.surfaceContainerLowest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: hovered ? 0.8 : 0.55),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _StatChip(
-              icon: Icons.visibility_outlined,
-              value: post.viewCount,
-              accent: scheme.primary,
-              compact: compact,
-            ),
-          ),
-          Expanded(
-            child: _StatChip(
-              icon: Icons.favorite_border_rounded,
-              value: post.likeCount,
-              accent: scheme.error,
-              compact: compact,
-            ),
-          ),
-          Expanded(
-            child: _StatChip(
-              icon: Icons.chat_bubble_outline_rounded,
-              value: post.commentCount,
-              accent: scheme.tertiary,
-              compact: compact,
-            ),
-          ),
-          Expanded(
-            child: _StatChip(
-              icon: Icons.share_outlined,
-              value: post.shareCount,
-              accent: scheme.secondary,
-              compact: compact,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.icon,
-    required this.value,
-    required this.accent,
-    this.compact = false,
-  });
-
-  final IconData icon;
-  final int value;
-  final Color accent;
-  final bool compact;
-
-  String _format(int n) {
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return '$n';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: compact ? 1 : 2),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 3 : 4,
-          vertical: compact ? 2 : 3,
-        ),
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: compact ? 11 : 12, color: accent),
-            SizedBox(width: compact ? 2 : 3),
-            Flexible(
-              child: Text(
-                _format(value),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: compact ? 9.5 : 10.5,
-                  color: scheme.onSurface.withValues(alpha: 0.85),
-                  fontWeight: FontWeight.w600,
-                ),
+          Flexible(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: color,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -720,7 +717,6 @@ class _StatChip extends StatelessWidget {
 class _ShimmerBox extends StatefulWidget {
   const _ShimmerBox({required this.isDark});
 
-  /// Retained for hot-reload compatibility; styling uses [ColorScheme] from context.
   final bool isDark;
 
   @override
@@ -770,7 +766,34 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 }
 
 class PostCardSkeleton extends StatelessWidget {
-  const PostCardSkeleton({super.key});
+  const PostCardSkeleton({super.key, this.metrics});
+
+  final PostCardMetrics? metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final resolved = metrics ??
+            PostCardMetrics(
+              cardWidth: constraints.maxWidth,
+              deviceType: getPostsDeviceType(
+                MediaQuery.sizeOf(context).width,
+              ),
+              columns: postsGridColumnCount(
+                MediaQuery.sizeOf(context).width,
+              ),
+            );
+        return _PostCardSkeletonBody(metrics: resolved);
+      },
+    );
+  }
+}
+
+class _PostCardSkeletonBody extends StatelessWidget {
+  const _PostCardSkeletonBody({required this.metrics});
+
+  final PostCardMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -778,10 +801,40 @@ class PostCardSkeleton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = scheme.surfaceContainerLow;
 
+    if (metrics.isHorizontal) {
+      final thumb = metrics.horizontalThumbSize;
+      return Container(
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(metrics.borderRadius),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        padding: metrics.bodyPadding,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: thumb,
+              height: thumb,
+              decoration: BoxDecoration(
+                color: base,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            SizedBox(width: metrics.sectionGap + 2),
+            Expanded(
+              child: _SkeletonContent(base: base, metrics: metrics),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(metrics.borderRadius),
         border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
@@ -797,38 +850,53 @@ class PostCardSkeleton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           AspectRatio(
-            aspectRatio: kPostCardThumbnailAspect,
+            aspectRatio: metrics.thumbnailAspect,
             child: _ShimmerBox(isDark: isDark),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(radius: 14, backgroundColor: base),
-                    const SizedBox(width: 6),
-                    _SkeletonLine(width: 80, height: 10, base: base),
-                    const Spacer(),
-                    _SkeletonLine(width: 52, height: 8, base: base),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _SkeletonLine(width: 56, height: 18, base: base, radius: 8),
-                    const SizedBox(width: 6),
-                    _SkeletonLine(width: 48, height: 18, base: base, radius: 8),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                _SkeletonLine(width: double.infinity, height: 24, base: base, radius: 8),
-              ],
-            ),
+            padding: metrics.bodyPadding,
+            child: _SkeletonContent(base: base, metrics: metrics),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SkeletonContent extends StatelessWidget {
+  const _SkeletonContent({required this.base, required this.metrics});
+
+  final Color base;
+  final PostCardMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(radius: metrics.avatarRadius, backgroundColor: base),
+            SizedBox(width: metrics.compact ? 5 : 6),
+            _SkeletonLine(width: 80, height: 10, base: base),
+          ],
+        ),
+        SizedBox(height: metrics.sectionGap),
+        Row(
+          children: [
+            _SkeletonLine(width: 56, height: 18, base: base, radius: 8),
+            SizedBox(width: metrics.compact ? 4 : 6),
+            _SkeletonLine(width: 48, height: 18, base: base, radius: 8),
+          ],
+        ),
+        SizedBox(height: metrics.sectionGap),
+        _SkeletonLine(
+          width: double.infinity,
+          height: metrics.stackMetaRow ? 36 : 24,
+          base: base,
+          radius: 8,
+        ),
+      ],
     );
   }
 }

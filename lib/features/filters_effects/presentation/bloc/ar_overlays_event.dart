@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../data/models/ar_overlay_models.dart';
+import '../../domain/entities/ar_overlay_entities.dart';
 import '../../../gifts/domain/enums/gifts_view_type.dart';
 
 abstract class ArOverlaysEvent extends Equatable {
@@ -64,6 +65,33 @@ class DeleteArOverlayEvent extends ArOverlaysEvent {
 
   @override
   List<Object?> get props => [id];
+}
+
+/// Activate an AR Overlay (`PATCH .../admin/:id/activate`).
+class ActivateArOverlayEvent extends ArOverlaysEvent {
+  const ActivateArOverlayEvent(this.id);
+  final String id;
+
+  @override
+  List<Object?> get props => [id];
+}
+
+/// Deactivate an AR Overlay (`PATCH .../admin/:id/deactivate`).
+class DeactivateArOverlayEvent extends ArOverlaysEvent {
+  const DeactivateArOverlayEvent(this.id);
+  final String id;
+
+  @override
+  List<Object?> get props => [id];
+}
+
+/// Filter overlays by active / inactive status.
+class FilterArOverlaysByStatusEvent extends ArOverlaysEvent {
+  const FilterArOverlaysByStatusEvent(this.statusFilter);
+  final ArOverlayStatusFilter statusFilter;
+
+  @override
+  List<Object?> get props => [statusFilter];
 }
 
 /// Search overlays locally by query string.

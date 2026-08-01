@@ -60,10 +60,14 @@ class UsersSelectionHeader extends StatelessWidget {
                   opacity: state.isBulkActionLoading ? 0.55 : 1,
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      // Collapse bulk admin actions before they collide with
-                      // the selection controls on laptop/MacBook widths.
-                      final narrow = metrics.compactSelectionBar ||
-                          constraints.maxWidth < 1180;
+                      // Collapse bulk admin actions before they collide /
+                      // overflow on laptop and tablet widths.
+                      final available = constraints.maxWidth;
+                      final useMenu = metrics.isMobile ||
+                          metrics.deviceType == DeviceType.tablet ||
+                          available < 980;
+                      final useDense = !useMenu && available < 1360;
+
                       return Row(
                         children: [
                           Expanded(
@@ -96,7 +100,7 @@ class UsersSelectionHeader extends StatelessWidget {
                                         ?.copyWith(fontWeight: FontWeight.w700),
                                   ),
                                 ),
-                                if (!narrow) ...[
+                                if (!useMenu && !useDense) ...[
                                   _ToolbarLink(
                                     icon: Icons.select_all_rounded,
                                     label: l10n.t('selectAllUsers'),
@@ -148,36 +152,72 @@ class UsersSelectionHeader extends StatelessWidget {
                               ],
                             ),
                           ),
-                          if (narrow)
+                          if (useMenu)
                             _BulkActionsMenu(l10n: l10n, actions: actions)
-                          else ...[
-                            if (actions.showBan &&
-                                PermissionManager.canBanUsers(context)) ...[
-                              _BanButton(l10n: l10n, compact: false),
-                              const SizedBox(width: 6),
-                            ],
-                            if (actions.showUnban &&
-                                PermissionManager.canBanUsers(context)) ...[
-                              _UnbanButton(l10n: l10n, compact: false),
-                              const SizedBox(width: 6),
-                            ],
-                            if (actions.showPromote &&
-                                PermissionManager.canAssignUserLegacyRoles(
-                                  context,
-                                )) ...[
-                              _PromoteButton(l10n: l10n, compact: false),
-                              const SizedBox(width: 6),
-                            ],
-                            if (actions.showDemote &&
-                                PermissionManager.canAssignUserLegacyRoles(
-                                  context,
-                                )) ...[
-                              _DemoteButton(l10n: l10n, compact: false),
-                              const SizedBox(width: 6),
-                            ],
-                            if (PermissionManager.canUpdateUsers(context))
-                              _DeleteButton(l10n: l10n, compact: false),
-                          ],
+                          else
+                            Flexible(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  reverse: true,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (actions.showBan &&
+                                          PermissionManager.canBanUsers(
+                                            context,
+                                          )) ...[
+                                        _BanButton(
+                                          l10n: l10n,
+                                          compact: useDense,
+                                        ),
+                                        SizedBox(width: useDense ? 4 : 6),
+                                      ],
+                                      if (actions.showUnban &&
+                                          PermissionManager.canBanUsers(
+                                            context,
+                                          )) ...[
+                                        _UnbanButton(
+                                          l10n: l10n,
+                                          compact: useDense,
+                                        ),
+                                        SizedBox(width: useDense ? 4 : 6),
+                                      ],
+                                      if (actions.showPromote &&
+                                          PermissionManager
+                                              .canAssignUserLegacyRoles(
+                                            context,
+                                          )) ...[
+                                        _PromoteButton(
+                                          l10n: l10n,
+                                          compact: useDense,
+                                        ),
+                                        SizedBox(width: useDense ? 4 : 6),
+                                      ],
+                                      if (actions.showDemote &&
+                                          PermissionManager
+                                              .canAssignUserLegacyRoles(
+                                            context,
+                                          )) ...[
+                                        _DemoteButton(
+                                          l10n: l10n,
+                                          compact: useDense,
+                                        ),
+                                        SizedBox(width: useDense ? 4 : 6),
+                                      ],
+                                      if (PermissionManager.canUpdateUsers(
+                                        context,
+                                      ))
+                                        _DeleteButton(
+                                          l10n: l10n,
+                                          compact: useDense,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       );
                     },

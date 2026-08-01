@@ -3,29 +3,37 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/post_filters.dart';
 
-/// Counts popup filters only (excludes search — search stays on the bar).
+/// Counts popup filters (excludes search).
 int postsAppliedFilterCount(PostFilters filters) {
   var count = 0;
+  if (filters.categoryId != null) count++;
   if (filters.type != null && filters.type!.isNotEmpty) count++;
-  if (filters.sort != null && filters.sort != PostFilters.defaultSort) count++;
+  if (filters.hasLocationFilter) count++;
+  if (filters.sort != null &&
+      filters.sort != PostFilters.defaultSort) {
+    count++;
+  }
   if (filters.isAuctionable == true) count++;
   if (filters.isAd == true) count++;
+  if (filters.userId != null) count++;
+  if (filters.hasDateTimeFilters) count++;
   return count;
 }
 
-/// Modern filter trigger with optional active-count badge.
-/// Hover is handled by [Material]/[InkWell] — no setState.
+/// Minimal filter trigger — icon-first with optional count badge.
 class PostsFilterButton extends StatelessWidget {
   const PostsFilterButton({
     super.key,
     required this.activeCount,
     required this.onPressed,
-    this.height = 40,
+    this.height = 36,
+    this.iconOnly = true,
   });
 
   final int activeCount;
   final VoidCallback onPressed;
   final double height;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -38,69 +46,82 @@ class PostsFilterButton extends StatelessWidget {
             .replaceAll('{count}', '$activeCount')
         : l10n.tOr('filters', 'Filters');
 
-    final bg =
-        hasActive ? scheme.primaryContainer : scheme.surfaceContainerLow;
-    final fg = hasActive ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    final bg = hasActive
+        ? scheme.primary.withValues(alpha: 0.08)
+        : Colors.transparent;
+    final fg = hasActive ? scheme.primary : scheme.onSurfaceVariant;
     final border = hasActive
-        ? scheme.primary
-        : scheme.outline.withValues(
-            alpha: scheme.brightness == Brightness.dark ? 0.28 : 0.18,
+        ? scheme.primary.withValues(alpha: 0.35)
+        : scheme.outline.withValues(alpha: 0.22);
+
+    final child = iconOnly
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(Icons.tune_rounded, size: 18, color: fg),
+              if (hasActive)
+                PositionedDirectional(
+                  top: -4,
+                  end: -6,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: scheme.surface, width: 1.5),
+                    ),
+                    child: Text(
+                      activeCount > 9 ? '9+' : '$activeCount',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onPrimary,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.tune_rounded, size: 16, color: fg),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+            ],
           );
 
     return Tooltip(
       message: l10n.tOr('giftOpenFiltersTooltip', 'Open filters'),
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(12),
-          hoverColor: hasActive
-              ? scheme.primary.withValues(alpha: 0.08)
-              : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(8),
+          hoverColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
           child: Container(
             height: height,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            width: iconOnly ? height : null,
+            padding: iconOnly
+                ? null
+                : const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: border),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.tune_rounded, size: 18, color: fg),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
-                  ),
-                ),
-                if (hasActive) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primary,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '$activeCount',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: scheme.onPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+            alignment: Alignment.center,
+            child: child,
           ),
         ),
       ),

@@ -72,10 +72,18 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   @override
   Future<String> uploadGiftImage(Uint8List bytes, String filename) async {
     final formData = FormData();
+    final lower = filename.toLowerCase();
+    final contentType = lower.endsWith('.svg')
+        ? DioMediaType('image', 'svg+xml')
+        : null;
     formData.files.add(
       MapEntry(
         'files',
-        MultipartFile.fromBytes(bytes, filename: filename),
+        MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: contentType,
+        ),
       ),
     );
 
