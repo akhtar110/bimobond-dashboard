@@ -82,15 +82,16 @@ class PostCardMetrics {
 
   double get sectionGap => narrow ? 3 : (compact ? 4 : (isMobile ? 6 : 5));
 
+  /// Full-card aspect (width / height). Lower = taller/bigger cards.
   double get thumbnailAspect => switch (layoutMode) {
-        PostCardLayoutMode.horizontal => 1,
+        PostCardLayoutMode.horizontal => isMobile ? 1.35 : 1.2,
         PostCardLayoutMode.vertical => narrow
-            ? 1.55
+            ? 0.78
             : compact
-                ? 1.62
+                ? 0.74
                 : dense
-                    ? 1.68
-                    : 1.75,
+                    ? 0.72
+                    : 0.7,
       };
 
   double get horizontalThumbSize =>
@@ -110,21 +111,14 @@ class PostCardMetrics {
 
   double get badgeFontSize => narrow ? 9 : 10;
 
+  /// Padding for the bottom details band.
   EdgeInsets get premiumBodyPadding => EdgeInsets.fromLTRB(
         narrow ? 10 : (compact ? 12 : 14),
-        narrow ? 8 : (compact ? 9 : 10),
+        narrow ? 6 : (compact ? 7 : 8),
         narrow ? 10 : (compact ? 12 : 14),
-        narrow ? 11 : (compact ? 12 : 14),
+        narrow ? 10 : (compact ? 12 : 14),
       );
 
-  /// Overlap of the black footer into the media fade zone.
-  double get premiumBlendOverlap =>
-      narrow ? 16 : (compact ? 18 : (dense ? 20 : 24));
-
-  /// Avatar overlap between media and info section (premium vertical cards).
-  double get premiumAvatarOverlap =>
-      narrow ? 12 : (compact ? 14 : 16);
-
   int get thumbnailCacheWidth =>
-      (cardWidth * (isHorizontal ? 0.35 : 1.0)).round().clamp(80, 560);
+      (cardWidth * 1.0).round().clamp(80, 560);
 }

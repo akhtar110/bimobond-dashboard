@@ -77,7 +77,7 @@ class _PostCardState extends State<PostCard> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: PostCardPremiumColors.black,
         borderRadius: BorderRadius.circular(metrics.borderRadius),
         border: Border.all(
           color: _hovered && metrics.enableHoverEffects
@@ -110,19 +110,12 @@ class _PostCardState extends State<PostCard> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(metrics.borderRadius),
-        child: metrics.isHorizontal
-            ? _HorizontalCardBody(
-                post: widget.post,
-                metrics: metrics,
-                isDark: isDark,
-                hovered: _hovered,
-              )
-            : _VerticalCardBody(
-                post: widget.post,
-                metrics: metrics,
-                isDark: isDark,
-                hovered: _hovered,
-              ),
+        child: _MediaOverlayCardBody(
+          post: widget.post,
+          metrics: metrics,
+          isDark: isDark,
+          hovered: _hovered,
+        ),
       ),
     );
 
@@ -160,8 +153,9 @@ class _PostCardState extends State<PostCard> {
   }
 }
 
-class _VerticalCardBody extends StatelessWidget {
-  const _VerticalCardBody({
+/// Image fills the whole card; details sit at the bottom over a bottom-up gradient.
+class _MediaOverlayCardBody extends StatelessWidget {
+  const _MediaOverlayCardBody({
     required this.post,
     required this.metrics,
     required this.isDark,
@@ -173,88 +167,77 @@ class _VerticalCardBody extends StatelessWidget {
   final bool isDark;
   final bool hovered;
 
+  String? get _mediaUrl => post.previewThumbnailUrl;
+  bool get _isVideo => post.containsVideoMedia;
+  bool get _isCarousel => post.type.toUpperCase() == 'CAROUSEL';
+
   @override
   Widget build(BuildContext context) {
-    final overlap = metrics.premiumBlendOverlap;
-    final avatarOverlap = metrics.premiumAvatarOverlap;
+    final mediaUrl = _mediaUrl;
+    final compact = metrics.compact;
 
-    return ColoredBox(
-      color: PostCardPremiumColors.black,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
+    return AspectRatio(
+      aspectRatio: metrics.thumbnailAspect,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          _MediaPreview(
-            post: post,
-            metrics: metrics,
-            isDark: isDark,
-            hovered: hovered,
-            blendToBlackFooter: true,
+          const ColoredBox(color: PostCardPremiumColors.black),
+          if (mediaUrl != null && mediaUrl.isNotEmpty)
+            PostListThumbnail(
+              key: ValueKey('post_thumb_${post.id}_$mediaUrl'),
+              postId: post.id,
+              imageUrl: mediaUrl,
+              fit: BoxFit.cover,
+              placeholder: (context) => _ShimmerBox(isDark: isDark),
+              error: (context) =>
+                  _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
+            )
+          else
+            _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
+
+          // Gradient rising from the bottom up through the author name
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              widthFactor: 1,
+              heightFactor: 0.58,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Color(0xF2000000),
+                      Color(0xCC000000),
+                      Color(0x80000000),
+                      Color(0x33000000),
+                      Color(0x00000000),
+                    ],
+                    stops: [0.0, 0.28, 0.52, 0.78, 1.0],
+                  ),
+                ),
+              ),
+            ),
           ),
-          Transform.translate(
-            offset: Offset(0, -overlap),
+
+          if (_isVideo) Center(child: _GlassPlayBadge(compact: compact)),
+          if (_isCarousel)
+            Positioned(
+              top: compact ? 8 : 10,
+              right: compact ? 8 : 10,
+              child: const _GlassMediaBadge(icon: Icons.collections_rounded),
+            ),
+
+          // Details pinned to the bottom over the gradient
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: _CardContent(
               post: post,
               metrics: metrics,
               isDark: isDark,
               hovered: hovered,
-              premiumBlack: true,
-              seamlessFooter: true,
-              avatarOverlap: avatarOverlap,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HorizontalCardBody extends StatelessWidget {
-  const _HorizontalCardBody({
-    required this.post,
-    required this.metrics,
-    required this.isDark,
-    required this.hovered,
-  });
-
-  final ManagedPostEntity post;
-  final PostCardMetrics metrics;
-  final bool isDark;
-  final bool hovered;
-
-  @override
-  Widget build(BuildContext context) {
-    final thumbSize = metrics.horizontalThumbSize;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        metrics.bodyPadding.left,
-        metrics.bodyPadding.top,
-        metrics.bodyPadding.right,
-        metrics.bodyPadding.bottom,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: thumbSize,
-            height: thumbSize,
-            child: _MediaPreview(
-              post: post,
-              metrics: metrics,
-              isDark: isDark,
-              hovered: hovered,
-              fixedSize: thumbSize,
-            ),
-          ),
-          SizedBox(width: metrics.sectionGap + 2),
-          Expanded(
-            child: _CardContent(
-              post: post,
-              metrics: metrics,
-              isDark: isDark,
-              hovered: hovered,
-              premiumBlack: true,
             ),
           ),
         ],
@@ -269,214 +252,42 @@ class _CardContent extends StatelessWidget {
     required this.metrics,
     required this.isDark,
     required this.hovered,
-    this.premiumBlack = false,
-    this.seamlessFooter = false,
-    this.avatarOverlap = 0,
   });
 
   final ManagedPostEntity post;
   final PostCardMetrics metrics;
   final bool isDark;
   final bool hovered;
-  final bool premiumBlack;
-  final bool seamlessFooter;
-  final double avatarOverlap;
 
   @override
   Widget build(BuildContext context) {
-    final authorRow = Transform.translate(
-      offset: seamlessFooter && avatarOverlap > 0
-          ? Offset(0, -avatarOverlap)
-          : Offset.zero,
-      child: _AuthorRow(
-        post: post,
-        isDark: isDark,
-        metrics: metrics,
-        premiumBlack: premiumBlack,
-      ),
-    );
-
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        authorRow,
-        SizedBox(height: premiumBlack ? metrics.sectionGap + 2 : metrics.sectionGap),
-        _CategoryStatusRow(
-          post: post,
-          metrics: metrics,
-          premiumBlack: premiumBlack,
-        ),
-        SizedBox(height: premiumBlack ? metrics.sectionGap + 2 : metrics.sectionGap),
-        PostListMetaRow(
-          post: post,
-          metrics: metrics,
-          hovered: hovered,
-          premiumBlack: premiumBlack,
-        ),
-      ],
-    );
-
-    if (!premiumBlack) return content;
-
-    final bodyPadding = seamlessFooter
-        ? metrics.premiumBodyPadding.copyWith(
-            top: (metrics.premiumBodyPadding.top - avatarOverlap * 0.35)
-                .clamp(4.0, double.infinity),
-          )
-        : metrics.premiumBodyPadding;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: PostCardPremiumColors.black,
-        border: seamlessFooter
-            ? null
-            : metrics.isHorizontal
-                ? const Border(
-                    left: BorderSide(color: PostCardPremiumColors.borderSubtle),
-                  )
-                : const Border(
-                    top: BorderSide(color: PostCardPremiumColors.borderSubtle),
-                  ),
-      ),
-      child: Padding(
-        padding: bodyPadding,
-        child: content,
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Media preview
-// ─────────────────────────────────────────────────────────────
-
-/// Premium fade painted only on the image (bottom ~40%), not on the card.
-abstract final class _PremiumImageBlendOverlay {
-  static const zoneHeightFactor = 0.40;
-
-  static const colors = [
-    Color(0x00000000),
-    Color(0x26000000), // rgba(0,0,0,0.15)
-    Color(0x73000000), // rgba(0,0,0,0.45)
-    Color(0xBF000000), // rgba(0,0,0,0.75)
-    PostCardPremiumColors.black,
-  ];
-
-  static const stops = [0.0, 0.5, 0.7, 0.85, 1.0];
-}
-
-class _PremiumImageGradientLayer extends StatelessWidget {
-  const _PremiumImageGradientLayer();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: FractionallySizedBox(
-          heightFactor: _PremiumImageBlendOverlay.zoneHeightFactor,
-          widthFactor: 1,
-          child: const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: _PremiumImageBlendOverlay.colors,
-                stops: _PremiumImageBlendOverlay.stops,
-              ),
-            ),
+    return Padding(
+      padding: metrics.premiumBodyPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _AuthorRow(
+            post: post,
+            isDark: isDark,
+            metrics: metrics,
+            premiumBlack: true,
           ),
-        ),
+          SizedBox(height: metrics.sectionGap + 2),
+          _CategoryStatusRow(
+            post: post,
+            metrics: metrics,
+            premiumBlack: true,
+          ),
+          SizedBox(height: metrics.sectionGap + 2),
+          PostListMetaRow(
+            post: post,
+            metrics: metrics,
+            hovered: hovered,
+            premiumBlack: true,
+          ),
+        ],
       ),
-    );
-  }
-}
-
-class _MediaPreview extends StatelessWidget {
-  const _MediaPreview({
-    required this.post,
-    required this.metrics,
-    required this.isDark,
-    required this.hovered,
-    this.fixedSize,
-    this.blendToBlackFooter = false,
-  });
-
-  final ManagedPostEntity post;
-  final PostCardMetrics metrics;
-  final bool isDark;
-  final bool hovered;
-  final double? fixedSize;
-  final bool blendToBlackFooter;
-
-  String? get _mediaUrl => post.previewThumbnailUrl;
-  bool get _isVideo => post.containsVideoMedia;
-  bool get _isCarousel => post.type.toUpperCase() == 'CAROUSEL';
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final mediaUrl = _mediaUrl;
-    final compact = metrics.compact;
-
-    final media = Stack(
-      fit: StackFit.expand,
-      children: [
-        if (mediaUrl != null && mediaUrl.isNotEmpty)
-          PostListThumbnail(
-            key: ValueKey('post_thumb_${post.id}_$mediaUrl'),
-            postId: post.id,
-            imageUrl: mediaUrl,
-            fit: BoxFit.cover,
-            placeholder: (context) => _ShimmerBox(isDark: isDark),
-            error: (context) =>
-                _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
-          )
-        else
-          _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
-        if (blendToBlackFooter)
-          const _PremiumImageGradientLayer()
-        else
-          IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    scheme.scrim.withValues(alpha: hovered ? 0.08 : 0.04),
-                    Colors.transparent,
-                    Colors.transparent,
-                    scheme.scrim.withValues(
-                      alpha: hovered ? 0.28 : 0.18,
-                    ),
-                  ],
-                  stops: const [0, 0.35, 0.65, 1],
-                ),
-              ),
-            ),
-          ),
-        if (_isVideo) Center(child: _GlassPlayBadge(compact: compact)),
-        if (_isCarousel)
-          Positioned(
-            top: compact ? 6 : 7,
-            right: compact ? 6 : 7,
-            child: const _GlassMediaBadge(icon: Icons.collections_rounded),
-          ),
-      ],
-    );
-
-    if (fixedSize != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(metrics.compact ? 8 : 10),
-        child: media,
-      );
-    }
-
-    return AspectRatio(
-      aspectRatio: metrics.thumbnailAspect,
-      child: media,
     );
   }
 }
@@ -551,14 +362,13 @@ class _MediaPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return ColoredBox(
-      color: scheme.surfaceContainerLow,
+      color: isDark ? const Color(0xFF141414) : const Color(0xFF1A1A1A),
       child: Center(
         child: Icon(
           isVideo ? Icons.videocam_outlined : Icons.image_outlined,
-          size: 32,
-          color: scheme.onSurfaceVariant,
+          size: 36,
+          color: PostCardPremiumColors.textMuted,
         ),
       ),
     );
@@ -602,7 +412,7 @@ class _AuthorRow extends StatelessWidget {
         Expanded(
           child: Text(
             name,
-            maxLines: metrics.isHorizontal ? 2 : (metrics.narrow ? 2 : 1),
+            maxLines: metrics.narrow || metrics.isHorizontal ? 2 : 1,
             softWrap: true,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -968,52 +778,6 @@ class _PostCardSkeletonBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = scheme.surfaceContainerLow;
-
-    if (metrics.isHorizontal) {
-      final thumb = metrics.horizontalThumbSize;
-      return Container(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(metrics.borderRadius),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        clipBehavior: Clip.antiAlias,
-        padding: metrics.bodyPadding,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: thumb,
-              height: thumb,
-              decoration: BoxDecoration(
-                color: base,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            SizedBox(width: metrics.sectionGap + 2),
-            Expanded(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: PostCardPremiumColors.black,
-                  border: Border(
-                    left: BorderSide(color: PostCardPremiumColors.borderSubtle),
-                  ),
-                ),
-                child: Padding(
-                  padding: metrics.premiumBodyPadding,
-                  child: _SkeletonContent(
-                    base: const Color(0xFF1A1A1A),
-                    metrics: metrics,
-                    premiumBlack: true,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
 
     return Container(
       decoration: BoxDecoration(
@@ -1029,28 +793,44 @@ class _PostCardSkeletonBody extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: ColoredBox(
-        color: PostCardPremiumColors.black,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
+      child: AspectRatio(
+        aspectRatio: metrics.thumbnailAspect,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            AspectRatio(
-              aspectRatio: metrics.thumbnailAspect,
-              child: _ShimmerBox(isDark: isDark),
-            ),
-            Transform.translate(
-              offset: Offset(0, -metrics.premiumBlendOverlap),
-              child: DecoratedBox(
-                decoration:
-                    const BoxDecoration(color: PostCardPremiumColors.black),
-                child: Padding(
-                  padding: metrics.premiumBodyPadding,
-                  child: _SkeletonContent(
-                    base: const Color(0xFF1A1A1A),
-                    metrics: metrics,
-                    premiumBlack: true,
+            _ShimmerBox(isDark: isDark),
+            const Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                widthFactor: 1,
+                heightFactor: 0.58,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Color(0xF2000000),
+                        Color(0xCC000000),
+                        Color(0x80000000),
+                        Color(0x33000000),
+                        Color(0x00000000),
+                      ],
+                      stops: [0.0, 0.28, 0.52, 0.78, 1.0],
+                    ),
                   ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Padding(
+                padding: metrics.premiumBodyPadding,
+                child: _SkeletonContent(
+                  base: const Color(0xFF1A1A1A),
+                  metrics: metrics,
                 ),
               ),
             ),
@@ -1065,17 +845,16 @@ class _SkeletonContent extends StatelessWidget {
   const _SkeletonContent({
     required this.base,
     required this.metrics,
-    this.premiumBlack = false,
   });
 
   final Color base;
   final PostCardMetrics metrics;
-  final bool premiumBlack;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           children: [
