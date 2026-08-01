@@ -43,6 +43,27 @@ class SearchPostsEvent extends PostsEvent {
   List<Object?> get props => [query];
 }
 
+class FilterPostsByUserEvent extends PostsEvent {
+  const FilterPostsByUserEvent(this.user);
+  final UserEntity? user;
+
+  @override
+  List<Object?> get props => [user];
+}
+
+class FilterPostsByDateRangeEvent extends PostsEvent {
+  const FilterPostsByDateRangeEvent({
+    required this.createdFrom,
+    required this.createdTo,
+  });
+
+  final DateTime? createdFrom;
+  final DateTime? createdTo;
+
+  @override
+  List<Object?> get props => [createdFrom, createdTo];
+}
+
 class FilterPostsByTypeEvent extends PostsEvent {
   FilterPostsByTypeEvent({
     this.isAuctionable,
@@ -59,11 +80,13 @@ class FilterPostsByTypeEvent extends PostsEvent {
 }
 
 class UpdatePostFiltersEvent extends PostsEvent {
-  const UpdatePostFiltersEvent(this.filters);
+  const UpdatePostFiltersEvent(this.filters, {this.filterUser});
+
   final PostFilters filters;
+  final UserEntity? filterUser;
 
   @override
-  List<Object?> get props => [filters];
+  List<Object?> get props => [filters, filterUser];
 }
 
 class ClearPostFiltersEvent extends PostsEvent {}

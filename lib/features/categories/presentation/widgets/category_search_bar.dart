@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/utils/search_debounce.dart';
 import '../bloc/categories_bloc.dart';
 
 class CategorySearchBar extends StatefulWidget {
@@ -16,6 +17,7 @@ class CategorySearchBar extends StatefulWidget {
 class _CategorySearchBarState extends State<CategorySearchBar> {
   late final TextEditingController _ctrl;
   final _focus = FocusNode();
+  final _debouncer = SearchDebouncer();
 
   @override
   void initState() {
@@ -36,9 +38,25 @@ class _CategorySearchBarState extends State<CategorySearchBar> {
 
   @override
   void dispose() {
+    _debouncer.dispose();
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  void _dispatchSearch(String value, {bool immediate = false}) {
+    void send() {
+      if (!mounted) return;
+      context.read<CategoriesBloc>().add(UpdateCategorySearchEvent(value));
+    }
+
+    if (immediate) {
+      _debouncer.cancel();
+      send();
+      return;
+    }
+
+    _debouncer.run(send);
   }
 
   @override
@@ -49,28 +67,28 @@ class _CategorySearchBarState extends State<CategorySearchBar> {
     return TextField(
       controller: _ctrl,
       focusNode: _focus,
-      onChanged: (v) {
-        setState(() {});
-        context.read<CategoriesBloc>().add(UpdateCategorySearchEvent(v));
-      },
+      onChanged: _dispatchSearch,
+      onSubmitted: (value) => _dispatchSearch(value, immediate: true),
+      textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: l10n.tOr(
           'searchCategories',
           'Search by name, slug, ID, or keywords…',
         ),
         prefixIcon: const Icon(Icons.search_rounded, size: 18),
-        suffixIcon: _ctrl.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.close_rounded, size: 16),
-                onPressed: () {
-                  _ctrl.clear();
-                  setState(() {});
-                  context
-                      .read<CategoriesBloc>()
-                      .add(UpdateCategorySearchEvent(''));
-                },
-              )
-            : null,
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _ctrl,
+          builder: (context, value, _) {
+            if (value.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.close_rounded, size: 16),
+              onPressed: () {
+                _ctrl.clear();
+                _dispatchSearch('', immediate: true);
+              },
+            );
+          },
+        ),
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

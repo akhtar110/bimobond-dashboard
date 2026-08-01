@@ -150,6 +150,7 @@ import 'features/user_activity/presentation/bloc/user_likes_bloc.dart';
 import 'features/user_activity/presentation/bloc/user_mentions_bloc.dart';
 import 'features/user_activity/presentation/bloc/user_unified_activity_bloc.dart';
 
+import 'features/post_management/data/datasources/managed_post_location_remote_data_source.dart';
 import 'features/post_management/data/datasources/post_management_remote_datasource.dart';
 import 'features/post_management/data/repositories/post_management_repository_impl.dart';
 import 'features/post_management/domain/repositories/post_management_repository.dart';
@@ -1089,8 +1090,15 @@ Future<void> init() async {
   // POST MANAGEMENT MODULE (admin edit/moderate user posts)
   // =========================================================
 
+  sl.registerLazySingleton<ManagedPostLocationRemoteDataSource>(
+    () => ManagedPostLocationRemoteDataSourceImpl(sl<Dio>()),
+  );
+
   sl.registerLazySingleton<PostManagementRemoteDataSource>(
-    () => PostManagementRemoteDataSourceImpl(sl<Dio>()),
+    () => PostManagementRemoteDataSourceImpl(
+      sl<Dio>(),
+      sl<ManagedPostLocationRemoteDataSource>(),
+    ),
   );
 
   sl.registerLazySingleton<PostManagementRepository>(
@@ -1183,7 +1191,11 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<PostListRepository>(
-    () => PostListRepositoryImpl(sl<PostsRemoteDataSource>()),
+    () => PostListRepositoryImpl(
+      sl<PostsRemoteDataSource>(),
+      sl<ManagedPostLocationRemoteDataSource>(),
+      sl<UsersRepository>(),
+    ),
   );
 
   sl.registerLazySingleton(() => GetAllPosts(sl<PostListRepository>()));

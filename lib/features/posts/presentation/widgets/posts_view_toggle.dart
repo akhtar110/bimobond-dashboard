@@ -5,8 +5,11 @@ import '../../../../core/localization/localization.dart';
 import '../../domain/enums/posts_view_type.dart';
 import '../bloc/posts_bloc.dart';
 
+/// Compact segmented view switcher — icon-only, minimal chrome.
 class PostsViewToggle extends StatelessWidget {
-  const PostsViewToggle({super.key});
+  const PostsViewToggle({super.key, this.height = 36});
+
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +25,10 @@ class PostsViewToggle extends StatelessWidget {
         return DecoratedBox(
           decoration: BoxDecoration(
             color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: scheme.outlineVariant),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: scheme.outline.withValues(alpha: 0.22),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -32,19 +37,21 @@ class PostsViewToggle extends StatelessWidget {
                 icon: Icons.grid_view_rounded,
                 tooltip: l10n.t('postsGridView'),
                 isSelected: viewType == PostsViewType.grid,
+                height: height,
                 onTap: () => context.read<PostsBloc>().add(
                       const ChangePostsViewEvent(PostsViewType.grid),
                     ),
               ),
               Container(
                 width: 1,
-                height: 28,
-                color: scheme.outlineVariant,
+                height: height - 10,
+                color: scheme.outline.withValues(alpha: 0.18),
               ),
               _ViewToggleButton(
                 icon: Icons.view_list_rounded,
                 tooltip: l10n.t('postsListView'),
                 isSelected: viewType == PostsViewType.list,
+                height: height,
                 onTap: () => context.read<PostsBloc>().add(
                       const ChangePostsViewEvent(PostsViewType.list),
                     ),
@@ -57,53 +64,42 @@ class PostsViewToggle extends StatelessWidget {
   }
 }
 
-class _ViewToggleButton extends StatefulWidget {
+class _ViewToggleButton extends StatelessWidget {
   const _ViewToggleButton({
     required this.icon,
     required this.tooltip,
     required this.isSelected,
+    required this.height,
     required this.onTap,
   });
 
   final IconData icon;
   final String tooltip;
   final bool isSelected;
+  final double height;
   final VoidCallback onTap;
-
-  @override
-  State<_ViewToggleButton> createState() => _ViewToggleButtonState();
-}
-
-class _ViewToggleButtonState extends State<_ViewToggleButton> {
-  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = widget.isSelected;
-    final bg = selected
-        ? scheme.primary.withValues(alpha: 0.12)
-        : _hovered
-            ? scheme.surfaceContainerHigh
-            : Colors.transparent;
+    final selected = isSelected;
     final fg = selected ? scheme.primary : scheme.onSurfaceVariant;
 
     return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Material(
-          color: bg,
-          borderRadius: BorderRadius.circular(9),
-          child: InkWell(
-            onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(9),
-            child: SizedBox(
-              width: 38,
-              height: 34,
-              child: Icon(widget.icon, size: 18, color: fg),
-            ),
+      message: tooltip,
+      child: Material(
+        color: selected
+            ? scheme.primary.withValues(alpha: 0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(7),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(7),
+          hoverColor: scheme.surfaceContainerHighest.withValues(alpha: 0.7),
+          child: SizedBox(
+            width: height + 2,
+            height: height,
+            child: Icon(icon, size: 17, color: fg),
           ),
         ),
       ),

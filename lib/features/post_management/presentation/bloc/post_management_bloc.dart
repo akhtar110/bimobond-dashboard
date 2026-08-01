@@ -411,6 +411,10 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         post.userPostsCount == 0;
   }
 
+  bool _authorLocationMissing(ManagedPostEntity post) {
+    return post.location == null || !post.location!.hasDisplayData;
+  }
+
   Future<ManagedPostEntity> _hydrateAuthorProfileIfNeeded(
     ManagedPostEntity post,
     UserEntity? sourceUser,
@@ -418,14 +422,14 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     if (post.userId.isEmpty) return post;
 
     final hinted = _authorHint(post, sourceUser);
-    if (hinted != null &&
-        (hinted.followerCount > 0 ||
-            hinted.followingCount > 0 ||
-            hinted.postCount > 0)) {
-      return enrichManagedPostAuthor(post, author: hinted);
-    }
+    final enrichedHint = hinted != null
+        ? enrichManagedPostAuthor(post, author: hinted)
+        : post;
 
-    if (!_authorStatsMissing(post)) return post;
+    final statsOk = !_authorStatsMissing(enrichedHint);
+    final locationOk = !_authorLocationMissing(enrichedHint);
+
+    if (statsOk && locationOk) return enrichedHint;
 
     try {
       final detail = await getUserById(post.userId);
@@ -435,10 +439,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         fallback: post,
       );
     } catch (_) {
-      if (hinted != null) {
-        return enrichManagedPostAuthor(post, author: hinted);
-      }
-      return post;
+      return enrichedHint;
     }
   }
 
@@ -470,6 +471,10 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
       isBanned: post.userIsBanned,
       roles: const [UserRole.user],
       createdAt: post.userJoinedAt,
+      lastLocation: sourceUser?.lastLocation,
+      city: sourceUser?.city,
+      region: sourceUser?.region,
+      country: sourceUser?.country,
     );
   }
 

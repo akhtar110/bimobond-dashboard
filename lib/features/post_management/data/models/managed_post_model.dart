@@ -53,11 +53,68 @@ class ManagedPostModel extends ManagedPostEntity {
     required super.createdAt,
     required super.updatedAt,
     super.locationId,
+    super.location,
     super.playlistId,
     super.soundId,
     super.sound,
     super.originalPostId,
   });
+
+  factory ManagedPostModel.fromEntity(ManagedPostEntity entity) {
+    return ManagedPostModel(
+      id: entity.id,
+      userId: entity.userId,
+      type: entity.type,
+      userName: entity.userName,
+      userFullName: entity.userFullName,
+      userEmail: entity.userEmail,
+      userProfileImage: entity.userProfileImage,
+      userIsVerified: entity.userIsVerified,
+      userFollowersCount: entity.userFollowersCount,
+      userFollowingCount: entity.userFollowingCount,
+      userPostsCount: entity.userPostsCount,
+      userJoinedAt: entity.userJoinedAt,
+      userIsBanned: entity.userIsBanned,
+      videoUrl: entity.videoUrl,
+      hlsUrl: entity.hlsUrl,
+      thumbnailUrl: entity.thumbnailUrl,
+      media: entity.media,
+      animatedCoverUrl: entity.animatedCoverUrl,
+      description: entity.description,
+      category: entity.category,
+      categoryEntity: entity.categoryEntity,
+      status: entity.status,
+      viewCount: entity.viewCount,
+      shareCount: entity.shareCount,
+      downloadCount: entity.downloadCount,
+      likeCount: entity.likeCount,
+      commentCount: entity.commentCount,
+      saveCount: entity.saveCount,
+      repostCount: entity.repostCount,
+      recentReposts: entity.recentReposts,
+      recentLikes: entity.recentLikes,
+      recentViews: entity.recentViews,
+      recentMentions: entity.recentMentions,
+      duration: entity.duration,
+      videoWidth: entity.videoWidth,
+      videoHeight: entity.videoHeight,
+      isAd: entity.isAd,
+      privacyStatus: entity.privacyStatus,
+      allowComments: entity.allowComments,
+      allowDuets: entity.allowDuets,
+      allowStitch: entity.allowStitch,
+      isStory: entity.isStory,
+      isAuctionable: entity.isAuctionable,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+      locationId: entity.locationId,
+      location: entity.location,
+      playlistId: entity.playlistId,
+      soundId: entity.soundId,
+      sound: entity.sound,
+      originalPostId: entity.originalPostId,
+    );
+  }
 
   factory ManagedPostModel.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>?;
@@ -91,6 +148,9 @@ class ManagedPostModel extends ManagedPostEntity {
         user?['avatar'] as String? ??
         user?['profileImage'] as String? ??
         user?['profilePicture'] as String?;
+
+    final locationFields =
+        ManagedPostLocationEntity.parseManagedPostLocationFields(json);
 
     return ManagedPostModel(
       id: json['id']?.toString() ?? '',
@@ -167,7 +227,11 @@ class ManagedPostModel extends ManagedPostEntity {
       isAuctionable: json['isAuctionable'] as bool? ?? false,
       createdAt: _readDate(json['createdAt']),
       updatedAt: _readDate(json['updatedAt']),
-      locationId: json['locationId'] as String?,
+      locationId: locationFields.locationId,
+      location: locationFields.location ??
+          ManagedPostLocationEntity.fromUserJson(
+            user != null ? Map<String, dynamic>.from(user) : null,
+          ),
       playlistId: json['playlistId'] as String?,
       soundId: readManagedPostSoundId(json),
       sound: parseManagedPostSound(

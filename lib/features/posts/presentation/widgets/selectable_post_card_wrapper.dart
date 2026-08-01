@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
 import '../bloc/posts_bloc.dart';
+import '../utils/post_card_layout.dart';
 import 'post_card.dart';
 
 /// Wraps [PostCard] with a selection checkbox without modifying the card design.
@@ -13,28 +14,38 @@ class SelectablePostCard extends StatelessWidget {
     required this.isSelected,
     required this.onSelectionChanged,
     required this.onTap,
+    this.metrics,
   });
 
   final ManagedPostEntity post;
   final bool isSelected;
   final ValueChanged<bool?> onSelectionChanged;
   final VoidCallback onTap;
+  final PostCardMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final borderRadius = metrics?.borderRadius ?? 12;
+    final inset = metrics?.isHorizontal == true ? 6.0 : 8.0;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        PostCard(key: ValueKey('post_card_${post.id}'), post: post, onTap: onTap),
+        PostCard(
+          key: ValueKey('post_card_${post.id}'),
+          post: post,
+          onTap: onTap,
+          metrics: metrics,
+        ),
         PositionedDirectional(
-          top: 8,
-          start: 8,
+          top: inset,
+          start: inset,
           child: _SelectionCheckboxOverlay(
             isSelected: isSelected,
             onChanged: onSelectionChanged,
             accentColor: scheme.primary,
+            compact: metrics?.compact ?? false,
           ),
         ),
         if (isSelected)
@@ -42,7 +53,7 @@ class SelectablePostCard extends StatelessWidget {
             child: IgnorePointer(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(borderRadius),
                   border: Border.all(
                     color: scheme.primary.withValues(alpha: 0.55),
                     width: 2,
@@ -61,11 +72,13 @@ class _SelectionCheckboxOverlay extends StatefulWidget {
     required this.isSelected,
     required this.onChanged,
     required this.accentColor,
+    this.compact = false,
   });
 
   final bool isSelected;
   final ValueChanged<bool?> onChanged;
   final Color accentColor;
+  final bool compact;
 
   @override
   State<_SelectionCheckboxOverlay> createState() =>
@@ -87,7 +100,9 @@ class _SelectionCheckboxOverlayState extends State<_SelectionCheckboxOverlay> {
         color: bg,
         elevation: _hovered ? 3 : 1,
         shadowColor: scheme.shadow.withValues(alpha: 0.15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(widget.compact ? 6 : 8),
+        ),
         child: Checkbox(
           value: widget.isSelected,
           onChanged: widget.onChanged,

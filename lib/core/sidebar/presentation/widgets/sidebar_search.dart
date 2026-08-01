@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../localization/localization.dart';
+import '../../../../core/utils/search_debounce.dart';
 import '../../bloc/sidebar_bloc.dart';
 import 'sidebar_tooltip.dart';
 
@@ -17,6 +18,7 @@ class SidebarSearch extends StatefulWidget {
 class _SidebarSearchState extends State<SidebarSearch> {
   late final TextEditingController _controller;
   final _focusNode = FocusNode();
+  final _debouncer = SearchDebouncer();
 
   @override
   void initState() {
@@ -26,9 +28,25 @@ class _SidebarSearchState extends State<SidebarSearch> {
 
   @override
   void dispose() {
+    _debouncer.dispose();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _dispatchSearch(String query, {bool immediate = false}) {
+    void send() {
+      if (!mounted) return;
+      context.read<SidebarBloc>().add(SearchMenuEvent(query));
+    }
+
+    if (immediate) {
+      _debouncer.cancel();
+      send();
+      return;
+    }
+
+    _debouncer.run(send);
   }
 
   @override
@@ -66,23 +84,25 @@ class _SidebarSearchState extends State<SidebarSearch> {
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
-        onChanged: (v) {
-          setState(() {});
-          bloc.add(SearchMenuEvent(v));
-        },
+        onChanged: _dispatchSearch,
+        onSubmitted: (value) => _dispatchSearch(value, immediate: true),
+        textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: l10n.tOr('searchMenu', 'Search menu…'),
           prefixIcon: const Icon(Icons.search_rounded, size: 18),
-          suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 16),
-                  onPressed: () {
-                    _controller.clear();
-                    bloc.add(const SearchMenuEvent(''));
-                    setState(() {});
-                  },
-                )
-              : null,
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _controller,
+            builder: (context, value, _) {
+              if (value.text.isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.close_rounded, size: 16),
+                onPressed: () {
+                  _controller.clear();
+                  _dispatchSearch('', immediate: true);
+                },
+              );
+            },
+          ),
           isDense: true,
           filled: true,
           fillColor: scheme.surfaceContainerHigh,
