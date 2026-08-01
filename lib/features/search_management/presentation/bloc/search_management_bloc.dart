@@ -1,9 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/utils/search_debounce.dart';
 import '../../domain/entities/search_management_entities.dart';
 import '../../domain/usecases/search_management_usecases.dart';
 import 'search_management_event.dart';
 import 'search_management_state.dart';
+import '../../../promotions/domain/entities/pagination_meta.dart';
 
 class SearchManagementBloc
     extends Bloc<SearchManagementEvent, SearchManagementState> {
@@ -47,6 +49,7 @@ class SearchManagementBloc
 
   SearchManagementFilterQuery _filter = const SearchManagementFilterQuery();
   SearchManagementTab _uiTab = SearchManagementTab.overview;
+  final SearchRequestGuard _reloadGuard = SearchRequestGuard();
 
   Future<void> _onLoad(
     LoadSearchManagementEvent event,
@@ -311,28 +314,31 @@ class SearchManagementBloc
   }
 
   Future<void> _reloadContent(Emitter<SearchManagementState> emit) async {
+    final token = _reloadGuard.next();
     final current = state;
-    final overview = current is SearchManagementLoaded
-        ? current.overview
-        : const SearchManagementOverviewEntity(
-            totalSearches: 0,
-            totalUsers: 0,
-            totalPosts: 0,
-            totalSounds: 0,
-            totalHashtags: 0,
-            trendingCount: 0,
-          );
+    final previous = current is SearchManagementLoaded ? current : null;
+    final overview = previous?.overview ??
+        const SearchManagementOverviewEntity(
+          totalSearches: 0,
+          totalUsers: 0,
+          totalPosts: 0,
+          totalSounds: 0,
+          totalHashtags: 0,
+          trendingCount: 0,
+        );
 
-    if (current is SearchManagementLoaded) {
-      emit(current.copyWith(isRefreshing: true, clearMessage: true));
+    if (previous != null) {
+      emit(previous.copyWith(isRefreshing: true, clearMessage: true));
     } else {
       emit(const SearchManagementLoading());
     }
 
     try {
-      final bundle = await _fetchBundle();
+      final bundle = await _fetchBundle(previous: previous);
+      if (!_reloadGuard.isCurrent(token)) return;
       _emitBundle(emit, overview: overview, bundle: bundle);
     } catch (e) {
+      if (!_reloadGuard.isCurrent(token)) return;
       emit(SearchManagementError(e.toString().replaceFirst('Exception: ', '')));
     }
   }
@@ -342,32 +348,58 @@ class SearchManagementBloc
         UnifiedSearchResult search,
         List<SearchTrendEntity> trends,
         SearchHistoryPageResult history,
-      })> _fetchBundle() async {
-    final searchFuture = _search(
-      _filter.copyWith(apiTab: _apiTabForUi(_uiTab)),
-    );
-    final trendsFuture = _getTrends(
-      search: _filter.q.trim().isEmpty ? null : _filter.q.trim(),
-    );
-    final historyFuture = _getAdminHistory(
-      search: _filter.q.trim().isEmpty ? null : _filter.q.trim(),
-      category: _historyCategoryForApi(_filter.apiTab),
-      from: _filter.from,
-      to: _filter.to,
-      page: _filter.page,
-    );
+      })> _fetchBundle({SearchManagementLoaded? previous}) async {
+    final q = _filter.q.trim().isEmpty ? null : _filter.q.trim();
 
-    final results = await Future.wait([
-      searchFuture,
-      trendsFuture,
-      historyFuture,
-    ]);
+    var search = previous?.searchResult ??
+        UnifiedSearchResult(q: _filter.q, tab: _apiTabForUi(_uiTab));
+    var trends = previous?.trends ?? const <SearchTrendEntity>[];
+    var history = previous?.history ??
+        const SearchHistoryPageResult(
+          data: [],
+          meta: PaginationMeta(
+            total: 0,
+            page: 1,
+            limit: 20,
+            totalPages: 1,
+          ),
+        );
 
-    return (
-      search: results[0] as UnifiedSearchResult,
-      trends: results[1] as List<SearchTrendEntity>,
-      history: results[2] as SearchHistoryPageResult,
-    );
+    switch (_uiTab) {
+      case SearchManagementTab.overview:
+        final results = await Future.wait([
+          _search(_filter.copyWith(apiTab: _apiTabForUi(_uiTab))),
+          _getTrends(search: q),
+          _getAdminHistory(
+            search: q,
+            category: _historyCategoryForApi(_filter.apiTab),
+            from: _filter.from,
+            to: _filter.to,
+            page: _filter.page,
+          ),
+        ]);
+        search = results[0] as UnifiedSearchResult;
+        trends = results[1] as List<SearchTrendEntity>;
+        history = results[2] as SearchHistoryPageResult;
+      case SearchManagementTab.searches:
+        history = await _getAdminHistory(
+          search: q,
+          category: _historyCategoryForApi(_filter.apiTab),
+          from: _filter.from,
+          to: _filter.to,
+          page: _filter.page,
+        );
+      case SearchManagementTab.users:
+      case SearchManagementTab.sounds:
+      case SearchManagementTab.hashtags:
+        search = await _search(
+          _filter.copyWith(apiTab: _apiTabForUi(_uiTab)),
+        );
+      case SearchManagementTab.trends:
+        trends = await _getTrends(search: q);
+    }
+
+    return (search: search, trends: trends, history: history);
   }
 
   void _emitBundle(

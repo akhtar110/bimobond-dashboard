@@ -26,6 +26,7 @@ class PostsLoaded extends PostsState {
     this.isPerformingBulkAction = false,
     this.bulkActionMessage,
     this.bulkActionIsError = false,
+    this.filterUser,
   }) : selectedPostIds = Set.unmodifiable(selectedPostIds ?? const {});
 
   final List<ManagedPostEntity> posts;
@@ -41,6 +42,7 @@ class PostsLoaded extends PostsState {
   final bool isPerformingBulkAction;
   final String? bulkActionMessage;
   final bool bulkActionIsError;
+  final UserEntity? filterUser;
 
   String? get selectedCategoryId => filters.categoryId;
   String? get selectedCategoryName => filters.categoryName;
@@ -69,6 +71,8 @@ class PostsLoaded extends PostsState {
     bool? isPerformingBulkAction,
     String? bulkActionMessage,
     bool? bulkActionIsError,
+    UserEntity? filterUser,
+    bool clearFilterUser = false,
     bool clearBulkActionMessage = false,
   }) {
     return PostsLoaded(
@@ -88,6 +92,8 @@ class PostsLoaded extends PostsState {
           ? null
           : (bulkActionMessage ?? this.bulkActionMessage),
       bulkActionIsError: bulkActionIsError ?? this.bulkActionIsError,
+      filterUser:
+          clearFilterUser ? null : (filterUser ?? this.filterUser),
     );
   }
 
@@ -106,15 +112,17 @@ class PostsLoaded extends PostsState {
         isPerformingBulkAction,
         bulkActionMessage,
         bulkActionIsError,
+        filterUser,
       ];
 }
 
 class PostsEmpty extends PostsState {
-  const PostsEmpty(this.filters);
+  const PostsEmpty(this.filters, {this.filterUser});
   final PostFilters filters;
+  final UserEntity? filterUser;
 
   @override
-  List<Object?> get props => [filters];
+  List<Object?> get props => [filters, filterUser];
 }
 
 class PostsError extends PostsState {

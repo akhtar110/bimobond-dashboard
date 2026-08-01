@@ -2,6 +2,7 @@
 
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
 import '../bloc/posts_bloc.dart';
+import '../utils/post_card_layout.dart';
 import '../utils/posts_page_layout.dart';
 import '../utils/posts_responsive.dart';
 import 'posts_pagination_indicators.dart';
@@ -27,14 +28,21 @@ class PostsGridView extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final m = PostsLayoutMetrics(getPostsDeviceType(constraints.maxWidth));
-        final gap = m.isMobile ? 8.0 : 12.0;
-        final columns = postsGridColumnCount(constraints.maxWidth);
+        final viewportWidth = constraints.maxWidth;
+        final deviceType = getPostsDeviceType(viewportWidth);
+        final layoutMetrics = PostsLayoutMetrics(deviceType);
+        final gap = layoutMetrics.isMobile ? 8.0 : 12.0;
+        final columns = postsGridColumnCount(viewportWidth);
         final rowCount = (posts.length / columns).ceil();
+        final cardMetrics = PostCardMetrics.fromViewport(
+          viewportWidth: viewportWidth,
+          gap: gap,
+        );
 
         return CustomScrollView(
           controller: scrollController,
-          cacheExtent: 600,
+          cacheExtent: layoutMetrics.isMobile ? 480 : 600,
+          physics: layoutMetrics.listScrollPhysics,
           slivers: [
             SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -47,30 +55,48 @@ class PostsGridView extends StatelessWidget {
                     padding: EdgeInsets.only(
                       bottom: rowIndex < rowCount - 1 ? gap : 0,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (var i = 0; i < columns; i++) ...[
-                          if (i > 0) SizedBox(width: gap),
-                          Expanded(
-                            child: i < rowPosts.length
-                                ? SelectablePostCard(
-                                    post: rowPosts[i],
-                                    isSelected: state.selectedPostIds
-                                        .contains(rowPosts[i].id),
-                                    onSelectionChanged: (selected) =>
-                                        togglePostSelection(
-                                      context,
-                                      rowPosts[i].id,
-                                      selected ?? false,
-                                    ),
-                                    onTap: () => onPostTap(rowPosts[i]),
-                                  )
-                                : const SizedBox.shrink(),
+                    child: columns == 1
+                        ? SelectablePostCard(
+                            post: rowPosts.first,
+                            metrics: cardMetrics,
+                            isSelected: state.selectedPostIds
+                                .contains(rowPosts.first.id),
+                            onSelectionChanged: (selected) =>
+                                togglePostSelection(
+                              context,
+                              rowPosts.first.id,
+                              selected ?? false,
+                            ),
+                            onTap: () => onPostTap(rowPosts.first),
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (var i = 0; i < columns; i++) ...[
+                                if (i > 0) SizedBox(width: gap),
+                                Expanded(
+                                  child: i < rowPosts.length
+                                      ? RepaintBoundary(
+                                          child: SelectablePostCard(
+                                            post: rowPosts[i],
+                                            metrics: cardMetrics,
+                                            isSelected: state.selectedPostIds
+                                                .contains(rowPosts[i].id),
+                                            onSelectionChanged: (selected) =>
+                                                togglePostSelection(
+                                              context,
+                                              rowPosts[i].id,
+                                              selected ?? false,
+                                            ),
+                                            onTap: () =>
+                                                onPostTap(rowPosts[i]),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                      ],
-                    ),
                   );
                 },
                 childCount: rowCount,

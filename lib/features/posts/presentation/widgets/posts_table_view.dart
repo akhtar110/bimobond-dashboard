@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
+import '../../domain/utils/post_author_display.dart';
 import 'post_list_thumbnail.dart';
 import '../../../../features/post_management/presentation/utils/post_detail_labels.dart';
 import '../bloc/posts_bloc.dart';
+import '../utils/post_date_format.dart';
+import 'post_list_location.dart';
 
 const double kPostsTableHeaderHeight = 36;
 const double kPostsTableRowHeight = 56;
@@ -18,10 +20,7 @@ String postDisplayTitle(ManagedPostEntity post) {
   return post.userName ?? post.userId;
 }
 
-String postDisplayAuthor(ManagedPostEntity post) =>
-    post.userFullName?.trim().isNotEmpty == true
-        ? post.userFullName!
-        : (post.userName ?? post.userId);
+String postDisplayAuthor(ManagedPostEntity post) => postAuthorDisplayName(post);
 
 enum PostsTableDensity { wide, medium, narrow, compact }
 
@@ -36,16 +35,16 @@ double _postsTableCheckboxWidth(PostsTableDensity density) =>
     density == PostsTableDensity.compact ? 28.0 : 34.0;
 
 double _postsTableThumbWidth(PostsTableDensity density) => switch (density) {
-      PostsTableDensity.compact => 32.0,
-      PostsTableDensity.narrow => 42.0,
-      _ => 50.0,
-    };
+  PostsTableDensity.compact => 32.0,
+  PostsTableDensity.narrow => 42.0,
+  _ => 50.0,
+};
 
 double _postsTableCellHPad(PostsTableDensity density) => switch (density) {
-      PostsTableDensity.compact => 4.0,
-      PostsTableDensity.narrow => 6.0,
-      _ => _kCellHPad,
-    };
+  PostsTableDensity.compact => 4.0,
+  PostsTableDensity.narrow => 6.0,
+  _ => _kCellHPad,
+};
 
 double _postsTableRowHPad(PostsTableDensity density) =>
     density == PostsTableDensity.compact ? 6.0 : 10.0;
@@ -68,11 +67,11 @@ class PostsTableHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: scheme.onSurfaceVariant,
-          fontSize: 11,
-          letterSpacing: 0.1,
-        );
+      fontWeight: FontWeight.w700,
+      color: scheme.onSurfaceVariant,
+      fontSize: 11,
+      letterSpacing: 0.1,
+    );
 
     return Container(
       height: kPostsTableHeaderHeight,
@@ -87,8 +86,8 @@ class PostsTableHeader extends StatelessWidget {
           value: allVisibleSelected
               ? true
               : someVisibleSelected
-                  ? null
-                  : false,
+              ? null
+              : false,
           onChanged: (_) =>
               context.read<PostsBloc>().add(SelectAllPostsEvent()),
         ),
@@ -123,6 +122,14 @@ class PostsTableHeader extends StatelessWidget {
             : const SizedBox.shrink(),
         engagement: density != PostsTableDensity.narrow
             ? Text(l10n.t('engagement'), style: style)
+            : const SizedBox.shrink(),
+        location: density != PostsTableDensity.narrow
+            ? Text(
+                l10n.t('location'),
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
             : const SizedBox.shrink(),
         created: Text(
           l10n.t('createdAt'),
@@ -165,13 +172,17 @@ class _PostsTableRowState extends State<PostsTableRow> {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final post = widget.post;
-    final created = DateFormat(
-      widget.density == PostsTableDensity.narrow ? 'MMM d' : 'MMM d, yyyy',
-    ).format(post.createdAt);
-    final cellStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize: 12,
-          height: 1.25,
-        );
+    final locale = Localizations.localeOf(context).languageCode;
+    final created = formatPostCreatedDateTime(
+      post.createdAt,
+      locale: locale,
+      compact:
+          widget.density == PostsTableDensity.narrow ||
+          widget.density == PostsTableDensity.compact,
+    );
+    final cellStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(fontSize: 12, height: 1.25);
 
     Color rowColor;
     if (widget.isSelected) {
@@ -216,38 +227,48 @@ class _PostsTableRowState extends State<PostsTableRow> {
                   overflow: TextOverflow.ellipsis,
                   style: cellStyle?.copyWith(fontWeight: FontWeight.w600),
                 ),
-              author: widget.density == PostsTableDensity.narrow
-                  ? const SizedBox.shrink()
-                  : Text(
-                      postDisplayAuthor(post),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cellStyle,
-                    ),
-              status: PostsStatusChip(status: post.status),
-              visibility: widget.density == PostsTableDensity.wide
-                  ? Text(
-                      privacyLabel(l10n, post.privacyStatus),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cellStyle?.copyWith(color: scheme.onSurfaceVariant),
-                    )
-                  : const SizedBox.shrink(),
-              engagement: widget.density != PostsTableDensity.narrow
-                  ? _EngagementMetrics(
-                      post: post,
-                      compact: widget.density == PostsTableDensity.medium,
-                    )
-                  : const SizedBox.shrink(),
-              created: Text(
-                      created,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cellStyle?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 11,
+                author: widget.density == PostsTableDensity.narrow
+                    ? const SizedBox.shrink()
+                    : Text(
+                        postDisplayAuthor(post),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: cellStyle,
                       ),
-                    ),
+                status: PostsStatusChip(status: post.status),
+                visibility: widget.density == PostsTableDensity.wide
+                    ? Text(
+                        privacyLabel(l10n, post.privacyStatus),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: cellStyle?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+                engagement: widget.density != PostsTableDensity.narrow
+                    ? _EngagementMetrics(
+                        post: post,
+                        compact: widget.density == PostsTableDensity.medium,
+                      )
+                    : const SizedBox.shrink(),
+                location: widget.density != PostsTableDensity.narrow
+                    ? PostListLocationLabel(
+                        post: post,
+                        compact: widget.density == PostsTableDensity.medium,
+                        iconSize: 11,
+                        fontSize: 11,
+                      )
+                    : const SizedBox.shrink(),
+                created: Text(
+                  created,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: cellStyle?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                ),
               ),
             ),
           ),
@@ -267,6 +288,7 @@ class _PostsTableRowLayout extends StatelessWidget {
     required this.status,
     required this.visibility,
     required this.engagement,
+    required this.location,
     required this.created,
   });
 
@@ -278,6 +300,7 @@ class _PostsTableRowLayout extends StatelessWidget {
   final Widget status;
   final Widget visibility;
   final Widget engagement;
+  final Widget location;
   final Widget created;
 
   @override
@@ -285,6 +308,7 @@ class _PostsTableRowLayout extends StatelessWidget {
     final showAuthor = density != PostsTableDensity.narrow;
     final showVisibility = density == PostsTableDensity.wide;
     final showEngagement = density != PostsTableDensity.narrow;
+    final showLocation = density != PostsTableDensity.narrow;
     final showCreated = true;
     final checkboxWidth = _postsTableCheckboxWidth(density);
     final thumbWidth = _postsTableThumbWidth(density);
@@ -301,6 +325,7 @@ class _PostsTableRowLayout extends StatelessWidget {
     const statusFlex = 2;
     final visibilityFlex = 2;
     final engagementFlex = density == PostsTableDensity.medium ? 3 : 4;
+    const locationFlex = 2;
     const createdFlex = 2;
 
     return Row(
@@ -309,12 +334,15 @@ class _PostsTableRowLayout extends StatelessWidget {
         SizedBox(width: checkboxWidth, child: checkbox),
         SizedBox(width: thumbWidth, child: thumbnail),
         Expanded(flex: titleFlex, child: _cell(title, cellHPad)),
-        if (showAuthor) Expanded(flex: authorFlex, child: _cell(author, cellHPad)),
+        if (showAuthor)
+          Expanded(flex: authorFlex, child: _cell(author, cellHPad)),
         Expanded(flex: statusFlex, child: _cell(status, cellHPad)),
         if (showVisibility)
           Expanded(flex: visibilityFlex, child: _cell(visibility, cellHPad)),
         if (showEngagement)
           Expanded(flex: engagementFlex, child: _cell(engagement, cellHPad)),
+        if (showLocation)
+          Expanded(flex: locationFlex, child: _cell(location, cellHPad)),
         if (showCreated)
           Expanded(flex: createdFlex, child: _cell(created, cellHPad)),
       ],
@@ -324,20 +352,13 @@ class _PostsTableRowLayout extends StatelessWidget {
   Widget _cell(Widget child, double horizontalPadding) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: child,
-      ),
+      child: Align(alignment: AlignmentDirectional.centerStart, child: child),
     );
   }
 }
 
 class _Thumb extends StatelessWidget {
-  const _Thumb({
-    required this.post,
-    this.small = false,
-    this.size,
-  });
+  const _Thumb({required this.post, this.small = false, this.size});
 
   final ManagedPostEntity post;
   final bool small;
@@ -458,9 +479,20 @@ class PostsCompactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final created = DateFormat('MMM d').format(post.createdAt);
-    final subtitle =
-        '${postDisplayAuthor(post)} · $created · ${_fmt(post.likeCount)} ♥';
+    final locale = Localizations.localeOf(context).languageCode;
+    final created = formatPostCreatedDateTime(
+      post.createdAt,
+      locale: locale,
+      compact: true,
+    );
+    final location = postListLocationLabel(post);
+    final subtitleParts = <String>[
+      postDisplayAuthor(post),
+      created,
+      if (location != null && location.isNotEmpty) location,
+      '${_fmt(post.likeCount)} ♥',
+    ];
+    final subtitle = subtitleParts.join(' · ');
 
     return Material(
       color: isSelected
@@ -499,18 +531,26 @@ class PostsCompactCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.25,
-                          ),
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
                     ),
                     const SizedBox(height: 3),
+                    if (location != null && location.isNotEmpty) ...[
+                      PostLocationRow(
+                        post: post,
+                        compact: true,
+                        fontSize: 11,
+                      ),
+                      const SizedBox(height: 3),
+                    ],
                     Text(
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     PostsStatusChip(status: post.status, compact: true),

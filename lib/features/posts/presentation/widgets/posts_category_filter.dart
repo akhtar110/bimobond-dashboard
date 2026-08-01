@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -32,7 +32,10 @@ class PostsCategoryFilter extends StatelessWidget {
     Color(0xFF14B8A6),
   ];
 
-  Color _colorForCategory(CategoryEntity cat) {
+  Color _colorForCategory(CategoryEntity cat) =>
+      PostsCategoryFilter.colorForCategory(cat);
+
+  static Color colorForCategory(CategoryEntity cat) {
     final key = cat.slug.isNotEmpty ? cat.slug : cat.name.toLowerCase();
     final idx = key.codeUnits.fold(0, (a, b) => a + b) % _palette.length;
     return _palette[idx];
@@ -56,9 +59,12 @@ class PostsCategoryFilter extends StatelessWidget {
             return prevId != nextId || prev.runtimeType != next.runtimeType;
           },
           builder: (context, postsState) {
-            final selectedId =
-                context.read<PostsBloc>().activeFilters.categoryId;
-            final m = metrics ??
+            final selectedId = context
+                .read<PostsBloc>()
+                .activeFilters
+                .categoryId;
+            final m =
+                metrics ??
                 PostsLayoutMetrics(
                   getPostsDeviceType(MediaQuery.sizeOf(context).width),
                 );
@@ -68,16 +74,17 @@ class PostsCategoryFilter extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: catState.catalogCategories.length + 1,
-                separatorBuilder: (context, idx) => SizedBox(width: m.filterGap + 1),
+                separatorBuilder: (context, idx) =>
+                    SizedBox(width: m.filterGap + 1),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return PostsCategoryChip(
                       label: l10n.t('all'),
                       isSelected: selectedId == null,
                       compact: m.isMobile,
-                      onTap: () => context
-                          .read<PostsBloc>()
-                          .add(FilterPostsByCategoryEvent()),
+                      onTap: () => context.read<PostsBloc>().add(
+                        FilterPostsByCategoryEvent(),
+                      ),
                     );
                   }
                   final cat = catState.catalogCategories[index - 1];
@@ -97,14 +104,14 @@ class PostsCategoryFilter extends StatelessWidget {
                         );
                       }
                       context.read<PostsBloc>().add(
-                            FilterPostsByCategoryEvent(
-                              categoryId: cat.id,
-                              categoryName: cat.name,
-                              categorySlug: cat.slug.isNotEmpty
-                                  ? cat.slug
-                                  : cat.name.toLowerCase(),
-                            ),
-                          );
+                        FilterPostsByCategoryEvent(
+                          categoryId: cat.id,
+                          categoryName: cat.name,
+                          categorySlug: cat.slug.isNotEmpty
+                              ? cat.slug
+                              : cat.name.toLowerCase(),
+                        ),
+                      );
                     },
                   );
                 },
@@ -150,12 +157,10 @@ class PostsCategoryChipState extends State<PostsCategoryChip> {
     final bg = selected
         ? color
         : _hovered
-            ? scheme.surfaceContainerHigh
-            : scheme.surface;
+        ? scheme.surfaceContainerHigh
+        : scheme.surface;
 
-    final fg = selected
-        ? Colors.white
-        : scheme.onSurface;
+    final fg = selected ? Colors.white : scheme.onSurface;
 
     final borderColor = selected ? color : scheme.outlineVariant;
 
@@ -193,14 +198,14 @@ class PostsCategoryChipState extends State<PostsCategoryChip> {
                       ),
                     ]
                   : _hovered
-                      ? [
-                          BoxShadow(
-                            color: scheme.shadow.withValues(alpha: 0.06),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
+                  ? [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             child: Center(
               child: Row(
@@ -210,7 +215,9 @@ class PostsCategoryChipState extends State<PostsCategoryChip> {
                     CategoryIcon(
                       category: widget.category,
                       size: iconSize,
-                      borderRadius: BorderRadius.circular(widget.compact ? 4 : 5),
+                      borderRadius: BorderRadius.circular(
+                        widget.compact ? 4 : 5,
+                      ),
                       backgroundColor: selected
                           ? Colors.white.withValues(alpha: 0.2)
                           : scheme.surfaceContainerHighest,
@@ -234,6 +241,63 @@ class PostsCategoryChipState extends State<PostsCategoryChip> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Category chips for the posts filter panel (draft selection before Apply).
+class PostsFilterCategorySection extends StatelessWidget {
+  const PostsFilterCategorySection({
+    super.key,
+    required this.selectedCategoryId,
+    required this.onCategorySelected,
+  });
+
+  final String? selectedCategoryId;
+  final void Function({
+    String? categoryId,
+    String? categoryName,
+    String? categorySlug,
+  }) onCategorySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    return BlocBuilder<CategoriesBloc, CategoriesState>(
+      builder: (context, catState) {
+        if (catState is! CategoriesLoaded ||
+            catState.catalogCategories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            PostsCategoryChip(
+              label: l10n.t('all'),
+              isSelected: selectedCategoryId == null,
+              compact: true,
+              onTap: () => onCategorySelected(),
+            ),
+            for (final cat in catState.catalogCategories)
+              PostsCategoryChip(
+                label: cat.name,
+                category: cat,
+                isSelected: cat.id.isNotEmpty && selectedCategoryId == cat.id,
+                accentColor: PostsCategoryFilter.colorForCategory(cat),
+                compact: true,
+                onTap: () => onCategorySelected(
+                  categoryId: cat.id,
+                  categoryName: cat.name,
+                  categorySlug:
+                      cat.slug.isNotEmpty ? cat.slug : cat.name.toLowerCase(),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

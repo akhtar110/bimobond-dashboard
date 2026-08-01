@@ -16,6 +16,10 @@ class PostsEmptyView extends StatelessWidget {
     final scheme = theme.colorScheme;
     final hasFilters =
         context.read<PostsBloc>().activeFilters.hasAnyFilters;
+    final userName = context.read<PostsBloc>().activeFilters.userName;
+    final emptyHint = userName != null && userName.isNotEmpty
+        ? context.tr('noPostsForUser', {'name': userName})
+        : l10n.t('tryDifferentCategory');
 
     return Center(
       child: Padding(
@@ -46,7 +50,7 @@ class PostsEmptyView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.t('tryDifferentCategory'),
+              emptyHint,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: scheme.onSurfaceVariant,
@@ -130,14 +134,17 @@ class PostsErrorView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  height: 1.5,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 72),
+                child: SingleChildScrollView(
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 22),

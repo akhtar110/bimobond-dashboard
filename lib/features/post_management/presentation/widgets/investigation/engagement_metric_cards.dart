@@ -12,11 +12,12 @@ class EngagementMetricCards extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cols = constraints.maxWidth >= 520
+        final cols = constraints.maxWidth >= 640
             ? 3
-            : constraints.maxWidth >= 320
+            : constraints.maxWidth >= 360
                 ? 2
                 : 1;
+        final aspectRatio = cols >= 3 ? 2.6 : 2.35;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -25,7 +26,7 @@ class EngagementMetricCards extends StatelessWidget {
             crossAxisCount: cols,
             mainAxisSpacing: InvestigationTheme.s8,
             crossAxisSpacing: InvestigationTheme.s8,
-            childAspectRatio: 2.2,
+            childAspectRatio: aspectRatio,
           ),
           itemBuilder: (context, i) {
             final m = metrics[i];
@@ -71,7 +72,7 @@ class _MetricCardState extends State<_MetricCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: InvestigationTheme.animMs),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: _hovered
               ? widget.accent.withValues(alpha: 0.08)
@@ -109,7 +110,7 @@ class _MetricCardState extends State<_MetricCard> {
             Text(
               widget.value,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: scheme.onSurface,
                 letterSpacing: -0.3,

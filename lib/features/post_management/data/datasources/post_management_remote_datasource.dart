@@ -1,11 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../domain/entities/comment_entity.dart';import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/entities/comment_entity.dart';
+import '../../domain/entities/managed_post_entity.dart';
+import '../../domain/entities/managed_post_location_entity.dart';
 import '../../domain/entities/post_engagement_user_item.dart';
 import '../models/comment_model.dart';
 import '../models/managed_post_model.dart';
 import '../models/post_engagement_user_model.dart';
+import 'managed_post_location_remote_data_source.dart';
 
 abstract class PostManagementRemoteDataSource {
   Future<ManagedPostModel> getManagedPostById(String postId);
@@ -44,29 +47,34 @@ abstract class PostManagementRemoteDataSource {
 
 class PostManagementRemoteDataSourceImpl
     implements PostManagementRemoteDataSource {
-  PostManagementRemoteDataSourceImpl(this._dio);
+  PostManagementRemoteDataSourceImpl(this._dio, this._locationDataSource);
 
   final Dio _dio;
+  final ManagedPostLocationRemoteDataSource _locationDataSource;
 
   @override
   Future<ManagedPostModel> getManagedPostById(String postId) async {
     DioException? lastError;
-    const paths = ['/posts/admin/', '/posts/'];
+    final paths = [
+      '/posts/admin/$postId',
+      '/posts/$postId',
+    ];
 
-    for (final prefix in paths) {
+    for (final path in paths) {
       try {
-        // detail=1 asks feed-style endpoints to embed soundSegment.sound.
         final response = await _dio.get(
-          '$prefix$postId',
+          path,
           queryParameters: const {'detail': 1},
         );
         if (kDebugMode) {
-          debugPrint('[GetPost] API response ($prefix$postId): ${response.data}');
+          debugPrint('[GetPost] API response ($path): ${response.data}');
         }
-        final model = _parsePostResponse(response.data);
+        var model = _parsePostResponse(response.data);
+        model = await _hydratePostLocation(model);
         if (kDebugMode) {
           debugPrint(
-            '[GetPost] Parsed Model: id=${model.id}, soundId=${model.soundId}, sound=${model.sound}, audioUrl=${model.sound?.audioUrl}',
+            '[GetPost] Parsed id=${model.id} locationId=${model.locationId} '
+            'location=${model.location?.displayLabel}',
           );
         }
         return model;
@@ -79,6 +87,17 @@ class PostManagementRemoteDataSourceImpl
     }
 
     throw lastError ?? Exception('Post not found: $postId');
+  }
+
+  Future<ManagedPostModel> _hydratePostLocation(ManagedPostModel model) async {
+    if (model.location?.hasDisplayData == true) return model;
+    final locationId = model.locationId?.trim();
+    if (locationId == null || locationId.isEmpty) return model;
+
+    final fetched = await _locationDataSource.fetchById(locationId);
+    if (fetched == null) return model;
+
+    return ManagedPostModel.fromEntity(model.copyWith(location: fetched));
   }
 
   @override
