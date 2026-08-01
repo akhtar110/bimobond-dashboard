@@ -1,7 +1,7 @@
 import '../../domain/entities/message_permission.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_entity.dart';
-
+import '../../domain/entities/user_follow_entity.dart';
 sealed class UserDetailEvent {}
 
 class LoadUserDetailEvent extends UserDetailEvent {
@@ -12,12 +12,25 @@ class LoadUserDetailEvent extends UserDetailEvent {
 
 class ClearUserDetailActionFeedbackEvent extends UserDetailEvent {}
 
+/// Optimistically adjust follower/following counts after admin edge removal.
+class AdjustUserFollowCountsEvent extends UserDetailEvent {
+  AdjustUserFollowCountsEvent({required this.kind});
+
+  final UserFollowListKind kind;
+}
 /// Admin updates a user's privacy / messaging settings
-/// (`PATCH /users/:userId/admin/settings`).
+/// (`PATCH /users/admin/:id`).
 class UpdateUserPrivacySettingsEvent extends UserDetailEvent {
-  UpdateUserPrivacySettingsEvent({this.isPrivate, this.messagePermission});
+  UpdateUserPrivacySettingsEvent({
+    this.isPrivate,
+    this.allowComments,
+    this.allowDirectMsgs,
+    this.messagePermission,
+  });
 
   final bool? isPrivate;
+  final bool? allowComments;
+  final bool? allowDirectMsgs;
   final MessagePermission? messagePermission;
 }
 

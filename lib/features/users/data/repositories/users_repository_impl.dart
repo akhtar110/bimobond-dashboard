@@ -241,4 +241,15 @@ class UsersRepositoryImpl implements UsersRepository {
       limit: limit,
     );
   }
+
+  @override
+  Future<ForceRemoveFollowResultEntity> forceRemoveFollower({
+    required String userId,
+    required String followerId,
+  }) {
+    return remoteDataSource.forceRemoveFollower(
+      userId: userId,
+      followerId: followerId,
+    );
+  }
 }

@@ -4,14 +4,15 @@ import '../../../../core/utils/api_error_messages.dart';
 import '../../data/models/user_model.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_detail_entity.dart';
+import '../../domain/entities/user_entity_follow_counts.dart';
+import '../../domain/entities/user_follow_entity.dart';
 import '../../domain/usecases/ban_user.dart';
 import '../../domain/usecases/delete_user.dart';
 import '../../domain/usecases/demote_user.dart';
 import '../../domain/usecases/get_user_by_id.dart';
 import '../../domain/usecases/get_user_posts.dart';
 import '../../domain/usecases/promote_to_admin.dart';
-import '../../domain/usecases/set_user_is_private.dart';
-import '../../domain/usecases/set_user_message_permission.dart';
+import '../../domain/usecases/update_user_privacy_settings.dart';
 import '../../domain/usecases/unban_user.dart';
 import 'user_detail_event.dart';
 import 'user_detail_state.dart';
@@ -25,8 +26,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     required PromoteUser promoteUser,
     required DemoteUser demoteUser,
     required DeleteUser deleteUser,
-    required SetUserIsPrivate setUserIsPrivate,
-    required SetUserMessagePermission setUserMessagePermission,
+    required UpdateUserPrivacySettings updateUserPrivacySettings,
   })  : _getUserById = getUserById,
         _getUserPosts = getUserPosts,
         _banUser = banUser,
@@ -34,13 +34,13 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
         _promoteUser = promoteUser,
         _demoteUser = demoteUser,
         _deleteUser = deleteUser,
-        _setUserIsPrivate = setUserIsPrivate,
-        _setUserMessagePermission = setUserMessagePermission,
+        _updateUserPrivacySettings = updateUserPrivacySettings,
         super(UserDetailInitial()) {
     on<LoadUserDetailEvent>(_onLoad);
     on<UserDetailAdminActionEvent>(_onAdminAction);
     on<UpdateUserPrivacySettingsEvent>(_onUpdatePrivacySettings);
     on<ClearUserDetailActionFeedbackEvent>(_onClearFeedback);
+    on<AdjustUserFollowCountsEvent>(_onAdjustFollowCounts);
   }
 
   final GetUserById _getUserById;
@@ -50,8 +50,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
   final PromoteUser _promoteUser;
   final DemoteUser _demoteUser;
   final DeleteUser _deleteUser;
-  final SetUserIsPrivate _setUserIsPrivate;
-  final SetUserMessagePermission _setUserMessagePermission;
+  final UpdateUserPrivacySettings _updateUserPrivacySettings;
 
   Future<void> _onLoad(
     LoadUserDetailEvent event,
@@ -130,15 +129,13 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     emit(current.copyWith(isSavingPrivacy: true, clearActionFeedback: true));
 
     try {
-      if (event.isPrivate != null) {
-        await _setUserIsPrivate(userId, isPrivate: event.isPrivate!);
-      }
-      if (event.messagePermission != null) {
-        await _setUserMessagePermission(
-          userId,
-          permission: event.messagePermission!,
-        );
-      }
+      await _updateUserPrivacySettings(
+        userId,
+        isPrivate: event.isPrivate,
+        allowComments: event.allowComments,
+        allowDirectMsgs: event.allowDirectMsgs,
+        messagePermission: event.messagePermission,
+      );
 
       final userDetail = await _fetchUserDetail(userId);
       emit(
@@ -157,6 +154,28 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
         ),
       );
     }
+  }
+
+  void _onAdjustFollowCounts(
+    AdjustUserFollowCountsEvent event,
+    Emitter<UserDetailState> emit,
+  ) {
+    final current = state;
+    if (current is! UserDetailLoaded) return;
+
+    final user = current.userDetail.user;
+    final updatedUser = switch (event.kind) {
+      UserFollowListKind.followers =>
+        user.withFollowCountDeltas(followerDelta: -1),
+      UserFollowListKind.following =>
+        user.withFollowCountDeltas(followingDelta: -1),
+    };
+
+    emit(
+      current.copyWith(
+        userDetail: current.userDetail.copyWith(user: updatedUser),
+      ),
+    );
   }
 
   void _onClearFeedback(

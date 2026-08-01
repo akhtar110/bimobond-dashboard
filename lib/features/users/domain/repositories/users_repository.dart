@@ -83,4 +83,8 @@ abstract class UsersRepository {
     int page = 1,
     int limit = 20,
   });
+  Future<ForceRemoveFollowResultEntity> forceRemoveFollower({
+    required String userId,
+    required String followerId,
+  });
 }

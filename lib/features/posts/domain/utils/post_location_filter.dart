@@ -1,58 +1,30 @@
-import 'dart:math' as math;
-
+import '../../../post_management/data/utils/managed_post_location_hydration.dart';
 import '../../../post_management/domain/entities/managed_post_entity.dart';
 import '../entities/post_filters.dart';
 
-const _earthRadiusKm = 6371.0;
+String _normalizePlaceLabel(String value) =>
+    value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
-/// Reads coordinates from the same resolved [ManagedPostEntity.location] used on cards.
-({double latitude, double longitude})? managedPostFilterCoordinates(
-  ManagedPostEntity post,
-) {
-  final loc = post.location;
-  final lat = loc?.latitude;
-  final lng = loc?.longitude;
-  if (lat == null || lng == null) return null;
-  return (latitude: lat, longitude: lng);
+/// Whether two location labels refer to the same place for filtering.
+///
+/// Matches the displayed place name exactly (case-insensitive), e.g.
+/// "Jeddah, Saudi Arabia" — no radius or city-only fallback.
+bool locationDisplayLabelsMatch(String filter, String postLabel) {
+  final query = _normalizePlaceLabel(filter);
+  final label = _normalizePlaceLabel(postLabel);
+  if (query.isEmpty || label.isEmpty) return false;
+  return query == label;
 }
 
-double haversineDistanceKm(
-  double lat1,
-  double lng1,
-  double lat2,
-  double lng2,
-) {
-  final dLat = _toRadians(lat2 - lat1);
-  final dLng = _toRadians(lng2 - lng1);
-  final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-      math.cos(_toRadians(lat1)) *
-          math.cos(_toRadians(lat2)) *
-          math.sin(dLng / 2) *
-          math.sin(dLng / 2);
-  final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-  return _earthRadiusKm * c;
-}
-
-double _toRadians(double degrees) => degrees * math.pi / 180;
-
-/// Whether [post] is within the active geographic radius filter.
+/// Whether [post] matches the active place-name location filter.
 bool postMatchesLocationFilter(ManagedPostEntity post, PostFilters filters) {
   if (!filters.hasLocationFilter) return true;
 
-  final anchorLat = filters.locationLatitude;
-  final anchorLng = filters.locationLongitude;
-  if (anchorLat == null || anchorLng == null) return true;
+  final query = filters.locationCity?.trim();
+  if (query == null || query.isEmpty) return true;
 
-  final coords = managedPostFilterCoordinates(post);
-  if (coords == null) return false;
+  final label = managedPostListLocationLabel(post)?.trim();
+  if (label == null || label.isEmpty) return false;
 
-  final radiusKm =
-      filters.locationRadiusKm ?? PostFilters.defaultLocationRadiusKm;
-  final distance = haversineDistanceKm(
-    anchorLat,
-    anchorLng,
-    coords.latitude,
-    coords.longitude,
-  );
-  return distance <= radiusKm;
+  return locationDisplayLabelsMatch(query, label);
 }

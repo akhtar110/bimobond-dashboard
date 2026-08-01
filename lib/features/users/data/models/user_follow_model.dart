@@ -62,3 +62,19 @@ class UserFollowListPageModel extends UserFollowListPageEntity {
     return null;
   }
 }
+
+class ForceRemoveFollowResultModel extends ForceRemoveFollowResultEntity {
+  const ForceRemoveFollowResultModel({
+    required super.removed,
+    required super.followerId,
+    required super.followingId,
+  });
+
+  factory ForceRemoveFollowResultModel.fromJson(Map<String, dynamic> json) {
+    return ForceRemoveFollowResultModel(
+      removed: json['removed'] as bool? ?? false,
+      followerId: json['followerId'] as String,
+      followingId: json['followingId'] as String,
+    );
+  }
+}

@@ -88,6 +88,10 @@ abstract class UsersRemoteDataSource {
     int page = 1,
     int limit = 20,
   });
+  Future<ForceRemoveFollowResultModel> forceRemoveFollower({
+    required String userId,
+    required String followerId,
+  });
 }
 
 class UsersPageModel {
@@ -649,6 +653,19 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     return UserFollowListPageModel.fromJson(
       response.data as Map<String, dynamic>,
       kind,
+    );
+  }
+
+  @override
+  Future<ForceRemoveFollowResultModel> forceRemoveFollower({
+    required String userId,
+    required String followerId,
+  }) async {
+    final response = await _dio.delete(
+      '/users/admin/$userId/followers/$followerId',
+    );
+    return ForceRemoveFollowResultModel.fromJson(
+      response.data as Map<String, dynamic>,
     );
   }
 }

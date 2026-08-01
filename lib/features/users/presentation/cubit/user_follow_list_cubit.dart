@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/api_error_messages.dart';
 import '../../domain/entities/user_follow_entity.dart';
 import '../../domain/usecases/get_user_follow_list.dart';
+import '../../domain/usecases/force_remove_follower.dart';
 
 sealed class UserFollowListState {}
 
@@ -17,6 +18,7 @@ class UserFollowListLoaded extends UserFollowListState {
     required this.page,
     required this.lastPage,
     this.isLoadingMore = false,
+    this.removingFollowerId,
     this.error,
   });
 
@@ -25,6 +27,7 @@ class UserFollowListLoaded extends UserFollowListState {
   final int page;
   final int lastPage;
   final bool isLoadingMore;
+  final String? removingFollowerId;
   final String? error;
 
   bool get hasMore => page < lastPage;
@@ -35,8 +38,10 @@ class UserFollowListLoaded extends UserFollowListState {
     int? page,
     int? lastPage,
     bool? isLoadingMore,
+    String? removingFollowerId,
     String? error,
     bool clearError = false,
+    bool clearRemovingFollowerId = false,
   }) {
     return UserFollowListLoaded(
       users: users ?? this.users,
@@ -44,6 +49,9 @@ class UserFollowListLoaded extends UserFollowListState {
       page: page ?? this.page,
       lastPage: lastPage ?? this.lastPage,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      removingFollowerId: clearRemovingFollowerId
+          ? null
+          : (removingFollowerId ?? this.removingFollowerId),
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -59,11 +67,13 @@ class UserFollowListError extends UserFollowListState {
 class UserFollowListCubit extends Cubit<UserFollowListState> {
   UserFollowListCubit({
     required this.getUserFollowList,
+    this.forceRemoveFollower,
     required this.userId,
     required this.kind,
   }) : super(UserFollowListInitial());
 
   final GetUserFollowList getUserFollowList;
+  final ForceRemoveFollower? forceRemoveFollower;
   final String userId;
   final UserFollowListKind kind;
 
@@ -139,6 +149,65 @@ class UserFollowListCubit extends Cubit<UserFollowListState> {
         isLoadingMore: false,
         error: ApiErrorMessages.from(e),
       ));
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<bool> removeFollowEdge(String otherUserId) async {
+    final remove = forceRemoveFollower;
+    if (remove == null) return false;
+
+    final current = state;
+    if (current is! UserFollowListLoaded ||
+        current.removingFollowerId != null ||
+        _busy) {
+      return false;
+    }
+
+    final params = kind == UserFollowListKind.followers
+        ? ForceRemoveFollowerParams(
+            userId: userId,
+            followerId: otherUserId,
+          )
+        : ForceRemoveFollowerParams(
+            userId: otherUserId,
+            followerId: userId,
+          );
+
+    _busy = true;
+    emit(current.copyWith(removingFollowerId: otherUserId, clearError: true));
+    try {
+      final result = await remove(params);
+      if (!result.removed) {
+        emit(
+          current.copyWith(
+            clearRemovingFollowerId: true,
+            error: 'Follow relationship not found',
+          ),
+        );
+        return false;
+      }
+
+      final updatedUsers =
+          current.users.where((user) => user.id != otherUserId).toList();
+      emit(
+        current.copyWith(
+          users: updatedUsers,
+          total: current.total > 0 ? current.total - 1 : 0,
+          clearRemovingFollowerId: true,
+          clearError: true,
+        ),
+      );
+      return true;
+    } catch (e) {
+      emit(
+        current.copyWith(
+          clearRemovingFollowerId: true,
+          error: ApiErrorMessages.from(e),
+        ),
+      );
+      return false;
     } finally {
       _busy = false;
     }

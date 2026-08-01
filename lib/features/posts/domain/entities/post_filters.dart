@@ -90,7 +90,8 @@ class PostFilters {
   bool get hasLocationAnchor =>
       locationLatitude != null && locationLongitude != null;
 
-  bool get hasLocationFilter => hasLocationAnchor;
+  bool get hasLocationFilter =>
+      locationCity != null && locationCity!.trim().isNotEmpty;
 
   /// @deprecated Use [hasLocationFilter].
   bool get hasLocationProximityFilter => hasLocationFilter;

@@ -61,21 +61,46 @@ String postsLocationPickerTitle(AppLocalizations l10n) =>
     l10n.tOr('postFilterLocationSearch', _kLocationPickerTitle);
 
 CreatePostLocationEntity? postsLocationFromFilters(PostFilters filters) {
-  if (!filters.hasLocationAnchor) return null;
+  final city = filters.locationCity?.trim();
+  if (city == null || city.isEmpty) return null;
+
+  if (filters.hasLocationAnchor) {
+    return CreatePostLocationEntity(
+      name: city,
+      latitude: filters.locationLatitude!,
+      longitude: filters.locationLongitude!,
+      city: city,
+    );
+  }
+
   return CreatePostLocationEntity(
-    name: filters.locationCity ?? '',
-    latitude: filters.locationLatitude!,
-    longitude: filters.locationLongitude!,
-    city: filters.locationCity,
+    name: city,
+    city: city,
+    latitude: 0,
+    longitude: 0,
   );
+}
+
+String locationFilterLabelFromPlace(CreatePostLocationEntity place) {
+  final name = place.name.trim();
+  if (name.contains(',')) return name;
+  final city = place.city?.trim();
+  final country = place.countryCode?.trim();
+  if (city != null &&
+      city.isNotEmpty &&
+      country != null &&
+      country.isNotEmpty) {
+    return '$city, $country';
+  }
+  if (city != null && city.isNotEmpty) return city;
+  return name;
 }
 
 /// Responsive location search dialog — matches [showPostsDateRangePickerDialog].
 Future<void> showPostsLocationPickerDialog({
   required BuildContext context,
   required CreatePostLocationEntity? place,
-  required double radiusKm,
-  required void Function(CreatePostLocationEntity? place, double radiusKm) onApply,
+  required void Function(CreatePostLocationEntity? place) onApply,
 }) {
   final width = MediaQuery.sizeOf(context).width;
 
@@ -93,7 +118,6 @@ Future<void> showPostsLocationPickerDialog({
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: _PostsLocationPickerSheet(
               place: place,
-              radiusKm: radiusKm,
               onApply: onApply,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               showDragHandle: true,
@@ -125,7 +149,6 @@ Future<void> showPostsLocationPickerDialog({
           ),
           child: _PostsLocationPickerSheet(
             place: place,
-            radiusKm: radiusKm,
             onApply: onApply,
             borderRadius: BorderRadius.circular(14),
           ),
@@ -142,37 +165,28 @@ Future<void> showPostsLocationFilterDialog({
 }) {
   final postsBloc = context.read<PostsBloc>();
   final draftPlace = postsLocationFromFilters(filters);
-  final draftRadius =
-      filters.locationRadiusKm ?? PostFilters.defaultLocationRadiusKm;
 
   return showPostsLocationPickerDialog(
     context: context,
     place: draftPlace,
-    radiusKm: draftRadius,
-    onApply: (place, radiusKm) {
-      if (place == null || !place.isComplete) {
+    onApply: (place) {
+      if (place == null) {
         postsBloc.add(
           UpdatePostFiltersEvent(postsFiltersClearLocation(filters)),
         );
         return;
       }
 
-      final l10n = context.l10n;
-      final label = place.city?.trim().isNotEmpty == true
-          ? place.city!.trim()
-          : (place.name.trim().isNotEmpty
-              ? place.name.trim()
-              : l10n.t('postFilterMyLocationAnchor'));
+      final label = locationFilterLabelFromPlace(place);
+      if (label.isEmpty) {
+        postsBloc.add(
+          UpdatePostFiltersEvent(postsFiltersClearLocation(filters)),
+        );
+        return;
+      }
 
       postsBloc.add(
-        UpdatePostFiltersEvent(
-          filters.copyWith(
-            locationCity: label,
-            locationLatitude: place.latitude,
-            locationLongitude: place.longitude,
-            locationRadiusKm: radiusKm,
-          ),
-        ),
+        UpdatePostFiltersEvent(postsFiltersWithPlaceName(filters, label)),
       );
     },
   );
@@ -181,15 +195,13 @@ Future<void> showPostsLocationFilterDialog({
 class _PostsLocationPickerSheet extends StatefulWidget {
   const _PostsLocationPickerSheet({
     required this.place,
-    required this.radiusKm,
     required this.onApply,
     required this.borderRadius,
     this.showDragHandle = false,
   });
 
   final CreatePostLocationEntity? place;
-  final double radiusKm;
-  final void Function(CreatePostLocationEntity? place, double radiusKm) onApply;
+  final void Function(CreatePostLocationEntity? place) onApply;
   final BorderRadius borderRadius;
   final bool showDragHandle;
 
@@ -200,17 +212,15 @@ class _PostsLocationPickerSheet extends StatefulWidget {
 
 class _PostsLocationPickerSheetState extends State<_PostsLocationPickerSheet> {
   CreatePostLocationEntity? _draftPlace;
-  late double _draftRadius;
 
   @override
   void initState() {
     super.initState();
     _draftPlace = widget.place;
-    _draftRadius = widget.radiusKm;
   }
 
   void _apply() {
-    widget.onApply(_draftPlace, _draftRadius);
+    widget.onApply(_draftPlace);
     Navigator.of(context).pop();
   }
 

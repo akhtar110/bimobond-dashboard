@@ -46,6 +46,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     on<ChatsTypeFilterChanged>(_onChatsTypeFilterChanged);
     on<ChatsParticipantFilterChanged>(_onChatsParticipantFilterChanged);
     on<ChatsFiltersReset>(_onChatsFiltersReset);
+    on<ChatsDateSortChanged>(_onChatsDateSortChanged);
     on<MessagesSearchChanged>(_onMessagesSearchChanged);
     on<MessagesRefreshed>(_onMessagesRefreshed);
     on<MessagesTypeFilterChanged>(_onMessagesTypeFilterChanged);
@@ -82,6 +83,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
 
   ChatListQuery _listQuery = const ChatListQuery();
   UserEntity? _filterUser;
+  ChatDateSort _dateSort = ChatDateSort.newest;
   ChatMessagesQuery _messagesQuery = const ChatMessagesQuery();
   List<ChatEntity> _chats = [];
   PaginationMeta? _chatsMeta;
@@ -133,6 +135,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     // Reset all per-session state.
     _filterUser = null;
     _listQuery = const ChatListQuery();
+    _dateSort = ChatDateSort.newest;
     _selectedChatIds = {};
     _selectedMessageIds = {};
     _chats = [];
@@ -299,13 +302,28 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     }
   }
 
+  void _sortChatsInPlace() {
+    _chats.sort((a, b) {
+      final cmp = a.updatedAt.compareTo(b.updatedAt);
+      return _dateSort == ChatDateSort.newest ? -cmp : cmp;
+    });
+  }
+
+  /// Messaging-app order: oldest → newest.
+  void _sortMessagesInPlace() {
+    _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
   void _emitLoaded(Emitter<ChatManagementState> emit) {
     if (emit.isDone) return;
+    _sortChatsInPlace();
+    _sortMessagesInPlace();
     emit(ChatManagementLoaded(
       chats: List.unmodifiable(_chats),
       chatsMeta: _chatsMeta,
       listQuery: _listQuery,
       filterUser: _filterUser,
+      dateSort: _dateSort,
       selectedChat: _selectedChat,
       messages: List.unmodifiable(_messages),
       messagesMeta: _messagesMeta,
@@ -538,7 +556,10 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     for (final chat in [...group.chats, ...direct.chats]) {
       if (seen.add(chat.id)) merged.add(chat);
     }
-    merged.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    merged.sort((a, b) {
+      final cmp = a.updatedAt.compareTo(b.updatedAt);
+      return _dateSort == ChatDateSort.newest ? -cmp : cmp;
+    });
 
     final total = group.meta.total + direct.meta.total;
     final totalPages = group.meta.totalPages > direct.meta.totalPages
@@ -620,10 +641,20 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
     _chatSearchDebounce?.cancel();
     _filterUser = null;
     _listQuery = const ChatListQuery();
+    _dateSort = ChatDateSort.newest;
     _selectedChatIds.clear();
     _listFilterRevision++;
     _emitLoaded(emit);
     await _reloadChats(emit);
+  }
+
+  Future<void> _onChatsDateSortChanged(
+    ChatsDateSortChanged event,
+    Emitter<ChatManagementState> emit,
+  ) async {
+    if (_dateSort == event.sort) return;
+    _dateSort = event.sort;
+    _emitLoaded(emit);
   }
 
   Future<void> _onMessagesSearchChanged(
@@ -939,7 +970,7 @@ class ChatManagementBloc extends Bloc<ChatManagementEvent, ChatManagementState> 
         if (message == null) return;
         if (_selectedChat?.id == message.chatId) {
           if (!_messages.any((m) => m.id == message.id)) {
-            _messages = [message, ..._messages];
+            _messages = [..._messages, message];
           }
         }
         final chatIdx = _chats.indexWhere((c) => c.id == message.chatId);

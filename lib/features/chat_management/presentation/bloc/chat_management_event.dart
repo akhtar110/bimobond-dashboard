@@ -79,6 +79,14 @@ class ChatsFiltersReset extends ChatManagementEvent {
   const ChatsFiltersReset();
 }
 
+class ChatsDateSortChanged extends ChatManagementEvent {
+  const ChatsDateSortChanged(this.sort);
+  final ChatDateSort sort;
+
+  @override
+  List<Object?> get props => [sort];
+}
+
 class MessagesSearchChanged extends ChatManagementEvent {
   const MessagesSearchChanged(this.query);
   final String query;

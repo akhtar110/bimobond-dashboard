@@ -72,7 +72,8 @@ class PostsFilterDraftState extends Equatable {
   bool get hasLocationAnchor =>
       locationLatitude != null && locationLongitude != null;
 
-  bool get hasLocationFilter => hasLocationAnchor;
+  bool get hasLocationFilter =>
+      locationCity != null && locationCity!.trim().isNotEmpty;
 
   int get activeCount {
     var count = 0;
@@ -87,7 +88,7 @@ class PostsFilterDraftState extends Equatable {
       count++;
     }
     if (categoryId != null) count++;
-    if (hasLocationAnchor) count++;
+    if (hasLocationFilter) count++;
     return count;
   }
 
@@ -114,6 +115,7 @@ class PostsFilterDraftState extends Equatable {
     bool clearTimeRange = false,
     bool clearCategory = false,
     bool clearLocation = false,
+    bool clearAnchor = false,
   }) {
     return PostsFilterDraftState(
       postType: postType ?? this.postType,
@@ -132,10 +134,10 @@ class PostsFilterDraftState extends Equatable {
       categoryName: clearCategory ? null : (categoryName ?? this.categoryName),
       categorySlug: clearCategory ? null : (categorySlug ?? this.categorySlug),
       locationCity: clearLocation ? null : (locationCity ?? this.locationCity),
-      locationLatitude: clearLocation
+      locationLatitude: clearLocation || clearAnchor
           ? null
           : (locationLatitude ?? this.locationLatitude),
-      locationLongitude: clearLocation
+      locationLongitude: clearLocation || clearAnchor
           ? null
           : (locationLongitude ?? this.locationLongitude),
       locationRadiusKm: clearLocation
@@ -190,8 +192,8 @@ class PostsFilterDraftCubit extends Cubit<PostsFilterDraftState> {
     String? city,
     double? latitude,
     double? longitude,
-    double? radiusKm,
     bool clear = false,
+    bool clearAnchor = false,
   }) {
     if (clear) {
       emit(state.copyWith(clearLocation: true));
@@ -203,14 +205,9 @@ class PostsFilterDraftCubit extends Cubit<PostsFilterDraftState> {
         locationCity: city,
         locationLatitude: latitude,
         locationLongitude: longitude,
-        locationRadiusKm: radiusKm,
+        clearAnchor: clearAnchor,
       ),
     );
-  }
-
-  void setLocationRadius(double radiusKm) {
-    if (state.locationRadiusKm == radiusKm) return;
-    emit(state.copyWith(locationRadiusKm: radiusKm));
   }
 
   void setUser(UserEntity? user) {
@@ -332,7 +329,6 @@ class PostsFilterDraftCubit extends Cubit<PostsFilterDraftState> {
       locationCity: state.locationCity,
       locationLatitude: state.locationLatitude,
       locationLongitude: state.locationLongitude,
-      locationRadiusKm: state.locationRadiusKm,
     );
   }
 }

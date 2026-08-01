@@ -68,9 +68,7 @@ class ChatImageMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final screenW = MediaQuery.sizeOf(context).width;
-    final maxW = bubbleStyle
-        ? math.min(_maxWidth, screenW * 0.72)
-        : _maxWidth;
+    final maxW = bubbleStyle ? math.min(_maxWidth, screenW * 0.72) : _maxWidth;
     final maxH = bubbleStyle ? 240.0 : _maxHeight;
 
     final image = ConstrainedBox(
@@ -112,10 +110,7 @@ class ChatImageMessage extends StatelessWidget {
       color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _openLightbox(context),
-        child: image,
-      ),
+      child: InkWell(onTap: () => _openLightbox(context), child: image),
     );
   }
 }
@@ -160,15 +155,18 @@ class _ChatVideoMessageState extends State<ChatVideoMessage> {
       Uri.parse(widget.videoUrl),
     );
     _controller = controller;
-    controller.initialize().then((_) {
-      if (!mounted || _controller != controller) return;
-      controller.setLooping(false);
-      controller.addListener(_onTick);
-      setState(() => _initialized = true);
-    }).catchError((_) {
-      if (!mounted || _controller != controller) return;
-      setState(() => _hasError = true);
-    });
+    controller
+        .initialize()
+        .then((_) {
+          if (!mounted || _controller != controller) return;
+          controller.setLooping(false);
+          controller.addListener(_onTick);
+          setState(() => _initialized = true);
+        })
+        .catchError((_) {
+          if (!mounted || _controller != controller) return;
+          setState(() => _hasError = true);
+        });
   }
 
   void _onTick() {
@@ -204,7 +202,9 @@ class _ChatVideoMessageState extends State<ChatVideoMessage> {
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) return;
     final duration = controller.value.duration;
-    controller.seekTo(Duration(milliseconds: (value * duration.inMilliseconds).round()));
+    controller.seekTo(
+      Duration(milliseconds: (value * duration.inMilliseconds).round()),
+    );
   }
 
   Size _videoSize(double aspectRatio) {
@@ -316,7 +316,9 @@ class _ChatVideoMessageState extends State<ChatVideoMessage> {
                               color: Colors.white,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                              shadows: [
+                                Shadow(color: Colors.black54, blurRadius: 4),
+                              ],
                             ),
                           ),
                           const Spacer(),
@@ -325,7 +327,9 @@ class _ChatVideoMessageState extends State<ChatVideoMessage> {
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
-                              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                              shadows: [
+                                Shadow(color: Colors.black54, blurRadius: 4),
+                              ],
                             ),
                           ),
                         ],
@@ -435,15 +439,18 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
       Uri.parse(widget.audioUrl),
     );
     _controller = controller;
-    controller.initialize().then((_) {
-      if (!mounted || _controller != controller) return;
-      controller.setLooping(false);
-      controller.addListener(_onTick);
-      setState(() => _initialized = true);
-    }).catchError((_) {
-      if (!mounted || _controller != controller) return;
-      setState(() => _hasError = true);
-    });
+    controller
+        .initialize()
+        .then((_) {
+          if (!mounted || _controller != controller) return;
+          controller.setLooping(false);
+          controller.addListener(_onTick);
+          setState(() => _initialized = true);
+        })
+        .catchError((_) {
+          if (!mounted || _controller != controller) return;
+          setState(() => _hasError = true);
+        });
   }
 
   void _onTick() {
@@ -492,7 +499,9 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) return;
     final duration = controller.value.duration;
-    controller.seekTo(Duration(milliseconds: (value * duration.inMilliseconds).round()));
+    controller.seekTo(
+      Duration(milliseconds: (value * duration.inMilliseconds).round()),
+    );
   }
 
   @override
@@ -509,18 +518,19 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
     }
 
     if (!_initialized || !controller.value.isInitialized) {
+      final loadingWidth = widget.embedded ? 180.0 : 280.0;
       return SizedBox(
-        width: math.min(MediaQuery.sizeOf(context).width * 0.72, 280),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+        width: math.min(MediaQuery.sizeOf(context).width * 0.68, loadingWidth),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: widget.embedded ? 4 : 8),
           child: Row(
             children: [
               SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                width: widget.embedded ? 14 : 18,
+                height: widget.embedded ? 14 : 18,
+                child: const CircularProgressIndicator(strokeWidth: 2),
               ),
-              SizedBox(width: 12),
+              SizedBox(width: widget.embedded ? 8 : 12),
             ],
           ),
         ),
@@ -534,8 +544,14 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
         ? 0.0
         : position.inMilliseconds / duration.inMilliseconds;
     final isPlaying = value.isPlaying;
-    final displayDuration =
-        isPlaying || position > Duration.zero ? position : duration;
+    final displayDuration = isPlaying || position > Duration.zero
+        ? position
+        : duration;
+
+    final playPadding = widget.embedded ? 5.0 : 8.0;
+    final playIconSize = widget.embedded ? 16.0 : 20.0;
+    final trackHeight = widget.embedded ? 2.0 : 3.0;
+    final thumbRadius = widget.embedded ? 4.0 : 5.0;
 
     final player = Row(
       children: [
@@ -546,22 +562,24 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
             customBorder: const CircleBorder(),
             onTap: _togglePlayback,
             child: Padding(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(playPadding),
               child: Icon(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: scheme.onPrimary,
-                size: 20,
+                size: playIconSize,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: widget.embedded ? 6 : 10),
         Expanded(
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+              trackHeight: trackHeight,
+              thumbShape: RoundSliderThumbShape(enabledThumbRadius: thumbRadius),
+              overlayShape: RoundSliderOverlayShape(
+                overlayRadius: widget.embedded ? 8 : 10,
+              ),
             ),
             child: Slider(
               value: progress.clamp(0.0, 1.0),
@@ -571,20 +589,21 @@ class _ChatAudioMessageState extends State<ChatAudioMessage> {
             ),
           ),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: widget.embedded ? 2 : 4),
         Text(
           formatMediaDuration(displayDuration),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurfaceVariant,
-              ),
+            fontWeight: FontWeight.w600,
+            fontSize: widget.embedded ? 10 : null,
+            color: scheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
 
     if (widget.embedded) {
       return SizedBox(
-        width: math.min(MediaQuery.sizeOf(context).width * 0.68, 280),
+        width: math.min(MediaQuery.sizeOf(context).width * 0.55, 200),
         child: player,
       );
     }

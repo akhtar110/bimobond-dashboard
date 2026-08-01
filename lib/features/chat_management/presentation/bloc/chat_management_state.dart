@@ -16,6 +16,7 @@ class ChatManagementLoaded extends ChatManagementState {
     required this.chats,
     required this.listQuery,
     this.filterUser,
+    this.dateSort = ChatDateSort.newest,
     required this.messages,
     required this.messagesQuery,
     required this.selectedChatIds,
@@ -41,6 +42,7 @@ class ChatManagementLoaded extends ChatManagementState {
   final PaginationMeta? chatsMeta;
   final ChatListQuery listQuery;
   final UserEntity? filterUser;
+  final ChatDateSort dateSort;
   final ChatEntity? selectedChat;
   final List<ChatMessageEntity> messages;
   final PaginationMeta? messagesMeta;
@@ -78,6 +80,7 @@ class ChatManagementLoaded extends ChatManagementState {
         chatsMeta,
         listQuery,
         filterUser,
+        dateSort,
         selectedChat,
         messages,
         messagesMeta,

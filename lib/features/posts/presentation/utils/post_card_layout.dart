@@ -110,6 +110,21 @@ class PostCardMetrics {
 
   double get badgeFontSize => narrow ? 9 : 10;
 
+  EdgeInsets get premiumBodyPadding => EdgeInsets.fromLTRB(
+        narrow ? 10 : (compact ? 12 : 14),
+        narrow ? 8 : (compact ? 9 : 10),
+        narrow ? 10 : (compact ? 12 : 14),
+        narrow ? 11 : (compact ? 12 : 14),
+      );
+
+  /// Overlap of the black footer into the media fade zone.
+  double get premiumBlendOverlap =>
+      narrow ? 16 : (compact ? 18 : (dense ? 20 : 24));
+
+  /// Avatar overlap between media and info section (premium vertical cards).
+  double get premiumAvatarOverlap =>
+      narrow ? 12 : (compact ? 14 : 16);
+
   int get thumbnailCacheWidth =>
       (cardWidth * (isHorizontal ? 0.35 : 1.0)).round().clamp(80, 560);
 }

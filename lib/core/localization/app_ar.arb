@@ -2487,6 +2487,7 @@
   "privateAccountToggle": "حساب خاص",
   "privateAccountToggleDescription": "يمكن للمتابعين فقط رؤية الملف الكامل والمنشورات",
   "whoCanMessageLabel": "من يمكنه مراسلة هذا المستخدم",
+  "allowDirectMsgsLabel": "السماح بالرسائل المباشرة",
   "adminSuccessPrivacyUpdated": "تم تحديث إعدادات الخصوصية بنجاح",
   "walletNavPlatformProfit": "أرباح وإيرادات المنصة",
   "walletProfitTitle": "أرباح وإيرادات المنصة",
