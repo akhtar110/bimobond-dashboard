@@ -98,8 +98,9 @@ class _GlassSelectionCheckboxState extends State<_GlassSelectionCheckbox> {
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.compact ? 28.0 : 32.0;
-    final iconSize = widget.compact ? 16.0 : 18.0;
+    final size = widget.compact ? 20.0 : 22.0;
+    final iconSize = widget.compact ? 12.0 : 13.0;
+    final radius = BorderRadius.circular(4);
     final selected = widget.isSelected;
 
     final fill = selected
@@ -125,9 +126,9 @@ class _GlassSelectionCheckboxState extends State<_GlassSelectionCheckbox> {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: radius,
             color: fill,
-            border: Border.all(color: border, width: selected ? 1.4 : 1.2),
+            border: Border.all(color: border, width: selected ? 1.3 : 1.1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: selected ? 0.35 : 0.28),

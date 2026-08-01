@@ -3,20 +3,26 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../bloc/categories_bloc.dart';
+import '../utils/categories_page_layout.dart';
+import 'categories_page_toolbar.dart';
 import 'category_form_dialog.dart';
 
-/// Compact categories top bar — title + actions, no subtitle/stat badges.
+/// Compact categories top bar — title + actions, optional filter toolbar.
 class CategoriesPageHeader extends StatelessWidget {
   const CategoriesPageHeader({
     super.key,
     required this.isDark,
     required this.state,
     this.compact = false,
+    this.showToolbar = false,
+    this.metrics,
   });
 
   final bool isDark;
   final CategoriesState state;
   final bool compact;
+  final bool showToolbar;
+  final CategoriesLayoutMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -69,28 +75,40 @@ class CategoriesPageHeader extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Text(
-              l10n.t('categoriesTitle'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: (compact
-                      ? theme.textTheme.titleLarge
-                      : theme.textTheme.headlineSmall)
-                  ?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-                color: scheme.onSurface,
-                height: 1.1,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.t('categoriesTitle'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: (compact
+                          ? theme.textTheme.titleLarge
+                          : theme.textTheme.headlineSmall)
+                      ?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                    color: scheme.onSurface,
+                    height: 1.1,
+                  ),
+                ),
               ),
-            ),
+              addBtn,
+              SizedBox(width: compact ? 6 : 8),
+              refreshBtn,
+            ],
           ),
-          addBtn,
-          SizedBox(width: compact ? 6 : 8),
-          refreshBtn,
+          if (showToolbar) ...[
+            SizedBox(height: compact ? 6 : 8),
+            CategoriesPageToolbar(
+              metrics: metrics ?? categoriesMetricsOf(context),
+            ),
+            const CategoriesActiveFilterChips(),
+          ],
         ],
       ),
     );

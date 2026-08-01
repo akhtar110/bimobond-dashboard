@@ -8,8 +8,6 @@ import '../utils/categories_page_layout.dart';
 import 'category_bulk_actions_bar.dart';
 import 'category_callbacks.dart';
 import 'category_children_panel.dart';
-import 'category_filters_bar.dart';
-import 'category_search_bar.dart';
 import 'root_category_tile.dart';
 
 class CategoryTreeView extends StatefulWidget {
@@ -86,14 +84,12 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _CategoryTreeToolbar(state: widget.state),
-          Divider(height: 1, color: scheme.outlineVariant),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // Prefer stacked master→detail below ~1000px so selected
-                // category + subcategories aren't crushed on laptop widths.
-                final useSplitView = constraints.maxWidth >= 1000;
+                final width = constraints.maxWidth;
+                final useSplitView = metrics.useMasterDetailSplit(width);
+
                 if (useSplitView) {
                   return _SplitMasterDetailView(
                     state: widget.state,
@@ -101,7 +97,8 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
                     onFormRequest: widget.onFormRequest,
                     onDeleteRequest: widget.onDeleteRequest,
                     useInfiniteScroll: metrics.useInfiniteScroll,
-                    availableWidth: constraints.maxWidth,
+                    layoutMetrics: metrics,
+                    totalWidth: width,
                   );
                 }
                 return _MobileMasterDetailView(
@@ -121,47 +118,6 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
   }
 }
 
-class _CategoryTreeToolbar extends StatelessWidget {
-  const _CategoryTreeToolbar({required this.state});
-
-  final CategoriesLoaded state;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CategorySearchBar(initialQuery: state.searchQuery),
-          const SizedBox(height: 10),
-          CategoryFiltersBar(state: state),
-          const SizedBox(height: 6),
-          BlocSelector<CategoriesBloc, CategoriesState, String>(
-            selector: (state) {
-              if (state is! CategoriesLoaded) return '';
-              return _categoryResultsLabel(l10n, state);
-            },
-            builder: (context, label) {
-              if (label.isEmpty) return const SizedBox.shrink();
-              return Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                    ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SplitMasterDetailView extends StatelessWidget {
   const _SplitMasterDetailView({
     required this.state,
@@ -169,7 +125,8 @@ class _SplitMasterDetailView extends StatelessWidget {
     required this.onFormRequest,
     required this.onDeleteRequest,
     required this.useInfiniteScroll,
-    required this.availableWidth,
+    required this.layoutMetrics,
+    required this.totalWidth,
   });
 
   final CategoriesLoaded state;
@@ -177,37 +134,52 @@ class _SplitMasterDetailView extends StatelessWidget {
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
   final bool useInfiniteScroll;
-  final double availableWidth;
+  final CategoriesLayoutMetrics layoutMetrics;
+  final double totalWidth;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final hideSubs = state.typeFilter == CategoryTypeFilter.rootOnly;
-    // Keep master panel proportional so the subcategory panel stays usable.
-    final masterWidth = (availableWidth * 0.34).clamp(280.0, 360.0);
+    final masterFlex = layoutMetrics.masterDetailMasterFlex(totalWidth);
+    final detailFlex = layoutMetrics.masterDetailDetailFlex(totalWidth);
+    final maxMasterWidth = layoutMetrics.masterPanelWidth(totalWidth);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: masterWidth,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest,
-              border: Border(
-                right: BorderSide(color: scheme.outlineVariant),
-              ),
+        Flexible(
+          flex: masterFlex,
+          fit: FlexFit.tight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: 168,
+              maxWidth: maxMasterWidth,
             ),
-            child: _RootCategoriesPanel(
-              scrollController: rootsScrollController,
-              hideSubcategories: hideSubs,
-              onFormRequest: onFormRequest,
-              onDeleteRequest: onDeleteRequest,
-              useInfiniteScroll: useInfiniteScroll,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLowest,
+                border: Border(
+                  right: BorderSide(color: scheme.outlineVariant),
+                ),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return _RootCategoriesPanel(
+                    scrollController: rootsScrollController,
+                    hideSubcategories: hideSubs,
+                    panelMetrics: CategoriesPanelMetrics(constraints.maxWidth),
+                    onFormRequest: onFormRequest,
+                    onDeleteRequest: onDeleteRequest,
+                    useInfiniteScroll: useInfiniteScroll,
+                  );
+                },
+              ),
             ),
           ),
         ),
         Expanded(
+          flex: detailFlex,
           child: hideSubs
               ? const CategoryChildrenPlaceholder()
               : BlocSelector<CategoriesBloc, CategoriesState, CategoryEntity?>(
@@ -270,6 +242,9 @@ class _MobileMasterDetailView extends StatelessWidget {
         return _RootCategoriesPanel(
           scrollController: rootsScrollController,
           hideSubcategories: hideSubs,
+          panelMetrics: CategoriesPanelMetrics(
+            MediaQuery.sizeOf(context).width,
+          ),
           onFormRequest: onFormRequest,
           onDeleteRequest: onDeleteRequest,
           useInfiniteScroll: useInfiniteScroll,
@@ -283,6 +258,7 @@ class _RootCategoriesPanel extends StatelessWidget {
   const _RootCategoriesPanel({
     required this.scrollController,
     required this.hideSubcategories,
+    required this.panelMetrics,
     required this.onFormRequest,
     required this.onDeleteRequest,
     required this.useInfiniteScroll,
@@ -290,6 +266,7 @@ class _RootCategoriesPanel extends StatelessWidget {
 
   final ScrollController scrollController;
   final bool hideSubcategories;
+  final CategoriesPanelMetrics panelMetrics;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
   final bool useInfiniteScroll;
@@ -354,15 +331,21 @@ class _RootCategoriesPanel extends StatelessWidget {
             data.hasReachedMax &&
             data.totalRoots > CategoriesBloc.pageLimit;
 
+        final hPad = panelMetrics.listHorizontalPadding;
+        final titleSize = panelMetrics.rootTileCompact ? 11.5 : 12.0;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: EdgeInsets.fromLTRB(hPad + 4, panelMetrics.listTopPadding, hPad + 4, 4),
               child: Text(
                 l10n.tOr('rootCategories', 'Root categories'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
+                      fontSize: titleSize,
                       color: scheme.onSurfaceVariant,
                     ),
               ),
@@ -370,7 +353,7 @@ class _RootCategoriesPanel extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                padding: EdgeInsets.fromLTRB(hPad, 4, hPad, hPad),
                 itemCount: data.roots.length + (showEndLabel ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index >= data.roots.length) {
@@ -391,14 +374,18 @@ class _RootCategoriesPanel extends StatelessWidget {
                     );
                   }
                   final root = data.roots[index];
-                  return RootCategoryTile(
-                    key: ValueKey(root.id),
-                    category: root,
-                    subcategoryCount: data.subcategoryCounts[root.id] ?? 0,
-                    isFocused: data.focusedRootId == root.id,
-                    isSelected: data.selectedIds.contains(root.id),
-                    onFormRequest: onFormRequest,
-                    onDeleteRequest: onDeleteRequest,
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: panelMetrics.tileSpacing),
+                    child: RootCategoryTile(
+                      key: ValueKey(root.id),
+                      category: root,
+                      subcategoryCount: data.subcategoryCounts[root.id] ?? 0,
+                      isFocused: data.focusedRootId == root.id,
+                      isSelected: data.selectedIds.contains(root.id),
+                      panelMetrics: panelMetrics,
+                      onFormRequest: onFormRequest,
+                      onDeleteRequest: onDeleteRequest,
+                    ),
                   );
                 },
               ),
@@ -434,28 +421,4 @@ class _RootsPanelData {
   final Set<String> selectedIds;
   final bool hasReachedMax;
   final int totalRoots;
-}
-
-String _categoryResultsLabel(AppLocalizations l10n, CategoriesLoaded state) {
-  final template =
-      l10n.tOr('showingResultsCount', 'Showing {shown} of {total}');
-  final focusId = state.focusedRootId;
-
-  if (focusId != null && state.typeFilter != CategoryTypeFilter.rootOnly) {
-    final children = state.displayChildrenFor(focusId);
-    final total = state.subcategoryCountFor(focusId);
-    return template
-        .replaceAll('{shown}', '${children.length}')
-        .replaceAll('{total}', '$total');
-  }
-
-  final total = state.typeFilter == CategoryTypeFilter.subOnly
-      ? state.catalogCategories.where((c) => !c.isRoot).length
-      : state.typeFilter == CategoryTypeFilter.rootOnly
-          ? state.catalogRoots.length
-          : state.catalogCategories.length;
-
-  return template
-      .replaceAll('{shown}', '${state.leftPanelRoots.length}')
-      .replaceAll('{total}', '$total');
 }

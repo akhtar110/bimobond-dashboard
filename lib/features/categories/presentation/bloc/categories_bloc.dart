@@ -549,6 +549,31 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   static const pageLimit = 20;
   static const _fullCatalogQuery = CategoriesAdminListQuery(includeInactive: true);
 
+  String get activeSearchQuery => switch (state) {
+        CategoriesLoaded(:final searchQuery) => searchQuery,
+        _ => '',
+      };
+
+  CategoryFilter get activeStatusFilter => switch (state) {
+        CategoriesLoaded(:final filter) => filter,
+        _ => CategoryFilter.all,
+      };
+
+  CategoryTypeFilter get activeTypeFilter => switch (state) {
+        CategoriesLoaded(:final typeFilter) => typeFilter,
+        _ => CategoryTypeFilter.all,
+      };
+
+  CategorySortOption get activeSortOption => switch (state) {
+        CategoriesLoaded(:final sortOption) => sortOption,
+        _ => CategorySortOption.name,
+      };
+
+  CategoryHasChildrenFilter get activeHasChildrenFilter => switch (state) {
+        CategoriesLoaded(:final hasChildrenFilter) => hasChildrenFilter,
+        _ => CategoryHasChildrenFilter.all,
+      };
+
   bool _useLocalCatalog(CategoriesLoaded state) =>
       state.searchQuery.trim().isEmpty &&
       state.filter == CategoryFilter.all &&
@@ -1179,10 +1204,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   ) {
     final current = state;
     if (current is! CategoriesLoaded) return;
-    if (current.focusedRootId == event.rootId) {
-      emit(current.copyWith(clearFocusedRoot: true, clearMessages: true));
-      return;
-    }
+    if (current.focusedRootId == event.rootId) return;
     emit(current.copyWith(
       focusedRootId: event.rootId,
       clearMessages: true,

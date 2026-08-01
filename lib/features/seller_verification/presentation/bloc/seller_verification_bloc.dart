@@ -46,6 +46,9 @@ class SellerVerificationBloc
   String _searchQuery = '';
   int _currentPage = 1;
 
+  String get activeSearchQuery => _searchQuery;
+  String? get activeStatusFilter => _statusFilter;
+
   AdminSellerVerificationQuery _buildQuery() => AdminSellerVerificationQuery(
         search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
         status: _statusFilter,
