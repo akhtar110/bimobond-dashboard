@@ -135,6 +135,12 @@ class StoriesTable extends StatelessWidget {
                           child: Text('${story.viewCount}'),
                         ),
                         PopupMenuButton<StoryCardActionType>(
+                          tooltip: MaterialLocalizations.of(context)
+                              .moreButtonTooltip,
+                          icon: Icon(
+                            Icons.more_vert_rounded,
+                            color: scheme.onSurface,
+                          ),
                           onSelected: (action) => onStoryAction(story, action),
                           itemBuilder: (context) => [
                             PopupMenuItem(

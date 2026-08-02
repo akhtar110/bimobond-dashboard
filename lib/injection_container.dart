@@ -106,6 +106,18 @@ import 'features/search_history/domain/repositories/search_history_repository.da
 import 'features/search_history/domain/usecases/search_history_usecases.dart';
 import 'features/search_history/presentation/bloc/search_history_bloc.dart';
 
+import 'features/user_history/data/datasources/user_history_remote_datasource.dart';
+import 'features/user_history/data/repositories/user_history_repository_impl.dart';
+import 'features/user_history/domain/repositories/user_history_repository.dart';
+import 'features/user_history/domain/usecases/get_user_history_usecase.dart';
+import 'features/user_history/presentation/bloc/user_history_bloc.dart';
+
+import 'features/security_logs/data/datasources/logs_remote_datasource.dart';
+import 'features/security_logs/data/repositories/logs_repository_impl.dart';
+import 'features/security_logs/domain/repositories/logs_repository.dart';
+import 'features/security_logs/domain/usecases/get_logs_usecase.dart';
+import 'features/security_logs/presentation/bloc/logs_bloc.dart';
+
 import 'features/search_management/data/datasources/search_management_remote_datasource.dart';
 import 'features/search_management/data/repositories/search_management_repository_impl.dart';
 import 'features/search_management/domain/repositories/search_management_repository.dart';
@@ -566,6 +578,9 @@ Future<void> init() async {
     () => UpdateBrandingUseCase(sl<AppSettingsRepository>()),
   );
   sl.registerLazySingleton(
+    () => UploadBrandingLogoUseCase(sl<AppSettingsRepository>()),
+  );
+  sl.registerLazySingleton(
     () => ListCurrenciesUseCase(sl<AppSettingsRepository>()),
   );
   sl.registerLazySingleton(
@@ -596,6 +611,7 @@ Future<void> init() async {
       updateSetting: sl<UpdateAppSettingUseCase>(),
       deleteSetting: sl<DeleteAppSettingUseCase>(),
       updateBranding: sl<UpdateBrandingUseCase>(),
+      uploadBrandingLogo: sl<UploadBrandingLogoUseCase>(),
       createCurrency: sl<CreateCurrencyUseCase>(),
       updateCurrency: sl<UpdateCurrencyUseCase>(),
       deleteCurrency: sl<DeleteCurrencyUseCase>(),
@@ -693,6 +709,7 @@ Future<void> init() async {
       promoteUser: sl<PromoteUser>(),
       demoteUser: sl<DemoteUser>(),
       deleteUser: sl<DeleteUser>(),
+      updateUserRoles: sl<UpdateUserRoles>(),
       updateUserPrivacySettings: sl<UpdateUserPrivacySettings>(),
     ),
   );
@@ -855,6 +872,36 @@ Future<void> init() async {
       bulkSearchHistory: sl<BulkSearchHistoryUseCase>(),
     ),
   );
+
+  // =========================================================
+  // USER HISTORY MODULE (Activity Admin timeline)
+  // =========================================================
+
+  sl.registerLazySingleton<UserHistoryRemoteDataSource>(
+    () => UserHistoryRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<UserHistoryRepository>(
+    () => UserHistoryRepositoryImpl(sl<UserHistoryRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(
+    () => GetUserHistoryUseCase(sl<UserHistoryRepository>()),
+  );
+  sl.registerFactory(
+    () => UserHistoryBloc(getUserHistory: sl<GetUserHistoryUseCase>()),
+  );
+
+  // =========================================================
+  // SECURITY LOGS MODULE (GET /user-history/admin/logs)
+  // =========================================================
+
+  sl.registerLazySingleton<LogsRemoteDataSource>(
+    () => LogsRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<LogsRepository>(
+    () => LogsRepositoryImpl(sl<LogsRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(() => GetLogsUseCase(sl<LogsRepository>()));
+  sl.registerFactory(() => LogsBloc(getLogs: sl<GetLogsUseCase>()));
 
   // =========================================================
   // USER INTERESTS MODULE
@@ -1069,6 +1116,12 @@ Future<void> init() async {
     () => UpdateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
   );
   sl.registerLazySingleton(
+    () => ActivateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => DeactivateAdminOverlayUseCase(sl<ArOverlaysRepository>()),
+  );
+  sl.registerLazySingleton(
     () => DeleteAdminOverlayUseCase(sl<ArOverlaysRepository>()),
   );
   sl.registerLazySingleton(
@@ -1081,6 +1134,8 @@ Future<void> init() async {
       getOverlayById: sl<GetAdminOverlayByIdUseCase>(),
       createOverlay: sl<CreateAdminOverlayUseCase>(),
       updateOverlay: sl<UpdateAdminOverlayUseCase>(),
+      activateOverlay: sl<ActivateAdminOverlayUseCase>(),
+      deactivateOverlay: sl<DeactivateAdminOverlayUseCase>(),
       deleteOverlay: sl<DeleteAdminOverlayUseCase>(),
     ),
   );

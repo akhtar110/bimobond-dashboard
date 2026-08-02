@@ -273,7 +273,9 @@ class DashboardTabAccessBoundary extends StatelessWidget {
       tabIndex == 6 || // stories
       tabIndex == 13 || // sounds
       tabIndex == 16 || // camera studio
-      tabIndex == 18; // roles
+      tabIndex == 18 || // roles
+      tabIndex == 19; // logs
+
 
   @override
   Widget build(BuildContext context) {

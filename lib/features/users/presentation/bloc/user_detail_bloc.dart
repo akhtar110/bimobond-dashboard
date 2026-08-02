@@ -4,6 +4,7 @@ import '../../../../core/utils/api_error_messages.dart';
 import '../../data/models/user_model.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_detail_entity.dart';
+import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_entity_follow_counts.dart';
 import '../../domain/entities/user_follow_entity.dart';
 import '../../domain/usecases/ban_user.dart';
@@ -14,6 +15,7 @@ import '../../domain/usecases/get_user_posts.dart';
 import '../../domain/usecases/promote_to_admin.dart';
 import '../../domain/usecases/update_user_privacy_settings.dart';
 import '../../domain/usecases/unban_user.dart';
+import '../../domain/usecases/updte_role.dart';
 import 'user_detail_event.dart';
 import 'user_detail_state.dart';
 
@@ -26,6 +28,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     required PromoteUser promoteUser,
     required DemoteUser demoteUser,
     required DeleteUser deleteUser,
+    required UpdateUserRoles updateUserRoles,
     required UpdateUserPrivacySettings updateUserPrivacySettings,
   })  : _getUserById = getUserById,
         _getUserPosts = getUserPosts,
@@ -34,10 +37,12 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
         _promoteUser = promoteUser,
         _demoteUser = demoteUser,
         _deleteUser = deleteUser,
+        _updateUserRoles = updateUserRoles,
         _updateUserPrivacySettings = updateUserPrivacySettings,
         super(UserDetailInitial()) {
     on<LoadUserDetailEvent>(_onLoad);
     on<UserDetailAdminActionEvent>(_onAdminAction);
+    on<SetUserDetailRoleEvent>(_onSetRole);
     on<UpdateUserPrivacySettingsEvent>(_onUpdatePrivacySettings);
     on<ClearUserDetailActionFeedbackEvent>(_onClearFeedback);
     on<AdjustUserFollowCountsEvent>(_onAdjustFollowCounts);
@@ -50,6 +55,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
   final PromoteUser _promoteUser;
   final DemoteUser _demoteUser;
   final DeleteUser _deleteUser;
+  final UpdateUserRoles _updateUserRoles;
   final UpdateUserPrivacySettings _updateUserPrivacySettings;
 
   Future<void> _onLoad(
@@ -104,6 +110,47 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
           userDetail: userDetail,
           clearExecutingAction: true,
           actionFeedback: action.successKey(userDetail.user),
+        ),
+      );
+    } catch (e) {
+      emit(
+        current.copyWith(
+          clearExecutingAction: true,
+          actionFeedback: _messageFromError(e),
+          actionFeedbackIsError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onSetRole(
+    SetUserDetailRoleEvent event,
+    Emitter<UserDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is! UserDetailLoaded) return;
+    if (current.isBusy) return;
+
+    final userId = current.userDetail.user.id;
+    final feedbackAction = event.role == UserRole.user
+        ? UserAdminActionType.demote
+        : UserAdminActionType.promote;
+
+    emit(
+      current.copyWith(
+        executingAction: feedbackAction,
+        clearActionFeedback: true,
+      ),
+    );
+
+    try {
+      await _updateUserRoles(userId: userId, roles: [event.role]);
+      final userDetail = await _fetchUserDetail(userId);
+      emit(
+        current.copyWith(
+          userDetail: userDetail,
+          clearExecutingAction: true,
+          actionFeedback: feedbackAction.successKey(userDetail.user),
         ),
       );
     } catch (e) {

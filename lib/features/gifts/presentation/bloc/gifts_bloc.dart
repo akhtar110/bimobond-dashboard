@@ -213,6 +213,8 @@ class ClearGiftSelectionEvent extends GiftsEvent {}
 
 class ClearGiftsBulkFeedbackEvent extends GiftsEvent {}
 
+class ClearGiftsFeedbackEvent extends GiftsEvent {}
+
 class GoToGiftsPageEvent extends GiftsEvent {
   GoToGiftsPageEvent(this.page);
   final int page;
@@ -618,6 +620,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     on<SelectAllGiftsEvent>(_onSelectAllGifts);
     on<ClearGiftSelectionEvent>(_onClearSelection);
     on<ClearGiftsBulkFeedbackEvent>(_onClearBulkFeedback);
+    on<ClearGiftsFeedbackEvent>(_onClearFeedback);
     on<DeleteSelectedGiftsEvent>(_onBulkAction);
     on<ActivateSelectedGiftsEvent>(_onBulkAction);
     on<DeactivateSelectedGiftsEvent>(_onBulkAction);
@@ -694,6 +697,17 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
     final current = state;
     if (current is GiftsLoaded && current.bulkActionMessage != null) {
       emit(current.copyWith(clearBulkActionMessage: true));
+    }
+  }
+
+  void _onClearFeedback(
+    ClearGiftsFeedbackEvent event,
+    Emitter<GiftsState> emit,
+  ) {
+    final current = state;
+    if (current is GiftsLoaded &&
+        (current.successMessage != null || current.errorMessage != null)) {
+      emit(current.copyWith(clearMessages: true));
     }
   }
 
@@ -1168,14 +1182,22 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
   ) async {
     final c = state;
     if (c is! GiftsLoaded) return;
+    emit(c.copyWith(clearMessages: true));
     try {
       final updated =
           await _updateGift(event.giftId, UpdateGiftData(isActive: event.isActive));
       final gifts =
           c.gifts.map((g) => g.id == event.giftId ? updated : g).toList();
-      emit(c.copyWith(gifts: gifts));
+      emit(c.copyWith(
+        gifts: gifts,
+        successMessage: event.isActive
+            ? 'Gift activated successfully'
+            : 'Gift deactivated successfully',
+      ));
     } catch (e) {
-      emit(c.copyWith(errorMessage: e.toString()));
+      emit(c.copyWith(
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      ));
     }
   }
 

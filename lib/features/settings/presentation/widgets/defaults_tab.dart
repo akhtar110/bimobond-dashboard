@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/empty_state_card.dart';
 import '../bloc/admin_settings_bloc.dart';
+import '../utils/settings_admin_l10n.dart';
 
 /// Compare factory defaults from [SettingsDefaultsEntity] with live values.
 class DefaultsTab extends StatelessWidget {
@@ -88,11 +89,13 @@ class _DefaultCompareRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final matches = current != null && current == factoryDefault;
 
+    final title = SettingsAdminL10n.settingKeyLabel(context, settingKey);
+
     return ListTile(
       title: Text(
-        settingKey,
+        title,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontFamily: 'monospace',
+              fontFamily: title == settingKey ? 'monospace' : null,
               fontWeight: FontWeight.w600,
             ),
       ),
@@ -107,7 +110,10 @@ class _DefaultCompareRow extends StatelessWidget {
           Text(
             l10n
                 .tOr('settingsCurrentValue', 'Current: {value}')
-                .replaceAll('{value}', current ?? l10n.tOr('settingsNotAvailable', '—')),
+                .replaceAll(
+                  '{value}',
+                  current ?? l10n.tOr('settingsNotAvailable', '—'),
+                ),
           ),
         ],
       ),

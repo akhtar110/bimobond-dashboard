@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +10,7 @@ import 'edit_gift_dialog.dart';
 import 'gift_animation_preview.dart';
 import 'gift_audio_preview.dart';
 import 'gift_color_picker_field.dart';
+import 'gift_thumbnail_image.dart';
 
 /// Shows a responsive, high-end, professional preview dialog for a [GiftEntity].
 /// Supports both image gifts (with optional PAG/Lottie/MP4 animation)
@@ -390,12 +391,11 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
                           border: Border.all(color: Colors.white, width: 2.5),
                         ),
                         child: ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: gift.thumbnailUrl,
+                          child: GiftThumbnailImage(
+                            networkUrl: gift.thumbnailUrl,
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => _audioPlaceholder(scheme),
-                            errorWidget: (_, __, ___) =>
-                                _audioPlaceholder(scheme),
+                            placeholder: _audioPlaceholder(scheme),
+                            errorWidget: _audioPlaceholder(scheme),
                           ),
                         ),
                       ),
@@ -616,12 +616,14 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
             decoration: _imagePreviewFrameDecoration(scheme, customColor),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
+              clipBehavior: kIsWeb ? Clip.none : Clip.antiAlias,
               child: gift.thumbnailUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: gift.thumbnailUrl,
+                  ? GiftThumbnailImage(
+                      key: ValueKey('preview-gift-img-${gift.thumbnailUrl}'),
+                      networkUrl: gift.thumbnailUrl,
                       fit: BoxFit.contain,
-                      placeholder: (_, __) => _imagePlaceholder(scheme),
-                      errorWidget: (_, __, ___) => _imagePlaceholder(scheme),
+                      placeholder: _imagePlaceholder(scheme),
+                      errorWidget: _imagePlaceholder(scheme),
                     )
                   : _imagePlaceholder(scheme),
             ),

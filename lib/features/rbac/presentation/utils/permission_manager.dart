@@ -33,6 +33,9 @@ abstract final class RbacPermissionKeys {
   /// User location history / movements.
   static const userLocations = 'users.admin.locations';
 
+  /// Activity admin read (`GET /activity/admin/*`).
+  static const activityAdminRead = 'activity.admin.read';
+
   /// Required for Camera Studio / Filters & Effects admin management.
   static const manageCameraStudio = 'camera_studio.admin.manage';
 
@@ -107,7 +110,7 @@ abstract final class PermissionManager {
   static bool isLegacyAdmin(BuildContext context) {
     try {
       final auth = context.read<AuthBloc>().state;
-      return auth is Authenticated && auth.user.roles.contains(UserRole.admin);
+      return auth is Authenticated && auth.user.roles.includesAdmin;
     } on ProviderNotFoundException {
       return false;
     }
@@ -249,32 +252,36 @@ abstract final class PermissionManager {
 
     if (tabIndex == 16) {
       return permissions.contains(RbacPermissionKeys.manageCameraStudio) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 6) {
       return permissions.contains(RbacPermissionKeys.readStories) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 13) {
       return permissions.contains(RbacPermissionKeys.manageSounds) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 18) {
       return permissions.contains(RbacPermissionKeys.manageRoles) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
+    }
+    if (tabIndex == 19) {
+      return permissions.contains(RbacPermissionKeys.activityAdminRead) ||
+          roles.includesAdmin;
     }
     if (tabIndex == 2) {
       return permissions.contains(RbacPermissionKeys.readUsers) ||
-          roles.contains(UserRole.admin);
+          roles.includesAdmin;
     }
     if (tabIndex == 8) {
       return permissions.contains(RbacPermissionKeys.readChat) ||
           permissions.contains(RbacPermissionKeys.moderateChat) ||
-          roles.contains(UserRole.admin) ||
+          roles.includesAdmin ||
           roles.contains(UserRole.moderator);
     }
 
-    if (roles.contains(UserRole.admin)) return true;
+    if (roles.includesAdmin) return true;
     if (!roles.contains(UserRole.moderator)) return false;
     return switch (tabIndex) {
       0 => true, // analytics

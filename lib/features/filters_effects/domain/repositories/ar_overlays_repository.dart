@@ -6,6 +6,7 @@ abstract class ArOverlaysRepository {
   Future<ArOverlayListResponseEntity> getAdminOverlays({
     int page = 1,
     int limit = 20,
+    bool? isActive,
   });
   Future<ArOverlayEntity> getAdminOverlayById(String id);
   Future<ArOverlayEntity> createAdminOverlay(CreateArOverlayData data);
@@ -13,5 +14,7 @@ abstract class ArOverlaysRepository {
     String id,
     UpdateArOverlayData data,
   );
+  Future<ArOverlayEntity> activateAdminOverlay(String id);
+  Future<ArOverlayEntity> deactivateAdminOverlay(String id);
   Future<void> deleteAdminOverlay(String id);
 }

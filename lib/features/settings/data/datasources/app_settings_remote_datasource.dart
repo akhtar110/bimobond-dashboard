@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
+import '../../../../core/utils/media_url_resolver.dart';
 import '../models/app_setting_model.dart';
 import '../models/settings_admin_models.dart';
 
@@ -21,6 +24,9 @@ abstract class AppSettingsRemoteDataSource {
     String? supportEmail,
     String? logoUrl,
   });
+
+  /// Uploads a logo image via `POST /posts/upload` and returns the CDN URL.
+  Future<String> uploadBrandingLogo(Uint8List bytes, String filename);
 
   Future<List<AppCurrencyModel>> listCurrencies();
   Future<AppCurrencyModel> createCurrency(AppCurrencyModel currency);
@@ -121,17 +127,167 @@ class AppSettingsRemoteDataSourceImpl implements AppSettingsRemoteDataSource {
     String? supportEmail,
     String? logoUrl,
   }) async {
+    // Admin API requires an absolute logo URL (see settings admin-api.md).
+    final absoluteLogoUrl =
+        logoUrl == null ? null : _toAbsoluteLogoUrl(logoUrl);
     final response = await _dio.patch(
       '/settings/admin/branding',
       data: {
         if (appName != null) 'appName': appName,
         if (tagline != null) 'tagline': tagline,
         if (supportEmail != null) 'supportEmail': supportEmail,
-        if (logoUrl != null) 'logoUrl': logoUrl,
+        if (absoluteLogoUrl != null) 'logoUrl': absoluteLogoUrl,
       },
     );
     return _parseBranding(response.data);
   }
+
+  @override
+  Future<String> uploadBrandingLogo(Uint8List bytes, String filename) async {
+    if (bytes.isEmpty) {
+      throw Exception('Logo upload failed: empty file');
+    }
+    final safeName =
+        filename.trim().isEmpty ? 'branding-logo.png' : filename.trim();
+    final lower = safeName.toLowerCase();
+    final contentType = lower.endsWith('.svg')
+        ? DioMediaType('image', 'svg+xml')
+        : lower.endsWith('.png')
+            ? DioMediaType('image', 'png')
+            : lower.endsWith('.webp')
+                ? DioMediaType('image', 'webp')
+                : lower.endsWith('.gif')
+                    ? DioMediaType('image', 'gif')
+                    : DioMediaType('image', 'jpeg');
+
+    final formData = FormData();
+    formData.files.add(
+      MapEntry(
+        'files',
+        MultipartFile.fromBytes(
+          bytes,
+          filename: safeName,
+          contentType: contentType,
+        ),
+      ),
+    );
+
+    final response = await _dio.post(
+      '/posts/upload',
+      data: formData,
+      options: Options(
+        sendTimeout: const Duration(minutes: 5),
+        receiveTimeout: const Duration(minutes: 5),
+      ),
+    );
+
+    final extracted = _extractUploadUrl(response.data);
+    if (extracted == null || extracted.isEmpty) {
+      throw Exception(
+        'Logo upload failed: no URL returned from server: ${response.data}',
+      );
+    }
+
+    // PATCH /settings/admin/branding expects an absolute URL, not `/uploads/...`.
+    final absolute = _toAbsoluteLogoUrl(extracted);
+    if (!_isAbsoluteHttpUrl(absolute)) {
+      throw Exception(
+        'Logo upload failed: could not build absolute URL from: $extracted',
+      );
+    }
+    return absolute;
+  }
+
+  /// Parses `POST /posts/upload` across Map/List shapes used by the API.
+  String? _extractUploadUrl(dynamic data) {
+    if (data == null) return null;
+
+    if (data is String && data.trim().isNotEmpty) {
+      return _parseUploadEntry(data);
+    }
+
+    if (data is List && data.isNotEmpty) {
+      for (final item in data) {
+        final parsed = _parseUploadEntry(item);
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+
+    final topUrls = map['urls'];
+    if (topUrls is List && topUrls.isNotEmpty) {
+      for (final item in topUrls) {
+        final parsed = _parseUploadEntry(item);
+        if (parsed != null) return parsed;
+      }
+    }
+
+    final nested = map['data'];
+    if (nested is Map) {
+      final nestedMap = Map<String, dynamic>.from(nested);
+      final nestedUrls = nestedMap['urls'];
+      if (nestedUrls is List && nestedUrls.isNotEmpty) {
+        for (final item in nestedUrls) {
+          final parsed = _parseUploadEntry(item);
+          if (parsed != null) return parsed;
+        }
+      }
+      final fromNested = _extractUploadUrl(nestedMap);
+      if (fromNested != null) return fromNested;
+    } else if (nested is List || nested is String) {
+      final fromNested = _extractUploadUrl(nested);
+      if (fromNested != null) return fromNested;
+    }
+
+    return _parseUploadEntry(
+      map['url'] ?? map['path'] ?? map['location'] ?? map['file'],
+    );
+  }
+
+  String? _parseUploadEntry(dynamic entry) {
+    if (entry == null) return null;
+    if (entry is String) {
+      final text = entry.trim();
+      if (text.isEmpty) return null;
+      // Never treat data URLs / raw payloads as an upload result.
+      if (text.startsWith('data:') ||
+          text.startsWith('{') ||
+          text.startsWith('[')) {
+        return null;
+      }
+      return text;
+    }
+    if (entry is Map) {
+      final map = Map<String, dynamic>.from(entry);
+      for (final key in ['url', 'path', 'location', 'file']) {
+        final parsed = _parseUploadEntry(map[key]);
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+    return null;
+  }
+
+  /// Branding `logoUrl` must be absolute (`https://…`).
+  String _toAbsoluteLogoUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (_isAbsoluteHttpUrl(trimmed)) return trimmed;
+
+    // Prefer the `/uploads/…` segment when the API returns a longer path.
+    final uploadsIndex = trimmed.indexOf('/uploads/');
+    final path = uploadsIndex >= 0
+        ? trimmed.substring(uploadsIndex)
+        : (trimmed.startsWith('/') ? trimmed : '/$trimmed');
+
+    return resolveMediaUrl(path) ?? path;
+  }
+
+  bool _isAbsoluteHttpUrl(String url) =>
+      url.startsWith('http://') || url.startsWith('https://');
 
   @override
   Future<List<AppCurrencyModel>> listCurrencies() async {
@@ -214,10 +370,39 @@ class AppSettingsRemoteDataSourceImpl implements AppSettingsRemoteDataSource {
   }
 
   AppBrandingModel _parseBranding(dynamic data) {
+    Map<String, dynamic>? map;
     if (data is Map) {
-      return AppBrandingModel.fromJson(Map<String, dynamic>.from(data));
+      map = Map<String, dynamic>.from(data);
+      final nested = map['data'];
+      if (nested is Map) {
+        final nestedMap = Map<String, dynamic>.from(nested);
+        // Prefer nested payload when it looks like the branding object.
+        if (nestedMap.containsKey('appName') ||
+            nestedMap.containsKey('logoUrl') ||
+            nestedMap.containsKey('id')) {
+          map = nestedMap;
+        }
+      }
     }
-    return const AppBrandingModel(id: '', appName: 'DCC');
+    if (map == null) {
+      return const AppBrandingModel(id: '', appName: 'DCC');
+    }
+
+    final model = AppBrandingModel.fromJson(map);
+    final logoUrl = model.logoUrl?.trim();
+    if (logoUrl == null || logoUrl.isEmpty) return model;
+
+    final absolute = _toAbsoluteLogoUrl(logoUrl);
+    if (absolute == logoUrl) return model;
+    return AppBrandingModel(
+      id: model.id,
+      appName: model.appName,
+      tagline: model.tagline,
+      supportEmail: model.supportEmail,
+      logoUrl: absolute,
+      createdAt: model.createdAt,
+      updatedAt: model.updatedAt,
+    );
   }
 
   AppCurrencyModel _parseCurrency(

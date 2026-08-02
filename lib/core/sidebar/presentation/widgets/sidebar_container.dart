@@ -37,16 +37,13 @@ class SidebarContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
 
-    return BlocSelector<SidebarBloc, SidebarState, _SidebarViewData>(
-      selector: (state) => _SidebarViewData(
-        collapsed: state.isCollapsed,
-        searchQuery: state.searchQuery,
-      ),
-      builder: (context, data) {
+    // Width / chrome only — search query rebuilds the menu list below.
+    return BlocSelector<SidebarBloc, SidebarState, bool>(
+      selector: (state) => forceCollapsed ?? state.isCollapsed,
+      builder: (context, collapsed) {
         final scheme = Theme.of(context).colorScheme;
-        final collapsed = forceCollapsed ?? data.collapsed;
         final width = collapsed ? collapsedWidth : expandedWidth;
-
+        final contentWidth = width;
         final radius = embedded ? 0.0 : 20.0;
 
         return AnimatedContainer(
@@ -77,44 +74,63 @@ class SidebarContainer extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius),
-              child: SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (showCollapseToggle)
-                      SidebarHeader(
-                        collapsed: collapsed,
-                        showToggle: showCollapseToggle,
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                        child: SidebarHeader(
-                          collapsed: false,
-                          showToggle: false,
-                        ),
-                      ),
-                    SidebarSearch(collapsed: collapsed),
-                    const SizedBox(height: 4),
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.only(bottom: 8),
+              // Lay out at the target width and clip while the shell animates,
+              // so expanded rows never overflow mid-tween (no per-frame rebuilds).
+              child: SizedBox.expand(
+                child: OverflowBox(
+                  alignment: AlignmentDirectional.topStart,
+                  minWidth: contentWidth,
+                  maxWidth: contentWidth,
+                  child: SizedBox(
+                    width: contentWidth,
+                    child: SafeArea(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (final group in kSidebarMenuGroups)
-                            SidebarMenuGroup(
-                              group: group,
-                              items: items,
-                              currentIndex: currentIndex,
+                          if (showCollapseToggle)
+                            SidebarHeader(
                               collapsed: collapsed,
-                              searchQuery: data.searchQuery,
-                              tabVisible: tabVisible,
-                              onDestinationSelected: onDestinationSelected,
+                              showToggle: showCollapseToggle,
+                            )
+                          else
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                              child: SidebarHeader(
+                                collapsed: false,
+                                showToggle: false,
+                              ),
                             ),
+                          SidebarSearch(collapsed: collapsed),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: BlocSelector<SidebarBloc, SidebarState,
+                                String>(
+                              selector: (state) => state.searchQuery,
+                              builder: (context, searchQuery) {
+                                return ListView(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  children: [
+                                    for (final group in kSidebarMenuGroups)
+                                      SidebarMenuGroup(
+                                        group: group,
+                                        items: items,
+                                        currentIndex: currentIndex,
+                                        collapsed: collapsed,
+                                        searchQuery: searchQuery,
+                                        tabVisible: tabVisible,
+                                        onDestinationSelected:
+                                            onDestinationSelected,
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                          SidebarFooter(collapsed: collapsed),
                         ],
                       ),
                     ),
-                    SidebarFooter(collapsed: collapsed),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -123,23 +139,4 @@ class SidebarContainer extends StatelessWidget {
       },
     );
   }
-}
-
-class _SidebarViewData {
-  const _SidebarViewData({
-    required this.collapsed,
-    required this.searchQuery,
-  });
-
-  final bool collapsed;
-  final String searchQuery;
-
-  @override
-  bool operator ==(Object other) =>
-      other is _SidebarViewData &&
-      collapsed == other.collapsed &&
-      searchQuery == other.searchQuery;
-
-  @override
-  int get hashCode => Object.hash(collapsed, searchQuery);
 }

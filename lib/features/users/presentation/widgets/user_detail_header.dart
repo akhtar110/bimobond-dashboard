@@ -15,7 +15,7 @@ class UserDetailRoleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final isAdmin = user.roles.contains(UserRole.admin);
+    final isAdmin = user.roles.includesAdmin;
     final isMod = user.roles.contains(UserRole.moderator);
     final Color foreground;
     final Color background;

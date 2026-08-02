@@ -17,6 +17,7 @@ import '../utils/user_detail_layout_metrics.dart';
 import 'user_detail_interests_tab.dart';
 import 'user_detail_locations_tab.dart';
 import 'user_detail_search_history_tab.dart';
+import 'user_detail_user_history_tab.dart';
 import 'user_detail_personal_info.dart';
 
 class UserDetailInfoActivitySection extends StatelessWidget {
@@ -39,7 +40,7 @@ class UserDetailInfoActivitySection extends StatelessWidget {
     final contentHeight = metrics.activityContentHeight(size.height);
 
     final tabsSection = DefaultTabController(
-      length: 12,
+      length: 13,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -78,6 +79,10 @@ class UserDetailInfoActivitySection extends StatelessWidget {
                 Tab(text: l10n.t('likes'), height: 40),
                 Tab(text: l10n.t('mentions'), height: 40),
                 Tab(text: l10n.t('activity'), height: 40),
+                Tab(
+                  text: l10n.tOr('userHistoryTab', 'User History'),
+                  height: 40,
+                ),
                 Tab(text: l10n.t('auctions'), height: 40),
                 Tab(text: l10n.t('gifts'), height: 40),
                 Tab(text: l10n.t('devices'), height: 40),
@@ -136,6 +141,10 @@ class UserDetailInfoActivitySection extends StatelessWidget {
                     UserActivityTab(
                       isDark: isDark,
                       sourceUser: user,
+                    ),
+                    UserDetailUserHistoryTab(
+                      user: user,
+                      isDark: isDark,
                     ),
                     UserActivityAuctionsTab(isDark: isDark),
                     UserActivityGiftsTab(isDark: isDark),

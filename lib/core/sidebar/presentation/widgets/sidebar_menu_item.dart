@@ -93,19 +93,25 @@ class _SidebarMenuItemState extends State<SidebarMenuItem> {
 
               return Row(
                 children: [
-                  SizedBox(width: 48, child: Center(child: iconWidget)),
+                  SizedBox(
+                    width: 48,
+                    child: Center(child: iconWidget),
+                  ),
                   Expanded(
-                    child: DefaultTextStyle(
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: widget.selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: widget.selected
-                            ? scheme.onSurface
-                            : scheme.onSurfaceVariant,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 8),
+                      child: DefaultTextStyle(
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: widget.selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: widget.selected
+                              ? scheme.onSurface
+                              : scheme.onSurfaceVariant,
+                        ),
+                        child: label,
                       ),
-                      child: label,
                     ),
                   ),
                 ],

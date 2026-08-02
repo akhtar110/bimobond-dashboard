@@ -71,6 +71,16 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       params['isAd'] = 'true';
     }
 
+    final status = filters.status?.trim();
+    if (status != null && status.isNotEmpty) {
+      params['status'] = status;
+    }
+
+    final privacyStatus = filters.privacyStatus?.trim();
+    if (privacyStatus != null && privacyStatus.isNotEmpty) {
+      params['privacyStatus'] = privacyStatus;
+    }
+
     final response = await _dio.get(
       '/posts/admin/all',
       queryParameters: params,

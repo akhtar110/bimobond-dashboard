@@ -1,19 +1,16 @@
 import '../../../users/domain/entities/user_entity.dart';
 import '../entities/user_entity.dart';
 
-bool isDashboardAdmin(DashboardUserEntity user) =>
-    user.roles.contains(UserRole.admin);
+bool isDashboardAdmin(DashboardUserEntity user) => user.roles.includesAdmin;
 
 bool isDashboardModerator(DashboardUserEntity user) =>
-    user.roles.contains(UserRole.moderator) && !isDashboardAdmin(user);
+    user.roles.includesModerator && !isDashboardAdmin(user);
 
-bool isDashboardStaff(DashboardUserEntity user) =>
-    user.roles.contains(UserRole.admin) ||
-    user.roles.contains(UserRole.moderator);
+bool isDashboardStaff(DashboardUserEntity user) => user.roles.includesStaff;
 
 bool canAccessDashboardTab(int tabIndex, List<UserRole> roles) {
-  if (roles.contains(UserRole.admin)) return true;
-  if (!roles.contains(UserRole.moderator)) return false;
+  if (roles.includesAdmin) return true;
+  if (!roles.includesModerator) return false;
   return switch (tabIndex) {
     0 => true, // analytics (monetization section hidden in UI)
     1 => true, // search management
@@ -27,25 +24,20 @@ bool canAccessDashboardTab(int tabIndex, List<UserRole> roles) {
   };
 }
 
-bool canManageWallets(List<UserRole> roles) => roles.contains(UserRole.admin);
+bool canManageWallets(List<UserRole> roles) => roles.includesAdmin;
 
-bool canAdjustWallets(List<UserRole> roles) => roles.contains(UserRole.admin);
+bool canAdjustWallets(List<UserRole> roles) => roles.includesAdmin;
 
-bool canManageCoinPackages(List<UserRole> roles) =>
-    roles.contains(UserRole.admin);
+bool canManageCoinPackages(List<UserRole> roles) => roles.includesAdmin;
 
-bool canManageSettings(List<UserRole> roles) => roles.contains(UserRole.admin);
+bool canManageSettings(List<UserRole> roles) => roles.includesAdmin;
 
-bool canViewMonetizationAnalytics(List<UserRole> roles) =>
-    roles.contains(UserRole.admin);
+bool canViewMonetizationAnalytics(List<UserRole> roles) => roles.includesAdmin;
 
-bool canManageGiftsCatalog(List<UserRole> roles) =>
-    roles.contains(UserRole.admin);
+bool canManageGiftsCatalog(List<UserRole> roles) => roles.includesAdmin;
 
-bool canWritePromotions(List<UserRole> roles) => roles.contains(UserRole.admin);
+bool canWritePromotions(List<UserRole> roles) => roles.includesAdmin;
 
-bool canModerateAuctions(List<UserRole> roles) =>
-    roles.contains(UserRole.admin) || roles.contains(UserRole.moderator);
+bool canModerateAuctions(List<UserRole> roles) => roles.includesStaff;
 
-bool canManageFiltersEffects(List<UserRole> roles) =>
-    roles.contains(UserRole.admin);
+bool canManageFiltersEffects(List<UserRole> roles) => roles.includesAdmin;

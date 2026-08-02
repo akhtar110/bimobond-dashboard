@@ -20,6 +20,8 @@ class PostFilters {
     this.isAuctionable,
     this.isStory,
     this.isAd,
+    this.status,
+    this.privacyStatus,
   });
   final String? categoryId;
   final String? categoryName;
@@ -65,7 +67,14 @@ class PostFilters {
   final bool? isStory;
   final bool? isAd;
 
+  /// Admin post status (e.g. `PUBLISHED`, `DRAFT`).
+  final String? status;
+
+  /// `PUBLIC`, `PRIVATE`, or `FRIENDS`.
+  final String? privacyStatus;
+
   static const defaultSort = 'LATEST';
+  static const privacyOptions = ['PUBLIC', 'PRIVATE', 'FRIENDS'];
   static const sortLatest = 'LATEST';
   static const sortPopular = 'POPULAR';
   static const sortAuthorAsc = 'AUTHOR_ASC';
@@ -130,6 +139,8 @@ class PostFilters {
     bool? isAuctionable,
     bool? isStory,
     bool? isAd,
+    String? status,
+    String? privacyStatus,
     bool clearCategory = false,
     bool clearLocation = false,
     bool clearSearch = false,
@@ -141,6 +152,8 @@ class PostFilters {
     bool clearAuction = false,
     bool clearStory = false,
     bool clearAd = false,
+    bool clearStatus = false,
+    bool clearPrivacyStatus = false,
   }) {
     return PostFilters(
       categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
@@ -196,6 +209,10 @@ class PostFilters {
           : (isAuctionable ?? this.isAuctionable),
       isStory: clearStory ? null : (isStory ?? this.isStory),
       isAd: clearAd ? null : (isAd ?? this.isAd),
+      status: clearStatus ? null : (status ?? this.status),
+      privacyStatus: clearPrivacyStatus
+          ? null
+          : (privacyStatus ?? this.privacyStatus),
     );
   }
 
@@ -207,6 +224,8 @@ class PostFilters {
     if (hasLocationFilter) count++;
     if (isAuctionable == true) count++;
     if (isAd == true) count++;
+    if (status != null && status!.isNotEmpty) count++;
+    if (privacyStatus != null && privacyStatus!.isNotEmpty) count++;
     return count;
   }
 
@@ -245,34 +264,42 @@ class PostFilters {
         other.locationRadiusKm == locationRadiusKm &&
         other.isAuctionable == isAuctionable &&
         other.isStory == isStory &&
-        other.isAd == isAd;
+        other.isAd == isAd &&
+        other.status == status &&
+        other.privacyStatus == privacyStatus;
   }
 
   @override
   int get hashCode => Object.hash(
-    categoryId,
-    categoryName,
-    categorySlug,
-    search,
-    userId,
-    userName,
-    createdFrom == null
-        ? null
-        : DateTime(createdFrom!.year, createdFrom!.month, createdFrom!.day),
-    createdTo == null
-        ? null
-        : DateTime(createdTo!.year, createdTo!.month, createdTo!.day),
-    createdTimeFromMinutes,
-    createdTimeToMinutes,
-    type,
-    sort,
-    locationCity,
-    locationLatitude,
-    locationLongitude,
-    locationRadiusKm,
-    isAuctionable,
-    isStory,
-    isAd,
+    Object.hash(
+      categoryId,
+      categoryName,
+      categorySlug,
+      search,
+      userId,
+      userName,
+      createdFrom == null
+          ? null
+          : DateTime(createdFrom!.year, createdFrom!.month, createdFrom!.day),
+      createdTo == null
+          ? null
+          : DateTime(createdTo!.year, createdTo!.month, createdTo!.day),
+      createdTimeFromMinutes,
+      createdTimeToMinutes,
+    ),
+    Object.hash(
+      type,
+      sort,
+      locationCity,
+      locationLatitude,
+      locationLongitude,
+      locationRadiusKm,
+      isAuctionable,
+      isStory,
+      isAd,
+      status,
+      privacyStatus,
+    ),
   );
 }
 

@@ -9,8 +9,13 @@ class GetAdminOverlaysUseCase {
   Future<ArOverlayListResponseEntity> call({
     int page = 1,
     int limit = 20,
+    bool? isActive,
   }) {
-    return _repository.getAdminOverlays(page: page, limit: limit);
+    return _repository.getAdminOverlays(
+      page: page,
+      limit: limit,
+      isActive: isActive,
+    );
   }
 }
 
@@ -38,6 +43,24 @@ class UpdateAdminOverlayUseCase {
 
   Future<ArOverlayEntity> call(String id, UpdateArOverlayData data) {
     return _repository.updateAdminOverlay(id, data);
+  }
+}
+
+class ActivateAdminOverlayUseCase {
+  const ActivateAdminOverlayUseCase(this._repository);
+  final ArOverlaysRepository _repository;
+
+  Future<ArOverlayEntity> call(String id) {
+    return _repository.activateAdminOverlay(id);
+  }
+}
+
+class DeactivateAdminOverlayUseCase {
+  const DeactivateAdminOverlayUseCase(this._repository);
+  final ArOverlaysRepository _repository;
+
+  Future<ArOverlayEntity> call(String id) {
+    return _repository.deactivateAdminOverlay(id);
   }
 }
 

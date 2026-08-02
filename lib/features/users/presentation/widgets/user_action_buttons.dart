@@ -34,11 +34,19 @@ class UserActionButtons extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final useCompact = compact ||
+            final screenWidth = MediaQuery.sizeOf(context).width;
+            final available = constraints.hasBoundedWidth
+                ? constraints.maxWidth
+                : screenWidth;
+            // Small / narrow action columns → overflow menu.
+            // Medium columns → denser chips. Wide → normal chips.
+            final useMenu = compact ||
                 !constraints.hasBoundedWidth ||
-                constraints.maxWidth < 300;
+                available < 360 ||
+                screenWidth < 900;
+            final dense = !useMenu && (available < 520 || screenWidth < 1400);
 
-            if (useCompact) {
+            if (useMenu) {
               return _CompactActionsMenu(
                 user: user,
                 canBan: canBan,
@@ -54,13 +62,14 @@ class UserActionButtons extends StatelessWidget {
             }
 
             return Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: dense ? 4 : 6,
+              runSpacing: dense ? 4 : 6,
               alignment: WrapAlignment.end,
               children: [
                 _ActionChip(
                   label: l10n.t('details'),
                   icon: Icons.open_in_new_rounded,
+                  dense: dense,
                   onPressed: () => _openDetails(context),
                 ),
                 if (canBan)
@@ -69,11 +78,13 @@ class UserActionButtons extends StatelessWidget {
                     icon: user.isBanned
                         ? Icons.lock_open_rounded
                         : Icons.block_rounded,
+                    dense: dense,
                     onPressed: () => _confirmBanToggle(context, bloc),
                   ),
                 if (canAssignRoles)
                   _RoleActionButton(
                     user: user,
+                    dense: dense,
                     onSetRole: (role) => bloc.add(
                       SetUserRoleEvent(userId: user.id, role: role),
                     ),
@@ -83,6 +94,7 @@ class UserActionButtons extends StatelessWidget {
                     label: l10n.t('delete'),
                     icon: Icons.delete_outline_rounded,
                     isDestructive: true,
+                    dense: dense,
                     onPressed: () => UserDeleteDialog.show(context, user.id),
                   ),
               ],
@@ -144,18 +156,24 @@ class _ActionChip extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.isDestructive = false,
+    this.dense = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
   final bool isDestructive;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = isDestructive ? scheme.error : scheme.primary;
+    final hPad = dense ? 7.0 : 10.0;
+    final vPad = dense ? 4.0 : 6.0;
+    final iconSize = dense ? 12.0 : 14.0;
+    final gap = dense ? 3.0 : 5.0;
 
     return Material(
       color: Colors.transparent,
@@ -173,16 +191,17 @@ class _ActionChip extends StatelessWidget {
             color: color.withValues(alpha: 0.06),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 5),
+                Icon(icon, size: iconSize, color: color),
+                SizedBox(width: gap),
                 Text(
                   label,
                   style: theme.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w600,
+                    fontSize: dense ? 11 : null,
                     color: color,
                   ),
                 ),
@@ -219,7 +238,6 @@ class _CompactActionsMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final isAdmin = user.roles.contains(UserRole.admin);
 
     return PopupMenuButton<String>(
       tooltip: l10n.t('actions'),
@@ -265,41 +283,42 @@ class _CompactActionsMenu extends StatelessWidget {
             ),
           ),
         if (canAssignRoles) ...[
-          if (isAdmin) ...[
+          if (user.isAdminRole)
             PopupMenuItem(
               value: 'set_role_user',
               child: _MenuRow(
                 Icons.person_outline_rounded,
-                l10n.t('roleUser'),
+                l10n.tOr('demoteToStandardUser', 'To User'),
               ),
-            ),
-            PopupMenuItem(
-              value: 'set_role_moderator',
-              child: _MenuRow(
-                Icons.shield_outlined,
-                l10n.t('roleModerator'),
-              ),
-            ),
-          ] else ...[
+            )
+          else if (user.isModeratorRole) ...[
             PopupMenuItem(
               value: 'set_role_user',
               child: _MenuRow(
                 Icons.person_outline_rounded,
-                l10n.t('roleUser'),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'set_role_moderator',
-              child: _MenuRow(
-                Icons.shield_outlined,
-                l10n.t('roleModerator'),
+                l10n.tOr('demoteToStandardUser', 'To User'),
               ),
             ),
             PopupMenuItem(
               value: 'set_role_admin',
               child: _MenuRow(
                 Icons.admin_panel_settings_outlined,
-                l10n.t('roleAdmin'),
+                l10n.tOr('promoteToAdmin', 'To Admin'),
+              ),
+            ),
+          ] else ...[
+            PopupMenuItem(
+              value: 'set_role_moderator',
+              child: _MenuRow(
+                Icons.shield_outlined,
+                l10n.tOr('promoteToModerator', 'To Moderator'),
+              ),
+            ),
+            PopupMenuItem(
+              value: 'set_role_admin',
+              child: _MenuRow(
+                Icons.admin_panel_settings_outlined,
+                l10n.tOr('promoteToAdmin', 'To Admin'),
               ),
             ),
           ],
@@ -322,10 +341,12 @@ class _RoleActionButton extends StatelessWidget {
   const _RoleActionButton({
     required this.user,
     required this.onSetRole,
+    this.dense = false,
   });
 
   final UserEntity user;
   final ValueChanged<UserRole> onSetRole;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -333,7 +354,53 @@ class _RoleActionButton extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = scheme.primary;
-    final isAdmin = user.roles.contains(UserRole.admin);
+    final isAdmin = user.isAdminRole;
+    final hPad = dense ? 7.0 : 10.0;
+    final vPad = dense ? 4.0 : 6.0;
+    final iconSize = dense ? 12.0 : 14.0;
+    final gap = dense ? 3.0 : 5.0;
+
+    final items = <PopupMenuEntry<UserRole>>[
+      if (user.isAdminRole)
+        PopupMenuItem(
+          value: UserRole.user,
+          child: _MenuRow(
+            Icons.person_outline_rounded,
+            l10n.tOr('demoteToStandardUser', 'To User'),
+          ),
+        )
+      else if (user.isModeratorRole) ...[
+        PopupMenuItem(
+          value: UserRole.user,
+          child: _MenuRow(
+            Icons.person_outline_rounded,
+            l10n.tOr('demoteToStandardUser', 'To User'),
+          ),
+        ),
+        PopupMenuItem(
+          value: UserRole.admin,
+          child: _MenuRow(
+            Icons.admin_panel_settings_outlined,
+            l10n.tOr('promoteToAdmin', 'To Admin'),
+          ),
+        ),
+      ] else ...[
+        PopupMenuItem(
+          value: UserRole.moderator,
+          child: _MenuRow(
+            Icons.shield_outlined,
+            l10n.tOr('promoteToModerator', 'To Moderator'),
+          ),
+        ),
+        PopupMenuItem(
+          value: UserRole.admin,
+          child: _MenuRow(
+            Icons.admin_panel_settings_outlined,
+            l10n.tOr('promoteToAdmin', 'To Admin'),
+          ),
+        ),
+      ],
+    ];
 
     return PopupMenuButton<UserRole>(
       tooltip: isAdmin
@@ -342,48 +409,9 @@ class _RoleActionButton extends StatelessWidget {
       onSelected: onSetRole,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       offset: const Offset(0, 8),
-      itemBuilder: (_) => isAdmin
-          ? [
-              PopupMenuItem(
-                value: UserRole.user,
-                child: _MenuRow(
-                  Icons.person_outline_rounded,
-                  l10n.t('roleUser'),
-                ),
-              ),
-              PopupMenuItem(
-                value: UserRole.moderator,
-                child: _MenuRow(
-                  Icons.shield_outlined,
-                  l10n.t('roleModerator'),
-                ),
-              ),
-            ]
-          : [
-              PopupMenuItem(
-                value: UserRole.user,
-                child: _MenuRow(
-                  Icons.person_outline_rounded,
-                  l10n.t('roleUser'),
-                ),
-              ),
-              PopupMenuItem(
-                value: UserRole.moderator,
-                child: _MenuRow(
-                  Icons.shield_outlined,
-                  l10n.t('roleModerator'),
-                ),
-              ),
-              PopupMenuItem(
-                value: UserRole.admin,
-                child: _MenuRow(
-                  Icons.admin_panel_settings_outlined,
-                  l10n.t('roleAdmin'),
-                ),
-              ),
-            ],
+      itemBuilder: (_) => items,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -395,12 +423,13 @@ class _RoleActionButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.manage_accounts_outlined, size: 14, color: color),
-            const SizedBox(width: 5),
+            Icon(Icons.manage_accounts_outlined, size: iconSize, color: color),
+            SizedBox(width: gap),
             Text(
               isAdmin ? l10n.t('demote') : l10n.t('promote'),
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w600,
+                fontSize: dense ? 11 : null,
                 color: color,
               ),
             ),

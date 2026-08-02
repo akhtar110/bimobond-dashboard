@@ -12,6 +12,8 @@ import '../../../user_activity/presentation/bloc/user_unified_activity_bloc.dart
 import '../../../promotions/presentation/bloc/location_intelligence_bloc.dart';
 import '../../../rbac/presentation/bloc/rbac_bloc.dart';
 import '../../../search_history/presentation/bloc/search_history_bloc.dart';
+import '../../../user_history/presentation/bloc/user_history_bloc.dart';
+import '../../../user_history/presentation/bloc/user_history_event.dart';
 import '../../../user_interests/presentation/bloc/user_interests_bloc.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/user_detail_bloc.dart';
@@ -38,6 +40,7 @@ class _UserDetailRouteScopeState extends State<UserDetailRouteScope> {
   late final CategoriesBloc _categoriesBloc;
   late final LocationIntelligenceBloc _locationBloc;
   late final SearchHistoryBloc _searchHistoryBloc;
+  late final UserHistoryBloc _userHistoryBloc;
   late final UserInterestsBloc _userInterestsBloc;
 
   @override
@@ -83,6 +86,10 @@ class _UserDetailRouteScopeState extends State<UserDetailRouteScope> {
     _searchHistoryBloc = di.sl<SearchHistoryBloc>();
     if (kDebugMode) debugPrint('SearchHistoryBloc created');
 
+    _userHistoryBloc = di.sl<UserHistoryBloc>()
+      ..add(SetUserHistoryUserId(user.id));
+    if (kDebugMode) debugPrint('UserHistoryBloc created');
+
     _userInterestsBloc = di.sl<UserInterestsBloc>();
     if (kDebugMode) debugPrint('UserInterestsBloc created');
   }
@@ -98,6 +105,7 @@ class _UserDetailRouteScopeState extends State<UserDetailRouteScope> {
     _categoriesBloc.close();
     _locationBloc.close();
     _searchHistoryBloc.close();
+    _userHistoryBloc.close();
     _userInterestsBloc.close();
     super.dispose();
   }
@@ -117,6 +125,7 @@ class _UserDetailRouteScopeState extends State<UserDetailRouteScope> {
         BlocProvider<CategoriesBloc>.value(value: _categoriesBloc),
         BlocProvider<LocationIntelligenceBloc>.value(value: _locationBloc),
         BlocProvider<SearchHistoryBloc>.value(value: _searchHistoryBloc),
+        BlocProvider<UserHistoryBloc>.value(value: _userHistoryBloc),
         BlocProvider<UserInterestsBloc>.value(value: _userInterestsBloc),
       ],
       child: UserDetailScreen(user: widget.user),

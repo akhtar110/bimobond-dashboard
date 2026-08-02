@@ -6,6 +6,17 @@ enum UserRole {
   user,
   admin,
   moderator,
+  superAdmin,
+}
+
+extension UserRolesX on Iterable<UserRole> {
+  /// Admin or Super Admin (legacy dashboard staff).
+  bool get includesAdmin =>
+      any((r) => r == UserRole.admin || r == UserRole.superAdmin);
+
+  bool get includesModerator => any((r) => r == UserRole.moderator);
+
+  bool get includesStaff => includesAdmin || includesModerator;
 }
 
 class UserEntity {
@@ -150,6 +161,14 @@ class UserEntity {
 
   /// Latest GPS point from admin list/detail (`UserLocationHistory` or profile fallback).
   final UserLastLocationEntity? lastLocation;
+
+  bool get isAdminRole => roles.includesAdmin;
+
+  bool get isModeratorRole =>
+      roles.includesModerator && !isAdminRole;
+
+  /// Standard / regular user (not admin and not moderator).
+  bool get isStandardRole => !isAdminRole && !isModeratorRole;
 }
 
 class UsersPageEntity {

@@ -10,43 +10,42 @@ class ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
 
     return SettingsSection(
       title: l10n.t('adminProfile'),
       child: SettingsSurfaceCard(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
         child: Row(
           children: [
             Container(
-              width: 72,
-              height: 72,
+              width: 68,
+              height: 68,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    primary.withValues(alpha: 0.85),
-                    primary.withValues(alpha: 0.55),
+                    scheme.primary,
+                    scheme.primary.withValues(alpha: 0.65),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: primary.withValues(alpha: 0.28),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: scheme.primary.withValues(alpha: 0.24),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.admin_panel_settings_rounded,
-                color: Colors.white,
-                size: 36,
+                color: scheme.onPrimary,
+                size: 34,
               ),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 18),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,22 +53,22 @@ class ProfileCard extends StatelessWidget {
                   Text(
                     l10n.t('adminName'),
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
-                      color: isDark ? Colors.white : const Color(0xFF111827),
+                      color: scheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.12),
+                      color: scheme.primaryContainer,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: primary.withValues(alpha: 0.28),
+                        color: scheme.primary.withValues(alpha: 0.25),
                       ),
                     ),
                     child: Row(
@@ -78,15 +77,14 @@ class ProfileCard extends StatelessWidget {
                         Icon(
                           Icons.verified_rounded,
                           size: 14,
-                          color: primary,
+                          color: scheme.onPrimaryContainer,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           l10n.t('adminRole'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: primary,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onPrimaryContainer,
                           ),
                         ),
                       ],
@@ -96,10 +94,7 @@ class ProfileCard extends StatelessWidget {
                   Text(
                     l10n.t('bimoBondAdmin'),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? Colors.grey.shade500
-                          : const Color(0xFF6B7280),
-                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ],

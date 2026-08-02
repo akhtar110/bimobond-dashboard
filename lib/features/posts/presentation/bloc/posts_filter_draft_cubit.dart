@@ -23,6 +23,8 @@ class PostsFilterDraftState extends Equatable {
     this.locationLatitude,
     this.locationLongitude,
     this.locationRadiusKm = PostFilters.defaultLocationRadiusKm,
+    this.status,
+    this.privacyStatus,
     this.revision = 0,
   });
 
@@ -47,6 +49,8 @@ class PostsFilterDraftState extends Equatable {
       locationLongitude: filters.locationLongitude,
       locationRadiusKm:
           filters.locationRadiusKm ?? PostFilters.defaultLocationRadiusKm,
+      status: filters.status,
+      privacyStatus: filters.privacyStatus,
     );
   }
 
@@ -65,6 +69,8 @@ class PostsFilterDraftState extends Equatable {
   final double? locationLatitude;
   final double? locationLongitude;
   final double? locationRadiusKm;
+  final String? status;
+  final String? privacyStatus;
 
   /// Bumped on [PostsFilterDraftCubit.reset] to force dependent widgets to refresh.
   final int revision;
@@ -88,7 +94,10 @@ class PostsFilterDraftState extends Equatable {
       count++;
     }
     if (categoryId != null) count++;
+    if (hasLocationAnchor) count++;
     if (hasLocationFilter) count++;
+    if (status != null && status!.isNotEmpty) count++;
+    if (privacyStatus != null && privacyStatus!.isNotEmpty) count++;
     return count;
   }
 
@@ -108,6 +117,8 @@ class PostsFilterDraftState extends Equatable {
     double? locationLatitude,
     double? locationLongitude,
     double? locationRadiusKm,
+    String? status,
+    String? privacyStatus,
     int? revision,
     bool clearType = false,
     bool clearUser = false,
@@ -115,6 +126,8 @@ class PostsFilterDraftState extends Equatable {
     bool clearTimeRange = false,
     bool clearCategory = false,
     bool clearLocation = false,
+    bool clearStatus = false,
+    bool clearPrivacyStatus = false,
     bool clearAnchor = false,
   }) {
     return PostsFilterDraftState(
@@ -143,6 +156,10 @@ class PostsFilterDraftState extends Equatable {
       locationRadiusKm: clearLocation
           ? PostFilters.defaultLocationRadiusKm
           : (locationRadiusKm ?? this.locationRadiusKm),
+      status: clearStatus ? null : (status ?? this.status),
+      privacyStatus: clearPrivacyStatus
+          ? null
+          : (privacyStatus ?? this.privacyStatus),
       revision: revision ?? this.revision,
     );
   }
@@ -164,6 +181,8 @@ class PostsFilterDraftState extends Equatable {
     locationLatitude,
     locationLongitude,
     locationRadiusKm,
+    status,
+    privacyStatus,
     revision,
   ];
 }
@@ -181,6 +200,19 @@ class PostsFilterDraftCubit extends Cubit<PostsFilterDraftState> {
   void setType(String? value) {
     if (state.type == value) return;
     emit(state.copyWith(type: value, clearType: value == null));
+  }
+
+  void setStatus(String? value) {
+    if (state.status == value) return;
+    emit(state.copyWith(status: value, clearStatus: value == null));
+  }
+
+  void setPrivacyStatus(String? value) {
+    if (state.privacyStatus == value) return;
+    emit(state.copyWith(
+      privacyStatus: value,
+      clearPrivacyStatus: value == null,
+    ));
   }
 
   void setSort(String value) {
@@ -329,6 +361,9 @@ class PostsFilterDraftCubit extends Cubit<PostsFilterDraftState> {
       locationCity: state.locationCity,
       locationLatitude: state.locationLatitude,
       locationLongitude: state.locationLongitude,
+      locationRadiusKm: state.locationRadiusKm,
+      status: state.status,
+      privacyStatus: state.privacyStatus,
     );
   }
 }

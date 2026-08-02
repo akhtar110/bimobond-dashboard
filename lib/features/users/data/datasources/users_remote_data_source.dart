@@ -267,6 +267,7 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     final legacyRoles = roles
         .map((e) => switch (e) {
               UserRole.admin => 'ADMIN',
+              UserRole.superAdmin => 'ADMIN',
               UserRole.moderator => 'MODERATOR',
               UserRole.user => 'USER',
             })
@@ -504,6 +505,7 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     final legacyRoles = roles
         .map((e) => switch (e) {
               UserRole.admin => 'ADMIN',
+              UserRole.superAdmin => 'ADMIN',
               UserRole.moderator => 'MODERATOR',
               UserRole.user => 'USER',
             })

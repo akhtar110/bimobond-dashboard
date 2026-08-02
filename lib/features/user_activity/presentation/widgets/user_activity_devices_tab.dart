@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../bloc/user_activity_bloc.dart';
 import 'activity_empty_state.dart';
+import 'last_active_history_dialog.dart';
 import 'user_activity_shimmer.dart';
 import 'user_device_card.dart';
 
@@ -45,6 +46,15 @@ class _UserActivityDevicesTabState extends State<UserActivityDevicesTab> {
     bloc.add(LoadMoreDevices());
   }
 
+  void _openLastActiveHistory(String userId, {String? deviceId}) {
+    if (userId.isEmpty) return;
+    showLastActiveHistoryDialog(
+      context,
+      userId: userId,
+      deviceId: deviceId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -60,33 +70,99 @@ class _UserActivityDevicesTabState extends State<UserActivityDevicesTab> {
         }
 
         if (state.devices.isEmpty) {
-          return ActivityEmptyState(
-            icon: Icons.devices_outlined,
-            message: l10n.t('noDevicesFound'),
-            isDark: widget.isDark,
+          return Column(
+            children: [
+              _HistoryActionBar(
+                enabled: state.userId.isNotEmpty,
+                onPressed: () => _openLastActiveHistory(state.userId),
+              ),
+              Expanded(
+                child: ActivityEmptyState(
+                  icon: Icons.devices_outlined,
+                  message: l10n.t('noDevicesFound'),
+                  isDark: widget.isDark,
+                ),
+              ),
+            ],
           );
         }
 
-        return ListView.separated(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          itemCount:
-              state.devices.length + (state.devicesLoadingMore ? 1 : 0),
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            if (index >= state.devices.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return UserDeviceCard(
-              device: state.devices[index],
-              isDark: widget.isDark,
-            );
-          },
+        return Column(
+          children: [
+            _HistoryActionBar(
+              enabled: state.userId.isNotEmpty,
+              onPressed: () => _openLastActiveHistory(state.userId),
+            ),
+            Expanded(
+              child: ListView.separated(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount:
+                    state.devices.length + (state.devicesLoadingMore ? 1 : 0),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  if (index >= state.devices.length) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final device = state.devices[index];
+                  return UserDeviceCard(
+                    device: device,
+                    isDark: widget.isDark,
+                    onViewLastActiveHistory: state.userId.isEmpty
+                        ? null
+                        : () => _openLastActiveHistory(
+                              state.userId,
+                              deviceId: device.deviceId,
+                            ),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _HistoryActionBar extends StatelessWidget {
+  const _HistoryActionBar({
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: enabled ? onPressed : null,
+          icon: Icon(
+            Icons.history_rounded,
+            size: 18,
+            color: enabled ? scheme.primary : scheme.onSurfaceVariant,
+          ),
+          label: Text(
+            l10n.tOr('viewLastActiveHistory', 'Last active history'),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: enabled ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

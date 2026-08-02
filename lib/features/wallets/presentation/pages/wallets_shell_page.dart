@@ -344,53 +344,95 @@ class _WalletsTopNav extends StatelessWidget {
     context.select<SettingsCubit, Locale>((c) => c.state.locale);
     final scheme = Theme.of(context).colorScheme;
     final metrics = walletsMetricsOf(context);
+    final width = MediaQuery.sizeOf(context).width;
+
+    // Narrow phones: icon-only chips avoid label overflow and tall chrome.
+    final iconOnly = width < 560;
+    final showTitle = width >= 420;
+    final chipGap = width < 400 ? 4.0 : metrics.toolbarFilterGap;
 
     return Material(
       elevation: 1,
       shadowColor: scheme.shadow.withValues(alpha: 0.08),
       color: scheme.surfaceContainerLow,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          metrics.pageHorizontalPadding,
-          metrics.isMobile ? 8 : 12,
-          metrics.pageHorizontalPadding,
-          metrics.isMobile ? 8 : 10,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              walletL10nOr(context, 'walletNavWallets', 'Wallets'),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.onSurface,
-                  ),
-            ),
-            SizedBox(height: metrics.isMobile ? 8 : 10),
-            SizedBox(
-              height: metrics.isMobile ? 36 : 40,
-              child: ListView.separated(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            metrics.pageHorizontalPadding,
+            metrics.isMobile ? 6 : 8,
+            metrics.pageHorizontalPadding,
+            metrics.isMobile ? 6 : 8,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showTitle) ...[
+                Text(
+                  walletL10nOr(context, 'walletNavWallets', 'Wallets'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: scheme.onSurface,
+                        fontSize: metrics.isMobile ? 15 : 16,
+                        height: 1.15,
+                      ),
+                ),
+                SizedBox(height: metrics.isMobile ? 6 : 8),
+              ],
+              // Intrinsic height — fixed heights were overflowing chip padding
+              // on small devices.
+              SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                itemCount: items.length,
-                separatorBuilder: (_, _) =>
-                    SizedBox(width: metrics.toolbarFilterGap),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return _TopNavChip(
-                    selected: section == item.$1,
-                    icon: item.$2,
-                    label: item.$3,
-                    compact: metrics.isMobile,
-                    onTap: () => onChanged(item.$1),
-                  );
-                },
+                clipBehavior: Clip.hardEdge,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      if (i > 0) SizedBox(width: chipGap),
+                      _TopNavChip(
+                        selected: section == items[i].$1,
+                        icon: items[i].$2,
+                        label: _shortNavLabel(
+                          items[i].$1,
+                          items[i].$3,
+                          width: width,
+                        ),
+                        tooltip: items[i].$3,
+                        iconOnly: iconOnly,
+                        compact: metrics.isMobile || width < 900,
+                        onTap: () => onChanged(items[i].$1),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Shorter labels on mid widths so chips fit without wrapping/overflow.
+  static String _shortNavLabel(
+    WalletsSection section,
+    String fullLabel, {
+    required double width,
+  }) {
+    if (width >= 780) return fullLabel;
+    return switch (section) {
+      WalletsSection.moneyDashboard => 'Money',
+      WalletsSection.economyHome => 'Economy',
+      WalletsSection.overview => 'Overview',
+      WalletsSection.walletsList => 'Wallets',
+      WalletsSection.ledger => 'Ledger',
+      WalletsSection.fiatPurchases => 'Fiat',
+      WalletsSection.withdrawals => 'Withdrawals',
+      WalletsSection.coinPackages => 'Packages',
+      WalletsSection.platformProfit => 'Profit',
+    };
   }
 }
 
@@ -400,32 +442,41 @@ class _TopNavChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.tooltip,
     this.compact = false,
+    this.iconOnly = false,
   });
 
   final bool selected;
   final IconData icon;
   final String label;
+  final String? tooltip;
   final VoidCallback onTap;
   final bool compact;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final radius = compact || iconOnly ? 10.0 : 12.0;
 
-    return Material(
+    final chip = Material(
       color: selected ? scheme.primaryContainer : scheme.surface,
-      borderRadius: BorderRadius.circular(compact ? 10 : 12),
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(compact ? 10 : 12),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
+          constraints: BoxConstraints(
+            minHeight: iconOnly ? 36 : (compact ? 32 : 36),
+            minWidth: iconOnly ? 36 : 0,
+          ),
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 10 : 12,
-            vertical: compact ? 6 : 8,
+            horizontal: iconOnly ? 8 : (compact ? 8 : 12),
+            vertical: iconOnly ? 8 : (compact ? 5 : 7),
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(compact ? 10 : 12),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: selected
                   ? scheme.primary
@@ -437,27 +488,42 @@ class _TopNavChip extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: compact ? 16 : 18,
+                size: iconOnly ? 18 : (compact ? 15 : 17),
                 color: selected
                     ? scheme.onPrimaryContainer
                     : scheme.onSurfaceVariant,
               ),
-              SizedBox(width: compact ? 6 : 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: compact ? 12 : 13,
-                  color: selected
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurface,
+              if (!iconOnly) ...[
+                SizedBox(width: compact ? 5 : 7),
+                Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: compact ? 11.5 : 13,
+                    height: 1.1,
+                    color: selected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurface,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
       ),
     );
+
+    if (iconOnly || (tooltip != null && tooltip != label)) {
+      return Tooltip(
+        message: tooltip ?? label,
+        waitDuration: const Duration(milliseconds: 400),
+        child: chip,
+      );
+    }
+    return chip;
   }
 }
 

@@ -29,7 +29,7 @@ class UsersCardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isAdmin = user.roles.contains(UserRole.admin);
+    final isAdmin = user.roles.includesAdmin;
     final subtitle = user.email ?? '@${user.username}';
 
     return Material(

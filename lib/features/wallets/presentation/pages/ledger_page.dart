@@ -51,10 +51,6 @@ class LedgerPage extends StatelessWidget {
               WalletsPageHeader(
                 metrics: metrics,
                 title: walletL10nOr(context, 'walletTitleGlobalLedger', 'Global ledger'),
-                subtitle: walletL10nOr(context,
-                  'walletSubtitleGlobalLedger',
-                  'Filter by entry type and credit/debit action.',
-                ),
               ),
               SizedBox(height: metrics.sectionGap),
               LedgerToolbar(

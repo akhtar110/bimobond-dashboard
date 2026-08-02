@@ -12,8 +12,8 @@ extension UserAdminActionTypeX on UserAdminActionType {
   String labelKey(UserEntity user) => switch (this) {
         UserAdminActionType.ban => 'ban',
         UserAdminActionType.unban => 'unban',
-        UserAdminActionType.promote => 'promote',
-        UserAdminActionType.demote => 'demote',
+        UserAdminActionType.promote => 'promoteToAdmin',
+        UserAdminActionType.demote => 'demoteToStandardUser',
         UserAdminActionType.delete => 'delete',
       };
 
@@ -52,8 +52,9 @@ extension UserAdminActionTypeX on UserAdminActionType {
   bool isVisibleFor(UserEntity user) => switch (this) {
         UserAdminActionType.ban => !user.isBanned,
         UserAdminActionType.unban => user.isBanned,
-        UserAdminActionType.promote => !user.roles.contains(UserRole.admin),
-        UserAdminActionType.demote => user.roles.contains(UserRole.admin),
+        // Role changes are rendered as targeted promote/demote options in the UI.
+        UserAdminActionType.promote => user.isStandardRole,
+        UserAdminActionType.demote => user.isAdminRole,
         UserAdminActionType.delete => true,
       };
 }
