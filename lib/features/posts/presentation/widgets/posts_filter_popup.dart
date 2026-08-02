@@ -365,80 +365,6 @@ class PostsFilterPopup extends StatelessWidget {
                           ),
                         ),
                         PostsFilterSection(
-<<<<<<< Updated upstream
-=======
-                          title: l10n.tOr('postStatus', 'Post Status'),
-                          icon: Icons.shield_outlined,
-                          child: PostsFilterChipGrid(
-                            children: [
-                              PostsFilterChoiceChip(
-                                label: l10n.t('all'),
-                                selected: draft.status == null,
-                                onTap: () => cubit.setStatus(null),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('postStatusPublished'),
-                                selected: draft.status == 'PUBLISHED',
-                                onTap: () => cubit.setStatus('PUBLISHED'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('postStatusDraft'),
-                                selected: draft.status == 'DRAFT',
-                                onTap: () => cubit.setStatus('DRAFT'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('postStatusUnderReview'),
-                                selected: draft.status == 'UNDER_REVIEW',
-                                onTap: () => cubit.setStatus('UNDER_REVIEW'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('postStatusHidden'),
-                                selected: draft.status == 'HIDDEN',
-                                onTap: () => cubit.setStatus('HIDDEN'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('postStatusBanned'),
-                                selected: draft.status == 'BANNED',
-                                onTap: () => cubit.setStatus('BANNED'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('archived'),
-                                selected: draft.status == 'ARCHIVED',
-                                onTap: () => cubit.setStatus('ARCHIVED'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        PostsFilterSection(
-                          title: l10n.tOr('privacyStatus', 'Privacy'),
-                          icon: Icons.lock_outline_rounded,
-                          child: PostsFilterChipGrid(
-                            children: [
-                              PostsFilterChoiceChip(
-                                label: l10n.t('all'),
-                                selected: draft.privacyStatus == null,
-                                onTap: () => cubit.setPrivacyStatus(null),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('public'),
-                                selected: draft.privacyStatus == 'PUBLIC',
-                                onTap: () => cubit.setPrivacyStatus('PUBLIC'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('private'),
-                                selected: draft.privacyStatus == 'PRIVATE',
-                                onTap: () => cubit.setPrivacyStatus('PRIVATE'),
-                              ),
-                              PostsFilterChoiceChip(
-                                label: l10n.t('friendsOnly'),
-                                selected: draft.privacyStatus == 'FRIENDS',
-                                onTap: () => cubit.setPrivacyStatus('FRIENDS'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        PostsFilterSection(
->>>>>>> Stashed changes
                           title: l10n.tOr('location', 'Location'),
                           icon: Icons.place_outlined,
                           child: Column(
@@ -704,29 +630,6 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
     );
   }
 
-<<<<<<< Updated upstream
-=======
-  if (draft.status != null && draft.status!.isNotEmpty) {
-    items.add(
-      GiftsActiveFilterItem(
-        id: 'status',
-        label: postStatusLabel(l10n, draft.status!),
-        onRemove: () => cubit.setStatus(null),
-      ),
-    );
-  }
-
-  if (draft.privacyStatus != null && draft.privacyStatus!.isNotEmpty) {
-    items.add(
-      GiftsActiveFilterItem(
-        id: 'privacyStatus',
-        label: privacyLabel(l10n, draft.privacyStatus!),
-        onRemove: () => cubit.setPrivacyStatus(null),
-      ),
-    );
-  }
-
->>>>>>> Stashed changes
   if (draft.sort != PostFilters.defaultSort) {
     items.add(
       GiftsActiveFilterItem(
