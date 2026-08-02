@@ -175,16 +175,6 @@ class PostsFilterPopup extends StatelessWidget {
     context.read<PostsFilterDraftCubit>().reset();
   }
 
-  void _apply(BuildContext context) {
-    final draft = context.read<PostsFilterDraftCubit>();
-    final postsBloc = context.read<PostsBloc>();
-    final applied = draft.toAppliedFilters(postsBloc.activeFilters);
-    postsBloc.add(
-      UpdatePostFiltersEvent(applied, filterUser: draft.state.user),
-    );
-    _close(context);
-  }
-
   void _applyDatePreset(
     PostsFilterDraftCubit cubit,
     PostsDateTimePreset preset,
@@ -222,7 +212,15 @@ class PostsFilterPopup extends StatelessWidget {
               if (showDragHandle) const _PostsFilterDragHandle(),
               PostsFilterPanelHeader(onClose: () => _close(context)),
               Expanded(
-                child: BlocBuilder<PostsFilterDraftCubit, PostsFilterDraftState>(
+                child: BlocConsumer<PostsFilterDraftCubit, PostsFilterDraftState>(
+                  listener: (context, draft) {
+                    final cubit = context.read<PostsFilterDraftCubit>();
+                    final postsBloc = context.read<PostsBloc>();
+                    final applied = cubit.toAppliedFilters(postsBloc.activeFilters);
+                    postsBloc.add(
+                      UpdatePostFiltersEvent(applied, filterUser: draft.user),
+                    );
+                  },
                   builder: (context, draft) {
                     final cubit = context.read<PostsFilterDraftCubit>();
                     final activeItems = postsDraftActiveFilterItems(
@@ -265,7 +263,7 @@ class PostsFilterPopup extends StatelessWidget {
                             selectedUser: draft.user,
                             hintText: l10n.t('filterPostsByUser'),
                             onUserSelected: cubit.setUser,
-                            onUserConfirmed: () => _apply(context),
+                            onUserConfirmed: () {},
                           ),
                         ),
                         PostsFilterSection(
@@ -367,6 +365,80 @@ class PostsFilterPopup extends StatelessWidget {
                           ),
                         ),
                         PostsFilterSection(
+<<<<<<< Updated upstream
+=======
+                          title: l10n.tOr('postStatus', 'Post Status'),
+                          icon: Icons.shield_outlined,
+                          child: PostsFilterChipGrid(
+                            children: [
+                              PostsFilterChoiceChip(
+                                label: l10n.t('all'),
+                                selected: draft.status == null,
+                                onTap: () => cubit.setStatus(null),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postStatusPublished'),
+                                selected: draft.status == 'PUBLISHED',
+                                onTap: () => cubit.setStatus('PUBLISHED'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postStatusDraft'),
+                                selected: draft.status == 'DRAFT',
+                                onTap: () => cubit.setStatus('DRAFT'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postStatusUnderReview'),
+                                selected: draft.status == 'UNDER_REVIEW',
+                                onTap: () => cubit.setStatus('UNDER_REVIEW'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postStatusHidden'),
+                                selected: draft.status == 'HIDDEN',
+                                onTap: () => cubit.setStatus('HIDDEN'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('postStatusBanned'),
+                                selected: draft.status == 'BANNED',
+                                onTap: () => cubit.setStatus('BANNED'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('archived'),
+                                selected: draft.status == 'ARCHIVED',
+                                onTap: () => cubit.setStatus('ARCHIVED'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PostsFilterSection(
+                          title: l10n.tOr('privacyStatus', 'Privacy'),
+                          icon: Icons.lock_outline_rounded,
+                          child: PostsFilterChipGrid(
+                            children: [
+                              PostsFilterChoiceChip(
+                                label: l10n.t('all'),
+                                selected: draft.privacyStatus == null,
+                                onTap: () => cubit.setPrivacyStatus(null),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('public'),
+                                selected: draft.privacyStatus == 'PUBLIC',
+                                onTap: () => cubit.setPrivacyStatus('PUBLIC'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('private'),
+                                selected: draft.privacyStatus == 'PRIVATE',
+                                onTap: () => cubit.setPrivacyStatus('PRIVATE'),
+                              ),
+                              PostsFilterChoiceChip(
+                                label: l10n.t('friendsOnly'),
+                                selected: draft.privacyStatus == 'FRIENDS',
+                                onTap: () => cubit.setPrivacyStatus('FRIENDS'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PostsFilterSection(
+>>>>>>> Stashed changes
                           title: l10n.tOr('location', 'Location'),
                           icon: Icons.place_outlined,
                           child: Column(
@@ -493,7 +565,6 @@ class PostsFilterPopup extends StatelessWidget {
               ),
               PostsFilterPanelFooter(
                 onReset: () => _resetDraft(context),
-                onApply: () => _apply(context),
               ),
             ],
           ),
@@ -633,6 +704,29 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
     );
   }
 
+<<<<<<< Updated upstream
+=======
+  if (draft.status != null && draft.status!.isNotEmpty) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'status',
+        label: postStatusLabel(l10n, draft.status!),
+        onRemove: () => cubit.setStatus(null),
+      ),
+    );
+  }
+
+  if (draft.privacyStatus != null && draft.privacyStatus!.isNotEmpty) {
+    items.add(
+      GiftsActiveFilterItem(
+        id: 'privacyStatus',
+        label: privacyLabel(l10n, draft.privacyStatus!),
+        onRemove: () => cubit.setPrivacyStatus(null),
+      ),
+    );
+  }
+
+>>>>>>> Stashed changes
   if (draft.sort != PostFilters.defaultSort) {
     items.add(
       GiftsActiveFilterItem(

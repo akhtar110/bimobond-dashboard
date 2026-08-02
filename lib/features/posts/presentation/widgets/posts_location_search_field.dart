@@ -213,19 +213,24 @@ class _PostsLocationSearchFieldState extends State<PostsLocationSearchField> {
       focusNode: _focusNode,
       textInputAction: TextInputAction.search,
       style: theme.textTheme.bodyMedium?.copyWith(
-        fontSize: widget.compact ? 12.5 : 13,
+        fontSize: widget.compact ? 13.5 : 14.5,
+        fontWeight: FontWeight.w500,
       ),
       decoration: InputDecoration(
         labelText: l10n.t('postFilterLocationSearch'),
         hintText: l10n.t('postFilterLocationSearchHint'),
         prefixIcon: Icon(
           Icons.place_outlined,
-          size: widget.compact ? 18 : 20,
+          size: 20,
           color: scheme.onSurfaceVariant,
         ),
         suffixIcon: _buildSuffixIcon(context, l10n, scheme),
         filled: true,
         fillColor: scheme.surfaceContainerLow,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: scheme.outlineVariant),
@@ -238,7 +243,7 @@ class _PostsLocationSearchFieldState extends State<PostsLocationSearchField> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
-        isDense: true,
+        isDense: false,
       ),
       onChanged: _onQueryChanged,
       onSubmitted: _onSubmitted,
@@ -262,13 +267,13 @@ class _PostsLocationSearchFieldState extends State<PostsLocationSearchField> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: scheme.onSurfaceVariant,
             height: 1.2,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Material(
           color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(10),
@@ -287,14 +292,14 @@ class _PostsLocationSearchFieldState extends State<PostsLocationSearchField> {
               focusNode: _focusNode,
               textInputAction: TextInputAction.search,
               style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 14,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w600,
                 height: 1.2,
               ),
               decoration: InputDecoration(
                 hintText: l10n.t('postFilterLocationSearchHint'),
                 hintStyle: TextStyle(
-                  fontSize: 14,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w500,
                   color: scheme.onSurfaceVariant,
                 ),
@@ -303,10 +308,10 @@ class _PostsLocationSearchFieldState extends State<PostsLocationSearchField> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 14,
+                  horizontal: 14,
+                  vertical: 16,
                 ),
-                isDense: true,
+                isDense: false,
               ),
               onChanged: _onQueryChanged,
               onSubmitted: _onSubmitted,
@@ -552,19 +557,38 @@ class _PostsLocationAnchorButtonsState extends State<PostsLocationAnchorButtons>
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final buttonStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      side: BorderSide(
+        color: scheme.outlineVariant,
+      ),
+      foregroundColor: scheme.onSurfaceVariant,
+      textStyle: const TextStyle(
+        fontSize: 13.0,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         OutlinedButton.icon(
           onPressed: _locating ? null : _useMyLocation,
+          style: buttonStyle,
           icon: _locating
               ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: scheme.primary,
                   ),
                 )
               : const Icon(Icons.my_location_rounded, size: 18),
@@ -574,6 +598,7 @@ class _PostsLocationAnchorButtonsState extends State<PostsLocationAnchorButtons>
           OutlinedButton.icon(
             onPressed:
                 _locating ? null : () => _useFilterUserLocation(widget.filterUser!),
+            style: buttonStyle,
             icon: const Icon(Icons.person_pin_circle_outlined, size: 18),
             label: Text(
               l10n.tArgs('postFilterUseUserLocation', {

@@ -219,22 +219,10 @@ class _PostsLocationPickerSheetState extends State<_PostsLocationPickerSheet> {
     _draftPlace = widget.place;
   }
 
-  void _apply() {
-    widget.onApply(_draftPlace);
-    Navigator.of(context).pop();
-  }
-
-  void _clear() {
-    setState(() {
-      _draftPlace = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final isCompact = MediaQuery.sizeOf(context).width < 600;
     final topPadding = widget.showDragHandle ? 10.0 : 22.0;
 
     return Material(
@@ -269,55 +257,32 @@ class _PostsLocationPickerSheetState extends State<_PostsLocationPickerSheet> {
             const SizedBox(height: 20),
             PostsLocationPicker(
               place: _draftPlace,
-              onChanged: (place) => setState(() => _draftPlace = place),
+              onChanged: (place) {
+                widget.onApply(place);
+                if (context.mounted && Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
             ),
-            const SizedBox(height: 20),
-            if (isCompact)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FilledButton(
-                    onPressed: _apply,
-                    child: Text(l10n.tOr('apply', 'Apply')),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _clear,
-                          child: Text(l10n.tOr('clear', 'Clear')),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(l10n.tOr('cancel', 'Cancel')),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(l10n.tOr('cancel', 'Cancel')),
-                  ),
-                  TextButton(
-                    onPressed: _clear,
-                    child: Text(l10n.tOr('clear', 'Clear')),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _apply,
-                    child: Text(l10n.tOr('apply', 'Apply')),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                OutlinedButton(
+                  onPressed: () {
+                    widget.onApply(null);
+                    if (context.mounted && Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: Text(l10n.tOr('clear', 'Clear')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.tOr('close', 'Close')),
+                ),
+              ],
+            ),
           ],
         ),
       ),

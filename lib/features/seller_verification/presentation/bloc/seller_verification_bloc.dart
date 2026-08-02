@@ -41,6 +41,8 @@ class SellerVerificationBloc
   Timer? _searchDebounce;
   static const _searchDebounceMs = 300;
   bool _busy = false;
+  bool _pendingRefresh = false;
+  int _loadToken = 0;
 
   String? _statusFilter;
   String _searchQuery = '';
@@ -60,16 +62,29 @@ class SellerVerificationBloc
     bool showLoading = true,
     bool append = false,
   }) async {
-    if (_busy) return;
     if (page < 1) return;
+    // If a fetch is already running, cancel it by bumping the token and
+    // then wait for _busy to clear before starting the new fetch.
+    if (_busy) {
+      if (!append) {
+        _loadToken++; // cancel the in-flight request
+        _pendingRefresh = true;
+        return;
+      }
+      return;
+    }
 
     _busy = true;
+    final token = ++_loadToken;
+    final query = _buildQuery();
     final previous = state;
     if (showLoading && previous is! SellerVerificationLoaded) {
       emit(const SellerVerificationLoading());
     } else if (previous is SellerVerificationLoaded) {
       emit(
         previous.copyWith(
+          statusFilter: _statusFilter,
+          clearStatusFilter: _statusFilter == null,
           isFetching: !append,
           isLoadingMore: append,
         ),
@@ -80,8 +95,10 @@ class SellerVerificationBloc
       final response = await _getApplications(
         page: page,
         limit: pageLimit,
-        query: _buildQuery(),
+        query: query,
       );
+
+      if (token != _loadToken) return;
 
       _currentPage = response.currentPage;
 
@@ -110,6 +127,7 @@ class SellerVerificationBloc
         ),
       );
     } catch (e) {
+      if (token != _loadToken) return;
       if (previous is SellerVerificationLoaded) {
         emit(
           previous.copyWith(isFetching: false, isLoadingMore: false),
@@ -119,6 +137,10 @@ class SellerVerificationBloc
       }
     } finally {
       _busy = false;
+      if (_pendingRefresh) {
+        _pendingRefresh = false;
+        if (!isClosed) add(const LoadSellerVerificationsEvent(refresh: true));
+      }
     }
   }
 
@@ -158,12 +180,16 @@ class SellerVerificationBloc
     );
   }
 
-  void _onFilter(
+  Future<void> _onFilter(
     FilterSellerVerificationsEvent event,
     Emitter<SellerVerificationState> emit,
-  ) {
+  ) async {
     _statusFilter = event.status;
-    add(const LoadSellerVerificationsEvent(refresh: true));
+    // Cancel any in-progress load so the new filter takes effect immediately.
+    _loadToken++;
+    _busy = false;
+    _pendingRefresh = false;
+    await _fetchPage(emit, page: 1, showLoading: false, append: false);
   }
 
   void _onUpdateSearch(
@@ -175,14 +201,25 @@ class SellerVerificationBloc
 
     final trimmed = event.query.trim();
     if (trimmed.isEmpty) {
-      add(const LoadSellerVerificationsEvent(refresh: true));
+      _loadToken++;
+      if (_busy) {
+        _pendingRefresh = true;
+      } else {
+        add(const LoadSellerVerificationsEvent(refresh: true));
+      }
       return;
     }
     if (trimmed.length < 2) return;
 
     _searchDebounce = Timer(
       const Duration(milliseconds: _searchDebounceMs),
-      () => add(const LoadSellerVerificationsEvent(refresh: true)),
+      () {
+        if (_busy) {
+          _pendingRefresh = true;
+        } else {
+          add(const LoadSellerVerificationsEvent(refresh: true));
+        }
+      },
     );
   }
 

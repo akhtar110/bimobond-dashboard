@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../post_management/presentation/utils/post_detail_labels.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/post_filters.dart';
 import '../bloc/posts_bloc.dart';
@@ -427,6 +428,30 @@ class PostsActiveFilterChips extends StatelessWidget {
               label: typeLabel,
               onRemove: () => context.read<PostsBloc>().add(
                     UpdatePostFiltersEvent(filters.copyWith(clearType: true)),
+                  ),
+            ),
+          );
+        }
+
+        if (filters.status != null && filters.status!.isNotEmpty) {
+          chips.add(
+            _ActiveFilterChip(
+              label: postStatusLabel(l10n, filters.status!),
+              onRemove: () => context.read<PostsBloc>().add(
+                    UpdatePostFiltersEvent(filters.copyWith(clearStatus: true)),
+                  ),
+            ),
+          );
+        }
+
+        if (filters.privacyStatus != null && filters.privacyStatus!.isNotEmpty) {
+          chips.add(
+            _ActiveFilterChip(
+              label: privacyLabel(l10n, filters.privacyStatus!),
+              onRemove: () => context.read<PostsBloc>().add(
+                    UpdatePostFiltersEvent(
+                      filters.copyWith(clearPrivacyStatus: true),
+                    ),
                   ),
             ),
           );

@@ -5,9 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import '../../../categories/presentation/bloc/categories_bloc.dart';
-import '../../../categories/presentation/widgets/category_icon.dart';
 import '../bloc/posts_bloc.dart';
 import '../utils/posts_responsive.dart';
+import 'posts_filter_panel_ui.dart';
 
 class PostsCategoryFilter extends StatelessWidget {
   const PostsCategoryFilter({super.key, this.metrics});
@@ -155,20 +155,20 @@ class PostsCategoryChipState extends State<PostsCategoryChip> {
     final selected = widget.isSelected;
 
     final bg = selected
-        ? color
+        ? color.withValues(alpha: 0.14)
         : _hovered
-        ? scheme.surfaceContainerHigh
-        : scheme.surface;
+            ? scheme.surfaceContainerHigh
+            : scheme.surfaceContainerLow;
 
-    final fg = selected ? Colors.white : scheme.onSurface;
-
-    final borderColor = selected ? color : scheme.outlineVariant;
+    final fg = selected ? color : scheme.onSurface;
+    final borderColor = selected
+        ? color.withValues(alpha: 0.45)
+        : scheme.outlineVariant;
 
     final scale = _hovered && !selected ? 1.025 : 1.0;
-    final chipHeight = widget.compact ? 28.0 : 34.0;
-    final hPad = widget.compact ? 9.0 : 13.0;
-    final iconSize = widget.compact ? 15.0 : 18.0;
-    final fontSize = widget.compact ? 11.0 : 12.0;
+    final chipHeight = widget.compact ? 32.0 : 36.0;
+    final hPad = widget.compact ? 10.0 : 12.0;
+    final fontSize = widget.compact ? 11.5 : 12.5;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -187,55 +187,41 @@ class PostsCategoryChipState extends State<PostsCategoryChip> {
             padding: EdgeInsets.symmetric(horizontal: hPad),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.28),
-                        blurRadius: 10,
+                        color: color.withValues(alpha: 0.18),
+                        blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ]
                   : _hovered
-                  ? [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(alpha: 0.06),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
+                      ? [
+                          BoxShadow(
+                            color: scheme.shadow.withValues(alpha: 0.05),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
             ),
             child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.category != null) ...[
-                    CategoryIcon(
-                      category: widget.category,
-                      size: iconSize,
-                      borderRadius: BorderRadius.circular(
-                        widget.compact ? 4 : 5,
-                      ),
-                      backgroundColor: selected
-                          ? Colors.white.withValues(alpha: 0.2)
-                          : scheme.surfaceContainerHighest,
-                      iconColor: fg,
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 160),
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: fg,
-                      letterSpacing: selected ? -0.1 : 0,
-                    ),
-                    child: Text(widget.label),
-                  ),
-                ],
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 160),
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: fg,
+                  letterSpacing: selected ? -0.1 : 0,
+                ),
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ),
@@ -271,9 +257,7 @@ class PostsFilterCategorySection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        return PostsFilterChipGrid(
           children: [
             PostsCategoryChip(
               label: l10n.t('all'),

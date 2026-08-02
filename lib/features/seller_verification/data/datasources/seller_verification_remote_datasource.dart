@@ -32,9 +32,58 @@ class SellerVerificationRemoteDataSourceImpl
     required int limit,
     required AdminSellerVerificationQuery query,
   }) async {
+    // When no status filter is active ("All"), fetch all known statuses in
+    // parallel because the backend may default to returning only PENDING.
+    if (query.status == null || query.status!.trim().isEmpty) {
+      return _fetchAllStatuses(search: query.search, page: page, limit: limit);
+    }
+    return _fetchPage(
+      queryParameters: query.toQueryParameters(page: page, limit: limit),
+      page: page,
+    );
+  }
+
+  /// Fetch PENDING, APPROVED, REJECTED, REVOKED in parallel and merge.
+  Future<SellerVerificationPageModel> _fetchAllStatuses({
+    String? search,
+    required int page,
+    required int limit,
+  }) async {
+    const statuses = ['PENDING', 'APPROVED', 'REJECTED', 'REVOKED'];
+    final futures = statuses.map((status) async {
+      try {
+        final params = AdminSellerVerificationQuery(
+          search: search,
+          status: status,
+        ).toQueryParameters(page: 1, limit: 100);
+        return await _fetchPage(queryParameters: params, page: 1);
+      } catch (_) {
+        // If one status request fails, return empty so others still show.
+        return SellerVerificationPageModel(
+          applications: const [],
+          currentPage: 1,
+          lastPage: 1,
+          total: 0,
+        );
+      }
+    });
+    final results = await Future.wait(futures);
+    final allApplications = results.expand((r) => r.applications).toList();
+    return SellerVerificationPageModel(
+      applications: allApplications,
+      currentPage: page,
+      lastPage: 1,
+      total: allApplications.length,
+    );
+  }
+
+  Future<SellerVerificationPageModel> _fetchPage({
+    required Map<String, dynamic> queryParameters,
+    required int page,
+  }) async {
     final response = await _dio.get(
       '/seller-verification/admin/all',
-      queryParameters: query.toQueryParameters(page: page, limit: limit),
+      queryParameters: queryParameters,
     );
     final data = response.data;
     if (data is Map<String, dynamic>) {

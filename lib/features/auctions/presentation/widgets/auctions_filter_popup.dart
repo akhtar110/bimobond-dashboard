@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
-import '../../../gifts/presentation/widgets/gifts_active_filters.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_chip.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_footer.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
-import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
+import '../../../posts/presentation/widgets/posts_filter_panel_ui.dart';
 import '../bloc/auctions_bloc.dart';
 
 /// Counts popup filters (excludes search, sort, date).
@@ -46,7 +42,7 @@ Future<void> showAuctionsFilterPopup({
           appliedStatus: statusFilter,
           appliedType: typeFilter,
           maxHeight: MediaQuery.sizeOf(ctx).height * 0.88,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           showDragHandle: true,
         ),
       ),
@@ -130,6 +126,7 @@ Future<void> showAuctionsFilterPopup({
   );
 }
 
+/// Glass shell filter panel for auctions (matching posts design style).
 class AuctionsFilterPopup extends StatefulWidget {
   const AuctionsFilterPopup({
     super.key,
@@ -168,58 +165,49 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
     if (navigator.canPop()) navigator.pop();
   }
 
+  void _setStatus(String? status) {
+    setState(() => _status = status);
+    context.read<AuctionsBloc>().add(FilterAuctionsEvent(status));
+  }
+
+  void _setType(AuctionTypeFilter type) {
+    setState(() => _type = type);
+    context.read<AuctionsBloc>().add(UpdateAuctionTypeFilterEvent(type));
+  }
+
   void _reset() {
     setState(() {
       _status = null;
       _type = AuctionTypeFilter.all;
     });
-  }
-
-  void _apply(BuildContext context) {
     final bloc = context.read<AuctionsBloc>();
-    if (bloc.activeStatusFilter != _status) {
-      bloc.add(FilterAuctionsEvent(_status));
-    }
-    if (bloc.activeTypeFilter != _type) {
-      bloc.add(UpdateAuctionTypeFilterEvent(_type));
-    }
-    _close(context);
+    bloc.add(FilterAuctionsEvent(null));
+    bloc.add(UpdateAuctionTypeFilterEvent(AuctionTypeFilter.all));
   }
 
-  String _sectionTitle(String text, BuildContext context) {
-    if (context.isRtl) return text;
-    return text.toUpperCase();
-  }
-
-  List<GiftsActiveFilterItem> _activeItems(AppLocalizations l10n) {
-    final items = <GiftsActiveFilterItem>[];
+  List<({String id, String label})> _activeTags(AppLocalizations l10n) {
+    final tags = <({String id, String label})>[];
     if (_status != null) {
-      items.add(
-        GiftsActiveFilterItem(
-          id: 'status',
-          label: auctionStatusLabel(l10n, _status!),
-          onRemove: () => setState(() => _status = null),
-        ),
-      );
+      tags.add((id: 'status', label: auctionStatusLabel(l10n, _status!)));
     }
     if (_type != AuctionTypeFilter.all) {
-      items.add(
-        GiftsActiveFilterItem(
-          id: 'type',
-          label: auctionTypeLabel(l10n, _type),
-          onRemove: () => setState(() => _type = AuctionTypeFilter.all),
-        ),
-      );
+      tags.add((id: 'type', label: auctionTypeLabel(l10n, _type)));
     }
-    return items;
+    return tags;
+  }
+
+  void _removeTag(String id) {
+    if (id == 'status') {
+      _setStatus(null);
+    } else if (id == 'type') {
+      _setType(AuctionTypeFilter.all);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final radius = widget.borderRadius ?? BorderRadius.circular(16);
+    final radius = widget.borderRadius ?? BorderRadius.circular(14);
 
     final statusOptions = <(String?, String)>[
       (null, l10n.t('all')),
@@ -232,82 +220,80 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
     ];
 
     return Material(
-      color: scheme.surface,
-      elevation: 10,
-      shadowColor: scheme.shadow.withValues(alpha: 0.18),
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.75)),
-      ),
+      color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        width: widget.width ?? 400,
-        height: widget.maxHeight,
-        child: Column(
-          children: [
-            if (widget.showDragHandle) const _AuctionsFilterDragHandle(),
-            _AuctionsFilterHeader(onClose: () => _close(context)),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 8),
-                children: [
-                  GiftsActiveFilters(items: _activeItems(l10n)),
-                  GiftsFilterSection(
-                    title: _sectionTitle(l10n.t('status'), context),
-                    child: GiftsFilterChipWrap(
-                      children: [
-                        for (final (status, label) in statusOptions)
-                          GiftsFilterChoiceChip(
-                            label: label,
-                            selected: _status == status,
-                            onTap: () => setState(() => _status = status),
+      borderRadius: radius,
+      child: PostsFilterGlassShell(
+        borderRadius: radius,
+        child: SizedBox(
+          width: widget.width ?? 400,
+          height: widget.maxHeight,
+          child: Column(
+            children: [
+              if (widget.showDragHandle) const _AuctionsFilterDragHandle(),
+              PostsFilterPanelHeader(onClose: () => _close(context)),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(
+                    bottom: PostsFilterPanelTokens.spacing,
+                  ),
+                  children: [
+                    PostsFilterActiveTags(
+                      labels: _activeTags(l10n),
+                      onRemove: _removeTag,
+                    ),
+                    PostsFilterSection(
+                      title: l10n.t('status'),
+                      icon: Icons.shield_outlined,
+                      showDivider: false,
+                      child: PostsFilterChipGrid(
+                        children: [
+                          for (final (status, label) in statusOptions)
+                            PostsFilterChoiceChip(
+                              label: label,
+                              selected: _status == status,
+                              onTap: () => _setStatus(status),
+                            ),
+                        ],
+                      ),
+                    ),
+                    PostsFilterSection(
+                      title: l10n.tOr('auctionType', 'Auction type'),
+                      icon: Icons.category_outlined,
+                      child: PostsFilterChipGrid(
+                        children: [
+                          PostsFilterChoiceChip(
+                            label: l10n.t('all'),
+                            selected: _type == AuctionTypeFilter.all,
+                            onTap: () => _setType(AuctionTypeFilter.all),
                           ),
-                      ],
+                          PostsFilterChoiceChip(
+                            label: l10n.tOr('auctionTypeFixed', 'Fixed price'),
+                            selected: _type == AuctionTypeFilter.fixed,
+                            onTap: () => _setType(AuctionTypeFilter.fixed),
+                          ),
+                          PostsFilterChoiceChip(
+                            label: l10n.tOr('auctionTypeTimed', 'Timed'),
+                            selected: _type == AuctionTypeFilter.timed,
+                            onTap: () => _setType(AuctionTypeFilter.timed),
+                          ),
+                          PostsFilterChoiceChip(
+                            label: l10n.t('live'),
+                            selected: _type == AuctionTypeFilter.live,
+                            onTap: () => _setType(AuctionTypeFilter.live),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  GiftsFilterSection(
-                    title: _sectionTitle(
-                      l10n.tOr('auctionType', 'Auction type'),
-                      context,
-                    ),
-                    child: GiftsFilterChipWrap(
-                      children: [
-                        GiftsFilterChoiceChip(
-                          label: l10n.t('all'),
-                          selected: _type == AuctionTypeFilter.all,
-                          onTap: () =>
-                              setState(() => _type = AuctionTypeFilter.all),
-                        ),
-                        GiftsFilterChoiceChip(
-                          label: l10n.tOr('auctionTypeFixed', 'Fixed price'),
-                          selected: _type == AuctionTypeFilter.fixed,
-                          onTap: () =>
-                              setState(() => _type = AuctionTypeFilter.fixed),
-                        ),
-                        GiftsFilterChoiceChip(
-                          label: l10n.tOr('auctionTypeTimed', 'Timed'),
-                          selected: _type == AuctionTypeFilter.timed,
-                          onTap: () =>
-                              setState(() => _type = AuctionTypeFilter.timed),
-                        ),
-                        GiftsFilterChoiceChip(
-                          label: l10n.t('live'),
-                          selected: _type == AuctionTypeFilter.live,
-                          onTap: () =>
-                              setState(() => _type = AuctionTypeFilter.live),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                    const SizedBox(height: PostsFilterPanelTokens.spacing),
+                  ],
+                ),
               ),
-            ),
-            GiftsFilterFooter(
-              onReset: _reset,
-              onCancel: () => _close(context),
-              onApply: () => _apply(context),
-            ),
-          ],
+              PostsFilterPanelFooter(
+                onReset: _reset,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -321,52 +307,16 @@ class _AuctionsFilterDragHandle extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 2),
+      padding: const EdgeInsets.only(top: 8, bottom: 2),
       child: Center(
         child: Container(
-          width: 36,
-          height: 4,
+          width: 32,
+          height: 3,
           decoration: BoxDecoration(
-            color: scheme.outlineVariant.withValues(alpha: 0.85),
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(999),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AuctionsFilterHeader extends StatelessWidget {
-  const _AuctionsFilterHeader({required this.onClose});
-
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              l10n.tOr('filters', 'Filters'),
-              textAlign: TextAlign.start,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: l10n.t('close'),
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded, size: 20),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
       ),
     );
   }
