@@ -109,6 +109,12 @@ class LoadMoreNotificationsRequested extends NotificationsEvent {
   const LoadMoreNotificationsRequested();
 }
 
+class ChangeNotificationsPageRequested extends NotificationsEvent {
+  const ChangeNotificationsPageRequested(this.page);
+
+  final int page;
+}
+
 class FilterNotificationsChanged extends NotificationsEvent {
   const FilterNotificationsChanged(this.filters);
   final NotificationFilters filters;

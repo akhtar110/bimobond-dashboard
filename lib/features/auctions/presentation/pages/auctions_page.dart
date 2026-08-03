@@ -128,7 +128,27 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
           body: BlocBuilder<SellerVerificationBloc, SellerVerificationState>(
             builder: (context, sellerState) {
               return BlocConsumer<AuctionsBloc, AuctionsState>(
-                listener: (context, state) {},
+                listenWhen: (previous, current) {
+                  if (current is! AuctionsLoaded ||
+                      current.actionError == null) {
+                    return false;
+                  }
+                  if (previous is! AuctionsLoaded) return true;
+                  return previous.actionError != current.actionError;
+                },
+                listener: (context, state) {
+                  if (state is! AuctionsLoaded || state.actionError == null) {
+                    return;
+                  }
+                  final scheme = Theme.of(context).colorScheme;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.actionError!),
+                      backgroundColor: scheme.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
                 builder: (context, state) {
                   final showAuctionsTab =
                       _activeTab == AuctionsPageTab.auctions;
@@ -665,7 +685,10 @@ class _SliverGrid extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(l10n.t('forceCancelAuctionTitle')),
         content: Text(
-          'Cancel "${name ?? 'this auction'}"? This cannot be undone.',
+          l10n.tOr(
+            'forceCancelAuctionConfirm',
+            'Cancel "${name ?? l10n.tOr('thisAuction', 'this auction')}"? This cannot be undone.',
+          ),
         ),
         actions: [
           TextButton(

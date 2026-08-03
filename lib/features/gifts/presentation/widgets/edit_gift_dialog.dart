@@ -16,6 +16,7 @@ import '../bloc/gift_groups_bloc.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_image_picker.dart';
+import '../utils/gift_publisher_name.dart';
 import 'gift_animation_upload_section.dart';
 import 'gift_audio_preview.dart';
 import 'gift_color_picker_field.dart';
@@ -976,6 +977,8 @@ class EditGiftDialogState extends State<EditGiftDialog> {
               flex: 6,
               child: GiftPublishedAtPicker(
                 value: _publishedAt,
+                publisherName:
+                    resolveGiftPublisherName(context, widget.gift),
                 onTap: isActioning ? null : _pickPublishedAt,
                 onClear: _publishedAt != null
                     ? () => setState(() => _publishedAt = null)

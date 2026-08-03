@@ -50,59 +50,60 @@ class _NotificationComposerState extends State<NotificationComposer>
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final dense = widget.expandVertically;
+    final panelPadding = dense ? 16.0 : 24.0;
+    final sectionGap = dense ? 12.0 : 20.0;
+    final tabGap = dense ? 12.0 : 16.0;
 
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(dense ? 16 : 20),
         border: Border.all(
           color: scheme.outlineVariant.withValues(alpha: 0.65),
         ),
         boxShadow: [
           BoxShadow(
             color: scheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 18,
+            blurRadius: dense ? 12 : 18,
             offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(panelPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(dense ? 6 : 8),
                   decoration: BoxDecoration(
                     color: scheme.primaryContainer,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.send_rounded,
-                      color: scheme.onPrimaryContainer, size: 20),
+                  child: Icon(
+                    Icons.send_rounded,
+                    color: scheme.onPrimaryContainer,
+                    size: dense ? 18 : 20,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.t('notificationComposerTitle'),
-                        style: textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        l10n.t('notificationComposerSubtitle'),
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
+                  child: Text(
+                    l10n.t('notificationComposerTitle'),
+                    style: (dense
+                            ? textTheme.titleSmall
+                            : textTheme.titleMedium)
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: sectionGap),
             TabBar(
               controller: _tabController,
               isScrollable: true,
@@ -110,6 +111,9 @@ class _NotificationComposerState extends State<NotificationComposer>
               dividerColor: scheme.outlineVariant.withValues(alpha: 0.4),
               labelStyle: textTheme.labelMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
+              labelPadding: dense
+                  ? const EdgeInsets.symmetric(horizontal: 10)
+                  : null,
               tabs: [
                 Tab(text: l10n.t('notificationTabSingleUser')),
                 Tab(text: l10n.t('notificationTabBulkUsers')),
@@ -117,7 +121,7 @@ class _NotificationComposerState extends State<NotificationComposer>
                 Tab(text: l10n.t('notificationTabBroadcastAdmins')),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: tabGap),
             if (widget.expandVertically)
               Expanded(
                 child: TabBarView(

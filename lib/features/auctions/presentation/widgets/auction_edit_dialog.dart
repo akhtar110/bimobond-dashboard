@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/coin_format.dart';
@@ -23,8 +24,7 @@ Future<AuctionUpdateBody?> showAuctionEditDialog(
   );
 }
 
-/// Admin edit dialog — sends dirty PATCH fields only (never `currencyCode` or
-/// `targetPriceCoins` on update).
+/// Admin edit dialog — sends dirty PATCH fields only.
 class AuctionEditDialog extends StatefulWidget {
   const AuctionEditDialog({super.key, required this.auction});
 
@@ -38,11 +38,14 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameController;
-  late final TextEditingController _startingPriceController;
   late final TextEditingController _targetPriceController;
 
   late final AuctionSnapshot _original;
   final _previewPricing = sl<PreviewAuctionPricing>();
+
+  DateTime? _startedAt;
+  DateTime? _endedAt;
+  late String _status;
 
   Timer? _previewDebounce;
   AuctionPricingPreviewEntity? _preview;
@@ -55,12 +58,12 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
     final auction = widget.auction;
     _original = AuctionSnapshot.fromEntity(auction);
     _nameController = TextEditingController(text: auction.itemName ?? '');
-    _startingPriceController = TextEditingController(
-      text: auction.startingPrice?.toString() ?? '',
-    );
     _targetPriceController = TextEditingController(
       text: auction.targetPrice?.toString() ?? '',
     );
+    _startedAt = auction.startedAt;
+    _endedAt = auction.endedAt;
+    _status = auction.status;
 
     _targetPriceController.addListener(_schedulePreview);
   }
@@ -69,7 +72,6 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
   void dispose() {
     _previewDebounce?.cancel();
     _nameController.dispose();
-    _startingPriceController.dispose();
     _targetPriceController.dispose();
     super.dispose();
   }
@@ -97,9 +99,7 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
     });
 
     try {
-      final preview = await _previewPricing(
-        targetPrice: targetPrice,
-      );
+      final preview = await _previewPricing(targetPrice: targetPrice);
       if (!mounted) return;
       setState(() {
         _preview = preview;
@@ -115,14 +115,15 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
   }
 
   AuctionUpdateBody _buildDirtyBody() {
-    final startingPrice = double.tryParse(_startingPriceController.text.trim());
     final targetPrice = double.tryParse(_targetPriceController.text.trim());
 
     return AuctionUpdateBody.diff(
       original: _original,
       itemName: _nameController.text,
-      startingPrice: startingPrice,
       targetPrice: targetPrice,
+      startedAt: _startedAt,
+      endedAt: _endedAt,
+      status: _status,
     );
   }
 
@@ -135,6 +136,36 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
       return;
     }
     Navigator.pop(context, body);
+  }
+
+  Future<void> _pickDateTime({
+    required DateTime? current,
+    required ValueChanged<DateTime?> onPicked,
+    required bool allowClear,
+  }) async {
+    final now = DateTime.now();
+    final initial = current ?? now;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+
+    onPicked(DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    ));
   }
 
   InputDecoration _fieldDecoration(
@@ -159,19 +190,33 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
     );
   }
 
+  Widget _sectionLabel(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, top: 4),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final auction = widget.auction;
     final screenW = MediaQuery.sizeOf(context).width;
-    final dialogW = screenW < 560 ? screenW * 0.92 : 480.0;
+    final dialogW = screenW < 560 ? screenW * 0.94 : 560.0;
     final canSave = !_buildDirtyBody().isEmpty;
+    final dateFmt = DateFormat.yMMMd().add_Hm();
 
     return AlertDialog(
       insetPadding: EdgeInsets.symmetric(
-        horizontal: screenW < 560 ? 16 : 24,
-        vertical: 24,
+        horizontal: screenW < 560 ? 12 : 24,
+        vertical: 20,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -200,7 +245,7 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n.tOr('editAuction', 'Edit auction'),
+                  l10n.tOr('edit_auction', 'Edit auction'),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -209,7 +254,7 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
                 Text(
                   l10n.tOr(
                     'editAuctionHint',
-                    'Update listing details. Coin goal and currency are managed by the server.',
+                    'Update listing details. Only changed fields are sent.',
                   ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
@@ -225,106 +270,156 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
         width: dialogW,
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: _fieldDecoration(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sectionLabel(
                   context,
-                  label: l10n.t('auctionItemName'),
-                  icon: Icons.inventory_2_outlined,
+                  l10n.tOr('basicInformation', 'Basic information'),
                 ),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return l10n.tOr('auctionItemNameRequired', 'Item name is required');
-                  }
-                  return null;
-                },
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 16),
-              _ReadOnlyPricingCard(auction: auction),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _startingPriceController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                TextFormField(
+                  controller: _nameController,
+                  decoration: _fieldDecoration(
+                    context,
+                    label: l10n.tOr('item_name', 'Item name'),
+                    icon: Icons.inventory_2_outlined,
+                  ),
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return l10n.tOr(
+                        'auctionItemNameRequired',
+                        'Item name is required',
+                      );
+                    }
+                    return null;
+                  },
+                  onChanged: (_) => setState(() {}),
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                const SizedBox(height: 16),
+                _sectionLabel(
+                  context,
+                  l10n.tOr('pricing', 'Pricing'),
+                ),
+                _ReadOnlyPricingCard(auction: auction),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _targetPriceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                  decoration: _fieldDecoration(
+                    context,
+                    label: l10n.tOr(
+                      'auctionTargetMoney',
+                      'Target price (money)',
+                    ),
+                    icon: Icons.payments_outlined,
+                  ),
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) return null;
+                    final parsed = double.tryParse(text);
+                    if (parsed == null || parsed <= 0) {
+                      return l10n.tOr(
+                        'auctionTargetMoneyInvalid',
+                        'Enter a valid target price',
+                      );
+                    }
+                    return null;
+                  },
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 52,
+                  child: _PreviewStrip(
+                    loading: _previewLoading,
+                    preview: _preview,
+                    error: _previewError,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _sectionLabel(
+                  context,
+                  l10n.tOr('status', 'Status'),
+                ),
+                DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
+                  value: _status,
+                  decoration: _fieldDecoration(
+                    context,
+                    label: l10n.tOr('auctionStatus', 'Auction status'),
+                    icon: Icons.flag_outlined,
+                  ),
+                  items: const [
+                    'ACTIVE',
+                    'COMPLETED',
+                    'SETTLED',
+                    'CANCELLED',
+                    'BANNED',
+                    'DISPUTED',
+                  ]
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _status = value);
+                  },
+                ),
+                if (widget.auction.isCancelled) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.tOr(
+                      'auctionCancelledReactivateHint',
+                      'Editing a cancelled auction reactivates it to ACTIVE (or set status explicitly).',
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
                 ],
-                decoration: _fieldDecoration(
+                const SizedBox(height: 16),
+                _sectionLabel(
                   context,
-                  label: l10n.tOr('auctionStartingMoney', 'Starting price (money)'),
-                  icon: Icons.price_change_outlined,
+                  l10n.tOr('auctionTiming', 'Auction timing'),
                 ),
-                validator: (value) {
-                  final text = value?.trim() ?? '';
-                  if (text.isEmpty) return null;
-                  final parsed = double.tryParse(text);
-                  if (parsed == null || parsed < 0) {
-                    return l10n.tOr(
-                      'auctionStartingMoneyInvalid',
-                      'Enter a valid starting price',
-                    );
-                  }
-                  final target = double.tryParse(_targetPriceController.text.trim());
-                  if (target != null && parsed > target) {
-                    return l10n.tOr(
-                      'auctionStartAboveTarget',
-                      'Starting price cannot exceed target price',
-                    );
-                  }
-                  return null;
-                },
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _targetPriceController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                _DateTimeField(
+                  label: l10n.tOr('started_at', 'Started at'),
+                  value: _startedAt,
+                  formatter: dateFmt,
+                  onTap: () => _pickDateTime(
+                    current: _startedAt,
+                    onPicked: (v) => setState(() => _startedAt = v),
+                    allowClear: false,
+                  ),
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                ],
-                decoration: _fieldDecoration(
-                  context,
-                  label: l10n.tOr('auctionTargetMoney', 'Target price (money)'),
-                  icon: Icons.payments_outlined,
+                const SizedBox(height: 12),
+                _DateTimeField(
+                  label: l10n.tOr('ended_at', 'Ended at'),
+                  value: _endedAt,
+                  formatter: dateFmt,
+                  onTap: () => _pickDateTime(
+                    current: _endedAt ?? _startedAt ?? DateTime.now(),
+                    onPicked: (v) => setState(() => _endedAt = v),
+                    allowClear: true,
+                  ),
+                  onClear: _endedAt == null
+                      ? null
+                      : () => setState(() => _endedAt = null),
                 ),
-                validator: (value) {
-                  final parsed = double.tryParse(value?.trim() ?? '');
-                  if (parsed == null || parsed <= 0) {
-                    return l10n.tOr(
-                      'auctionTargetMoneyInvalid',
-                      'Enter a valid target price',
-                    );
-                  }
-                  final start = double.tryParse(_startingPriceController.text.trim());
-                  if (start != null && parsed < start) {
-                    return l10n.tOr(
-                      'auctionTargetBelowStarting',
-                      'Target must be greater than or equal to starting price',
-                    );
-                  }
-                  return null;
-                },
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 52,
-                child: _PreviewStrip(
-                  loading: _previewLoading,
-                  preview: _preview,
-                  error: _previewError,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -335,9 +430,67 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
         ),
         FilledButton(
           onPressed: canSave ? _save : null,
-          child: Text(l10n.t('save')),
+          child: Text(l10n.tOr('update_auction', 'Update auction')),
         ),
       ],
+    );
+  }
+}
+
+class _DateTimeField extends StatelessWidget {
+  const _DateTimeField({
+    required this.label,
+    required this.value,
+    required this.formatter,
+    required this.onTap,
+    this.onClear,
+  });
+
+  final String label;
+  final DateTime? value;
+  final DateFormat formatter;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final l10n = context.l10n;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: const Icon(Icons.schedule_outlined, size: 20),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: scheme.outlineVariant),
+          ),
+          filled: true,
+          fillColor: scheme.surfaceContainerLowest,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          suffixIcon: onClear != null
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: onClear,
+                )
+              : null,
+        ),
+        child: Text(
+          value != null
+              ? formatter.format(value!.toLocal())
+              : l10n.tOr('notSet', 'Not set'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: value != null ? scheme.onSurface : scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -508,10 +661,12 @@ class _PreviewStrip extends StatelessWidget {
     final spend = preview!.estimatedBidderSpendCoins;
     final parts = <String>[
       if (coins != null)
-        l10n.tOr('auctionPreviewGoal', 'Goal: {coins} coins')
+        l10n
+            .tOr('auctionPreviewGoal', 'Goal: {coins} coins')
             .replaceAll('{coins}', CoinFormat.coins(coins)),
       if (spend != null)
-        l10n.tOr('auctionPreviewSpend', 'Est. gift spend: {coins}')
+        l10n
+            .tOr('auctionPreviewSpend', 'Est. gift spend: {coins}')
             .replaceAll('{coins}', CoinFormat.coins(spend)),
     ];
 

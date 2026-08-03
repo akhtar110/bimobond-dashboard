@@ -18,6 +18,7 @@ bool canAccessDashboardTab(int tabIndex, List<UserRole> roles) {
     12 => true, // promotions (read-only actions)
     14 => true, // reports / money reports
     15 => true, // notifications
+    20 => true, // own admin profile
     // Camera Studio (16) is gated by camera_studio.admin.manage in the router.
     // Stories (6) is gated by stories.admin.read in the router.
     _ => false,

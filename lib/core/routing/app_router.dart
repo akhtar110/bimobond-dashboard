@@ -14,6 +14,7 @@ import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/notifications/presentation/notifications_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../bloc/persistent_bloc_provider.dart';
 import '../localization/localization.dart';
 import '../routing/admin_detail_page_route.dart';
@@ -292,7 +293,7 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const _tabCount = 20;
+  static const _tabCount = 21;
   int _index = 0;
 
   List<UserRole> _roles(BuildContext context) {
@@ -596,6 +597,11 @@ class _HomeShellChrome extends StatelessWidget {
           selectedIcon: Icons.receipt_long,
           label: l10n.tOr('securityLogs', 'Logs'),
         ),
+        DashboardNavItem(
+          icon: Icons.person_outline,
+          selectedIcon: Icons.person,
+          label: l10n.tOr('profile', 'Profile'),
+        ),
       ],
     );
   }
@@ -611,7 +617,7 @@ class _DashboardTabStack extends StatefulWidget {
 }
 
 class _DashboardTabStackState extends State<_DashboardTabStack> {
-  static const _tabCount = 20;
+  static const _tabCount = 21;
   final List<Widget?> _tabCache = List<Widget?>.filled(_tabCount, null);
 
   @override
@@ -666,6 +672,7 @@ class _DashboardTabStackState extends State<_DashboardTabStack> {
         key: ValueKey('dashboard_tab_rbac_roles'),
       ),
       19 => const LogsPage(key: ValueKey('dashboard_tab_security_logs')),
+      20 => const ProfilePage(key: ValueKey('dashboard_tab_profile')),
       _ => const SizedBox.shrink(key: ValueKey('dashboard_tab_empty')),
     };
     return DashboardTabAccessBoundary(tabIndex: index, child: page);

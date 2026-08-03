@@ -206,7 +206,6 @@ abstract final class PermissionManager {
 
   static bool canFulfillAuctions(BuildContext context) =>
       hasPermission(context, RbacPermissionKeys.fulfillAuctions) ||
-      hasPermission(context, RbacPermissionKeys.resolveAuctions) ||
       isLegacyAdmin(context);
 
   static bool canReadSellerVerification(BuildContext context) =>
