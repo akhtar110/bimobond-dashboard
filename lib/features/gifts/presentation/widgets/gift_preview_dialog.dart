@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gift_type.dart';
+import '../utils/gift_publisher_name.dart';
 import '../utils/gift_schedule_label.dart';
 import 'edit_gift_dialog.dart';
 import 'gift_animation_preview.dart';
@@ -814,7 +815,14 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
             _MetaChip(
               icon: Icons.event_rounded,
               label: l10n.tOr('giftFilterPublished', 'Published'),
-              value: schedule.text,
+              value: () {
+                final publisher = resolveGiftPublisherName(context, gift);
+                if (publisher == null || publisher.isEmpty) {
+                  return schedule.text;
+                }
+                final by = l10n.tOr('by', 'by');
+                return '${schedule.text} $by $publisher';
+              }(),
             ),
           ],
         ),

@@ -400,6 +400,7 @@ class CampaignsBloc extends Bloc<CampaignsEvent, CampaignsState> {
       ));
     }
   }
+
 }
 
 abstract class BulkActionsEvent {}

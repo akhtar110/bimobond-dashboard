@@ -16,6 +16,7 @@ class NotificationsState {
     this.notifications = const [],
     this.notificationsPage = 0,
     this.notificationsTotal = 0,
+    this.notificationsLastPage = 1,
     this.notificationsLoading = false,
     this.notificationsLoadingMore = false,
     this.notificationsHasReachedMax = false,
@@ -42,6 +43,7 @@ class NotificationsState {
   final List<NotificationEntity> notifications;
   final int notificationsPage;
   final int notificationsTotal;
+  final int notificationsLastPage;
   final bool notificationsLoading;
   final bool notificationsLoadingMore;
   final bool notificationsHasReachedMax;
@@ -95,6 +97,7 @@ class NotificationsState {
     List<NotificationEntity>? notifications,
     int? notificationsPage,
     int? notificationsTotal,
+    int? notificationsLastPage,
     bool? notificationsLoading,
     bool? notificationsLoadingMore,
     bool? notificationsHasReachedMax,
@@ -119,6 +122,8 @@ class NotificationsState {
       notifications: notifications ?? this.notifications,
       notificationsPage: notificationsPage ?? this.notificationsPage,
       notificationsTotal: notificationsTotal ?? this.notificationsTotal,
+      notificationsLastPage:
+          notificationsLastPage ?? this.notificationsLastPage,
       notificationsLoading:
           notificationsLoading ?? this.notificationsLoading,
       notificationsLoadingMore:

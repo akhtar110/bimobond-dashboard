@@ -35,6 +35,9 @@ abstract class AuctionsRepository {
 
   Future<AuctionEntity> adminBanAuction(String auctionId);
 
+  /// Restores a BANNED auction — `PATCH /auctions/admin/:id/unban`.
+  Future<AuctionEntity> adminUnbanAuction(String auctionId);
+
   Future<AuctionEntity> adminUpdateAuction(
     String auctionId,
     AuctionUpdateBody body,

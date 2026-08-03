@@ -41,6 +41,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<FetchNotificationsRequested>(_onFetch);
     on<RefreshNotificationsRequested>(_onRefresh);
     on<LoadMoreNotificationsRequested>(_onLoadMore);
+    on<ChangeNotificationsPageRequested>(_onChangePage);
     on<FilterNotificationsChanged>(_onFilterChanged);
     on<ClearNotificationFilters>(_onClearFilters);
     on<NotificationScheduleModeChanged>(_onScheduleModeChanged);
@@ -61,7 +62,8 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final GetUsers getUsers;
   final GetAllNotifications getAllNotifications;
 
-  static const int _feedLimit = 20;
+  static const int feedPageSize = 20;
+  static const int _feedLimit = feedPageSize;
   static const _userSearchDebounce = Duration(milliseconds: 350);
 
   StreamSubscription<AdminNotificationEventEntity>? _socketSub;
@@ -516,6 +518,26 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     await _fetchPage(state.notificationsPage + 1, emit, replace: false);
   }
 
+  Future<void> _onChangePage(
+    ChangeNotificationsPageRequested event,
+    Emitter<NotificationsState> emit,
+  ) async {
+    final lastPage = state.notificationsLastPage < 1
+        ? 1
+        : state.notificationsLastPage;
+    final page = event.page.clamp(1, lastPage);
+    if (page == state.notificationsPage && state.notifications.isNotEmpty) {
+      return;
+    }
+    emit(
+      state.copyWith(
+        notificationsLoading: true,
+        clearNotificationsError: true,
+      ),
+    );
+    await _fetchPage(page, emit, replace: true);
+  }
+
   Future<void> _onFilterChanged(
     FilterNotificationsChanged event,
     Emitter<NotificationsState> emit,
@@ -571,6 +593,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
           notifications: newList,
           notificationsPage: result.page,
           notificationsTotal: result.total,
+          notificationsLastPage: result.lastPage < 1 ? 1 : result.lastPage,
           notificationsHasReachedMax: result.page >= result.lastPage,
           notificationsLoading: false,
           notificationsLoadingMore: false,

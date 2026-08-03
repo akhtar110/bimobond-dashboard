@@ -7,16 +7,29 @@ import '../../../gifts/presentation/widgets/gifts_filter_chip.dart';
 import '../../../gifts/presentation/widgets/gifts_filter_footer.dart';
 import '../../../gifts/presentation/widgets/gifts_filter_models.dart';
 import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
+import '../../../users/domain/entities/user_entity.dart';
+import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../bloc/auctions_bloc.dart';
+import 'auctions_sort_dropdown.dart';
 
 /// Counts popup filters (excludes search, sort, date).
 int auctionsAppliedFilterCount({
   String? statusFilter,
   AuctionTypeFilter typeFilter = AuctionTypeFilter.all,
+  UserEntity? hostFilter,
+  UserEntity? winnerFilter,
+  String? postIdFilter,
+  String? liveIdFilter,
+  bool? hasWinnerFilter,
+  bool? hasPostFilter,
+  bool? hasLiveFilter,
 }) {
   var count = 0;
   if (statusFilter != null) count++;
   if (typeFilter != AuctionTypeFilter.all) count++;
+  if (hostFilter != null) count++;
+  if (winnerFilter != null) count++;
+  if (hasWinnerFilter != null) count++;
   return count;
 }
 
@@ -35,6 +48,25 @@ Future<void> showAuctionsFilterPopup({
         child: child,
       );
 
+  AuctionsFilterPopup popup({
+    double? width,
+    required double maxHeight,
+    BorderRadius? borderRadius,
+    bool showDragHandle = false,
+  }) =>
+      AuctionsFilterPopup(
+        appliedStatus: statusFilter,
+        appliedType: typeFilter,
+        appliedSort: auctionsBloc.activeSortOption,
+        appliedHost: auctionsBloc.activeHostFilter,
+        appliedWinner: auctionsBloc.activeWinnerFilter,
+        appliedHasWinner: auctionsBloc.activeHasWinnerFilter,
+        width: width,
+        maxHeight: maxHeight,
+        borderRadius: borderRadius,
+        showDragHandle: showDragHandle,
+      );
+
   if (width < 600) {
     return showModalBottomSheet<void>(
       context: context,
@@ -42,9 +74,7 @@ Future<void> showAuctionsFilterPopup({
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => wrap(
-        AuctionsFilterPopup(
-          appliedStatus: statusFilter,
-          appliedType: typeFilter,
+        popup(
           maxHeight: MediaQuery.sizeOf(ctx).height * 0.88,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           showDragHandle: true,
@@ -63,9 +93,7 @@ Future<void> showAuctionsFilterPopup({
         child: Align(
           alignment: Alignment.center,
           child: wrap(
-            AuctionsFilterPopup(
-              appliedStatus: statusFilter,
-              appliedType: typeFilter,
+            popup(
               width: 420,
               maxHeight: MediaQuery.sizeOf(ctx).height * 0.82,
             ),
@@ -114,9 +142,7 @@ Future<void> showAuctionsFilterPopup({
                 ),
                 alignment: Alignment.topCenter,
                 child: wrap(
-                  AuctionsFilterPopup(
-                    appliedStatus: statusFilter,
-                    appliedType: typeFilter,
+                  popup(
                     width: panelWidth,
                     maxHeight: maxPanelHeight,
                   ),
@@ -135,6 +161,10 @@ class AuctionsFilterPopup extends StatefulWidget {
     super.key,
     required this.appliedStatus,
     required this.appliedType,
+    required this.appliedSort,
+    this.appliedHost,
+    this.appliedWinner,
+    this.appliedHasWinner,
     this.width,
     this.maxHeight = 560,
     this.borderRadius,
@@ -143,6 +173,10 @@ class AuctionsFilterPopup extends StatefulWidget {
 
   final String? appliedStatus;
   final AuctionTypeFilter appliedType;
+  final AuctionSortOption appliedSort;
+  final UserEntity? appliedHost;
+  final UserEntity? appliedWinner;
+  final bool? appliedHasWinner;
   final double? width;
   final double maxHeight;
   final BorderRadius? borderRadius;
@@ -155,12 +189,20 @@ class AuctionsFilterPopup extends StatefulWidget {
 class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
   late String? _status;
   late AuctionTypeFilter _type;
+  late AuctionSortOption _sort;
+  UserEntity? _host;
+  UserEntity? _winner;
+  bool? _hasWinner;
 
   @override
   void initState() {
     super.initState();
     _status = widget.appliedStatus;
     _type = widget.appliedType;
+    _sort = widget.appliedSort;
+    _host = widget.appliedHost;
+    _winner = widget.appliedWinner;
+    _hasWinner = widget.appliedHasWinner;
   }
 
   void _close(BuildContext context) {
@@ -172,7 +214,21 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
     setState(() {
       _status = null;
       _type = AuctionTypeFilter.all;
+      _sort = AuctionsSortDropdown.defaultSort;
+      _host = null;
+      _winner = null;
+      _hasWinner = null;
     });
+  }
+
+  bool _advancedFiltersChanged(AuctionsBloc bloc) {
+    return bloc.activeHostFilter?.id != _host?.id ||
+        bloc.activeWinnerFilter?.id != _winner?.id ||
+        bloc.activeHasWinnerFilter != _hasWinner ||
+        bloc.activePostIdFilter != null ||
+        bloc.activeLiveIdFilter != null ||
+        bloc.activeHasPostFilter != null ||
+        bloc.activeHasLiveFilter != null;
   }
 
   void _apply(BuildContext context) {
@@ -183,12 +239,37 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
     if (bloc.activeTypeFilter != _type) {
       bloc.add(UpdateAuctionTypeFilterEvent(_type));
     }
+    if (bloc.activeSortOption != _sort) {
+      bloc.add(UpdateAuctionSortEvent(_sort));
+    }
+    if (_advancedFiltersChanged(bloc)) {
+      bloc.add(
+        UpdateAuctionAdvancedFiltersEvent(
+          host: _host,
+          clearHost: _host == null,
+          winner: _winner,
+          clearWinner: _winner == null,
+          hasWinner: _hasWinner,
+          clearHasWinner: _hasWinner == null,
+          clearPost: true,
+          clearLive: true,
+          clearHasPost: true,
+          clearHasLive: true,
+        ),
+      );
+    }
     _close(context);
   }
 
   String _sectionTitle(String text, BuildContext context) {
     if (context.isRtl) return text;
     return text.toUpperCase();
+  }
+
+  String _boolFilterLabel(AppLocalizations l10n, String key, String fallback, bool value) {
+    final base = l10n.tOr(key, fallback);
+    final yn = value ? l10n.tOr('yes', 'Yes') : l10n.tOr('no', 'No');
+    return '$base: $yn';
   }
 
   List<GiftsActiveFilterItem> _activeItems(AppLocalizations l10n) {
@@ -211,7 +292,70 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
         ),
       );
     }
+    if (_sort != AuctionsSortDropdown.defaultSort) {
+      items.add(
+        GiftsActiveFilterItem(
+          id: 'sort',
+          label: auctionSortLabel(l10n, _sort),
+          onRemove: () =>
+              setState(() => _sort = AuctionsSortDropdown.defaultSort),
+        ),
+      );
+    }
+    if (_host != null) {
+      items.add(
+        GiftsActiveFilterItem(
+          id: 'host',
+          label: '@${_host!.username}',
+          onRemove: () => setState(() => _host = null),
+        ),
+      );
+    }
+    if (_winner != null) {
+      items.add(
+        GiftsActiveFilterItem(
+          id: 'winner',
+          label: '@${_winner!.username}',
+          onRemove: () => setState(() => _winner = null),
+        ),
+      );
+    }
+    if (_hasWinner != null) {
+      items.add(
+        GiftsActiveFilterItem(
+          id: 'hasWinner',
+          label: _boolFilterLabel(l10n, 'hasWinner', 'Has winner', _hasWinner!),
+          onRemove: () => setState(() => _hasWinner = null),
+        ),
+      );
+    }
     return items;
+  }
+
+  Widget _triStateChips({
+    required bool? value,
+    required ValueChanged<bool?> onChanged,
+    required AppLocalizations l10n,
+  }) {
+    return GiftsFilterChipWrap(
+      children: [
+        GiftsFilterChoiceChip(
+          label: l10n.tOr('any', 'Any'),
+          selected: value == null,
+          onTap: () => onChanged(null),
+        ),
+        GiftsFilterChoiceChip(
+          label: l10n.tOr('yes', 'Yes'),
+          selected: value == true,
+          onTap: () => onChanged(true),
+        ),
+        GiftsFilterChoiceChip(
+          label: l10n.tOr('no', 'No'),
+          selected: value == false,
+          onTap: () => onChanged(false),
+        ),
+      ],
+    );
   }
 
   @override
@@ -229,6 +373,27 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
       ('DISPUTED', l10n.tOr('disputed', 'Disputed')),
       ('CANCELLED', l10n.t('cancelled')),
       ('BANNED', l10n.tOr('banned', 'Banned')),
+    ];
+
+    final sortOptions = <(AuctionSortOption, String)>[
+      (AuctionSortOption.newestFirst, l10n.tOr('auctionSortNewest', 'Newest')),
+      (AuctionSortOption.oldestFirst, l10n.tOr('auctionSortOldestShort', 'Oldest')),
+      (
+        AuctionSortOption.highestBid,
+        l10n.tOr('auctionSortHighestTotal', 'Highest Total'),
+      ),
+      (
+        AuctionSortOption.lowestBid,
+        l10n.tOr('auctionSortLowestTotal', 'Lowest Total'),
+      ),
+      (
+        AuctionSortOption.targetPrice,
+        l10n.tOr('auctionSortHighestTarget', 'Highest Target'),
+      ),
+      (
+        AuctionSortOption.endingSoon,
+        l10n.tOr('auctionSortRecentlyEnded', 'Recently Ended'),
+      ),
     ];
 
     return Material(
@@ -297,6 +462,61 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                               setState(() => _type = AuctionTypeFilter.live),
                         ),
                       ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: _sectionTitle(
+                      l10n.tOr('sortBy', 'Sort'),
+                      context,
+                    ),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        for (final (sort, label) in sortOptions)
+                          GiftsFilterChoiceChip(
+                            label: label,
+                            selected: _sort == sort,
+                            onTap: () => setState(() => _sort = sort),
+                          ),
+                      ],
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: _sectionTitle(
+                      l10n.tOr('host', 'Host'),
+                      context,
+                    ),
+                    child: AdminUserSearchField(
+                      key: ValueKey('auction-filter-host-${_host?.id ?? 'none'}'),
+                      compact: true,
+                      selectedUser: _host,
+                      hintText: l10n.tOr('searchHost', 'Search host'),
+                      onUserSelected: (user) => setState(() => _host = user),
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: _sectionTitle(
+                      l10n.tOr('winner', 'Winner'),
+                      context,
+                    ),
+                    child: AdminUserSearchField(
+                      key: ValueKey(
+                        'auction-filter-winner-${_winner?.id ?? 'none'}',
+                      ),
+                      compact: true,
+                      selectedUser: _winner,
+                      hintText: l10n.tOr('searchWinner', 'Search winner'),
+                      onUserSelected: (user) => setState(() => _winner = user),
+                    ),
+                  ),
+                  GiftsFilterSection(
+                    title: _sectionTitle(
+                      l10n.tOr('hasWinner', 'Has winner'),
+                      context,
+                    ),
+                    child: _triStateChips(
+                      value: _hasWinner,
+                      onChanged: (v) => setState(() => _hasWinner = v),
+                      l10n: l10n,
                     ),
                   ),
                 ],

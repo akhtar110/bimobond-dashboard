@@ -37,6 +37,10 @@ abstract class AuctionsRemoteDataSource {
 
   Future<AuctionModel> adminBanAuction(String auctionId);
 
+  /// `PATCH /auctions/admin/:id/unban` — isolated so the path can be adjusted
+  /// if the backend uses a different route name.
+  Future<AuctionModel> adminUnbanAuction(String auctionId);
+
   Future<AuctionModel> adminUpdateAuction(
     String auctionId,
     AuctionUpdateBody body,
@@ -161,6 +165,12 @@ class AuctionsRemoteDataSourceImpl implements AuctionsRemoteDataSource {
   @override
   Future<AuctionModel> adminBanAuction(String auctionId) async {
     final response = await _dio.patch('/auctions/admin/$auctionId/ban');
+    return _parse(response.data);
+  }
+
+  @override
+  Future<AuctionModel> adminUnbanAuction(String auctionId) async {
+    final response = await _dio.patch('/auctions/admin/$auctionId/unban');
     return _parse(response.data);
   }
 

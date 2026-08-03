@@ -132,10 +132,21 @@ class AuctionCard extends StatelessWidget {
                         Expanded(
                           child: _HostRow(auction: auction, compact: true),
                         ),
+                        if (auction.hasWinner && auction.winnerAvatar != null) ...[
+                          const SizedBox(width: 4),
+                          CircleAvatar(
+                            radius: compact ? 9 : 11,
+                            backgroundColor: scheme.tertiaryContainer,
+                            backgroundImage:
+                                NetworkImage(auction.winnerAvatar!),
+                          ),
+                        ],
                         const SizedBox(width: 4),
                         _TimestampRow(auction: auction, compact: true),
                       ],
                     ),
+                    SizedBox(height: gap),
+                    _MetaChips(auction: auction, compact: compact),
                     SizedBox(height: gap),
                     _ProgressSection(auction: auction, compact: true),
                     SizedBox(height: dense ? 6 : 8),
@@ -202,7 +213,7 @@ class _HeaderRow extends StatelessWidget {
         ),
         SizedBox(width: compact ? 4 : 6),
         AuctionStatusBadge(status: auction.status, compact: compact),
-        if (auction.isActive && onCancel != null) ...[
+        if (onCancel != null) ...[
           SizedBox(width: compact ? 2 : 4),
           SizedBox(
             width: compact ? 26 : 30,
@@ -336,6 +347,126 @@ class _HostRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Compact meta chips (escrow / fulfillment / live / post / gifts) ─────────
+
+class _MetaChips extends StatelessWidget {
+  const _MetaChips({required this.auction, this.compact = false});
+
+  final AuctionEntity auction;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final chips = <Widget>[];
+
+    if (auction.effectiveEscrowEnabled) {
+      chips.add(_chip(
+        scheme,
+        icon: Icons.account_balance_wallet_outlined,
+        label: l10n.tOr('escrow', 'Escrow'),
+        fg: scheme.tertiary,
+        bg: scheme.tertiaryContainer,
+      ));
+    }
+    if (auction.hasFulfillmentLifecycle) {
+      chips.add(_chip(
+        scheme,
+        icon: Icons.local_shipping_outlined,
+        label: auction.fulfillmentStatus!,
+        fg: scheme.secondary,
+        bg: scheme.secondaryContainer,
+      ));
+    }
+    if (auction.hasLive) {
+      chips.add(_chip(
+        scheme,
+        icon: Icons.live_tv_outlined,
+        label: l10n.t('live'),
+        fg: scheme.error,
+        bg: scheme.errorContainer,
+      ));
+    }
+    if (auction.hasPost) {
+      chips.add(_chip(
+        scheme,
+        icon: Icons.video_file_outlined,
+        label: l10n.tOr('post', 'Post'),
+        fg: scheme.primary,
+        bg: scheme.primaryContainer,
+      ));
+    }
+    if (auction.hasWinner) {
+      chips.add(_chip(
+        scheme,
+        icon: Icons.emoji_events_outlined,
+        label: l10n.tOr('winner', 'Winner'),
+        fg: scheme.tertiary,
+        bg: scheme.tertiaryContainer,
+      ));
+    }
+    final gifts = auction.giftTransactionCount;
+    if (gifts > 0) {
+      chips.add(_chip(
+        scheme,
+        icon: Icons.card_giftcard_outlined,
+        label: '$gifts',
+        fg: scheme.onSurfaceVariant,
+        bg: scheme.surfaceContainerHighest,
+      ));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: compact ? 18 : 20,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chips.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 4),
+        itemBuilder: (_, i) => chips[i],
+      ),
+    );
+  }
+
+  Widget _chip(
+    ColorScheme scheme, {
+    required IconData icon,
+    required String label,
+    required Color fg,
+    required Color bg,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 6,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: fg.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: compact ? 10 : 11, color: fg),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontSize: compact ? 8.5 : 9.5,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

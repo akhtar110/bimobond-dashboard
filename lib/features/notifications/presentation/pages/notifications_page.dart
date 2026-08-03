@@ -155,14 +155,16 @@ class _NotificationsPageViewState extends State<_NotificationsPageView> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            final isDesktop = width >= 1200;
-            final isTablet = width >= 768 && width < 1200;
-            final compact = width < 720;
+            // Side-by-side for laptops, MacBooks, and desktops.
+            final isWide = width >= 900;
+            final isTablet = width >= 700 && width < 900;
+            final compact = width < 700;
 
-            if (isDesktop) {
+            if (isWide) {
               return _DesktopNotificationsLayout(
                 isDark: isDark,
                 compact: compact,
+                availableWidth: width,
               );
             }
 
@@ -185,7 +187,7 @@ class _NotificationsPageViewState extends State<_NotificationsPageView> {
                             NotificationFeedPanel(
                               isDark: isDark,
                               expandVertically: false,
-                              minHeight: isTablet ? 640 : 520,
+                              minHeight: isTablet ? 560 : 480,
                             ),
                           ],
                         ),
@@ -205,14 +207,32 @@ class _NotificationsPageViewState extends State<_NotificationsPageView> {
 class _DesktopNotificationsLayout extends StatelessWidget {
   const _DesktopNotificationsLayout({
     required this.isDark,
+    required this.availableWidth,
     this.compact = false,
   });
 
   final bool isDark;
+  final double availableWidth;
   final bool compact;
+
+  /// Composer stays left and narrower; feed takes the remaining space.
+  static double _composerWidth(double availableWidth) {
+    if (availableWidth >= 1600) return 400;
+    if (availableWidth >= 1400) return 380;
+    if (availableWidth >= 1200) return 350;
+    if (availableWidth >= 1100) return 330;
+    return 300;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final composerWidth = _composerWidth(availableWidth);
+    final gap = availableWidth >= 1400
+        ? 20.0
+        : availableWidth >= 1100
+            ? 16.0
+            : 12.0;
+
     return Padding(
       padding: _pagePadding(context, top: 8, bottom: 16),
       child: Align(
@@ -223,18 +243,20 @@ class _DesktopNotificationsLayout extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _NotificationsHeader(compact: compact),
-              SizedBox(height: compact ? 8 : 12),
+              SizedBox(height: compact ? 8 : 10),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(
-                      width: 480,
-                      child: NotificationComposer(
+                    // Left: Notification Composer (sticky column).
+                    SizedBox(
+                      width: composerWidth,
+                      child: const NotificationComposer(
                         expandVertically: true,
                       ),
                     ),
-                    const SizedBox(width: 24),
+                    SizedBox(width: gap),
+                    // Right: Notification Feed (scroll + pagination).
                     Expanded(
                       child: NotificationFeedPanel(
                         isDark: isDark,

@@ -126,7 +126,11 @@ class SidebarContainer extends StatelessWidget {
                               },
                             ),
                           ),
-                          SidebarFooter(collapsed: collapsed),
+                          SidebarFooter(
+                            collapsed: collapsed,
+                            onDestinationSelected: onDestinationSelected,
+                            currentIndex: currentIndex,
+                          ),
                         ],
                       ),
                     ),

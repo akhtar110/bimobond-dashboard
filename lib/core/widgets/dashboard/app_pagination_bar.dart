@@ -140,6 +140,7 @@ class AppPaginationBar extends StatelessWidget {
     this.itemCount,
     this.hideWhenSinglePage = true,
     this.showTopBorder = false,
+    this.showBorder = true,
     this.showEdgeButtons = true,
     this.siblingCount = 1,
     this.boundaryCount = 1,
@@ -159,6 +160,9 @@ class AppPaginationBar extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final bool hideWhenSinglePage;
   final bool showTopBorder;
+
+  /// When false, renders without an outer border or shadow.
+  final bool showBorder;
 
   /// Retained for API compatibility. First/last jump buttons are no longer
   /// shown; only previous/next arrows are rendered.
@@ -198,13 +202,15 @@ class AppPaginationBar extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: showTopBorder ? null : radius,
-        border: showTopBorder
-            ? Border(top: BorderSide(color: scheme.outlineVariant))
-            : Border.all(
-                color: scheme.outlineVariant.withValues(alpha: 0.55),
-              ),
-        boxShadow: showTopBorder
+        borderRadius: !showBorder || showTopBorder ? null : radius,
+        border: !showBorder
+            ? null
+            : showTopBorder
+                ? Border(top: BorderSide(color: scheme.outlineVariant))
+                : Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.55),
+                  ),
+        boxShadow: !showBorder || showTopBorder
             ? null
             : [
                 BoxShadow(

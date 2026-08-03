@@ -12,6 +12,7 @@ class AuctionUpdateBody {
     this.currencyCode,
     this.startedAt,
     this.endedAt,
+    this.status,
   });
 
   final String? itemName;
@@ -25,6 +26,7 @@ class AuctionUpdateBody {
   final String? currencyCode;
   final DateTime? startedAt;
   final DateTime? endedAt;
+  final String? status;
 
   bool get isEmpty =>
       itemName == null &&
@@ -37,7 +39,8 @@ class AuctionUpdateBody {
       startingPriceCoins == null &&
       currencyCode == null &&
       startedAt == null &&
-      endedAt == null;
+      endedAt == null &&
+      status == null;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -58,6 +61,7 @@ class AuctionUpdateBody {
     if (endedAt != null) {
       map['endedAt'] = endedAt!.toUtc().toIso8601String();
     }
+    if (status != null) map['status'] = status;
     return map;
   }
 
@@ -75,6 +79,7 @@ class AuctionUpdateBody {
     String? currencyCode,
     DateTime? startedAt,
     DateTime? endedAt,
+    String? status,
   }) {
     String? changedString(String? next, String? prev) {
       final n = next?.trim();
@@ -108,6 +113,7 @@ class AuctionUpdateBody {
       currencyCode: changedString(currencyCode, original.currencyCode),
       startedAt: changedDate(startedAt, original.startedAt),
       endedAt: changedDate(endedAt, original.endedAt),
+      status: changedString(status, original.status),
     );
   }
 }
@@ -126,6 +132,7 @@ class AuctionSnapshot {
     this.currencyCode,
     this.startedAt,
     this.endedAt,
+    this.status,
   });
 
   final String? itemName;
@@ -139,6 +146,7 @@ class AuctionSnapshot {
   final String? currencyCode;
   final DateTime? startedAt;
   final DateTime? endedAt;
+  final String? status;
 
   factory AuctionSnapshot.fromEntity(dynamic auction) {
     return AuctionSnapshot(
@@ -153,6 +161,7 @@ class AuctionSnapshot {
       currencyCode: auction.currencyCode as String?,
       startedAt: auction.startedAt as DateTime,
       endedAt: auction.endedAt as DateTime?,
+      status: auction.status as String?,
     );
   }
 }
