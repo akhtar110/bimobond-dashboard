@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../posts/presentation/widgets/posts_filter_button.dart';
+import '../../../users/domain/entities/user_entity.dart';
 import '../bloc/auctions_bloc.dart';
 import '../utils/auctions_responsive.dart';
 import 'auctions_date_filter_button.dart';
@@ -144,22 +145,55 @@ class _AuctionsToolbarRow extends StatelessWidget {
     return BlocSelector<
         AuctionsBloc,
         AuctionsState,
-        ({String? status, AuctionTypeFilter type})>(
+        ({
+          String? status,
+          AuctionTypeFilter type,
+          UserEntity? host,
+          UserEntity? winner,
+          String? postId,
+          String? liveId,
+          bool? hasWinner,
+          bool? hasPost,
+          bool? hasLive,
+        })>(
       selector: (state) {
         final bloc = context.read<AuctionsBloc>();
+        if (state is AuctionsLoaded) {
+          return (
+            status: state.statusFilter,
+            type: state.typeFilter,
+            host: state.hostFilter,
+            winner: state.winnerFilter,
+            postId: state.postIdFilter,
+            liveId: state.liveIdFilter,
+            hasWinner: state.hasWinnerFilter,
+            hasPost: state.hasPostFilter,
+            hasLive: state.hasLiveFilter,
+          );
+        }
         return (
-          status: state is AuctionsLoaded
-              ? state.statusFilter
-              : bloc.activeStatusFilter,
-          type: state is AuctionsLoaded
-              ? state.typeFilter
-              : bloc.activeTypeFilter,
+          status: bloc.activeStatusFilter,
+          type: bloc.activeTypeFilter,
+          host: bloc.activeHostFilter,
+          winner: bloc.activeWinnerFilter,
+          postId: bloc.activePostIdFilter,
+          liveId: bloc.activeLiveIdFilter,
+          hasWinner: bloc.activeHasWinnerFilter,
+          hasPost: bloc.activeHasPostFilter,
+          hasLive: bloc.activeHasLiveFilter,
         );
       },
       builder: (context, filters) {
         final activeCount = auctionsAppliedFilterCount(
           statusFilter: filters.status,
           typeFilter: filters.type,
+          hostFilter: filters.host,
+          winnerFilter: filters.winner,
+          postIdFilter: filters.postId,
+          liveIdFilter: filters.liveId,
+          hasWinnerFilter: filters.hasWinner,
+          hasPostFilter: filters.hasPost,
+          hasLiveFilter: filters.hasLive,
         );
         final useWrap = availableWidth < 360;
         final actions = useWrap
@@ -232,6 +266,18 @@ class AuctionsActiveFilterChips extends StatelessWidget {
     bloc.add(UpdateAuctionSortEvent(AuctionsSortDropdown.defaultSort));
     bloc.add(UpdateAuctionDateRangeEvent(null));
     bloc.add(UpdateAuctionSearchEvent(''));
+    bloc.add(ClearAuctionAdvancedFiltersEvent());
+  }
+
+  String _boolChipLabel(
+    AppLocalizations l10n,
+    String key,
+    String fallback,
+    bool value,
+  ) {
+    final base = l10n.tOr(key, fallback);
+    final yn = value ? l10n.tOr('yes', 'Yes') : l10n.tOr('no', 'No');
+    return '$base: $yn';
   }
 
   @override
@@ -245,7 +291,14 @@ class AuctionsActiveFilterChips extends StatelessWidget {
           return prev.statusFilter != next.statusFilter ||
               prev.typeFilter != next.typeFilter ||
               prev.sortOption != next.sortOption ||
-              prev.dateRange != next.dateRange;
+              prev.dateRange != next.dateRange ||
+              prev.hostFilter?.id != next.hostFilter?.id ||
+              prev.winnerFilter?.id != next.winnerFilter?.id ||
+              prev.postIdFilter != next.postIdFilter ||
+              prev.liveIdFilter != next.liveIdFilter ||
+              prev.hasWinnerFilter != next.hasWinnerFilter ||
+              prev.hasPostFilter != next.hasPostFilter ||
+              prev.hasLiveFilter != next.hasLiveFilter;
         }
         return prev.runtimeType != next.runtimeType;
       },
@@ -292,6 +345,102 @@ class AuctionsActiveFilterChips extends StatelessWidget {
               label: auctionSortLabel(l10n, state.sortOption),
               onRemove: () => context.read<AuctionsBloc>().add(
                     UpdateAuctionSortEvent(AuctionsSortDropdown.defaultSort),
+                  ),
+            ),
+          );
+        }
+
+        if (state.hostFilter != null) {
+          chips.add(
+            _ActiveFilterChip(
+              label: '@${state.hostFilter!.username}',
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearHost: true),
+                  ),
+            ),
+          );
+        }
+
+        if (state.winnerFilter != null) {
+          chips.add(
+            _ActiveFilterChip(
+              label: '@${state.winnerFilter!.username}',
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearWinner: true),
+                  ),
+            ),
+          );
+        }
+
+        if (state.postIdFilter != null && state.postIdFilter!.isNotEmpty) {
+          chips.add(
+            _ActiveFilterChip(
+              label: state.postLabelFilter?.trim().isNotEmpty == true
+                  ? state.postLabelFilter!
+                  : l10n.tOr('linkedPost', 'Linked post'),
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearPost: true),
+                  ),
+            ),
+          );
+        }
+
+        if (state.liveIdFilter != null && state.liveIdFilter!.isNotEmpty) {
+          chips.add(
+            _ActiveFilterChip(
+              label: state.liveLabelFilter?.trim().isNotEmpty == true
+                  ? state.liveLabelFilter!
+                  : l10n.tOr('linkedLiveSession', 'Linked live session'),
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearLive: true),
+                  ),
+            ),
+          );
+        }
+
+        if (state.hasWinnerFilter != null) {
+          chips.add(
+            _ActiveFilterChip(
+              label: _boolChipLabel(
+                l10n,
+                'hasWinner',
+                'Has winner',
+                state.hasWinnerFilter!,
+              ),
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearHasWinner: true),
+                  ),
+            ),
+          );
+        }
+
+        if (state.hasPostFilter != null) {
+          chips.add(
+            _ActiveFilterChip(
+              label: _boolChipLabel(
+                l10n,
+                'hasPost',
+                'Has post',
+                state.hasPostFilter!,
+              ),
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearHasPost: true),
+                  ),
+            ),
+          );
+        }
+
+        if (state.hasLiveFilter != null) {
+          chips.add(
+            _ActiveFilterChip(
+              label: _boolChipLabel(
+                l10n,
+                'hasLive',
+                'Has live',
+                state.hasLiveFilter!,
+              ),
+              onRemove: () => context.read<AuctionsBloc>().add(
+                    UpdateAuctionAdvancedFiltersEvent(clearHasLive: true),
                   ),
             ),
           );

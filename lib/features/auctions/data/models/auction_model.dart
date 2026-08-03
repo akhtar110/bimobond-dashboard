@@ -27,7 +27,9 @@ class AuctionModel extends AuctionEntity {
     super.winner,
     super.giftTransactions,
     super.post,
+    super.live,
     super.pricing,
+    super.counts,
   });
 
   factory AuctionModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,9 @@ class AuctionModel extends AuctionEntity {
     final rawTx = map['giftTransactions'] as List?;
     final postSummary =
         _parsePostSummary(map['post']) ?? _parsePostSummaryFromRoot(map);
+    final liveSummary =
+        _parseLiveSummary(map['live']) ?? _liveFromId(map['liveId']?.toString());
+    final counts = _parseCounts(map['counts']);
 
     var itemImageUrl = _resolveItemImageUrl(map);
     if ((itemImageUrl == null || itemImageUrl.isEmpty) && postSummary != null) {
@@ -45,10 +50,17 @@ class AuctionModel extends AuctionEntity {
     }
 
     final pricingJson = map['pricing'];
+    final postId = map['postId']?.toString() ?? postSummary?.id;
+    final liveId = map['liveId']?.toString() ?? liveSummary?.id;
+    final giftTransactions = rawTx
+        ?.map((e) => GiftTransactionModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ))
+        .toList();
     return AuctionModel(
       id: map['id']?.toString() ?? map['auctionId']?.toString() ?? '',
-      postId: map['postId']?.toString(),
-      liveId: map['liveId']?.toString(),
+      postId: postId,
+      liveId: liveId,
       hostId: map['hostId']?.toString() ?? '',
       itemName: map['itemName']?.toString(),
       itemImageUrl: itemImageUrl,
@@ -76,15 +88,16 @@ class AuctionModel extends AuctionEntity {
       winner: map['winner'] is Map
           ? Map<String, dynamic>.from(map['winner'] as Map)
           : null,
-      giftTransactions: rawTx
-          ?.map((e) => GiftTransactionModel.fromJson(
-                Map<String, dynamic>.from(e as Map),
-              ))
-          .toList(),
+      giftTransactions: giftTransactions,
       post: postSummary,
+      live: liveSummary,
       pricing: pricingJson is Map<String, dynamic>
           ? _parsePricing(pricingJson)
           : null,
+      counts: counts ??
+          (giftTransactions != null
+              ? AuctionCounts(giftTransactions: giftTransactions.length)
+              : null),
     );
   }
 
@@ -147,16 +160,48 @@ class AuctionModel extends AuctionEntity {
   static AuctionPostSummary? _parsePostSummary(dynamic raw) {
     if (raw is! Map) return null;
     final m = Map<String, dynamic>.from(raw);
+    final id = m['id']?.toString();
+    final description = m['description']?.toString();
     final thumbnail = resolveMediaUrl(
       m['thumbnailUrl']?.toString() ?? m['thumbnail']?.toString(),
     );
     final media = PostMediaEntity.listFromJson(m['media']);
-    if ((thumbnail == null || thumbnail.isEmpty) && media.isEmpty) {
-      return null;
-    }
+    final hasMedia = (thumbnail != null && thumbnail.isNotEmpty) || media.isNotEmpty;
+    final hasIdentity =
+        (id != null && id.isNotEmpty) ||
+        (description != null && description.trim().isNotEmpty);
+    if (!hasMedia && !hasIdentity) return null;
     return AuctionPostSummary(
+      id: id,
+      description: description,
       thumbnailUrl: thumbnail,
       media: media,
+    );
+  }
+
+  static AuctionLiveSummary? _parseLiveSummary(dynamic raw) {
+    if (raw is! Map) return null;
+    final m = Map<String, dynamic>.from(raw);
+    final id = m['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return AuctionLiveSummary(
+      id: id,
+      title: m['title']?.toString(),
+      status: m['status']?.toString(),
+    );
+  }
+
+  static AuctionLiveSummary? _liveFromId(String? liveId) {
+    if (liveId == null || liveId.isEmpty) return null;
+    return AuctionLiveSummary(id: liveId);
+  }
+
+  static AuctionCounts? _parseCounts(dynamic raw) {
+    if (raw is! Map) return null;
+    final m = Map<String, dynamic>.from(raw);
+    return AuctionCounts(
+      bids: (m['bids'] as num?)?.toInt() ?? 0,
+      giftTransactions: (m['giftTransactions'] as num?)?.toInt() ?? 0,
     );
   }
 

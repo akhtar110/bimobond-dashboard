@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
+import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../domain/entities/notification_filters.dart';
 import '../bloc/notifications_bloc.dart';
 import '../utils/notification_labels.dart';
@@ -49,7 +50,6 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(_onScroll);
     // Initial load
     context
         .read<NotificationsBloc>()
@@ -63,13 +63,13 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
     super.dispose();
   }
 
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final pos = _scroll.position;
-    if (pos.pixels < pos.maxScrollExtent - 200) return;
+  void _goToPage(int page) {
     context
         .read<NotificationsBloc>()
-        .add(const LoadMoreNotificationsRequested());
+        .add(ChangeNotificationsPageRequested(page));
+    if (_scroll.hasClients) {
+      _scroll.jumpTo(0);
+    }
   }
 
   void _applyFilters() {
@@ -235,8 +235,9 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
       buildWhen: (a, b) =>
           a.notifications != b.notifications ||
           a.notificationsLoading != b.notificationsLoading ||
-          a.notificationsLoadingMore != b.notificationsLoadingMore ||
-          a.notificationsHasReachedMax != b.notificationsHasReachedMax ||
+          a.notificationsPage != b.notificationsPage ||
+          a.notificationsTotal != b.notificationsTotal ||
+          a.notificationsLastPage != b.notificationsLastPage ||
           a.notificationsError != b.notificationsError,
       builder: (context, state) {
         if (state.notificationsLoading && state.notifications.isEmpty) {
@@ -292,67 +293,71 @@ class _NotificationFeedPanelState extends State<NotificationFeedPanel> {
         final total = state.notificationsTotal > 0
             ? state.notificationsTotal
             : state.notifications.length;
+        final lastPage = state.notificationsLastPage < 1
+            ? 1
+            : state.notificationsLastPage;
+        final currentPage = state.notificationsPage < 1
+            ? 1
+            : state.notificationsPage.clamp(1, lastPage);
+
+        final list = ListView.separated(
+          controller: _scroll,
+          shrinkWrap: !widget.expandVertically,
+          physics: widget.expandVertically
+              ? null
+              : const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          itemCount: state.notifications.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 8),
+          itemBuilder: (context, index) => NotificationItemCard(
+            notification: state.notifications[index],
+            isDark: widget.isDark,
+          ),
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                notificationCountLabel(l10n, total),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            if (widget.expandVertically)
-              Expanded(
-                child: ListView.separated(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  itemCount: state.notifications.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 8),
-                  itemBuilder: (context, index) => NotificationItemCard(
-                    notification: state.notifications[index],
-                    isDark: widget.isDark,
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                controller: _scroll,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                itemCount: state.notifications.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 8),
-                itemBuilder: (context, index) => NotificationItemCard(
-                  notification: state.notifications[index],
-                  isDark: widget.isDark,
-                ),
-              ),
-            if (state.notificationsLoadingMore)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            if (state.notificationsHasReachedMax &&
-                state.notifications.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    l10n.t('allNotificationsLoaded'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: widget.isDark
-                          ? Colors.grey.shade500
-                          : Colors.grey.shade600,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      notificationCountLabel(l10n, total),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
+                  if (state.notificationsLoading)
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
+                    ),
+                ],
               ),
+            ),
+            if (widget.expandVertically) Expanded(child: list) else list,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: AppPaginationBar(
+                currentPage: currentPage,
+                lastPage: lastPage,
+                total: total,
+                pageSize: NotificationsBloc.feedPageSize,
+                itemCount: state.notifications.length,
+                hideWhenSinglePage: false,
+                showBorder: false,
+                borderRadius: BorderRadius.circular(12),
+                compactBreakpoint: 420,
+                onPageChanged: _goToPage,
+              ),
+            ),
           ],
         );
       },

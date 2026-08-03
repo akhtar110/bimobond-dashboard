@@ -8,11 +8,15 @@ class GiftPublishedAtPicker extends StatelessWidget {
     required this.value,
     required this.onTap,
     this.onClear,
+    this.publisherName,
   });
 
   final DateTime? value;
   final VoidCallback? onTap;
   final VoidCallback? onClear;
+
+  /// Admin/user name shown beside the published date when available.
+  final String? publisherName;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +25,8 @@ class GiftPublishedAtPicker extends StatelessWidget {
     final hasValue = value != null;
     final locale = Localizations.localeOf(context).languageCode;
     final dateFmt = DateFormat('MMM d, yyyy  HH:mm', locale);
+    final publisher = publisherName?.trim();
+    final hasPublisher = publisher != null && publisher.isNotEmpty;
 
     final borderColor = hasValue ? scheme.primary : scheme.outlineVariant;
     final bgColor = hasValue
@@ -29,11 +35,15 @@ class GiftPublishedAtPicker extends StatelessWidget {
     final textColor =
         hasValue ? scheme.primary : scheme.onSurfaceVariant;
 
+    final dateText = hasValue
+        ? dateFmt.format(value!.toLocal())
+        : l10n.t('defaultsToNow');
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        constraints: const BoxConstraints(minHeight: 50),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(10),
@@ -56,15 +66,35 @@ class GiftPublishedAtPicker extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  Text(
-                    hasValue
-                        ? dateFmt.format(value!.toLocal())
-                        : l10n.t('defaultsToNow'),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: textColor,
-                      fontWeight: FontWeight.w600,
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: textColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      children: [
+                        TextSpan(text: dateText),
+                        if (hasPublisher) ...[
+                          TextSpan(
+                            text: ' ${l10n.tOr('by', 'by')} ',
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.55),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          TextSpan(
+                            text: publisher,
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

@@ -11,6 +11,7 @@ import '../../domain/usecases/cancel_auction_usecase.dart';
 import '../../domain/usecases/get_auction_details_usecase.dart';
 import '../../domain/usecases/preview_auction_pricing_usecase.dart';
 import '../../domain/usecases/resolve_auction_usecase.dart';
+import '../../domain/usecases/unban_auction_usecase.dart';
 import '../../domain/usecases/update_auction_usecase.dart';
 import '../../data/datasources/auction_socket_service.dart';
 
@@ -41,6 +42,8 @@ class AdminCancelDetailAuctionEvent extends AuctionDetailEvent {}
 
 class AdminBanDetailAuctionEvent extends AuctionDetailEvent {}
 
+class AdminUnbanDetailAuctionEvent extends AuctionDetailEvent {}
+
 class AdminUpdateAuctionEvent extends AuctionDetailEvent {
   AdminUpdateAuctionEvent(this.body);
   final AuctionUpdateBody body;
@@ -54,6 +57,8 @@ class AdminResolveAuctionEvent extends AuctionDetailEvent {
 class AdminRefundFulfillmentEvent extends AuctionDetailEvent {}
 
 class AdminReleaseFulfillmentEvent extends AuctionDetailEvent {}
+
+class ClearAuctionDetailMessagesEvent extends AuctionDetailEvent {}
 
 // ─── States ──────────────────────────────────────────────────────────────────
 
@@ -116,6 +121,7 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     required GetAuctionDetails getAuctionDetails,
     required AdminCancelAuction cancelAuction,
     required AdminBanAuction banAuction,
+    required AdminUnbanAuction unbanAuction,
     required AdminUpdateAuction updateAuction,
     required AdminResolveAuction resolveAuction,
     required AdminRefundFulfillment refundFulfillment,
@@ -125,6 +131,7 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
   })  : _getAuctionDetails = getAuctionDetails,
         _cancelAuction = cancelAuction,
         _banAuction = banAuction,
+        _unbanAuction = unbanAuction,
         _updateAuction = updateAuction,
         _resolveAuction = resolveAuction,
         _refundFulfillment = refundFulfillment,
@@ -138,15 +145,18 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     on<ReceiveAuctionUpdateEvent>(_onReceiveUpdate);
     on<AdminCancelDetailAuctionEvent>(_onCancel);
     on<AdminBanDetailAuctionEvent>(_onBan);
+    on<AdminUnbanDetailAuctionEvent>(_onUnban);
     on<AdminUpdateAuctionEvent>(_onUpdate);
     on<AdminResolveAuctionEvent>(_onResolve);
     on<AdminRefundFulfillmentEvent>(_onRefundFulfillment);
     on<AdminReleaseFulfillmentEvent>(_onReleaseFulfillment);
+    on<ClearAuctionDetailMessagesEvent>(_onClearMessages);
   }
 
   final GetAuctionDetails _getAuctionDetails;
   final AdminCancelAuction _cancelAuction;
   final AdminBanAuction _banAuction;
+  final AdminUnbanAuction _unbanAuction;
   final AdminUpdateAuction _updateAuction;
   final AdminResolveAuction _resolveAuction;
   final AdminRefundFulfillment _refundFulfillment;
@@ -263,6 +273,26 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     }
   }
 
+  Future<void> _onUnban(
+    AdminUnbanDetailAuctionEvent event,
+    Emitter<AuctionDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is! AuctionDetailLoaded) return;
+    emit(current.copyWith(isActioning: true, clearMessages: true));
+    try {
+      final updated = await _unbanAuction(current.auction.id);
+      final refreshed = await _getAuctionDetails(updated.id);
+      emit(current.copyWith(
+        auction: refreshed,
+        isActioning: false,
+        successMessage: 'auction_unbanned_successfully',
+      ));
+    } catch (e) {
+      emit(current.copyWith(isActioning: false, errorMessage: e.toString()));
+    }
+  }
+
   Future<void> _onUpdate(
       AdminUpdateAuctionEvent event, Emitter<AuctionDetailState> emit) async {
     final current = state;
@@ -273,17 +303,32 @@ class AuctionDetailBloc extends Bloc<AuctionDetailEvent, AuctionDetailState> {
     }
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      await _updateAuction(current.auction.id, event.body);
-      var refreshed = await _getAuctionDetails(current.auction.id);
+      var refreshed = await _updateAuction(current.auction.id, event.body);
       refreshed = await _applyResolvedCoinGoal(refreshed, event.body);
-      emit(current.copyWith(
+      final latest = state;
+      if (latest is! AuctionDetailLoaded) return;
+      emit(latest.copyWith(
         auction: refreshed,
         isActioning: false,
-        successMessage: 'Auction updated',
+        successMessage: 'auction_updated_successfully',
       ));
     } catch (e) {
-      emit(current.copyWith(isActioning: false, errorMessage: e.toString()));
+      final latest = state;
+      if (latest is! AuctionDetailLoaded) return;
+      emit(latest.copyWith(
+        isActioning: false,
+        errorMessage: e.toString(),
+      ));
     }
+  }
+
+  void _onClearMessages(
+    ClearAuctionDetailMessagesEvent event,
+    Emitter<AuctionDetailState> emit,
+  ) {
+    final current = state;
+    if (current is! AuctionDetailLoaded) return;
+    emit(current.copyWith(clearMessages: true));
   }
 
   Future<void> _onResolve(

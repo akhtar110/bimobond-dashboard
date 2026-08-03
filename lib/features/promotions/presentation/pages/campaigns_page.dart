@@ -11,8 +11,8 @@ import '../../domain/entities/promotion_entities.dart';
 import '../../domain/enums/promotion_enums.dart';
 import '../bloc/campaigns_bloc.dart';
 import '../utils/promotions_responsive.dart';
-import '../widgets/campaigns_table.dart';
 import '../widgets/campaign_detail_sheet.dart';
+import '../widgets/campaigns_table.dart';
 import '../widgets/promotions_dashboard_widgets.dart';
 import '../widgets/promotions_data_display_widgets.dart';
 import '../widgets/promotions_pagination_bar.dart';
@@ -96,7 +96,10 @@ class _CampaignsPageState extends State<CampaignsPage> {
                     SizedBox(height: metrics.sectionGap),
                     const LinearProgressIndicator(minHeight: 2),
                   ],
-                  SizedBox(height: metrics.isMobile ? PromotionsSpace.md : PromotionsSpace.lg),
+                  SizedBox(
+                      height: metrics.isMobile
+                          ? PromotionsSpace.md
+                          : PromotionsSpace.lg),
                   _CampaignsDataSection(blocState: state),
                 ],
               );

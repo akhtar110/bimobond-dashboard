@@ -36,6 +36,7 @@ class AuthRepositoryImpl implements AuthRepository {
       id: user.id,
       email: user.email,
       username: user.username,
+      fullName: user.fullName,
       isVerified: user.isVerified,
       isNewUser: user.isNewUser,
       isProfileIncomplete: user.isProfileIncomplete,
@@ -75,6 +76,7 @@ class AuthRepositoryImpl implements AuthRepository {
       username: result['username'] ??
           (userPayload is Map ? userPayload['username'] : null) ??
           '',
+      fullName: _readFullName(result, userPayload),
       isVerified: result['isVerified'] ??
           (userPayload is Map ? userPayload['isVerified'] : null) ??
           false,
@@ -86,5 +88,17 @@ class AuthRepositoryImpl implements AuthRepository {
           false,
       roles: parseUserRoles(rolesSource),
     );
+  }
+
+  String? _readFullName(Map<String, dynamic> result, dynamic userPayload) {
+    for (final key in const ['fullName', 'displayName', 'name']) {
+      final top = result[key]?.toString().trim();
+      if (top != null && top.isNotEmpty) return top;
+      if (userPayload is Map) {
+        final nested = userPayload[key]?.toString().trim();
+        if (nested != null && nested.isNotEmpty) return nested;
+      }
+    }
+    return null;
   }
 }

@@ -25,3 +25,19 @@ abstract final class AuctionDetailLabels {
     return template.replaceAll('{name}', name);
   }
 }
+
+String fulfillmentStatusLabel(AppLocalizations l10n, String? status) {
+  final value = status?.trim().toUpperCase();
+  if (value == null || value.isEmpty || value == 'NONE') {
+    return l10n.tOr('fulfillmentNone', 'None');
+  }
+  return switch (value) {
+    'AWAITING_SHIPMENT' =>
+      l10n.tOr('fulfillmentAwaitingShipment', 'Awaiting shipment'),
+    'SHIPPED' => l10n.tOr('fulfillmentShipped', 'Shipped'),
+    'DELIVERED' => l10n.tOr('fulfillmentDelivered', 'Delivered'),
+    'ACCEPTED' => l10n.tOr('fulfillmentAccepted', 'Accepted'),
+    'DISPUTED' => l10n.tOr('fulfillmentDisputed', 'Disputed'),
+    _ => status!,
+  };
+}

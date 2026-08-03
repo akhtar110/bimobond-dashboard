@@ -15,7 +15,7 @@ import '../../../users/presentation/widgets/admin_user_search_field.dart';
 import '../../domain/entities/auction_entity.dart';
 import '../../domain/entities/gift_transaction_entity.dart';
 import '../bloc/auction_detail_bloc.dart';
-import '../bloc/auctions_bloc.dart';
+import '../services/auctions_list_sync.dart';
 import '../utils/auction_detail_labels.dart';
 import '../widgets/auction_card.dart';
 import '../widgets/auction_edit_dialog.dart';
@@ -301,14 +301,8 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
         );
   }
 
-  void _syncToListBloc(BuildContext context, AuctionEntity auction) {
-    try {
-      context
-          .read<AuctionsBloc>()
-          .add(AuctionStatusUpdatedEvent(auction));
-    } catch (_) {
-      // AuctionsBloc may not be in the tree in edge-case navigation paths.
-    }
+  void _syncToListBloc(AuctionEntity auction) {
+    sl<AuctionsListSync>().publish(auction);
   }
 
   @override
@@ -338,10 +332,23 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
           ),
         ),
         body: BlocConsumer<AuctionDetailBloc, AuctionDetailState>(
+          listenWhen: (previous, current) {
+            if (current is! AuctionDetailLoaded) return false;
+            if (previous is! AuctionDetailLoaded) return true;
+            return previous.auction.id != current.auction.id ||
+                previous.auction.status != current.auction.status ||
+                previous.auction.currentTotalCoins !=
+                    current.auction.currentTotalCoins ||
+                previous.successMessage != current.successMessage ||
+                previous.errorMessage != current.errorMessage ||
+                previous.isActioning != current.isActioning;
+          },
           listener: (context, state) {
             if (state is AuctionDetailLoaded) {
-              _syncToListBloc(context, state.auction);
+              _syncToListBloc(state.auction);
               final l10n = context.l10n;
+              final bloc = context.read<AuctionDetailBloc>();
+
               if (state.successMessage != null) {
                 final sm = state.successMessage!;
                 final message = () {
@@ -359,6 +366,14 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                       l10n.t('auctionFulfillmentReleaseSuccess'),
                     'auction_fulfillment_already_settled' =>
                       l10n.t('auctionFulfillmentAlreadySettled'),
+                    'auction_updated_successfully' => l10n.tOr(
+                        'auction_updated_successfully',
+                        'Auction updated successfully',
+                      ),
+                    'auction_unbanned_successfully' => l10n.tOr(
+                        'auction_unbanned_successfully',
+                        'Auction unbanned successfully',
+                      ),
                     _ => sm,
                   };
                 }();
@@ -368,14 +383,15 @@ class _AuctionDetailPageState extends State<AuctionDetailPage> {
                     backgroundColor: scheme.primary,
                   ),
                 );
-              }
-              if (state.errorMessage != null) {
+                bloc.add(ClearAuctionDetailMessagesEvent());
+              } else if (state.errorMessage != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(state.errorMessage!),
                     backgroundColor: scheme.error,
                   ),
                 );
+                bloc.add(ClearAuctionDetailMessagesEvent());
               }
             }
           },
@@ -517,7 +533,7 @@ class _AuctionHeroSection extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final dateFmt = DateFormat('MMM d');
-    final giftCount = auction.giftTransactions?.length ?? 0;
+    final giftCount = auction.giftTransactionCount;
     final itemName = auction.itemName?.isNotEmpty == true
         ? auction.itemName!
         : l10n.t('noData');
@@ -809,7 +825,9 @@ class _AuctionStatsSection extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final dateFmt = DateFormat('MMM d, yyyy');
-    final giftCount = auction.giftTransactions?.length ?? 0;
+    final giftCount = auction.giftTransactionCount;
+    final liveTitle = auction.live?.title?.trim();
+    final postDesc = auction.post?.description?.trim();
 
     return DashboardCard(
       child: LayoutBuilder(
@@ -863,15 +881,21 @@ class _AuctionStatsSection extends StatelessWidget {
             MetricCard(
               icon: Icons.link_rounded,
               label: l10n.tOr('linkedPost', 'Linked post'),
-              value: (auction.postId != null || auction.post != null)
-                  ? l10n.tOr('yes', 'Yes')
+              value: auction.hasPost
+                  ? (postDesc != null && postDesc.isNotEmpty
+                      ? (postDesc.length > 28
+                          ? '${postDesc.substring(0, 28)}…'
+                          : postDesc)
+                      : l10n.tOr('yes', 'Yes'))
                   : l10n.tOr('no', 'No'),
             ),
             MetricCard(
               icon: Icons.live_tv_outlined,
               label: l10n.tOr('liveSession', 'Live session'),
-              value: (auction.liveId != null && auction.liveId!.isNotEmpty)
-                  ? l10n.tOr('yes', 'Yes')
+              value: auction.hasLive
+                  ? (liveTitle != null && liveTitle.isNotEmpty
+                      ? liveTitle
+                      : l10n.tOr('yes', 'Yes'))
                   : l10n.tOr('no', 'No'),
             ),
             MetricCard(
@@ -881,13 +905,11 @@ class _AuctionStatsSection extends StatelessWidget {
                   ? l10n.tOr('enabled', 'Enabled')
                   : l10n.tOr('disabled', 'Disabled'),
             ),
-            if (auction.fulfillmentStatus != null &&
-                auction.fulfillmentStatus!.isNotEmpty &&
-                auction.fulfillmentStatus != 'NONE')
+            if (auction.hasFulfillmentLifecycle)
               MetricCard(
                 icon: Icons.local_shipping_outlined,
                 label: l10n.tOr('fulfillmentStatus', 'Fulfillment'),
-                value: auction.fulfillmentStatus!,
+                value: fulfillmentStatusLabel(l10n, auction.fulfillmentStatus),
               ),
           ];
 
@@ -1261,15 +1283,17 @@ class _AuctionFulfillmentSection extends StatelessWidget {
     final auction = state.auction;
     final canFulfill = PermissionManager.canFulfillAuctions(context);
 
-    if (!canFulfill || !auction.showEscrowFulfillmentTools) {
+    // Panel only when escrow is enabled (permission + escrow flag).
+    if (!canFulfill || !auction.effectiveEscrowEnabled) {
       return const SizedBox.shrink();
     }
 
     final hasActions =
         auction.canAdminRefundEscrow || auction.canAdminReleaseEscrow;
-    if (!hasActions) {
-      return const SizedBox.shrink();
-    }
+    final fulfillmentLabel = fulfillmentStatusLabel(
+      l10n,
+      auction.fulfillmentStatus,
+    );
 
     return ActionPanel(
       title: l10n.t('auctionFulfillmentTitle'),
@@ -1324,9 +1348,7 @@ class _AuctionFulfillmentSection extends StatelessWidget {
                   const SizedBox(width: DashboardSpace.sm),
                   Expanded(
                     child: Text(
-                      auction.isDisputed
-                          ? l10n.t('auctionFulfillmentDisputeHint')
-                          : l10n.t('auctionEscrowEnabledHint'),
+                      l10n.t('auctionEscrowEnabledHint'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -1334,17 +1356,20 @@ class _AuctionFulfillmentSection extends StatelessWidget {
                   ),
                 ],
               ),
-              if (auction.fulfillmentStatus != null &&
-                  auction.fulfillmentStatus!.isNotEmpty &&
-                  auction.fulfillmentStatus != 'NONE') ...[
-                const SizedBox(height: DashboardSpace.sm),
-                Text(
-                  '${l10n.t('fulfillmentStatus')}: ${auction.fulfillmentStatus}',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              const SizedBox(height: DashboardSpace.sm),
+              Text(
+                '${l10n.t('status')}: ${auctionStatusStyle(scheme, l10n, auction.status).label}',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${l10n.t('fulfillmentStatus')}: $fulfillmentLabel',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: DashboardSpace.sm),
               Text(
                 context.tr('auctionFulfillmentHeldCoins', {
@@ -1357,8 +1382,10 @@ class _AuctionFulfillmentSection extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: DashboardSpace.lg),
-        _AuctionFulfillmentActionsBar(auction: auction),
+        if (hasActions) ...[
+          const SizedBox(height: DashboardSpace.lg),
+          _AuctionFulfillmentActionsBar(auction: auction),
+        ],
       ],
     );
   }
@@ -1459,9 +1486,18 @@ class _AuctionAdminSection extends StatelessWidget {
     if (canModerate && auction.isAdminEditable) {
       moderationButtons.add(
         ActionPanelButton(
-          label: l10n.tOr('editAuction', 'Edit auction'),
+          label: l10n.tOr('edit_auction', 'Edit auction'),
           icon: Icons.edit_outlined,
           onTap: () => _showEditDialog(context, auction),
+        ),
+      );
+    }
+    if (canModerate && auction.canAdminUnban) {
+      moderationButtons.add(
+        ActionPanelButton(
+          label: l10n.tOr('unban_auction', 'Unban auction'),
+          icon: Icons.lock_open_rounded,
+          onTap: () => _confirmUnban(context),
         ),
       );
     }
@@ -1577,18 +1613,22 @@ class _AuctionAdminSection extends StatelessWidget {
   }
 
   void _confirmBan(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ban auction'),
-        content: const Text(
-          'This will mark the auction as BANNED and remove it from active gift activity.',
+        title: Text(l10n.tOr('banAuction', 'Ban auction')),
+        content: Text(
+          l10n.tOr(
+            'banAuctionConfirm',
+            'This will mark the auction as BANNED and remove it from active gift activity.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Keep'),
+            child: Text(l10n.tOr('keep', 'Keep')),
           ),
           FilledButton(
             onPressed: () {
@@ -1601,7 +1641,43 @@ class _AuctionAdminSection extends StatelessWidget {
               backgroundColor: scheme.error,
               foregroundColor: scheme.onError,
             ),
-            child: const Text('Ban'),
+            child: Text(l10n.tOr('ban', 'Ban')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmUnban(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.tOr('unban_auction', 'Unban auction')),
+        content: Text(
+          l10n.tOr(
+            'confirm_unban',
+            'Restore this auction from BANNED status?',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context
+                  .read<AuctionDetailBloc>()
+                  .add(AdminUnbanDetailAuctionEvent());
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.primary,
+              foregroundColor: scheme.onPrimary,
+            ),
+            child: Text(l10n.tOr('unban_auction', 'Unban auction')),
           ),
         ],
       ),

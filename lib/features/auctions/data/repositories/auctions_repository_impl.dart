@@ -63,6 +63,10 @@ class AuctionsRepositoryImpl implements AuctionsRepository {
       _dataSource.adminBanAuction(auctionId);
 
   @override
+  Future<AuctionEntity> adminUnbanAuction(String auctionId) =>
+      _dataSource.adminUnbanAuction(auctionId);
+
+  @override
   Future<AuctionEntity> adminUpdateAuction(
     String auctionId,
     AuctionUpdateBody body,
