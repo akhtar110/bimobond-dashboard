@@ -16,6 +16,9 @@ class GetUsers {
     String? role,
     DateTime? createdFrom,
     DateTime? createdTo,
+    String? city,
+    String? region,
+    String? country,
   }) {
     return repository.getUsers(
       page: page,
@@ -27,6 +30,9 @@ class GetUsers {
       role: role,
       createdFrom: createdFrom,
       createdTo: createdTo,
+      city: city,
+      region: region,
+      country: country,
     );
   }
 }

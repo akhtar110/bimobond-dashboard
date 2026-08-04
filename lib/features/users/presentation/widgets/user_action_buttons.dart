@@ -254,12 +254,22 @@ class _CompactActionsMenu extends StatelessWidget {
             return;
           case 'edit':
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Edit user details for @${user.username}')),
+              SnackBar(
+                content: Text(
+                  l10n.tArgs('editUserDetailsFor', {'username': user.username}),
+                ),
+              ),
             );
             return;
           case 'verify':
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(user.isVerified ? 'Verification removed' : 'User verified successfully')),
+              SnackBar(
+                content: Text(
+                  user.isVerified
+                      ? l10n.tOr('verificationRemoved', 'Verification removed')
+                      : l10n.tOr('userVerifiedSuccessfully', 'User verified successfully'),
+                ),
+              ),
             );
             return;
           case 'suspend':
@@ -268,21 +278,25 @@ class _CompactActionsMenu extends StatelessWidget {
             return;
           case 'reset_password':
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Password reset email sent to ${user.email ?? user.username}')),
+              SnackBar(
+                content: Text(
+                  l10n.tArgs('passwordResetEmailSent', {
+                    'email': user.email ?? user.username,
+                  }),
+                ),
+              ),
             );
             return;
           case 'send_notification':
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Notification dispatch modal opened for @${user.username}')),
+              SnackBar(
+                content: Text(
+                  l10n.tArgs('notificationDispatchModalOpened', {
+                    'username': user.username,
+                  }),
+                ),
+              ),
             );
-            return;
-          case 'view_reports':
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Viewing reports received by @${user.username}')),
-            );
-            return;
-          case 'moderation_history':
-            onDetails();
             return;
           case 'delete':
             onDelete();
@@ -329,20 +343,6 @@ class _CompactActionsMenu extends StatelessWidget {
           child: _MenuRow(
             Icons.notifications_active_outlined,
             l10n.tOr('sendNotification', 'Send Notification'),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'view_reports',
-          child: _MenuRow(
-            Icons.flag_outlined,
-            l10n.tOr('viewReports', 'View Reports'),
-          ),
-        ),
-        PopupMenuItem(
-          value: 'moderation_history',
-          child: _MenuRow(
-            Icons.history_rounded,
-            l10n.tOr('moderationHistory', 'Moderation History'),
           ),
         ),
         if (canUpdate)

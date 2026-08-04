@@ -36,7 +36,7 @@ class UsersTablePanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
@@ -47,7 +47,7 @@ class UsersTablePanel extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(12),
         child: BlocBuilder<UsersBloc, UsersState>(
           buildWhen: (previous, current) {
             if (current is ResetUserPasswordLoading ||
@@ -55,7 +55,7 @@ class UsersTablePanel extends StatelessWidget {
                 current is ResetUserPasswordFailure) {
               return false;
             }
-            return previous.runtimeType != current.runtimeType;
+            return true;
           },
           builder: (context, state) {
             return AnimatedSwitcher(
@@ -139,12 +139,7 @@ class _LoadedUsersContent extends StatelessWidget {
               },
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                metrics.cardPadding,
-                metrics.cardPadding - 4,
-                metrics.cardPadding,
-                8,
-              ),
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
               child: Text(
                 '$total ${l10n.t('users')}',
                 style: Theme.of(
@@ -307,29 +302,28 @@ class _DesktopTabletTable extends StatelessWidget {
             },
           ),
         ),
-        if (metrics.useDesktopPagination)
-          BlocSelector<UsersBloc, UsersState, _PaginationData>(
-            selector: (state) {
-              if (state is! UsersLoaded) {
-                return const _PaginationData.empty();
-              }
-              return _PaginationData(
-                currentPage: state.currentPage,
-                lastPage: state.lastPage,
-                total: state.total,
-                itemCount: state.users.length,
-              );
-            },
-            builder: (context, data) {
-              if (!data.visible) return const SizedBox.shrink();
-              return UsersPaginationBar(
-                currentPage: data.currentPage,
-                lastPage: data.lastPage,
-                total: data.total,
-                itemCount: data.itemCount,
-              );
-            },
-          ),
+        BlocSelector<UsersBloc, UsersState, _PaginationData>(
+          selector: (state) {
+            if (state is! UsersLoaded) {
+              return const _PaginationData.empty();
+            }
+            return _PaginationData(
+              currentPage: state.currentPage,
+              lastPage: state.lastPage,
+              total: state.total,
+              itemCount: state.users.length,
+            );
+          },
+          builder: (context, data) {
+            if (!data.visible) return const SizedBox.shrink();
+            return UsersPaginationBar(
+              currentPage: data.currentPage,
+              lastPage: data.lastPage,
+              total: data.total,
+              itemCount: data.itemCount,
+            );
+          },
+        ),
       ],
     );
   }
@@ -439,9 +433,13 @@ class _UsersListData {
 
   @override
   bool operator ==(Object other) {
-    return other is _UsersListData &&
-        other.users == users &&
-        other.selectedUserIds == selectedUserIds &&
+    if (identical(this, other)) return true;
+    if (other is! _UsersListData) return false;
+    if (other.users.length != users.length) return false;
+    for (int i = 0; i < users.length; i++) {
+      if (!identical(users[i], other.users[i])) return false;
+    }
+    return other.selectedUserIds == selectedUserIds &&
         other.selectionEnabled == selectionEnabled &&
         other.isLoadingMore == isLoadingMore &&
         other.hasReachedMax == hasReachedMax;

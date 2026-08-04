@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/utils/api_error_messages.dart';
+import '../../data/datasources/users_presence_socket_service.dart';
 import '../../data/models/user_model.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_detail_entity.dart';
@@ -30,6 +33,7 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
     required DeleteUser deleteUser,
     required UpdateUserRoles updateUserRoles,
     required UpdateUserPrivacySettings updateUserPrivacySettings,
+    UsersPresenceSocketService? presenceSocketService,
   })  : _getUserById = getUserById,
         _getUserPosts = getUserPosts,
         _banUser = banUser,
@@ -39,13 +43,18 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
         _deleteUser = deleteUser,
         _updateUserRoles = updateUserRoles,
         _updateUserPrivacySettings = updateUserPrivacySettings,
+        _presenceSocketService = presenceSocketService ?? UsersPresenceSocketService(),
         super(UserDetailInitial()) {
     on<LoadUserDetailEvent>(_onLoad);
+    on<RefreshUserDetailEvent>(_onRefresh);
     on<UserDetailAdminActionEvent>(_onAdminAction);
     on<SetUserDetailRoleEvent>(_onSetRole);
     on<UpdateUserPrivacySettingsEvent>(_onUpdatePrivacySettings);
     on<ClearUserDetailActionFeedbackEvent>(_onClearFeedback);
     on<AdjustUserFollowCountsEvent>(_onAdjustFollowCounts);
+    on<UserDetailPresenceChangedEvent>(_onPresenceChanged);
+
+    _initPresenceSubscription();
   }
 
   final GetUserById _getUserById;
@@ -57,6 +66,45 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
   final DeleteUser _deleteUser;
   final UpdateUserRoles _updateUserRoles;
   final UpdateUserPrivacySettings _updateUserPrivacySettings;
+  final UsersPresenceSocketService _presenceSocketService;
+
+  StreamSubscription<UserPresenceChange>? _presenceSubscription;
+
+  void _initPresenceSubscription() {
+    _presenceSocketService.connect();
+    _presenceSubscription =
+        _presenceSocketService.onUserPresenceChanged.listen((update) {
+      if (!isClosed) {
+        add(UserDetailPresenceChangedEvent(update));
+      }
+    });
+  }
+
+  void _onPresenceChanged(
+    UserDetailPresenceChangedEvent event,
+    Emitter<UserDetailState> emit,
+  ) {
+    final current = state;
+    if (current is! UserDetailLoaded) return;
+    final update = event.update;
+    if (update is UserPresenceChange &&
+        update.userId == current.userDetail.user.id) {
+      final oldUser = current.userDetail.user;
+      final updatedUser = oldUser.copyWith(
+        isOnlineOverride: update.isOnline,
+        lastActive: update.lastSeenAt ??
+            (update.isOnline ? DateTime.now() : oldUser.lastActive),
+      );
+      final updatedDetail = current.userDetail.copyWith(user: updatedUser);
+      emit(current.copyWith(userDetail: updatedDetail));
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _presenceSubscription?.cancel();
+    return super.close();
+  }
 
   Future<void> _onLoad(
     LoadUserDetailEvent event,
@@ -69,6 +117,33 @@ class UserDetailBloc extends Bloc<UserDetailEvent, UserDetailState> {
       emit(UserDetailLoaded(userDetail: userDetail));
     } catch (e) {
       emit(UserDetailError(_messageFromError(e)));
+    }
+  }
+
+  Future<void> _onRefresh(
+    RefreshUserDetailEvent event,
+    Emitter<UserDetailState> emit,
+  ) async {
+    final current = state;
+    if (current is UserDetailLoaded) {
+      if (current.isRefreshing) return;
+      emit(current.copyWith(isRefreshing: true));
+
+      try {
+        final userDetail = await _fetchUserDetail(current.userDetail.user.id);
+        emit(UserDetailLoaded(
+          userDetail: userDetail,
+          isRefreshing: false,
+        ));
+      } catch (e) {
+        emit(
+          current.copyWith(
+            isRefreshing: false,
+            actionFeedback: _messageFromError(e),
+            actionFeedbackIsError: true,
+          ),
+        );
+      }
     }
   }
 

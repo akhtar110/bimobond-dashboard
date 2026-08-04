@@ -7,17 +7,15 @@ import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../injection_container.dart' as di;
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../security_logs/data/datasources/user_audit_log_socket_service.dart';
-import '../../../security_logs/domain/usecases/get_logs_usecase.dart';
+import '../../../security_logs/data/datasources/user_violations_remote_datasource.dart';
+import '../../../security_logs/presentation/bloc/user_violations_bloc.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
-import '../../../security_logs/presentation/widgets/logs_detail_dialog.dart';
+import '../../../security_logs/presentation/widgets/admin_and_violation_detail_dialogs.dart';
 import '../../domain/entities/user_entity.dart';
-import '../bloc/user_audit_log_bloc.dart';
-import '../bloc/user_detail_bloc.dart';
-import '../bloc/user_detail_state.dart';
 import 'permission_denied_state.dart';
 
-class UserDetailAuditLogTab extends StatelessWidget {
-  const UserDetailAuditLogTab({
+class UserDetailViolationsTab extends StatelessWidget {
+  const UserDetailViolationsTab({
     super.key,
     required this.user,
     required this.isDark,
@@ -34,35 +32,23 @@ class UserDetailAuditLogTab extends StatelessWidget {
       allowLegacyAdmin: true,
       fallback: PermissionDeniedState(
         message: l10n.tOr(
-          'userAuditLogPermissionDenied',
-          'You do not have permission to view audit logs.',
+          'userViolationsPermissionDenied',
+          'You do not have permission to view user violations history.',
         ),
       ),
-      child: BlocProvider<UserAuditLogBloc>(
-        create: (_) => UserAuditLogBloc(
+      child: BlocProvider<UserViolationsBloc>(
+        create: (_) => UserViolationsBloc(
           userId: user.id,
-          getLogs: di.sl<GetLogsUseCase>(),
-        )..add(const LoadUserAuditLogEvent(page: 1)),
-        child: BlocListener<UserDetailBloc, UserDetailState>(
-          listenWhen: (previous, current) {
-            if (current is UserDetailLoaded && previous is UserDetailLoaded) {
-              return current.actionFeedback != null ||
-                  current.userDetail.user.updatedAt != previous.userDetail.user.updatedAt;
-            }
-            return false;
-          },
-          listener: (context, state) {
-            context.read<UserAuditLogBloc>().add(const RefreshUserAuditLogEvent());
-          },
-          child: _UserDetailAuditLogView(isDark: isDark),
-        ),
+          remoteDataSource: UserViolationsRemoteDataSourceImpl(di.sl()),
+        )..add(const LoadUserViolationsEvent(page: 1)),
+        child: _UserDetailViolationsView(isDark: isDark),
       ),
     );
   }
 }
 
-class _UserDetailAuditLogView extends StatelessWidget {
-  const _UserDetailAuditLogView({required this.isDark});
+class _UserDetailViolationsView extends StatelessWidget {
+  const _UserDetailViolationsView({required this.isDark});
 
   final bool isDark;
 
@@ -73,13 +59,13 @@ class _UserDetailAuditLogView extends StatelessWidget {
     final l10n = context.l10n;
     final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
 
-    return BlocBuilder<UserAuditLogBloc, UserAuditLogState>(
+    return BlocBuilder<UserViolationsBloc, UserViolationsState>(
       builder: (context, state) {
-        if (state is UserAuditLogLoading) {
+        if (state is UserViolationsLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (state is UserAuditLogError) {
+        if (state is UserViolationsError) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -96,8 +82,8 @@ class _UserDetailAuditLogView extends StatelessWidget {
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => context
-                        .read<UserAuditLogBloc>()
-                        .add(const LoadUserAuditLogEvent(page: 1)),
+                        .read<UserViolationsBloc>()
+                        .add(const LoadUserViolationsEvent(page: 1)),
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: Text(l10n.tOr('retry', 'Retry')),
                   ),
@@ -107,22 +93,22 @@ class _UserDetailAuditLogView extends StatelessWidget {
           );
         }
 
-        if (state is UserAuditLogLoaded) {
-          if (state.logs.isEmpty) {
+        if (state is UserViolationsLoaded) {
+          if (state.violations.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.history_toggle_off_rounded,
+                    const Icon(
+                      Icons.verified_user_outlined,
                       size: 44,
-                      color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                      color: Colors.green,
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      l10n.tOr('noAuditLogsFound', 'No audit log entries found for this user.'),
+                      l10n.tOr('noViolationsFound', 'No community guideline violations found on record.'),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -160,9 +146,10 @@ class _UserDetailAuditLogView extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '${l10n.tOr('userAuditLogTab', 'Audit Log')} (${state.meta.total})',
+                          '${l10n.tOr('violationsHistoryTitle', 'Violations History')} (${state.meta.total})',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
+                            color: Colors.red,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -201,8 +188,8 @@ class _UserDetailAuditLogView extends StatelessWidget {
                             ),
                             onPressed: () {
                               context
-                                  .read<UserAuditLogBloc>()
-                                  .add(const ReconnectSocketEvent());
+                                  .read<UserViolationsBloc>()
+                                  .add(const ReconnectViolationSocketEvent());
                             },
                             icon: const Icon(Icons.sync_problem_rounded, size: 14),
                             label: Text(l10n.tOr('reconnect', 'Reconnect'), style: const TextStyle(fontSize: 11)),
@@ -212,8 +199,8 @@ class _UserDetailAuditLogView extends StatelessWidget {
                           icon: const Icon(Icons.refresh_rounded, size: 18),
                           onPressed: () {
                             context
-                                .read<UserAuditLogBloc>()
-                                .add(const RefreshUserAuditLogEvent());
+                                .read<UserViolationsBloc>()
+                                .add(const RefreshUserViolationsEvent());
                           },
                         ),
                       ],
@@ -224,10 +211,10 @@ class _UserDetailAuditLogView extends StatelessWidget {
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.all(12),
-                  itemCount: state.logs.length,
+                  itemCount: state.violations.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    final item = state.logs[index];
+                    final item = state.violations[index];
                     final actionLabel = logsActionLabel(l10n, item);
                     final categoryLabel = logsCategoryLabel(l10n, item.category);
 
@@ -238,7 +225,7 @@ class _UserDetailAuditLogView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(10),
-                        onTap: () => showLogsDetailDialog(context, item),
+                        onTap: () => showViolationDetailDialog(context, item),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
@@ -247,13 +234,13 @@ class _UserDetailAuditLogView extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: scheme.primaryContainer.withValues(alpha: 0.5),
+                                  color: Colors.red.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  _iconForCategory(item.category),
+                                child: const Icon(
+                                  Icons.gavel_rounded,
                                   size: 20,
-                                  color: scheme.primary,
+                                  color: Colors.red,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -268,6 +255,7 @@ class _UserDetailAuditLogView extends StatelessWidget {
                                             actionLabel,
                                             style: theme.textTheme.titleSmall?.copyWith(
                                               fontWeight: FontWeight.w700,
+                                              color: Colors.red,
                                             ),
                                           ),
                                         ),
@@ -277,15 +265,16 @@ class _UserDetailAuditLogView extends StatelessWidget {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: scheme.surfaceContainerHighest,
+                                            color: Colors.red.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                                           ),
                                           child: Text(
                                             categoryLabel,
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
-                                              color: scheme.onSurfaceVariant,
+                                              color: Colors.red,
                                             ),
                                           ),
                                         ),
@@ -316,39 +305,21 @@ class _UserDetailAuditLogView extends StatelessWidget {
                                             color: scheme.onSurfaceVariant,
                                           ),
                                         ),
-                                        if (item.actorRole != null) ...[
-                                          const SizedBox(width: 12),
-                                          Icon(
-                                            Icons.admin_panel_settings_outlined,
-                                            size: 13,
-                                            color: scheme.onSurfaceVariant,
+                                        const SizedBox(width: 12),
+                                        const Icon(
+                                          Icons.warning_amber_rounded,
+                                          size: 13,
+                                          color: Colors.red,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'VIOLATION',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.red,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            item.actorRole!,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: scheme.primary,
-                                            ),
-                                          ),
-                                        ],
-                                        if (item.ipAddress != null) ...[
-                                          const SizedBox(width: 12),
-                                          Icon(
-                                            Icons.wifi_rounded,
-                                            size: 13,
-                                            color: scheme.onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            item.ipAddress!,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ],
                                     ),
                                   ],
@@ -375,11 +346,11 @@ class _UserDetailAuditLogView extends StatelessWidget {
                     lastPage: state.meta.totalPages,
                     total: state.meta.total,
                     pageSize: state.meta.limit,
-                    itemCount: state.logs.length,
+                    itemCount: state.violations.length,
                     onPageChanged: (page) {
                       context
-                          .read<UserAuditLogBloc>()
-                          .add(LoadUserAuditLogEvent(page: page));
+                          .read<UserViolationsBloc>()
+                          .add(LoadUserViolationsEvent(page: page));
                     },
                   ),
                 ),
@@ -390,19 +361,5 @@ class _UserDetailAuditLogView extends StatelessWidget {
         return const SizedBox.shrink();
       },
     );
-  }
-
-  IconData _iconForCategory(String category) {
-    return switch (category.toUpperCase()) {
-      'AUTH' => Icons.lock_outline_rounded,
-      'SOCIAL' => Icons.people_outline_rounded,
-      'CONTENT' => Icons.article_outlined,
-      'COMMERCE' => Icons.shopping_bag_outlined,
-      'MESSAGING' => Icons.chat_bubble_outline_rounded,
-      'MODERATION' => Icons.gavel_rounded,
-      'ADMIN' => Icons.admin_panel_settings_rounded,
-      'SETTINGS' => Icons.settings_outlined,
-      _ => Icons.history_rounded,
-    };
   }
 }

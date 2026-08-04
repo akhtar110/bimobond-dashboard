@@ -159,9 +159,7 @@ class UserEntity {
 
   DateTime? get lastSeen => lastActive ?? updatedAt ?? createdAt;
 
-  bool get isOnline =>
-      isOnlineOverride ??
-      (lastSeen != null && DateTime.now().difference(lastSeen!).inMinutes < 3);
+  bool get isOnline => isOnlineOverride ?? false;
 
   String get lastSeenFormatted {
     if (lastSeen == null) return '—';
@@ -191,6 +189,138 @@ class UserEntity {
 
   /// Standard / regular user (not admin and not moderator).
   bool get isStandardRole => !isAdminRole && !isModeratorRole;
+
+  UserEntity copyWith({
+    String? id,
+    String? firebaseUid,
+    String? username,
+    String? fullName,
+    String? email,
+    String? phoneNumber,
+    String? bio,
+    String? avatarUrl,
+    String? gender,
+    DateTime? dateOfBirth,
+    bool? isVerified,
+    String? instagramUrl,
+    String? youtubeUrl,
+    String? websiteUrl,
+    String? tiktokUrl,
+    String? twitterUrl,
+    String? snapchatUrl,
+    String? spotifyUrl,
+    String? pronouns,
+    String? creatorCategory,
+    String? accountType,
+    String? verificationBadge,
+    String? likedVideosVisibility,
+    String? followersListVisibility,
+    String? followingListVisibility,
+    bool? discoverable,
+    bool? suggestToContacts,
+    bool? profileViewHistoryEnabled,
+    bool? showActivityStatus,
+    bool? restrictedMode,
+    bool? showShopOnProfile,
+    bool? allowDuetsDefault,
+    bool? allowStitchDefault,
+    bool? allowDownloadsDefault,
+    bool? allowRepostsDefault,
+    bool? showRepostsOnProfile,
+    bool? isPrivate,
+    bool? isProfileLocked,
+    bool? allowComments,
+    bool? allowDirectMsgs,
+    MessagePermission? messagePermission,
+    bool? canPost,
+    String? language,
+    String? theme,
+    String? country,
+    String? region,
+    String? city,
+    int? followerCount,
+    int? followingCount,
+    int? postCount,
+    int? totalLikes,
+    bool? isBanned,
+    String? banReason,
+    DateTime? bannedUntil,
+    String? fcmToken,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? lastActive,
+    bool? isOnlineOverride,
+    List<UserRole>? roles,
+    UserWalletEntity? wallet,
+    UserRelationCountsEntity? relationCounts,
+    UserLastLocationEntity? lastLocation,
+  }) {
+    return UserEntity(
+      id: id ?? this.id,
+      firebaseUid: firebaseUid ?? this.firebaseUid,
+      username: username ?? this.username,
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      bio: bio ?? this.bio,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      gender: gender ?? this.gender,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      isVerified: isVerified ?? this.isVerified,
+      instagramUrl: instagramUrl ?? this.instagramUrl,
+      youtubeUrl: youtubeUrl ?? this.youtubeUrl,
+      websiteUrl: websiteUrl ?? this.websiteUrl,
+      tiktokUrl: tiktokUrl ?? this.tiktokUrl,
+      twitterUrl: twitterUrl ?? this.twitterUrl,
+      snapchatUrl: snapchatUrl ?? this.snapchatUrl,
+      spotifyUrl: spotifyUrl ?? this.spotifyUrl,
+      pronouns: pronouns ?? this.pronouns,
+      creatorCategory: creatorCategory ?? this.creatorCategory,
+      accountType: accountType ?? this.accountType,
+      verificationBadge: verificationBadge ?? this.verificationBadge,
+      likedVideosVisibility: likedVideosVisibility ?? this.likedVideosVisibility,
+      followersListVisibility: followersListVisibility ?? this.followersListVisibility,
+      followingListVisibility: followingListVisibility ?? this.followingListVisibility,
+      discoverable: discoverable ?? this.discoverable,
+      suggestToContacts: suggestToContacts ?? this.suggestToContacts,
+      profileViewHistoryEnabled: profileViewHistoryEnabled ?? this.profileViewHistoryEnabled,
+      showActivityStatus: showActivityStatus ?? this.showActivityStatus,
+      restrictedMode: restrictedMode ?? this.restrictedMode,
+      showShopOnProfile: showShopOnProfile ?? this.showShopOnProfile,
+      allowDuetsDefault: allowDuetsDefault ?? this.allowDuetsDefault,
+      allowStitchDefault: allowStitchDefault ?? this.allowStitchDefault,
+      allowDownloadsDefault: allowDownloadsDefault ?? this.allowDownloadsDefault,
+      allowRepostsDefault: allowRepostsDefault ?? this.allowRepostsDefault,
+      showRepostsOnProfile: showRepostsOnProfile ?? this.showRepostsOnProfile,
+      isPrivate: isPrivate ?? this.isPrivate,
+      isProfileLocked: isProfileLocked ?? this.isProfileLocked,
+      allowComments: allowComments ?? this.allowComments,
+      allowDirectMsgs: allowDirectMsgs ?? this.allowDirectMsgs,
+      messagePermission: messagePermission ?? this.messagePermission,
+      canPost: canPost ?? this.canPost,
+      language: language ?? this.language,
+      theme: theme ?? this.theme,
+      country: country ?? this.country,
+      region: region ?? this.region,
+      city: city ?? this.city,
+      followerCount: followerCount ?? this.followerCount,
+      followingCount: followingCount ?? this.followingCount,
+      postCount: postCount ?? this.postCount,
+      totalLikes: totalLikes ?? this.totalLikes,
+      isBanned: isBanned ?? this.isBanned,
+      banReason: banReason ?? this.banReason,
+      bannedUntil: bannedUntil ?? this.bannedUntil,
+      fcmToken: fcmToken ?? this.fcmToken,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastActive: lastActive ?? this.lastActive,
+      isOnlineOverride: isOnlineOverride ?? this.isOnlineOverride,
+      roles: roles ?? this.roles,
+      wallet: wallet ?? this.wallet,
+      relationCounts: relationCounts ?? this.relationCounts,
+      lastLocation: lastLocation ?? this.lastLocation,
+    );
+  }
 }
 
 class UsersPageEntity {
@@ -198,11 +328,13 @@ class UsersPageEntity {
   final int total;
   final int page;
   final int lastPage;
+  final int onlineCount;
 
   const UsersPageEntity({
     required this.users,
     required this.total,
     required this.page,
     required this.lastPage,
+    this.onlineCount = 0,
   });
 }

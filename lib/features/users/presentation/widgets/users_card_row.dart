@@ -7,6 +7,7 @@ import '../bloc/users_bloc.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
 import 'user_location_cell.dart';
+import 'user_online_point_indicator.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 
@@ -37,7 +38,7 @@ class UsersCardRow extends StatelessWidget {
           ? scheme.primaryContainer.withValues(alpha: 0.12)
           : scheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(
           color: isSelected
               ? scheme.primary.withValues(alpha: 0.45)
@@ -47,9 +48,9 @@ class UsersCardRow extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onUserTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
+          padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -132,26 +133,40 @@ class _CardAvatar extends StatelessWidget {
         ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
         : [Colors.transparent, Colors.transparent];
 
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(colors: ringColors),
-      ),
-      child: CircleAvatar(
-        radius: 20,
-        backgroundColor: scheme.surfaceContainerHighest,
-        backgroundImage: user.avatarUrl != null
-            ? CachedNetworkImageProvider(user.avatarUrl!)
-            : null,
-        child: user.avatarUrl == null
-            ? Icon(
-                Icons.person_rounded,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              )
-            : null,
-      ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: ringColors),
+          ),
+          child: CircleAvatar(
+            radius: 20,
+            backgroundColor: scheme.surfaceContainerHighest,
+            backgroundImage: user.avatarUrl != null
+                ? CachedNetworkImageProvider(user.avatarUrl!)
+                : null,
+            child: user.avatarUrl == null
+                ? Icon(
+                    Icons.person_rounded,
+                    size: 20,
+                    color: scheme.onSurfaceVariant,
+                  )
+                : null,
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: UserOnlinePointIndicator(
+            isOnline: user.isOnline,
+            size: 13,
+            borderWidth: 2,
+          ),
+        ),
+      ],
     );
   }
 }

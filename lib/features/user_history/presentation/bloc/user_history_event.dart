@@ -63,3 +63,20 @@ class ChangeUserHistoryFilters extends UserHistoryEvent {
 class ClearUserHistoryFilters extends UserHistoryEvent {
   const ClearUserHistoryFilters();
 }
+
+class StartRealtimeUserHistoryListening extends UserHistoryEvent {
+  const StartRealtimeUserHistoryListening({this.intervalSeconds = 5});
+
+  final int intervalSeconds;
+
+  @override
+  List<Object?> get props => [intervalSeconds];
+}
+
+class StopRealtimeUserHistoryListening extends UserHistoryEvent {
+  const StopRealtimeUserHistoryListening();
+}
+
+class PollRealtimeUserHistory extends UserHistoryEvent {
+  const PollRealtimeUserHistory();
+}

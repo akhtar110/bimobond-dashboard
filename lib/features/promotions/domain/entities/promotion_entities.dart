@@ -159,8 +159,10 @@ class CampaignEntity extends Equatable {
       ? 0
       : ((impressionCount / impressionTarget) * 100).clamp(0, 100);
 
-  double get remainingBudgetCoins =>
-      (budgetCoins - spentCoins).clamp(0, double.infinity);
+  double get remainingBudgetCoins {
+    final rem = budgetCoins - spentCoins;
+    return rem > 0 ? rem : 0.0;
+  }
 
   @override
   List<Object?> get props => [

@@ -31,8 +31,10 @@ class PromotionOverviewEntity extends Equatable {
   final double activeBudgetCoins;
   final double activeSpentCoins;
 
-  double get activeSpendRemainingCoins =>
-      (activeBudgetCoins - activeSpentCoins).clamp(0, double.infinity);
+  double get activeSpendRemainingCoins {
+    final rem = activeBudgetCoins - activeSpentCoins;
+    return rem > 0 ? rem : 0.0;
+  }
 
   @override
   List<Object?> get props => [

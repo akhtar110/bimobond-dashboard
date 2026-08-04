@@ -16,6 +16,9 @@ abstract class UsersRepository {
     String? role,
     DateTime? createdFrom,
     DateTime? createdTo,
+    String? city,
+    String? region,
+    String? country,
   });
 
   Future<void> blockUser({

@@ -99,6 +99,17 @@ class LogsExportButton extends StatelessWidget {
                 ],
               ),
             ),
+            const PopupMenuItem(
+              value: LogsExportFormat.pdf,
+              child: Row(
+                children: [
+                  Icon(Icons.picture_as_pdf_rounded,
+                      size: 18, color: Colors.red),
+                  SizedBox(width: 10),
+                  Text('Export to PDF (.pdf)'),
+                ],
+              ),
+            ),
           ],
           child: Container(
             height: height,

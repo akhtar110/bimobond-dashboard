@@ -24,6 +24,9 @@ abstract class UsersRemoteDataSource {
     String? role,
     DateTime? createdFrom,
     DateTime? createdTo,
+    String? city,
+    String? region,
+    String? country,
   });
 
   Future<void> blockUser({
@@ -102,12 +105,14 @@ class UsersPageModel {
   final int total;
   final int page;
   final int lastPage;
+  final int onlineCount;
 
   UsersPageModel({
     required this.users,
     required this.total,
     required this.page,
     required this.lastPage,
+    this.onlineCount = 0,
   });
 }
 
@@ -127,36 +132,58 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     String? role,
     DateTime? createdFrom,
     DateTime? createdTo,
+    String? city,
+    String? region,
+    String? country,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
 
-    final response = await _dio.get(
-      '/users',
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        if (search != null && search.isNotEmpty) 'search': search,
-        if (isVerified != null) 'isVerified': isVerified,
-        if (isBanned != null) 'isBanned': isBanned,
-        if (location != null && location.isNotEmpty) 'location': location,
-        if (role != null && role.isNotEmpty) 'role': role,
-        if (createdFrom != null)
-          'createdFrom':
-              '${createdFrom.year}-${createdFrom.month.toString().padLeft(2, '0')}-${createdFrom.day.toString().padLeft(2, '0')}',
-        if (createdTo != null)
-          'createdTo':
-              '${createdTo.year}-${createdTo.month.toString().padLeft(2, '0')}-${createdTo.day.toString().padLeft(2, '0')}',
-      },
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-      ),
-    );
+    final queryParams = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (isVerified != null) 'isVerified': isVerified,
+      if (isBanned != null) 'isBanned': isBanned,
+      if (location != null && location.isNotEmpty) 'location': location,
+      if (city != null && city.isNotEmpty) 'city': city,
+      if (region != null && region.isNotEmpty) 'region': region,
+      if (country != null && country.isNotEmpty) 'country': country,
+      if (role != null && role.isNotEmpty) 'role': role,
+      if (createdFrom != null)
+        'createdFrom':
+            '${createdFrom.year}-${createdFrom.month.toString().padLeft(2, '0')}-${createdFrom.day.toString().padLeft(2, '0')}',
+      if (createdTo != null)
+        'createdTo':
+            '${createdTo.year}-${createdTo.month.toString().padLeft(2, '0')}-${createdTo.day.toString().padLeft(2, '0')}',
+    };
 
-    final data = response.data as Map<String, dynamic>;
+    final authHeaders = {
+      'Authorization': 'Bearer $idToken',
+      'Content-Type': 'application/json',
+    };
+
+    // Use the admin/online endpoint which includes isOnline + onlineCount.
+    // Fall back to /users if the endpoint is not available.
+    Map<String, dynamic> data;
+    int onlineCount = 0;
+    try {
+      final response = await _dio.get(
+        '/users/admin/online',
+        queryParameters: queryParams,
+        options: Options(headers: authHeaders),
+      );
+      data = response.data as Map<String, dynamic>;
+      onlineCount = (data['onlineCount'] as num?)?.toInt() ?? 0;
+    } catch (_) {
+      // Fallback to the standard endpoint if admin/online is unavailable.
+      final response = await _dio.get(
+        '/users',
+        queryParameters: queryParams,
+        options: Options(headers: authHeaders),
+      );
+      data = response.data as Map<String, dynamic>;
+    }
 
     var users = (data['users'] as List).map((e) {
       final map = Map<String, dynamic>.from(e as Map);
@@ -180,11 +207,13 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
       );
     }
 
+    final meta = data['meta'] as Map<String, dynamic>;
     return UsersPageModel(
       users: users,
-      total: data['meta']['total'],
-      page: data['meta']['page'],
-      lastPage: data['meta']['lastPage'],
+      total: (meta['total'] as num).toInt(),
+      page: (meta['page'] as num).toInt(),
+      lastPage: (meta['lastPage'] as num).toInt(),
+      onlineCount: onlineCount,
     );
   }
 

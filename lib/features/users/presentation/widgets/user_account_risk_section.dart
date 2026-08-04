@@ -4,11 +4,15 @@ import 'package:intl/intl.dart';
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../injection_container.dart' as di;
+import '../../../reports/domain/entities/report_entity.dart';
+import '../../../reports/domain/usecases/get_reports_usecase.dart';
+import '../../../reports/presentation/utils/report_target_navigation.dart';
+import '../../../security_logs/data/datasources/user_violations_remote_datasource.dart';
 import '../../../security_logs/domain/entities/log_entity.dart';
 import '../../../security_logs/domain/usecases/get_logs_usecase.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
 import '../../../security_logs/presentation/widgets/logs_detail_dialog.dart';
-import '../../../security_logs/presentation/widgets/moderation_action_timeline.dart';
+
 import '../../domain/entities/user_entity.dart';
 
 enum AccountRiskLevel {
@@ -65,9 +69,12 @@ class UserAccountRiskSection extends StatefulWidget {
 
 class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
   final GetLogsUseCase _getLogs = di.sl<GetLogsUseCase>();
+  late final UserViolationsRemoteDataSource _violationsDataSource =
+      UserViolationsRemoteDataSourceImpl(di.sl());
 
   int? _violationsCount;
   int? _adminActionsCount;
+  int? _reportsCount;
 
   @override
   void initState() {
@@ -87,11 +94,10 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
 
   Future<void> _fetchBackendCounts() async {
     try {
-      final violationsRes = await _getLogs(LogsQuery(
+      final violationsRes = await _violationsDataSource.getUserViolations(
         userId: widget.user.id,
-        category: 'MODERATION',
         limit: 1,
-      ));
+      );
 
       final actionsRes = await _getLogs(LogsQuery(
         userId: widget.user.id,
@@ -99,14 +105,20 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
         limit: 1,
       ));
 
+      final reportsRes = await di.sl<GetReports>()(
+        reportedUserId: widget.user.id,
+        limit: 1,
+      );
+
       if (mounted) {
         setState(() {
           _violationsCount = violationsRes.meta.total;
           _adminActionsCount = actionsRes.meta.total;
+          _reportsCount = reportsRes.total;
         });
       }
     } catch (_) {
-      // Retain zero fallback without creating mock numbers
+      // Retain existing values or fallback gracefully
     }
   }
 
@@ -122,25 +134,23 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
     return AccountRiskLevel.low;
   }
 
-  int get totalReports => widget.user.relationCounts?.reportsRecv ?? 0;
+  int get totalReports => _reportsCount ?? (widget.user.relationCounts?.reportsRecv ?? 0);
   int get totalViolations => _violationsCount ?? 0;
   int get totalAdminActions => _adminActionsCount ?? 0;
+
+  int get safetyScore {
+    final reports = totalReports;
+    final violations = totalViolations;
+    final penalties = (reports * 5) + (violations * 20) + (widget.user.isBanned ? 40 : 0);
+    return (100 - penalties).clamp(0, 100);
+  }
 
   void _showReportsDetail(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _UserReportsDetailSheet(user: widget.user, reportsCount: totalReports),
-    );
-  }
-
-  void _showViolationsDetail(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _UserViolationsDetailSheet(user: widget.user, violationsCount: totalViolations),
+      builder: (ctx) => _UserReportsDetailSheet(user: widget.user),
     );
   }
 
@@ -149,61 +159,50 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _UserAdminActionsDetailSheet(user: widget.user, actionsCount: totalAdminActions),
+      builder: (ctx) => _UserAdminActionsDetailSheet(user: widget.user),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = context.l10n;
     final risk = riskLevel;
-    final isHighRisk = risk == AccountRiskLevel.high;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Section Header
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.shield_outlined,
-                  size: 20,
-                  color: isHighRisk ? risk.color : scheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.tOr('accountRiskAndModeration', 'Account Risk & Moderation'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.onSurface,
-                  ),
-                ),
-              ],
+            Icon(Icons.shield_outlined, size: 20, color: scheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              l10n.tOr('accountRiskAndModeration', 'Account Risk & Moderation'),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: scheme.onSurface,
+              ),
             ),
+            const Spacer(),
             _RiskBadge(riskLevel: risk),
           ],
         ),
         const SizedBox(height: 12),
 
-        // High Risk Highlight Warning Banner
-        if (isHighRisk) ...[
+        // Notice Banner if High Risk
+        if (risk == AccountRiskLevel.high) ...[
           Container(
-            width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: risk.color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+              color: risk.color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: risk.color.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
-                Icon(Icons.report_problem_rounded, color: risk.color, size: 20),
+                Icon(Icons.warning_amber_rounded, size: 20, color: risk.color),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -221,9 +220,10 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
               ],
             ),
           ),
+          const SizedBox(height: 12),
         ],
 
-        // 4 Summary Metric Cards
+        // 4 Dedicated Metric Cards
         LayoutBuilder(
           builder: (context, constraints) {
             final isCompact = constraints.maxWidth < 560;
@@ -231,7 +231,7 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
             final riskCard = _RiskStatCard(
               title: l10n.tOr('riskLevel', 'Risk Level'),
               value: risk.label(context),
-              subtitle: l10n.tOr('safetyIndex', 'Safety Index'),
+              subtitle: l10n.tArgs('safetyScore', {'score': '$safetyScore'}),
               icon: risk.icon,
               color: risk.color,
               onTap: null,
@@ -246,15 +246,6 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
               onTap: () => _showReportsDetail(context),
             );
 
-            final violationsCard = _RiskStatCard(
-              title: l10n.tOr('violationsHistory', 'Violations History'),
-              value: '$totalViolations',
-              subtitle: l10n.tOr('guidelineBreaches', 'Guideline breaches'),
-              icon: Icons.gavel_outlined,
-              color: totalViolations > 0 ? const Color(0xFFEF4444) : scheme.onSurfaceVariant,
-              onTap: () => _showViolationsDetail(context),
-            );
-
             final actionsCard = _RiskStatCard(
               title: l10n.tOr('adminActions', 'Admin Actions'),
               value: '$totalAdminActions',
@@ -267,17 +258,11 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
             if (isCompact) {
               return Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: riskCard),
-                      const SizedBox(width: 10),
-                      Expanded(child: reportsCard),
-                    ],
-                  ),
+                  riskCard,
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: violationsCard),
+                      Expanded(child: reportsCard),
                       const SizedBox(width: 10),
                       Expanded(child: actionsCard),
                     ],
@@ -292,21 +277,13 @@ class _UserAccountRiskSectionState extends State<UserAccountRiskSection> {
                 const SizedBox(width: 10),
                 Expanded(child: reportsCard),
                 const SizedBox(width: 10),
-                Expanded(child: violationsCard),
-                const SizedBox(width: 10),
                 Expanded(child: actionsCard),
               ],
             );
           },
         ),
 
-        const SizedBox(height: 16),
 
-        // Live Backend Append-Only Moderation Action Timeline
-        ModerationActionTimeline(
-          userId: widget.user.id,
-          pageSize: 5,
-        ),
       ],
     );
   }
@@ -461,56 +438,396 @@ class _RiskStatCardState extends State<_RiskStatCard> {
   }
 }
 
-class _UserReportsDetailSheet extends StatelessWidget {
-  const _UserReportsDetailSheet({required this.user, required this.reportsCount});
+/// Dedicated detail sheet for Reports Received against the user's content
+class _UserReportsDetailSheet extends StatefulWidget {
+  const _UserReportsDetailSheet({required this.user});
   final UserEntity user;
-  final int reportsCount;
+
+  @override
+  State<_UserReportsDetailSheet> createState() => _UserReportsDetailSheetState();
+}
+
+class _UserReportsDetailSheetState extends State<_UserReportsDetailSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  final GetReports _getReports = di.sl<GetReports>();
+
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<ReportEntity> _reports = [];
+  int _currentPage = 1;
+  int _lastPage = 1;
+  int _totalCount = 0;
+  String? _selectedStatus;
+  final bool _sortNewestFirst = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReports();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchReports({int page = 1}) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final search = _searchController.text.trim();
+      final result = await _getReports(
+        page: page,
+        limit: 10,
+        reportedUserId: widget.user.id,
+        status: _selectedStatus,
+        search: search.isNotEmpty ? search : null,
+        sortOrder: _sortNewestFirst ? 'DESC' : 'ASC',
+      );
+
+      if (mounted) {
+        setState(() {
+          _reports = List<ReportEntity>.of(result.reports, growable: true);
+          _currentPage = page;
+          _lastPage = result.lastPage;
+          _totalCount = result.total;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    return _UserRiskLogsDetailSheet(
-      user: user,
-      title: '${l10n.tOr('reportsAgainst', 'Reports Against')} @${user.username}',
-      icon: Icons.flag_rounded,
-      iconColor: Colors.orange,
-      defaultCategory: 'MODERATION',
-      defaultAction: 'REPORT_CREATE',
-      emptyMessage: l10n.tOr('noReportsFound', 'No reports found for this user.'),
+    final locale = Localizations.localeOf(context).languageCode;
+    final dateFmt = DateFormat.yMMMd(locale).add_jm();
+
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.75,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: scheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.flag_rounded, color: Colors.orange, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${l10n.tArgs('reportsAgainstUser', {'username': widget.user.username})} ($_totalCount)',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 20),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Search and Filter Bar
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: TextField(
+                    controller: _searchController,
+                    onSubmitted: (_) => _fetchReports(page: 1),
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration: InputDecoration(
+                      hintText: l10n.tOr('search', 'Search...'),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
+                      filled: true,
+                      fillColor: scheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: scheme.outlineVariant),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              PopupMenuButton<String?>(
+                tooltip: l10n.tOr('filterByStatus', 'Filter Status'),
+                onSelected: (val) {
+                  setState(() => _selectedStatus = val);
+                  _fetchReports(page: 1);
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: null,
+                    child: Text(l10n.tOr('all', 'All')),
+                  ),
+                  PopupMenuItem(
+                    value: 'pending',
+                    child: Text(l10n.tOr('statusPending', 'Pending')),
+                  ),
+                  PopupMenuItem(
+                    value: 'resolved',
+                    child: Text(l10n.tOr('statusResolved', 'Resolved')),
+                  ),
+                  PopupMenuItem(
+                    value: 'dismissed',
+                    child: Text(l10n.tOr('statusDismissed', 'Dismissed')),
+                  ),
+                ],
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.filter_list_rounded, size: 18, color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(
+                        _selectedStatus == null
+                            ? l10n.tOr('all', 'All')
+                            : _selectedStatus!.toUpperCase(),
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline_rounded, size: 36, color: scheme.error),
+                            const SizedBox(height: 8),
+                            Text(_errorMessage!, style: TextStyle(color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: () => _fetchReports(page: 1),
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: Text(l10n.t('retry')),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _reports.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inbox_rounded,
+                                  size: 40,
+                                  color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  l10n.tOr('noReportsFound', 'No reports found for this user.'),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _reports.length,
+                            separatorBuilder: (_, _) => const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final report = _reports[index];
+                              final canOpenTarget = ReportTargetNavigation.canOpen(report);
+
+                              return Material(
+                                color: scheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          _ReportStatusBadge(status: report.status),
+                                          const Spacer(),
+                                          Icon(
+                                            Icons.access_time_rounded,
+                                            size: 12,
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            dateFmt.format(report.createdAt.toLocal()),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            '${l10n.tOr('reporter', 'Reporter')}: ',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                          Text(
+                                            '@${report.reporter?.username ?? l10n.tOr('anonymous', 'Anonymous')}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: scheme.onSurface,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${l10n.tOr('reportReason', 'Reason')}: ${report.reason}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: scheme.onSurface,
+                                        ),
+                                      ),
+                                      if (canOpenTarget) ...[
+                                        const SizedBox(height: 8),
+                                        Align(
+                                          alignment: AlignmentDirectional.centerEnd,
+                                          child: TextButton.icon(
+                                            style: TextButton.styleFrom(
+                                              visualDensity: VisualDensity.compact,
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                            ),
+                                            onPressed: () => ReportTargetNavigation.open(context, report),
+                                            icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                                            label: Text(
+                                              l10n.tOr('reportedContent', 'Reported Content'),
+                                              style: const TextStyle(fontSize: 11),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+          ),
+
+          if (_lastPage > 1) ...[
+            const SizedBox(height: 8),
+            AppPaginationBar(
+              currentPage: _currentPage,
+              lastPage: _lastPage,
+              total: _totalCount,
+              pageSize: 10,
+              itemCount: _reports.length,
+              onPageChanged: (page) => _fetchReports(page: page),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-class _UserViolationsDetailSheet extends StatelessWidget {
-  const _UserViolationsDetailSheet({required this.user, required this.violationsCount});
-  final UserEntity user;
-  final int violationsCount;
+class _ReportStatusBadge extends StatelessWidget {
+  const _ReportStatusBadge({required this.status});
+  final String status;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return _UserRiskLogsDetailSheet(
-      user: user,
-      title: '${l10n.tOr('guidelineViolations', 'Community Guideline Violations')} (@${user.username})',
-      icon: Icons.gavel_rounded,
-      iconColor: Colors.red,
-      defaultCategory: 'MODERATION',
-      emptyMessage: l10n.tOr('noViolationsFound', 'No guideline violations found.'),
+    final color = switch (status.toLowerCase()) {
+      'pending' => const Color(0xFFF59E0B),
+      'resolved' => const Color(0xFF22C55E),
+      'dismissed' => Colors.grey,
+      _ => Colors.blue,
+    };
+
+    final label = switch (status.toLowerCase()) {
+      'pending' => l10n.tOr('statusPending', 'Pending'),
+      'resolved' => l10n.tOr('statusResolved', 'Resolved'),
+      'dismissed' => l10n.tOr('statusDismissed', 'Dismissed'),
+      _ => status.toUpperCase(),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
+      ),
     );
   }
 }
 
+/// Dedicated detail sheet for Moderator Administrative Actions
 class _UserAdminActionsDetailSheet extends StatelessWidget {
-  const _UserAdminActionsDetailSheet({required this.user, required this.actionsCount});
+  const _UserAdminActionsDetailSheet({required this.user});
   final UserEntity user;
-  final int actionsCount;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return _UserRiskLogsDetailSheet(
       user: user,
-      title: '${l10n.tOr('adminActionLogs', 'Administrative Action Logs')} (@${user.username})',
+      title: l10n.tArgs('adminLogsOfUser', {'username': user.username}),
       icon: Icons.admin_panel_settings_rounded,
       iconColor: Colors.blue,
       defaultCategory: 'ADMIN',
@@ -526,7 +843,6 @@ class _UserRiskLogsDetailSheet extends StatefulWidget {
     required this.icon,
     required this.iconColor,
     this.defaultCategory,
-    this.defaultAction,
     required this.emptyMessage,
   });
 
@@ -535,7 +851,6 @@ class _UserRiskLogsDetailSheet extends StatefulWidget {
   final IconData icon;
   final Color iconColor;
   final String? defaultCategory;
-  final String? defaultAction;
   final String emptyMessage;
 
   @override
@@ -578,7 +893,6 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
       final query = LogsQuery(
         userId: widget.user.id,
         category: _selectedCategory,
-        action: widget.defaultAction,
         page: page,
         limit: 15,
       );
@@ -630,10 +944,11 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
-    final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
+    final locale = Localizations.localeOf(context).languageCode;
+    final dateFmt = DateFormat.yMMMd(locale).add_jm();
 
     return Container(
-      height: MediaQuery.sizeOf(context).height * 0.72,
+      height: MediaQuery.sizeOf(context).height * 0.75,
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -660,7 +975,7 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
               Expanded(
                 child: Text(
                   '${widget.title} ($_totalCount)',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                 ),
               ),
               IconButton(
@@ -754,7 +1069,7 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
                             FilledButton.icon(
                               onPressed: () => _fetchLogs(page: 1),
                               icon: const Icon(Icons.refresh_rounded, size: 16),
-                              label: Text(l10n.tOr('retry', 'Retry')),
+                              label: Text(l10n.t('retry')),
                             ),
                           ],
                         ),
@@ -926,4 +1241,3 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
     );
   }
 }
-

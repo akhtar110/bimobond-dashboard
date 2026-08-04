@@ -148,6 +148,9 @@ class UserHistoryQuery extends Equatable {
     this.from,
     this.to,
     this.types = const [],
+    this.category,
+    this.action,
+    this.deviceId,
   });
 
   final int page;
@@ -155,9 +158,17 @@ class UserHistoryQuery extends Equatable {
   final DateTime? from;
   final DateTime? to;
   final List<String> types;
+  final String? category;
+  final String? action;
+  final String? deviceId;
 
   bool get hasActiveFilters =>
-      from != null || to != null || types.isNotEmpty;
+      from != null ||
+      to != null ||
+      types.isNotEmpty ||
+      (category != null && category!.isNotEmpty) ||
+      (action != null && action!.isNotEmpty) ||
+      (deviceId != null && deviceId!.isNotEmpty);
 
   UserHistoryQuery copyWith({
     int? page,
@@ -165,9 +176,15 @@ class UserHistoryQuery extends Equatable {
     DateTime? from,
     DateTime? to,
     List<String>? types,
+    String? category,
+    String? action,
+    String? deviceId,
     bool clearFrom = false,
     bool clearTo = false,
     bool clearTypes = false,
+    bool clearCategory = false,
+    bool clearAction = false,
+    bool clearDeviceId = false,
     bool clearDateRange = false,
   }) {
     return UserHistoryQuery(
@@ -176,6 +193,9 @@ class UserHistoryQuery extends Equatable {
       from: clearDateRange || clearFrom ? null : (from ?? this.from),
       to: clearDateRange || clearTo ? null : (to ?? this.to),
       types: clearTypes ? const [] : (types ?? this.types),
+      category: clearCategory ? null : (category ?? this.category),
+      action: clearAction ? null : (action ?? this.action),
+      deviceId: clearDeviceId ? null : (deviceId ?? this.deviceId),
     );
   }
 
@@ -186,6 +206,9 @@ class UserHistoryQuery extends Equatable {
       if (from != null) 'from': _toIso(from!),
       if (to != null) 'to': _toIsoEndOfDay(to!),
       if (types.isNotEmpty) 'types': types.join(','),
+      if (category != null && category!.isNotEmpty) 'category': category,
+      if (action != null && action!.isNotEmpty) 'action': action,
+      if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
     };
   }
 
@@ -208,5 +231,5 @@ class UserHistoryQuery extends Equatable {
   }
 
   @override
-  List<Object?> get props => [page, limit, from, to, types];
+  List<Object?> get props => [page, limit, from, to, types, category, action, deviceId];
 }

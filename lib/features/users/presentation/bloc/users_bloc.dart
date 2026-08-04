@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:bimo_bond_dashboard/features/users/domain/entities/user_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/utils/api_error_messages.dart';
+import '../../data/datasources/users_presence_socket_service.dart';
 import '../../domain/entities/admin_bulk_users_result_entity.dart';
 import '../../domain/usecases/bulk_activate_users.dart';
 import '../../domain/usecases/bulk_delete_users.dart';
@@ -22,6 +25,15 @@ import '../utils/user_location_list_utils.dart';
 import '../utils/users_export_service.dart';
 
 sealed class UsersEvent {}
+
+class StartUsersRealtimePresenceListening extends UsersEvent {}
+
+class StopUsersRealtimePresenceListening extends UsersEvent {}
+
+class UserPresenceChangedEvent extends UsersEvent {
+  UserPresenceChangedEvent(this.update);
+  final UserPresenceChange update;
+}
 
 class LoadUsersEvent extends UsersEvent {
   LoadUsersEvent({this.refresh = false, this.page});
@@ -179,6 +191,7 @@ class UsersLoaded extends UsersState {
     this.isExporting = false,
     this.exportMessage,
     this.exportIsError = false,
+    this.onlineCount = 0,
   });
 
   final List<UserEntity> users;
@@ -201,6 +214,8 @@ class UsersLoaded extends UsersState {
   final bool isExporting;
   final String? exportMessage;
   final bool exportIsError;
+  /// Live count of currently online users (from backend + WS updates).
+  final int onlineCount;
 
   int get selectedCount => selectedUserIds.length;
   bool get hasSelection => selectedUserIds.isNotEmpty;
@@ -237,6 +252,7 @@ class UsersLoaded extends UsersState {
     bool? isExporting,
     String? exportMessage,
     bool? exportIsError,
+    int? onlineCount,
     bool clearBulkActionMessage = false,
     bool clearExportMessage = false,
   }) {
@@ -265,6 +281,7 @@ class UsersLoaded extends UsersState {
           ? null
           : (exportMessage ?? this.exportMessage),
       exportIsError: exportIsError ?? this.exportIsError,
+      onlineCount: onlineCount ?? this.onlineCount,
     );
   }
 }
@@ -296,7 +313,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     required this.bulkPromoteUsers,
     required this.bulkDemoteUsers,
     required this.resetUserPassword,
-  }) : super(UsersLoading()) {
+    UsersPresenceSocketService? presenceSocketService,
+  })  : _presenceSocketService = presenceSocketService ?? UsersPresenceSocketService(),
+        super(UsersLoading()) {
     on<LoadUsersEvent>(_onLoad);
     on<LoadMoreUsersEvent>(_onLoadMore);
     on<GoToUsersPageEvent>(_onGoToPage);
@@ -324,6 +343,74 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<ResetUserPasswordEvent>(_onResetUserPassword);
     on<ExportUsersEvent>(_onExportUsers);
     on<ClearUsersExportFeedbackEvent>(_onClearExportFeedback);
+    on<StartUsersRealtimePresenceListening>(_onStartPresenceListening);
+    on<StopUsersRealtimePresenceListening>(_onStopPresenceListening);
+    on<UserPresenceChangedEvent>(_onUserPresenceChanged);
+
+    _initPresenceSocketSubscription();
+  }
+
+  final UsersPresenceSocketService _presenceSocketService;
+  StreamSubscription<UserPresenceChange>? _presenceSubscription;
+
+  void _initPresenceSocketSubscription() {
+    _presenceSubscription =
+        _presenceSocketService.onUserPresenceChanged.listen((update) {
+      if (!isClosed) {
+        add(UserPresenceChangedEvent(update));
+      }
+    });
+  }
+
+  void _onStartPresenceListening(
+    StartUsersRealtimePresenceListening event,
+    Emitter<UsersState> emit,
+  ) {
+    _presenceSocketService.connect();
+  }
+
+  void _onStopPresenceListening(
+    StopUsersRealtimePresenceListening event,
+    Emitter<UsersState> emit,
+  ) {
+    _presenceSocketService.disconnect();
+  }
+
+  void _onUserPresenceChanged(
+    UserPresenceChangedEvent event,
+    Emitter<UsersState> emit,
+  ) {
+    final update = event.update;
+    final index = _users.indexWhere((u) => u.id == update.userId);
+
+    if (index != -1) {
+      final oldUser = _users[index];
+      final updatedUser = oldUser.copyWith(
+        isOnlineOverride: update.isOnline,
+        lastActive: update.lastSeenAt ??
+            (update.isOnline ? DateTime.now() : oldUser.lastActive),
+      );
+      _users[index] = updatedUser;
+    }
+
+    if (update.isOnline) {
+      if (_onlineUserIds.add(update.userId)) {
+        _onlineCount = (_onlineCount + 1).clamp(0, 9999999);
+      }
+    } else {
+      if (_onlineUserIds.remove(update.userId)) {
+        _onlineCount = (_onlineCount - 1).clamp(0, 9999999);
+      }
+    }
+
+    _emitLoaded(emit);
+  }
+
+  @override
+  Future<void> close() {
+    _presenceSubscription?.cancel();
+    _presenceSocketService.dispose();
+    return super.close();
   }
 
   final GetUsers getUsers;
@@ -346,6 +433,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   int _currentPage = 1;
   int _lastPage = 1;
   int _total = 0;
+  int _onlineCount = 0;
+  final Set<String> _onlineUserIds = {};
   bool _loadMoreBusy = false;
   bool _resetPasswordBusy = false;
   UsersState? _stateBeforeResetPassword;
@@ -439,12 +528,20 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         _currentPage = response.page;
         _lastPage = response.lastPage;
         _total = response.total;
+        _onlineCount = response.onlineCount;
+        _onlineUserIds
+          ..clear()
+          ..addAll(
+            response.users.where((u) => u.isOnline).map((u) => u.id),
+          );
         _applyLocationSort();
 
         if (_users.isEmpty) {
           emit(UsersEmpty());
         } else {
           _emitLoaded(emit, isLoadingMore: false, isRefreshing: false);
+          // Start real-time presence subscription after first page loads.
+          add(StartUsersRealtimePresenceListening());
         }
       } catch (e) {
         if (generation != _listFetchGeneration) return;
@@ -489,6 +586,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         emit(UsersEmpty());
       } else {
         _emitLoaded(emit, isLoadingMore: false);
+        add(StartUsersRealtimePresenceListening());
       }
     } catch (e) {
       final current = state;
@@ -532,6 +630,7 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         currentPage: _currentPage,
         lastPage: _lastPage,
         total: _total,
+        onlineCount: _onlineCount,
         filter: _filter,
         query: _query,
         locationQuery: _locationQuery,

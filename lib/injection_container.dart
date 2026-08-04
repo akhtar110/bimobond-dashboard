@@ -77,6 +77,7 @@ import 'features/auction_reports/presentation/bloc/auction_reports_bloc.dart';
 import 'features/reports/presentation/bloc/reports_center_overview_cubit.dart';
 
 import 'features/users/data/datasources/users_remote_data_source.dart';
+import 'features/users/data/datasources/users_presence_socket_service.dart';
 import 'features/users/data/repositories/users_repository_impl.dart';
 import 'features/users/domain/repositories/users_repository.dart';
 import 'features/users/domain/usecases/bulk_activate_users.dart';
@@ -711,6 +712,7 @@ Future<void> init() async {
       deleteUser: sl<DeleteUser>(),
       updateUserRoles: sl<UpdateUserRoles>(),
       updateUserPrivacySettings: sl<UpdateUserPrivacySettings>(),
+      presenceSocketService: sl<UsersPresenceSocketService>(),
     ),
   );
 
@@ -773,8 +775,12 @@ Future<void> init() async {
         UserUnifiedActivityBloc(getUserActivityFeed: sl<GetUserActivityFeed>()),
   );
 
+  sl.registerLazySingleton(
+    () => UsersPresenceSocketService(baseUrl: socketBaseUrl),
+  );
+
   sl.registerFactory(
-        () => UsersBloc(
+    () => UsersBloc(
       getUsers: sl<GetUsers>(),
       banUser: sl<BanUser>(),
       unbanUser: sl<UnbanUser>(),
@@ -788,6 +794,7 @@ Future<void> init() async {
       bulkPromoteUsers: sl<BulkPromoteUsers>(),
       bulkDemoteUsers: sl<BulkDemoteUsers>(),
       resetUserPassword: sl<ResetUserPasswordUseCase>(),
+      presenceSocketService: sl<UsersPresenceSocketService>(),
     ),
   );
 

@@ -4,7 +4,7 @@ import '../../../../core/localization/localization.dart';
 import '../users_location_sort.dart';
 import 'users_table_config.dart';
 
-const double kUsersTableHeaderHeight = 36;
+const double kUsersTableHeaderHeight = 32;
 
 class UsersTableHeader extends StatelessWidget {
   const UsersTableHeader({

@@ -284,7 +284,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
       items.add(
         GiftsActiveFilterItem(
           id: 'role',
-          label: 'Role: ${_role!}',
+          label: l10n.tArgs('roleFilterPrefix', {'role': _role!}),
           onRemove: () => setState(() => _role = null),
         ),
       );
@@ -294,8 +294,8 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
       final label = _createdFrom != null && _createdTo != null
           ? '${df.format(_createdFrom!)} - ${df.format(_createdTo!)}'
           : _createdFrom != null
-              ? 'From ${df.format(_createdFrom!)}'
-              : 'Until ${df.format(_createdTo!)}';
+              ? l10n.tArgs('dateFromFilter', {'date': df.format(_createdFrom!)})
+              : l10n.tArgs('dateUntilFilter', {'date': df.format(_createdTo!)});
       items.add(
         GiftsActiveFilterItem(
           id: 'dateRange',
@@ -397,7 +397,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
 
                   // Role filter
                   GiftsFilterSection(
-                    title: _sectionTitle('User Role', context),
+                    title: _sectionTitle(l10n.tOr('userRole', 'User Role'), context),
                     child: GiftsFilterChipWrap(
                       children: [
                         for (final opt in roleOptions)
@@ -412,7 +412,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
 
                   // Registration Date Range
                   GiftsFilterSection(
-                    title: _sectionTitle('Registration Date', context),
+                    title: _sectionTitle(l10n.tOr('registrationDate', 'Registration Date'), context),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -440,8 +440,8 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                                 Expanded(
                                   child: Text(
                                     _createdFrom != null || _createdTo != null
-                                        ? '${_createdFrom != null ? DateFormat('yyyy-MM-dd').format(_createdFrom!) : 'Start'} → ${_createdTo != null ? DateFormat('yyyy-MM-dd').format(_createdTo!) : 'End'}'
-                                        : 'Select Date Range',
+                                        ? '${_createdFrom != null ? DateFormat('yyyy-MM-dd').format(_createdFrom!) : l10n.tOr('startDate', 'Start')} → ${_createdTo != null ? DateFormat('yyyy-MM-dd').format(_createdTo!) : l10n.tOr('endDate', 'End')}'
+                                        : l10n.tOr('selectDateRange', 'Select Date Range'),
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: _createdFrom != null
@@ -477,7 +477,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                           runSpacing: 4,
                           children: [
                             _QuickDateChip(
-                              label: 'Today',
+                              label: l10n.tOr('today', 'Today'),
                               onTap: () {
                                 final now = DateTime.now();
                                 setState(() {
@@ -487,7 +487,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                               },
                             ),
                             _QuickDateChip(
-                              label: 'Last 7 Days',
+                              label: l10n.tOr('last7Days', 'Last 7 Days'),
                               onTap: () {
                                 final now = DateTime.now();
                                 setState(() {
@@ -497,7 +497,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                               },
                             ),
                             _QuickDateChip(
-                              label: 'Last 30 Days',
+                              label: l10n.tOr('last30Days', 'Last 30 Days'),
                               onTap: () {
                                 final now = DateTime.now();
                                 setState(() {

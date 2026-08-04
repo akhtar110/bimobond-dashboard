@@ -157,7 +157,8 @@ class AuctionEntity {
   double get remainingCoins {
     final target = effectiveTargetPriceCoins;
     if (target > 0) {
-      return (target - currentTotalCoins).clamp(0, double.infinity);
+      final rem = target - currentTotalCoins;
+      return rem > 0 ? rem : 0.0;
     }
     return pricing?.remainingCoins ?? 0;
   }

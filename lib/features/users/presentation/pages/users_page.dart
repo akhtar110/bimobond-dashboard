@@ -79,11 +79,18 @@ class _UsersPageViewState extends State<_UsersPageView> {
     setState(() => _selectedDrawerUser = null);
   }
 
+  UserEntity? _resolveDrawerUser(UsersState state) {
+    if (_selectedDrawerUser == null) return null;
+    if (state is UsersLoaded) {
+      for (final u in state.users) {
+        if (u.id == _selectedDrawerUser!.id) return u;
+      }
+    }
+    return _selectedDrawerUser;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
     return BlocListener<UsersBloc, UsersState>(
       listenWhen: (previous, current) {
         if (current is! UsersLoaded) return false;
@@ -98,48 +105,56 @@ class _UsersPageViewState extends State<_UsersPageView> {
         if (state is! UsersLoaded) return;
         final scheme = Theme.of(context).colorScheme;
 
-        if (state.bulkActionMessage != null) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: state.bulkActionIsError
-                    ? scheme.errorContainer
-                    : null,
-                content: Text(
-                  state.bulkActionMessage!,
-                  style: TextStyle(
-                    color: state.bulkActionIsError
-                        ? scheme.onErrorContainer
-                        : scheme.onInverseSurface,
-                  ),
+        final bulkMsg = state.bulkActionMessage;
+        if (bulkMsg != null) {
+          final text = state.bulkActionIsError
+              ? bulkMsg
+              : context.l10n.tOr(bulkMsg, bulkMsg);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor:
+                  state.bulkActionIsError ? scheme.errorContainer : null,
+              content: Text(
+                text,
+                style: TextStyle(
+                  color: state.bulkActionIsError
+                      ? scheme.onErrorContainer
+                      : null,
                 ),
               ),
-            );
+            ),
+          );
           context.read<UsersBloc>().add(ClearUsersBulkFeedbackEvent());
-        } else if (state.exportMessage != null) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(state.exportMessage!),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor:
-                    state.exportIsError ? scheme.error : scheme.primary,
+        }
+
+        final exportMsg = state.exportMessage;
+        if (exportMsg != null) {
+          final text = state.exportIsError
+              ? exportMsg
+              : context.l10n.tOr(exportMsg, exportMsg);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor:
+                  state.exportIsError ? scheme.errorContainer : null,
+              content: Text(
+                text,
+                style: TextStyle(
+                  color: state.exportIsError ? scheme.onErrorContainer : null,
+                ),
               ),
-            );
+            ),
+          );
           context.read<UsersBloc>().add(ClearUsersExportFeedbackEvent());
         }
       },
       child: Stack(
         children: [
-          Container(
-            color: scheme.surfaceContainerLowest,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1680),
+          Scaffold(
+            body: SafeArea(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (_) => false,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final metrics = UsersLayoutMetrics(
@@ -162,11 +177,11 @@ class _UsersPageViewState extends State<_UsersPageView> {
                               LoadUsersEvent(refresh: true),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: metrics.sectionSpacing),
                           const UsersAnalyticsCards(),
-                          const SizedBox(height: 8),
+                          SizedBox(height: metrics.sectionSpacing),
                           UsersSelectionHeader(metrics: metrics),
-                          SizedBox(height: metrics.isMobile ? 6 : 8),
+                          SizedBox(height: metrics.sectionSpacing),
                           Expanded(
                             child: UsersTablePanel(
                               metrics: metrics,
@@ -185,26 +200,39 @@ class _UsersPageViewState extends State<_UsersPageView> {
             ),
           ),
 
-          // Right-Side Slide Drawer Overlay
-          if (_selectedDrawerUser != null) ...[
-            GestureDetector(
-              onTap: _closeUserDrawer,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                color: Colors.black.withValues(alpha: 0.35),
-              ),
-            ),
-            Align(
-              alignment: context.isRtl ? Alignment.centerLeft : Alignment.centerRight,
-              child: SlideTransition(
-                position: AlwaysStoppedAnimation(const Offset(0, 0)),
-                child: UserDetailDrawer(
-                  user: _selectedDrawerUser!,
-                  onClose: _closeUserDrawer,
-                ),
-              ),
-            ),
-          ],
+          // Right-Side Slide Drawer Overlay synced with UsersBloc live state
+          BlocBuilder<UsersBloc, UsersState>(
+            builder: (context, state) {
+              final activeDrawerUser = _resolveDrawerUser(state);
+              if (activeDrawerUser == null) return const SizedBox.shrink();
+
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _closeUserDrawer,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        color: Colors.black.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: context.isRtl
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    child: SlideTransition(
+                      position: const AlwaysStoppedAnimation(Offset(0, 0)),
+                      child: UserDetailDrawer(
+                        user: activeDrawerUser,
+                        onClose: _closeUserDrawer,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );

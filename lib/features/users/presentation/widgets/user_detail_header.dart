@@ -191,9 +191,9 @@ class UserDetailHeader extends StatelessWidget {
                 alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  UserOnlineStatusCell(user: user),
                   UserPrivacyBadge(user: user),
                   MessagePermissionBadge(permission: user.messagePermission),
+                  UserLastSeenBadge(user: user),
                 ],
               ),
             ],
@@ -219,7 +219,7 @@ class UserDetailHeader extends StatelessWidget {
             children: [
               if (adminActions != null)
                 Align(
-                  alignment: Alignment.topRight,
+                  alignment: AlignmentDirectional.topEnd,
                   child: adminActions!,
                 ),
               if (adminActions != null) SizedBox(height: metrics.sectionSpacing * 0.5),

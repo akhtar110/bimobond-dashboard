@@ -180,10 +180,10 @@ class _PortraitMediaPanelState extends State<PortraitMediaPanel> {
             ? constraints.maxHeight
             : viewportCap;
 
-        final maxMediaHeight =
-            (availableHeight - (isCarousel ? dotsHeight : 0.0))
-                .clamp(160.0, double.infinity)
-                .toDouble();
+        final rawHeight = availableHeight - (isCarousel ? dotsHeight : 0.0);
+        final maxMediaHeight = (rawHeight.isNaN || rawHeight.isInfinite)
+            ? 300.0
+            : (rawHeight < 160.0 ? 160.0 : rawHeight);
 
         final fitted = _fitMediaSize(
           maxWidth: availableWidth,

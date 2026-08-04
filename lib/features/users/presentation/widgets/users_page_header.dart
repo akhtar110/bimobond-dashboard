@@ -4,7 +4,7 @@ import '../../../../core/localization/localization.dart';
 import '../utils/responsive.dart';
 import 'users_page_toolbar.dart';
 
-/// Users top bar — title, refresh, and posts-style filter toolbar.
+/// Fully responsive Users top bar — title, subtitle, refresh button, and filter toolbar.
 class UsersPageHeader extends StatelessWidget {
   const UsersPageHeader({
     super.key,
@@ -20,12 +20,12 @@ class UsersPageHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final wide = width >= 900;
-        final compact = metrics.isMobile;
+        final isDesktopWide = width >= 1150;
         final controlHeight = metrics.filterControlHeight;
         final gap = metrics.filterGap + 2;
+        final compact = metrics.isMobile;
 
-        if (wide) {
+        if (isDesktopWide) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -38,6 +38,7 @@ class UsersPageHeader extends StatelessWidget {
                 inlineActions: true,
                 onRefresh: onRefresh,
                 compact: compact,
+                width: width,
               ),
               const UsersActiveFilterChips(),
             ],
@@ -48,25 +49,20 @@ class UsersPageHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _UsersHeaderToolbarRow(
-              metrics: metrics,
-              controlHeight: controlHeight,
-              gap: gap,
-              showTitle: true,
-              inlineActions: false,
-              onRefresh: onRefresh,
-              compact: compact,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Expanded(child: _UsersHeaderTitle()),
+                const SizedBox(width: 8),
+                _UsersRefreshButton(
+                  onRefresh: onRefresh,
+                  size: controlHeight,
+                  compact: compact,
+                ),
+              ],
             ),
             SizedBox(height: gap),
-            _UsersHeaderToolbarRow(
-              metrics: metrics,
-              controlHeight: controlHeight,
-              gap: gap,
-              showTitle: false,
-              inlineActions: true,
-              onRefresh: onRefresh,
-              compact: compact,
-            ),
+            UsersPageToolbar(metrics: metrics),
             const UsersActiveFilterChips(),
           ],
         );
@@ -84,6 +80,7 @@ class _UsersHeaderToolbarRow extends StatelessWidget {
     required this.inlineActions,
     required this.onRefresh,
     required this.compact,
+    required this.width,
   });
 
   final UsersLayoutMetrics metrics;
@@ -93,6 +90,7 @@ class _UsersHeaderToolbarRow extends StatelessWidget {
   final bool inlineActions;
   final VoidCallback onRefresh;
   final bool compact;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -102,40 +100,18 @@ class _UsersHeaderToolbarRow extends StatelessWidget {
       compact: compact,
     );
 
-    final toolbar = inlineActions
-        ? (showTitle
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Expanded(
-                    child: UsersPageToolbar(metrics: metrics),
-                  ),
-                  SizedBox(width: gap),
-                  refreshBtn,
-                ],
-              )
-            : UsersPageToolbar(metrics: metrics))
-        : null;
-
-    if (!showTitle && inlineActions) {
-      return toolbar!;
-    }
-
-    if (showTitle && !inlineActions) {
-      return Row(
-        children: [
-          const Expanded(child: _UsersHeaderTitle()),
-          refreshBtn,
-        ],
-      );
-    }
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const _UsersHeaderTitle(),
-        SizedBox(width: gap + 8),
-        Expanded(child: UsersPageToolbar(metrics: metrics)),
+        const Flexible(
+          flex: 2,
+          child: _UsersHeaderTitle(),
+        ),
+        SizedBox(width: gap + 4),
+        Expanded(
+          flex: 3,
+          child: UsersPageToolbar(metrics: metrics),
+        ),
         SizedBox(width: gap),
         refreshBtn,
       ],
@@ -152,7 +128,8 @@ class _UsersHeaderTitle extends StatelessWidget {
     final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final scheme = theme.colorScheme;
-    final fontSize = width < 480 ? 20.0 : width < 900 ? 22.0 : 24.0;
+    final fontSize = width < 480 ? 18.0 : width < 900 ? 21.0 : 24.0;
+    final subFontSize = width < 480 ? 11.5 : 12.5;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,18 +146,18 @@ class _UsersHeaderTitle extends StatelessWidget {
             fontSize: fontSize,
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 2),
         Text(
           l10n.tOr(
             'usersPageSubtitle',
             'Manage platform users, permissions, account verification, and moderation history.',
           ),
-          maxLines: 1,
+          maxLines: width < 600 ? 2 : 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodySmall?.copyWith(
             color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
-            fontSize: 12.5,
+            fontSize: subFontSize,
           ),
         ),
       ],

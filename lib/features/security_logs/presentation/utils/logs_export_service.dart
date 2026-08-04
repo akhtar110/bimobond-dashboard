@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:archive/archive.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 import '../../../../core/utils/file_downloader.dart';
 import '../../domain/entities/log_entity.dart';
@@ -8,6 +10,7 @@ import '../../domain/entities/log_entity.dart';
 enum LogsExportFormat {
   excel,
   csv,
+  pdf,
 }
 
 class LogsExportParams {
@@ -100,6 +103,15 @@ class LogsExportService {
               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         );
         break;
+
+      case LogsExportFormat.pdf:
+        final pdfBytes = await _generateLogsPdf(params);
+        await saveAndDownloadFile(
+          bytes: pdfBytes,
+          fileName: 'logs_export_$timestamp.pdf',
+          mimeType: 'application/pdf',
+        );
+        break;
     }
   }
 
@@ -140,10 +152,98 @@ class LogsExportService {
         _description(log),
       ];
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CSV
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── ENTERPRISE PDF SECURITY LOGS GENERATOR ──────────────────────────────
+  static Future<List<int>> _generateLogsPdf(LogsExportParams params) async {
+    final pdf = pw.Document();
+    final nowStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
 
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(24),
+        header: (pw.Context context) {
+          return pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 10),
+            padding: const pw.EdgeInsets.all(8),
+            decoration: const pw.BoxDecoration(
+              color: PdfColors.blueGrey900,
+              borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'BIMOBOND ENTERPRISE ADMIN SYSTEM',
+                      style: pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.Text(
+                      'SECURITY & AUDIT LOGS TRAIL  •  Generated: $nowStr',
+                      style: const pw.TextStyle(color: PdfColors.grey400, fontSize: 8),
+                    ),
+                  ],
+                ),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColors.blue700,
+                    borderRadius: pw.BorderRadius.all(pw.Radius.circular(3)),
+                  ),
+                  child: pw.Text(
+                    'TOTAL LOGS: ${params.logs.length}',
+                    style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        footer: (pw.Context context) {
+          return pw.Container(
+            margin: const pw.EdgeInsets.only(top: 10),
+            padding: const pw.EdgeInsets.only(top: 6),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Filters: ${params.activeFiltersSummary}',
+                  style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 8),
+                ),
+                pw.Text(
+                  'Page ${context.pageNumber} of ${context.pagesCount}',
+                  style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 8),
+                ),
+              ],
+            ),
+          );
+        },
+        build: (pw.Context context) => [
+          pw.Table.fromTextArray(
+            headers: _kHeaders,
+            data: params.logs.map(_rowCells).toList(),
+            headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 8),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+            rowDecoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5))),
+            cellStyle: const pw.TextStyle(fontSize: 7.5),
+            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+          ),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // ── CSV Generator ────────────────────────────────────────────────────────
   static String _csvCell(String val) {
     if (val.contains(',') ||
         val.contains('"') ||
@@ -158,7 +258,7 @@ class LogsExportService {
     final sb = StringBuffer();
     sb.write('\uFEFF'); // UTF-8 BOM — Excel auto-detects UTF-8
     final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
-    sb.writeln('BimoBond Admin Dashboard - Security Logs Export');
+    sb.writeln('BimoBond Enterprise Admin Dashboard - Security Logs Export');
     sb.writeln('Generated At:,$now');
     sb.writeln('Total Records:,${params.logs.length}');
     sb.writeln('Applied Filters:,${_csvCell(params.activeFiltersSummary)}');
@@ -170,16 +270,8 @@ class LogsExportService {
     return sb.toString();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Proper OOXML .xlsx (ZIP of XML parts)
-  //
-  // Element order inside <worksheet> (ECMA-376 §18.3.1.99):
-  //   sheetPr? → dimension? → sheetViews? → sheetFormatPr? → cols? →
-  //   sheetData → (autoFilter, etc.)
-  // ─────────────────────────────────────────────────────────────────────────
-
+  // ── XLSX Generator ───────────────────────────────────────────────────────
   static List<int> _generateXlsx(LogsExportParams params) {
-    // ── Shared-string table ────────────────────────────────────────────────
     final strings = <String>[];
     final strIdx = <String, int>{};
 
@@ -191,7 +283,6 @@ class LogsExportService {
 
     final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
 
-    // ── Worksheet XML ──────────────────────────────────────────────────────
     final ws = StringBuffer();
     ws.write(
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -202,14 +293,12 @@ class LogsExportService {
         ' mc:Ignorable="x14ac"'
         ' xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac">');
 
-    // Total rows = 4 meta + 1 blank + 1 header + data rows
     final totalRows = 6 + params.logs.length;
     final lastDataCol = _colLetter(_kHeaders.length - 1);
     ws.write('<dimension ref="A1:$lastDataCol$totalRows"/>');
 
-    // sheetViews — freeze first 6 rows (4 meta + blank + header)
     ws.write('<sheetViews>'
-        '<sheetView tabSelected="1" workbookViewId="0">'
+        '<sheetView tabSelected="1" workbookViewId="0" showGridLines="1">'
         '<pane ySplit="6" topLeftCell="A7" activePane="bottomLeft" state="frozen"/>'
         '<selection pane="bottomLeft" activeCell="A7" sqref="A7"/>'
         '</sheetView>'
@@ -217,25 +306,33 @@ class LogsExportService {
 
     ws.write('<sheetFormatPr defaultRowHeight="15" x14ac:dyDescent="0.25"/>');
 
-    // Column widths
+    final widths = List<double>.filled(_kHeaders.length, 12.0);
+    for (var c = 0; c < _kHeaders.length; c++) {
+      widths[c] = _kHeaders[c].length.toDouble() + 4.0;
+    }
+    for (final log in params.logs) {
+      final cells = _rowCells(log);
+      for (var c = 0; c < cells.length && c < widths.length; c++) {
+        final len = cells[c].length.toDouble() + 4.0;
+        if (len > widths[c]) widths[c] = len;
+      }
+    }
+
     ws.write('<cols>');
-    final widths = [22, 24, 13, 13, 22, 22, 18, 28, 34, 42];
     for (var c = 0; c < widths.length; c++) {
+      final w = widths[c].clamp(12.0, 50.0);
       ws.write(
-          '<col min="${c + 1}" max="${c + 1}" width="${widths[c]}" bestFit="0" customWidth="1"/>');
+          '<col min="${c + 1}" max="${c + 1}" width="$w" bestFit="0" customWidth="1"/>');
     }
     ws.write('</cols>');
 
-    // sheetData
     ws.write('<sheetData>');
 
-    // Helper: write a shared-string cell
     String sc(String colRow, String value, {int style = 0}) =>
         '<c r="$colRow" t="s" s="$style"><v>${addStr(value)}</v></c>';
 
-    // ── Meta rows (rows 1-4) ─────────────────────────────────────────────
     ws.write('<row r="1" spans="1:2">'
-        '${sc('A1', 'BimoBond Admin - Security Logs Export')}'
+        '${sc('A1', 'BimoBond Enterprise Admin System — Security Logs Export')}'
         '</row>');
     ws.write('<row r="2" spans="1:2">'
         '${sc('A2', 'Generated At')}${sc('B2', now)}'
@@ -247,17 +344,14 @@ class LogsExportService {
         '${sc('A4', 'Applied Filters')}${sc('B4', params.activeFiltersSummary)}'
         '</row>');
 
-    // Row 5: blank separator
     ws.write('<row r="5"/>');
 
-    // ── Header row (row 6) — style index 1 ───────────────────────────────
     ws.write('<row r="6" spans="1:${_kHeaders.length}" s="1" customFormat="1">');
     for (var c = 0; c < _kHeaders.length; c++) {
       ws.write(sc('${_colLetter(c)}6', _kHeaders[c], style: 1));
     }
     ws.write('</row>');
 
-    // ── Data rows (rows 7+) ───────────────────────────────────────────────
     for (var r = 0; r < params.logs.length; r++) {
       final rowIdx = r + 7;
       final rowStyle = r.isOdd ? 2 : 0;
@@ -272,65 +366,35 @@ class LogsExportService {
 
     ws.write('</sheetData>');
 
-    // AutoFilter on header row
     ws.write('<autoFilter ref="A6:${lastDataCol}6"/>');
     ws.write('</worksheet>');
 
-    // ── Shared strings XML ────────────────────────────────────────────────
     final ssSb = StringBuffer();
     ssSb.write(
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
         ' count="${strings.length}" uniqueCount="${strings.length}">');
     for (final s in strings) {
-      // xml:space="preserve" keeps leading/trailing whitespace; required for
-      // Arabic and other bidirectional/whitespace-sensitive strings.
       ssSb.write('<si><t xml:space="preserve">${_xmlEsc(s)}</t></si>');
     }
     ssSb.write('</sst>');
 
-    // ── Styles XML ────────────────────────────────────────────────────────
-    //
-    // OOXML fill indices 0 & 1 are RESERVED (none + gray125).
-    // Custom fills start at index 2.
-    //
-    // Fill index map:
-    //   0 = none (required)
-    //   1 = gray125 (required)
-    //   2 = stripe background (#F1F5F9)
-    //   3 = header background (#1E293B)
-    //
-    // Font index map:
-    //   0 = default (Calibri 11)
-    //   1 = header  (Calibri 11 bold white)
-    //
-    // Border index map:
-    //   0 = none (required)
-    //   1 = thin light border (#E2E8F0)
-    //
-    // cellXfs (style) index map:
-    //   0 = default cell  (font 0, fill 0, border 1, wrap+top)
-    //   1 = header cell   (font 1, fill 3, border 1, no wrap, vcenter)
-    //   2 = stripe cell   (font 0, fill 2, border 1, wrap+top)
     const stylesXml =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
         ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'
         ' mc:Ignorable="x14ac"'
         ' xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac">'
-        // Fonts
         '<fonts count="2" x14ac:knownFonts="1">'
         '<font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
         '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>'
         '</fonts>'
-        // Fills
         '<fills count="4">'
         '<fill><patternFill patternType="none"/></fill>'
         '<fill><patternFill patternType="gray125"/></fill>'
         '<fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/><bgColor indexed="64"/></patternFill></fill>'
         '<fill><patternFill patternType="solid"><fgColor rgb="FF1E293B"/><bgColor indexed="64"/></patternFill></fill>'
         '</fills>'
-        // Borders
         '<borders count="2">'
         '<border><left/><right/><top/><bottom/><diagonal/></border>'
         '<border>'
@@ -341,29 +405,22 @@ class LogsExportService {
         '<diagonal/>'
         '</border>'
         '</borders>'
-        // cellStyleXfs (base formats — required)
         '<cellStyleXfs count="1">'
         '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'
         '</cellStyleXfs>'
-        // cellXfs (applied formats)
         '<cellXfs count="3">'
-        // 0 – default data cell
         '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1">'
         '<alignment horizontal="left" vertical="top" wrapText="1"/></xf>'
-        // 1 – header cell (bold, white text, navy fill)
         '<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">'
         '<alignment horizontal="left" vertical="center" wrapText="0"/></xf>'
-        // 2 – stripe data cell
         '<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1">'
         '<alignment horizontal="left" vertical="top" wrapText="1"/></xf>'
         '</cellXfs>'
-        // cellStyles
         '<cellStyles count="1">'
         '<cellStyle name="Normal" xfId="0" builtinId="0"/>'
         '</cellStyles>'
         '</styleSheet>';
 
-    // ── Workbook XML ──────────────────────────────────────────────────────
     const workbookXml =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<workbook'
@@ -376,7 +433,6 @@ class LogsExportService {
         '<calcPr calcId="145621"/>'
         '</workbook>';
 
-    // ── [Content_Types].xml ───────────────────────────────────────────────
     const contentTypes =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
@@ -392,14 +448,12 @@ class LogsExportService {
         ' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
         '</Types>';
 
-    // ── Root relationships ─────────────────────────────────────────────────
     const rootRels =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
         '</Relationships>';
 
-    // ── Workbook relationships ─────────────────────────────────────────────
     const wbRels =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -408,7 +462,6 @@ class LogsExportService {
         '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
         '</Relationships>';
 
-    // ── Assemble ZIP (no compression on XML so Excel can stream-parse) ─────
     final archive = Archive();
 
     void addPart(String name, String content) {
@@ -427,7 +480,6 @@ class LogsExportService {
     return ZipEncoder().encode(archive);
   }
 
-  /// Zero-based column index → Excel column letter: 0→A, 25→Z, 26→AA …
   static String _colLetter(int index) {
     var result = '';
     var n = index;
@@ -438,13 +490,11 @@ class LogsExportService {
     return result;
   }
 
-  /// XML-escape a string, preserving Arabic and all Unicode code-points.
   static String _xmlEsc(String s) => s
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&apos;')
-      // Remove XML-invalid control characters (keep \t \n \r).
       .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]'), '');
 }

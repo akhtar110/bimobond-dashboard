@@ -125,6 +125,9 @@ class UserDetailLayoutMetrics {
   /// Prefer filling remaining viewport so posts get more room after a compact
   /// header, while keeping a sensible floor/ceiling.
   double activityContentHeight(double viewportHeight) {
+    if (viewportHeight.isNaN || viewportHeight.isInfinite || viewportHeight <= 0) {
+      return activityTabHeight;
+    }
     final reservedChrome = switch (deviceType) {
       DeviceType.mobileSmall => 220.0,
       DeviceType.mobileLarge => 230.0,
@@ -139,6 +142,7 @@ class UserDetailLayoutMetrics {
       DeviceType.tablet => 1000.0,
       DeviceType.desktop => 1100.0,
     };
+    if (available.isNaN || available.isInfinite) return ceiling;
     return available.clamp(floor, ceiling);
   }
 

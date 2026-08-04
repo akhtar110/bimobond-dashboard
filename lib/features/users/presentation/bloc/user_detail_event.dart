@@ -10,6 +10,14 @@ class LoadUserDetailEvent extends UserDetailEvent {
   final UserEntity user;
 }
 
+class RefreshUserDetailEvent extends UserDetailEvent {}
+
+class UserDetailPresenceChangedEvent extends UserDetailEvent {
+  UserDetailPresenceChangedEvent(this.update);
+
+  final dynamic update;
+}
+
 class ClearUserDetailActionFeedbackEvent extends UserDetailEvent {}
 
 /// Optimistically adjust follower/following counts after admin edge removal.

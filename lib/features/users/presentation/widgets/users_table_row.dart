@@ -6,12 +6,13 @@ import '../../domain/entities/user_entity.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
 import 'user_location_cell.dart';
+import 'user_online_point_indicator.dart';
 import 'user_online_status_cell.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 import 'users_table_config.dart';
 
-const double kUsersTableRowHeight = 56;
+const double kUsersTableRowHeight = 44;
 
 class UsersTableRow extends StatelessWidget {
   const UsersTableRow({
@@ -225,26 +226,40 @@ class _UserAvatar extends StatelessWidget {
         ? [scheme.primary, scheme.primary.withValues(alpha: 0.5)]
         : [Colors.transparent, Colors.transparent];
 
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(colors: ringColors),
-      ),
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: scheme.surfaceContainerHighest,
-        backgroundImage: user.avatarUrl != null
-            ? CachedNetworkImageProvider(user.avatarUrl!)
-            : null,
-        child: user.avatarUrl == null
-            ? Icon(
-                Icons.person_rounded,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              )
-            : null,
-      ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: ringColors),
+          ),
+          child: CircleAvatar(
+            radius: 13,
+            backgroundColor: scheme.surfaceContainerHighest,
+            backgroundImage: user.avatarUrl != null
+                ? CachedNetworkImageProvider(user.avatarUrl!)
+                : null,
+            child: user.avatarUrl == null
+                ? Icon(
+                    Icons.person_rounded,
+                    size: 15,
+                    color: scheme.onSurfaceVariant,
+                  )
+                : null,
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: UserOnlinePointIndicator(
+            isOnline: user.isOnline,
+            size: 9,
+            borderWidth: 1.5,
+          ),
+        ),
+      ],
     );
   }
 }

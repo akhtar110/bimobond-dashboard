@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../../core/widgets/post_media_preview.dart';
 import '../../domain/entities/managed_post_entity.dart';
-import '../../domain/entities/post_media_entity.dart';
 import 'media_carousel_item.dart';
 
 class PostMediaCarousel extends StatefulWidget {
@@ -381,9 +380,10 @@ class _PostMediaCarouselState extends State<PostMediaCarousel> {
         final hasMultiple = _media.length > 1;
         final reservedIndicator = hasMultiple ? indicatorHeight : 0.0;
 
-        final mediaHeight = (constraints.maxHeight - reservedIndicator)
-            .clamp(120.0, double.infinity)
-            .toDouble();
+        final rawHeight = constraints.maxHeight - reservedIndicator;
+        final mediaHeight = (rawHeight.isNaN || rawHeight.isInfinite)
+            ? 300.0
+            : (rawHeight < 120.0 ? 120.0 : rawHeight);
 
         if (_media.isEmpty) {
           return _buildFallbackMedia(

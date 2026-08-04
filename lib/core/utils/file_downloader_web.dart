@@ -12,8 +12,8 @@ Future<void> saveAndDownloadFile({
     ..setAttribute('download', fileName)
     ..style.display = 'none';
 
-  html.document.body?.children.add(anchor);
+  html.document.body?.append(anchor);
   anchor.click();
-  html.document.body?.children.remove(anchor);
+  anchor.remove();
   html.Url.revokeObjectUrl(url);
 }

@@ -9,15 +9,15 @@ import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../security_logs/data/datasources/user_audit_log_socket_service.dart';
 import '../../../security_logs/domain/usecases/get_logs_usecase.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
-import '../../../security_logs/presentation/widgets/logs_detail_dialog.dart';
+import '../../../security_logs/presentation/widgets/admin_and_violation_detail_dialogs.dart';
 import '../../domain/entities/user_entity.dart';
 import '../bloc/user_audit_log_bloc.dart';
 import '../bloc/user_detail_bloc.dart';
 import '../bloc/user_detail_state.dart';
 import 'permission_denied_state.dart';
 
-class UserDetailAuditLogTab extends StatelessWidget {
-  const UserDetailAuditLogTab({
+class UserDetailAdminActionsTab extends StatelessWidget {
+  const UserDetailAdminActionsTab({
     super.key,
     required this.user,
     required this.isDark,
@@ -34,8 +34,8 @@ class UserDetailAuditLogTab extends StatelessWidget {
       allowLegacyAdmin: true,
       fallback: PermissionDeniedState(
         message: l10n.tOr(
-          'userAuditLogPermissionDenied',
-          'You do not have permission to view audit logs.',
+          'adminActionsPermissionDenied',
+          'You do not have permission to view administrative actions.',
         ),
       ),
       child: BlocProvider<UserAuditLogBloc>(
@@ -54,15 +54,15 @@ class UserDetailAuditLogTab extends StatelessWidget {
           listener: (context, state) {
             context.read<UserAuditLogBloc>().add(const RefreshUserAuditLogEvent());
           },
-          child: _UserDetailAuditLogView(isDark: isDark),
+          child: _UserDetailAdminActionsView(isDark: isDark),
         ),
       ),
     );
   }
 }
 
-class _UserDetailAuditLogView extends StatelessWidget {
-  const _UserDetailAuditLogView({required this.isDark});
+class _UserDetailAdminActionsView extends StatelessWidget {
+  const _UserDetailAdminActionsView({required this.isDark});
 
   final bool isDark;
 
@@ -116,13 +116,13 @@ class _UserDetailAuditLogView extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.history_toggle_off_rounded,
+                      Icons.admin_panel_settings_outlined,
                       size: 44,
                       color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      l10n.tOr('noAuditLogsFound', 'No audit log entries found for this user.'),
+                      l10n.tOr('noAdminActionsFound', 'No administrative actions found for this user.'),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -160,7 +160,7 @@ class _UserDetailAuditLogView extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '${l10n.tOr('userAuditLogTab', 'Audit Log')} (${state.meta.total})',
+                          '${l10n.tOr('adminActionsTitle', 'Admin Actions')} (${state.meta.total})',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -238,7 +238,7 @@ class _UserDetailAuditLogView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(10),
-                        onTap: () => showLogsDetailDialog(context, item),
+                        onTap: () => showAdminActionDetailDialog(context, item),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
@@ -247,13 +247,13 @@ class _UserDetailAuditLogView extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: scheme.primaryContainer.withValues(alpha: 0.5),
+                                  color: Colors.blue.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  _iconForCategory(item.category),
+                                child: const Icon(
+                                  Icons.admin_panel_settings_rounded,
                                   size: 20,
-                                  color: scheme.primary,
+                                  color: Colors.blue,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -333,22 +333,6 @@ class _UserDetailAuditLogView extends StatelessWidget {
                                             ),
                                           ),
                                         ],
-                                        if (item.ipAddress != null) ...[
-                                          const SizedBox(width: 12),
-                                          Icon(
-                                            Icons.wifi_rounded,
-                                            size: 13,
-                                            color: scheme.onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            item.ipAddress!,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
                                       ],
                                     ),
                                   ],
@@ -390,19 +374,5 @@ class _UserDetailAuditLogView extends StatelessWidget {
         return const SizedBox.shrink();
       },
     );
-  }
-
-  IconData _iconForCategory(String category) {
-    return switch (category.toUpperCase()) {
-      'AUTH' => Icons.lock_outline_rounded,
-      'SOCIAL' => Icons.people_outline_rounded,
-      'CONTENT' => Icons.article_outlined,
-      'COMMERCE' => Icons.shopping_bag_outlined,
-      'MESSAGING' => Icons.chat_bubble_outline_rounded,
-      'MODERATION' => Icons.gavel_rounded,
-      'ADMIN' => Icons.admin_panel_settings_rounded,
-      'SETTINGS' => Icons.settings_outlined,
-      _ => Icons.history_rounded,
-    };
   }
 }

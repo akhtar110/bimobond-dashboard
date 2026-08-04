@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../../core/widgets/dashboard/app_pagination_bar.dart';
 import '../../../../injection_container.dart' as di;
+import '../../data/datasources/user_audit_log_socket_service.dart';
 import '../../domain/entities/log_entity.dart';
 import '../../domain/usecases/get_logs_usecase.dart';
 import '../utils/logs_labels.dart';
@@ -42,6 +45,11 @@ class ModerationActionTimeline extends StatefulWidget {
 class _ModerationActionTimelineState extends State<ModerationActionTimeline> {
   final GetLogsUseCase _getLogs = di.sl<GetLogsUseCase>();
   final TextEditingController _searchController = TextEditingController();
+  late final UserAuditLogSocketService _socketService = UserAuditLogSocketService();
+
+  StreamSubscription<LogEntity>? _logSubscription;
+  StreamSubscription<RealtimeSocketStatus>? _statusSubscription;
+  final Set<String> _realtimeArrivalIds = {};
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -63,6 +71,48 @@ class _ModerationActionTimelineState extends State<ModerationActionTimeline> {
     super.initState();
     _selectedCategory = widget.initialCategory;
     _fetchTimelineLogs(page: 1);
+    _initRealtimeSocket();
+  }
+
+  void _initRealtimeSocket() {
+    _socketService.connect(targetUserId: widget.userId ?? '');
+
+    _statusSubscription = _socketService.statusStream.listen((status) {
+      if (mounted) setState(() {});
+    });
+
+    _logSubscription = _socketService.onModerationLog.listen((newLog) {
+      _handleRealtimeLogArrival(newLog);
+    });
+  }
+
+  void _handleRealtimeLogArrival(LogEntity newLog) {
+    if (_logs.any((l) => l.id == newLog.id)) return;
+
+    if (widget.userId != null && widget.userId!.isNotEmpty) {
+      if (newLog.targetId != widget.userId && newLog.actorId != widget.userId) {
+        return;
+      }
+    }
+
+    if (_selectedCategory != null &&
+        newLog.category.toUpperCase() != _selectedCategory!.toUpperCase()) {
+      return;
+    }
+
+    if (_selectedAction != null &&
+        newLog.action.toUpperCase() != _selectedAction!.toUpperCase()) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _logs = List<LogEntity>.of(_logs, growable: true);
+        _logs.insert(0, newLog);
+        _realtimeArrivalIds.add(newLog.id);
+        _totalCount += 1;
+      });
+    }
   }
 
   @override
@@ -72,11 +122,15 @@ class _ModerationActionTimelineState extends State<ModerationActionTimeline> {
         oldWidget.initialCategory != widget.initialCategory) {
       _selectedCategory = widget.initialCategory;
       _fetchTimelineLogs(page: 1);
+      _socketService.connect(targetUserId: widget.userId ?? '');
     }
   }
 
   @override
   void dispose() {
+    _logSubscription?.cancel();
+    _statusSubscription?.cancel();
+    _socketService.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -129,7 +183,7 @@ class _ModerationActionTimelineState extends State<ModerationActionTimeline> {
 
       if (mounted) {
         setState(() {
-          _logs = fetchedLogs;
+          _logs = List<LogEntity>.of(fetchedLogs, growable: true);
           _currentPage = result.meta.page;
           _totalPages = result.meta.totalPages;
           _totalCount = result.meta.total;
@@ -187,29 +241,39 @@ class _ModerationActionTimelineState extends State<ModerationActionTimeline> {
                   ),
                 ],
               ),
-              // Append-Only Permanent Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: scheme.primary.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.lock_clock_rounded, size: 13, color: scheme.primary),
-                    const SizedBox(width: 5),
-                    Text(
-                      l10n.tOr('appendOnlyAuditNotice', 'Append-Only Permanent Audit Trail'),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.primary,
-                      ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _RealtimeSocketStatusBadge(
+                    status: _socketService.currentStatus,
+                    onReconnect: () => _socketService.reconnect(),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: scheme.primary.withValues(alpha: 0.3)),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_clock_rounded, size: 13, color: scheme.primary),
+                        const SizedBox(width: 5),
+                        Text(
+                          l10n.tOr('appendOnlyAuditNotice', 'Append-Only Permanent Audit Trail'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -758,3 +822,75 @@ class _TimelineRecordNode extends StatelessWidget {
     return (Icons.gavel_rounded, scheme.primary);
   }
 }
+
+class _RealtimeSocketStatusBadge extends StatelessWidget {
+  const _RealtimeSocketStatusBadge({
+    required this.status,
+    required this.onReconnect,
+  });
+
+  final RealtimeSocketStatus status;
+  final VoidCallback onReconnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final color = switch (status) {
+      RealtimeSocketStatus.connected => const Color(0xFF22C55E),
+      RealtimeSocketStatus.connecting ||
+      RealtimeSocketStatus.reconnecting =>
+        const Color(0xFFF59E0B),
+      RealtimeSocketStatus.disconnected ||
+      RealtimeSocketStatus.error =>
+        const Color(0xFFEF4444),
+    };
+
+    final text = switch (status) {
+      RealtimeSocketStatus.connected => l10n.tOr('liveSocketConnected', 'LIVE'),
+      RealtimeSocketStatus.connecting => l10n.tOr('connecting', 'Connecting...'),
+      RealtimeSocketStatus.reconnecting => l10n.tOr('reconnecting', 'Reconnecting...'),
+      RealtimeSocketStatus.disconnected ||
+      RealtimeSocketStatus.error =>
+        l10n.tOr('offline', 'Offline'),
+    };
+
+    return InkWell(
+      onTap: (status == RealtimeSocketStatus.disconnected ||
+              status == RealtimeSocketStatus.error)
+          ? onReconnect
+          : null,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

@@ -7,6 +7,7 @@ import '../../domain/entities/user_entity.dart';
 import '../utils/users_export_service.dart';
 import 'user_account_risk_section.dart';
 import 'user_detail_header.dart';
+import 'user_online_status_cell.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 
@@ -65,7 +66,10 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
     final l10n = context.l10n;
 
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final drawerWidth = (screenWidth * 0.92).clamp(320.0, 480.0);
+    final rawWidth = screenWidth * 0.92;
+    final drawerWidth = (rawWidth.isNaN || rawWidth.isInfinite || rawWidth <= 0)
+        ? 380.0
+        : rawWidth.clamp(320.0, 480.0);
 
     return Drawer(
       width: drawerWidth,
@@ -160,6 +164,7 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
                             UserDetailRoleChip(user: user, compact: true),
                             UserStatusBadge(user: user),
                             UserPrivacyBadge(user: user, compact: true),
+                            UserLastSeenBadge(user: user, compact: true),
                           ],
                         ),
                       ],
@@ -176,18 +181,7 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => UsersExportService.exportSingleUser(
-                        user: user,
-                        format: UsersExportFormat.excel,
-                      ),
-                      icon: const Icon(Icons.download_rounded, size: 16),
-                      label: const Text('Export', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                    ),
+                    child: UserDrawerExportButton(user: user),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -273,11 +267,6 @@ class _OverviewTab extends StatelessWidget {
 
     final infoMap = <String, String>{
       'User ID': user.id,
-      'Online Status': user.isOnline ? 'Online 🟢' : 'Offline ⚪',
-      'Last Active': user.lastSeenFormatted,
-      'Exact Last Activity': user.lastSeen != null
-          ? DateFormat('yyyy-MM-dd HH:mm:ss').format(user.lastSeen!.toLocal())
-          : 'Never',
       'Firebase UID': user.firebaseUid ?? '—',
       'Email': user.email ?? '—',
       'Phone': user.phoneNumber ?? '—',
@@ -536,18 +525,7 @@ class _DevicesTab extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           leading: const Icon(Icons.phone_iphone_rounded, color: Colors.blue),
           title: const Text('iPhone 15 Pro Max', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          subtitle: const Text('iOS 17.4 • App v2.4.1 • Active Now', style: TextStyle(fontSize: 11)),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              l10n.tOr('online', 'Active'),
-              style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w700),
-            ),
-          ),
+          subtitle: const Text('iOS 17.4 • App v2.4.1', style: TextStyle(fontSize: 11)),
         ),
         const SizedBox(height: 8),
         ListTile(
@@ -556,7 +534,7 @@ class _DevicesTab extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           leading: const Icon(Icons.laptop_mac_rounded, color: Colors.purple),
           title: const Text('MacBook Pro (Chrome Web)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          subtitle: const Text('macOS Sonoma • Last seen 3h ago', style: TextStyle(fontSize: 11)),
+          subtitle: const Text('macOS Sonoma', style: TextStyle(fontSize: 11)),
         ),
       ],
     );
@@ -680,7 +658,7 @@ class _ModerationNotesTab extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Private notes visible only to platform admins and moderators.',
+          l10n.tOr('privateNotesSubtitle', 'Private notes visible only to platform admins and moderators.'),
           style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: 10),
@@ -690,7 +668,7 @@ class _ModerationNotesTab extends StatelessWidget {
           maxLines: 4,
           style: const TextStyle(fontSize: 12.5),
           decoration: InputDecoration(
-            hintText: 'Add internal notes or moderation observations...',
+            hintText: l10n.tOr('addInternalNotesPlaceholder', 'Add internal notes or moderation observations...'),
             filled: true,
             fillColor: scheme.surfaceContainerLow,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -699,7 +677,7 @@ class _ModerationNotesTab extends StatelessWidget {
         const SizedBox(height: 10),
 
         Align(
-          alignment: Alignment.centerRight,
+          alignment: AlignmentDirectional.centerEnd,
           child: FilledButton.icon(
             onPressed: isSaving ? null : onSave,
             icon: isSaving
@@ -739,20 +717,179 @@ class _ModerationNotesTab extends StatelessWidget {
                   const Icon(Icons.security_rounded, size: 16, color: Colors.blue),
                   const SizedBox(width: 8),
                   Text(
-                    user.isVerified ? 'Verification Granted' : 'Standard User Account',
+                    user.isVerified
+                        ? l10n.tOr('verificationGranted', 'Verification Granted')
+                        : l10n.tOr('standardUserAccount', 'Standard User Account'),
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                'Account registered on ${user.createdAt != null ? DateFormat('yyyy-MM-dd').format(user.createdAt!) : '—'}',
+                l10n.tArgs('accountRegisteredOnDate', {
+                  'date': user.createdAt != null
+                      ? DateFormat('yyyy-MM-dd').format(user.createdAt!)
+                      : '—',
+                }),
                 style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class UserDrawerExportButton extends StatefulWidget {
+  const UserDrawerExportButton({super.key, required this.user});
+
+  final UserEntity user;
+
+  @override
+  State<UserDrawerExportButton> createState() => _UserDrawerExportButtonState();
+}
+
+class _UserDrawerExportButtonState extends State<UserDrawerExportButton> {
+  bool _isExporting = false;
+
+  Future<void> _handleExport(UsersExportFormat format) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      await UsersExportService.exportSingleUser(
+        user: widget.user,
+        format: format,
+      );
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.tArgs('exportUserSuccessMessage', {
+                'username': widget.user.username,
+              }),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.tArgs('exportUserFailedMessage', {
+                'error': e.toString().replaceFirst('Exception: ', ''),
+              }),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+
+    if (_isExporting) {
+      return Container(
+        height: 32,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              l10n.tOr('exporting', 'Exporting...'),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: scheme.primary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return PopupMenuButton<UsersExportFormat>(
+      tooltip: l10n.tOr('export', 'Export Report'),
+      offset: const Offset(0, 36),
+      onSelected: _handleExport,
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: UsersExportFormat.excel,
+          child: Row(
+            children: const [
+              Icon(Icons.table_chart_rounded, size: 18, color: Colors.green),
+              SizedBox(width: 8),
+              Text('Excel Report (.xlsx)', style: TextStyle(fontSize: 12.5)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.csv,
+          child: Row(
+            children: const [
+              Icon(Icons.description_rounded, size: 18, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('CSV Report (.csv)', style: TextStyle(fontSize: 12.5)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.pdf,
+          child: Row(
+            children: const [
+              Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.red),
+              SizedBox(width: 8),
+              Text('PDF Report (.pdf)', style: TextStyle(fontSize: 12.5)),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 32,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.download_rounded, size: 16),
+            SizedBox(width: 4),
+            Text('Export', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Icon(Icons.arrow_drop_down, size: 16),
+          ],
+        ),
+      ),
     );
   }
 }

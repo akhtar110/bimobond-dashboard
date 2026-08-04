@@ -12,7 +12,7 @@ import 'users_filter_bar.dart';
 import 'users_filter_popup.dart';
 import 'users_sort_dropdown.dart';
 
-/// Responsive users toolbar — matches posts layout with Export button.
+/// Responsive users toolbar — matches posts layout with PDF, Excel, CSV Export button.
 class UsersPageToolbar extends StatelessWidget {
   const UsersPageToolbar({super.key, required this.metrics});
 
@@ -141,6 +141,7 @@ class _UsersToolbarRow extends StatelessWidget {
         },
         builder: (context, filters) {
           final l10n = context.l10n;
+          final isSmallScreen = availableWidth < 520;
           final activeCount = usersAppliedFilterCount(
             filter: filters.status,
             locationQuery: filters.location,
@@ -149,61 +150,74 @@ class _UsersToolbarRow extends StatelessWidget {
             createdTo: filters.createdTo,
           );
 
-          final actions = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              UsersSortDropdown(height: controlHeight),
-              SizedBox(width: gap),
-              Builder(
-                builder: (buttonContext) {
-                  return PostsFilterButton(
-                    activeCount: activeCount,
-                    height: controlHeight,
-                    iconOnly: true,
-                    onPressed: () => _openFilters(
-                      buttonContext,
-                      statusFilter: filters.status,
-                      locationQuery: filters.location,
-                      role: filters.role,
-                      createdFrom: filters.createdFrom,
-                      createdTo: filters.createdTo,
+          final actionsList = [
+            UsersSortDropdown(height: controlHeight),
+            SizedBox(width: gap),
+            Builder(
+              builder: (buttonContext) {
+                return PostsFilterButton(
+                  activeCount: activeCount,
+                  height: controlHeight,
+                  iconOnly: true,
+                  onPressed: () => _openFilters(
+                    buttonContext,
+                    statusFilter: filters.status,
+                    locationQuery: filters.location,
+                    role: filters.role,
+                    createdFrom: filters.createdFrom,
+                    createdTo: filters.createdTo,
+                  ),
+                );
+              },
+            ),
+            SizedBox(width: gap),
+            UsersExportButton(
+              height: controlHeight,
+              isExporting: filters.isExporting,
+            ),
+            SizedBox(width: gap),
+            SizedBox(
+              height: controlHeight,
+              child: FilledButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        l10n.tOr('addUserWorkflowInitiated', 'Add User workflow initiated'),
+                      ),
                     ),
                   );
                 },
-              ),
-              SizedBox(width: gap),
-              UsersExportButton(
-                height: controlHeight,
-                isExporting: filters.isExporting,
-              ),
-              SizedBox(width: gap),
-              SizedBox(
-                height: controlHeight,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          l10n.tOr('addUserWorkflowInitiated', 'Add User workflow initiated'),
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: Text(
-                    l10n.tOr('addUser', 'Add User'),
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                  isSmallScreen && availableWidth < 380
+                      ? l10n.tOr('add', 'Add')
+                      : l10n.tOr('addUser', 'Add User'),
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
-            ],
-          );
+            ),
+          ];
+
+          final actionsWidget = isSmallScreen
+              ? SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: actionsList,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: actionsList,
+                );
 
           if (inline) {
             final actionsWidth = (controlHeight * 3) + (gap * 2);
@@ -226,7 +240,7 @@ class _UsersToolbarRow extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: gap),
-                  actions,
+                  actionsWidget,
                 ],
               ),
             );
@@ -242,7 +256,7 @@ class _UsersToolbarRow extends StatelessWidget {
                 height: controlHeight,
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
-                  child: actions,
+                  child: actionsWidget,
                 ),
               ),
             ],
@@ -253,7 +267,7 @@ class _UsersToolbarRow extends StatelessWidget {
   }
 }
 
-/// Export Button with Excel, CSV, and PDF options.
+/// Export Button with PDF, Excel, and CSV options.
 class UsersExportButton extends StatelessWidget {
   const UsersExportButton({
     super.key,
@@ -335,6 +349,16 @@ class UsersExportButton extends StatelessWidget {
             ],
           ),
         ),
+        PopupMenuItem(
+          value: UsersExportFormat.pdf,
+          child: Row(
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.red),
+              const SizedBox(width: 10),
+              Text(l10n.tOr('exportToPdf', 'Export to PDF (.pdf)')),
+            ],
+          ),
+        ),
       ],
       child: Container(
         height: height,
@@ -373,7 +397,6 @@ class UsersExportButton extends StatelessWidget {
     );
   }
 }
-
 
 /// Dismissible chips for active user filters (excludes search).
 class UsersActiveFilterChips extends StatelessWidget {
