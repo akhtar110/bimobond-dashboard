@@ -2,10 +2,12 @@ import '../../../../core/utils/media_url_resolver.dart';
 import '../../../categories/domain/entities/category_entity.dart';
 import 'managed_post_location_entity.dart';
 import 'managed_post_sound_entity.dart';
+import 'post_applied_catalog_ref.dart';
 import 'post_engagement_user_item.dart';
 import 'post_media_entity.dart';
 
 export '../../../categories/domain/entities/category_entity.dart';
+export 'post_applied_catalog_ref.dart';
 export 'managed_post_location_entity.dart';
 export 'managed_post_sound_entity.dart';
 export 'post_engagement_user_item.dart';
@@ -42,6 +44,7 @@ class ManagedPostEntity {
     required this.commentCount,
     required this.saveCount,
     this.repostCount = 0,
+    this.reportCount = 0,
     this.recentReposts = const [],
     this.recentLikes = const [],
     this.recentViews = const [],
@@ -64,6 +67,10 @@ class ManagedPostEntity {
     this.soundId,
     this.sound,
     this.originalPostId,
+    this.filterId,
+    this.effectId,
+    this.appliedFilter,
+    this.appliedEffect,
   });
 
   final String id;
@@ -223,6 +230,7 @@ class ManagedPostEntity {
   final int commentCount;
   final int saveCount;
   final int repostCount;
+  final int reportCount;
   final List<Map<String, dynamic>> recentReposts;
   final List<PostEngagementUserItem> recentLikes;
   final List<PostEngagementUserItem> recentViews;
@@ -245,6 +253,10 @@ class ManagedPostEntity {
   final String? soundId;
   final ManagedPostSoundEntity? sound;
   final String? originalPostId;
+  final String? filterId;
+  final String? effectId;
+  final PostAppliedCatalogRef? appliedFilter;
+  final PostAppliedCatalogRef? appliedEffect;
 
   ManagedPostEntity copyWith({
     String? id,
@@ -276,6 +288,7 @@ class ManagedPostEntity {
     int? commentCount,
     int? saveCount,
     int? repostCount,
+    int? reportCount,
     List<Map<String, dynamic>>? recentReposts,
     List<PostEngagementUserItem>? recentLikes,
     List<PostEngagementUserItem>? recentViews,
@@ -298,6 +311,10 @@ class ManagedPostEntity {
     String? soundId,
     ManagedPostSoundEntity? sound,
     String? originalPostId,
+    String? filterId,
+    String? effectId,
+    PostAppliedCatalogRef? appliedFilter,
+    PostAppliedCatalogRef? appliedEffect,
   }) {
     return ManagedPostEntity(
       id: id ?? this.id,
@@ -329,6 +346,7 @@ class ManagedPostEntity {
       commentCount: commentCount ?? this.commentCount,
       saveCount: saveCount ?? this.saveCount,
       repostCount: repostCount ?? this.repostCount,
+      reportCount: reportCount ?? this.reportCount,
       recentReposts: recentReposts ?? this.recentReposts,
       recentLikes: recentLikes ?? this.recentLikes,
       recentViews: recentViews ?? this.recentViews,
@@ -351,6 +369,10 @@ class ManagedPostEntity {
       soundId: soundId ?? this.soundId,
       sound: sound ?? this.sound,
       originalPostId: originalPostId ?? this.originalPostId,
+      filterId: filterId ?? this.filterId,
+      effectId: effectId ?? this.effectId,
+      appliedFilter: appliedFilter ?? this.appliedFilter,
+      appliedEffect: appliedEffect ?? this.appliedEffect,
     );
   }
 }

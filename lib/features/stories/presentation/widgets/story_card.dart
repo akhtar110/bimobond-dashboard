@@ -2,7 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../posts/presentation/widgets/post_card.dart';
+import '../../../posts/presentation/utils/post_card_layout.dart';
+import '../../../posts/presentation/utils/posts_page_layout.dart';
+import '../../../posts/presentation/utils/posts_responsive.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/story_entity.dart';
 import '../utils/stories_admin_l10n.dart';
@@ -60,6 +62,11 @@ class _StoryCardState extends State<StoryCard> {
         final radius = compact ? 10.0 : 12.0;
         final nameSize = compact ? 10.5 : 11.5;
         final metaSize = compact ? 9.0 : 10.0;
+        final metrics = PostCardMetrics(
+          cardWidth: constraints.maxWidth,
+          deviceType: getPostsDeviceType(MediaQuery.sizeOf(context).width),
+          columns: postsGridColumnCount(constraints.maxWidth),
+        );
 
         return MouseRegion(
           onEnter: (_) => _setHovered(true),
@@ -115,9 +122,7 @@ class _StoryCardState extends State<StoryCard> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         AspectRatio(
-                          aspectRatio: compact
-                              ? kPostCardThumbnailAspectCompact
-                              : kPostCardThumbnailAspect,
+                          aspectRatio: metrics.thumbnailAspect,
                           child: Stack(
                             fit: StackFit.expand,
                             children: [

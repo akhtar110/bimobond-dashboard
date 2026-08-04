@@ -315,23 +315,20 @@ class PostsFilterPopup extends StatelessWidget {
                           child: PostsFilterChipGrid(
                             children: [
                               PostsFilterChoiceChip(
-                                label: l10n.t('postFilterAuctionAll'),
+                                label: l10n.tOr('postFilterAuctionAll', 'Posts'),
                                 selected: draft.postType == PostTypeFilter.all,
                                 onTap: () =>
                                     cubit.setPostType(PostTypeFilter.all),
                               ),
                               PostsFilterChoiceChip(
-                                label: l10n.t('postFilterAuctionOnly'),
+                                label: l10n.tOr('postFilterAuctionOnly', 'Auctions Only'),
                                 selected:
                                     draft.postType == PostTypeFilter.auction,
                                 onTap: () =>
                                     cubit.setPostType(PostTypeFilter.auction),
                               ),
                               PostsFilterChoiceChip(
-                                label: context.trOr(
-                                  'postFilterAdsOnly',
-                                  'Ads only',
-                                ),
+                                label: l10n.tOr('postFilterAdsOnly', 'Ads Only'),
                                 selected: draft.postType == PostTypeFilter.ads,
                                 onTap: () =>
                                     cubit.setPostType(PostTypeFilter.ads),
@@ -650,9 +647,9 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
 
   if (draft.postType != PostTypeFilter.all) {
     final label = switch (draft.postType) {
-      PostTypeFilter.auction => l10n.t('postFilterAuctionOnly'),
-      PostTypeFilter.ads => l10n.tOr('postFilterAdsOnly', 'Ads only'),
-      PostTypeFilter.all => l10n.t('postFilterAuctionAll'),
+      PostTypeFilter.auction => l10n.tOr('postFilterAuctionOnly', 'Auctions Only'),
+      PostTypeFilter.ads => l10n.tOr('postFilterAdsOnly', 'Ads Only'),
+      PostTypeFilter.all => l10n.tOr('postFilterAuctionAll', 'Posts'),
     };
     items.add(
       GiftsActiveFilterItem(

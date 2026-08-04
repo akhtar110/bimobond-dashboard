@@ -20,6 +20,15 @@ class GoToPostsPageEvent extends PostsEvent {
   List<Object?> get props => [page];
 }
 
+class ChangePostsPageSizeEvent extends PostsEvent {
+  const ChangePostsPageSizeEvent(this.pageSize);
+
+  final int pageSize;
+
+  @override
+  List<Object?> get props => [pageSize];
+}
+
 class FilterPostsByCategoryEvent extends PostsEvent {
   FilterPostsByCategoryEvent({
     this.categoryId,

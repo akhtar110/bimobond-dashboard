@@ -437,6 +437,9 @@ ManagedPostEntity enrichManagedPostContent(
   );
   final location = primary.location ?? fallback.location;
   final locationId = _pickNonEmptyStr(primary.locationId, fallback.locationId);
+  final reportCount = primary.reportCount > 0
+      ? primary.reportCount
+      : (fallback.reportCount > 0 ? fallback.reportCount : primary.reportCount);
 
   if (description == primary.description &&
       category == primary.category &&
@@ -450,7 +453,8 @@ ManagedPostEntity enrichManagedPostContent(
       soundId == primary.soundId &&
       sound == primary.sound &&
       location == primary.location &&
-      locationId == primary.locationId) {
+      locationId == primary.locationId &&
+      reportCount == primary.reportCount) {
     return hydrateManagedPostMedia(primary);
   }
 
@@ -469,6 +473,7 @@ ManagedPostEntity enrichManagedPostContent(
       sound: sound,
       location: location,
       locationId: locationId,
+      reportCount: reportCount,
     ),
   );
 }

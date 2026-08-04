@@ -14,40 +14,40 @@ import '../../domain/entities/auction_entity.dart';
 ) {
   return switch (status.toUpperCase()) {
     'ACTIVE' => (
-        fg: scheme.primary,
-        bg: scheme.primaryContainer,
-        label: l10n.t('active'),
-      ),
+      fg: scheme.primary,
+      bg: scheme.primaryContainer,
+      label: l10n.t('active'),
+    ),
     'COMPLETED' => (
-        fg: scheme.secondary,
-        bg: scheme.secondaryContainer,
-        label: l10n.t('completed'),
-      ),
+      fg: scheme.secondary,
+      bg: scheme.secondaryContainer,
+      label: l10n.t('completed'),
+    ),
     'CANCELLED' => (
-        fg: scheme.error,
-        bg: scheme.errorContainer,
-        label: l10n.t('cancelled'),
-      ),
+      fg: scheme.error,
+      bg: scheme.errorContainer,
+      label: l10n.t('cancelled'),
+    ),
     'BANNED' => (
-        fg: scheme.onErrorContainer,
-        bg: scheme.errorContainer,
-        label: l10n.tOr('banned', 'Banned'),
-      ),
+      fg: scheme.onErrorContainer,
+      bg: scheme.errorContainer,
+      label: l10n.tOr('banned', 'Banned'),
+    ),
     'SETTLED' => (
-        fg: scheme.tertiary,
-        bg: scheme.tertiaryContainer,
-        label: l10n.tOr('settled', 'Settled'),
-      ),
+      fg: scheme.tertiary,
+      bg: scheme.tertiaryContainer,
+      label: l10n.tOr('settled', 'Settled'),
+    ),
     'DISPUTED' => (
-        fg: scheme.error,
-        bg: scheme.errorContainer.withValues(alpha: 0.65),
-        label: l10n.tOr('disputed', 'Disputed'),
-      ),
+      fg: scheme.error,
+      bg: scheme.errorContainer.withValues(alpha: 0.65),
+      label: l10n.tOr('disputed', 'Disputed'),
+    ),
     _ => (
-        fg: scheme.onSurfaceVariant,
-        bg: scheme.surfaceContainerHigh,
-        label: status,
-      ),
+      fg: scheme.onSurfaceVariant,
+      bg: scheme.surfaceContainerHigh,
+      label: status,
+    ),
   };
 }
 
@@ -132,13 +132,15 @@ class AuctionCard extends StatelessWidget {
                         Expanded(
                           child: _HostRow(auction: auction, compact: true),
                         ),
-                        if (auction.hasWinner && auction.winnerAvatar != null) ...[
+                        if (auction.hasWinner &&
+                            auction.winnerAvatar != null) ...[
                           const SizedBox(width: 4),
                           CircleAvatar(
                             radius: compact ? 9 : 11,
                             backgroundColor: scheme.tertiaryContainer,
-                            backgroundImage:
-                                NetworkImage(auction.winnerAvatar!),
+                            backgroundImage: NetworkImage(
+                              auction.winnerAvatar!,
+                            ),
                           ),
                         ],
                         const SizedBox(width: 4),
@@ -159,9 +161,7 @@ class AuctionCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            compact ? 8 : 10,
-                          ),
+                          borderRadius: BorderRadius.circular(compact ? 8 : 10),
                         ),
                       ),
                       child: Text(l10n.t('viewDetails')),
@@ -297,12 +297,12 @@ class _ItemImage extends StatelessWidget {
   }
 
   Widget _placeholder(ColorScheme scheme, bool compact) => Center(
-        child: Icon(
-          Icons.gavel_rounded,
-          size: compact ? 24 : 28,
-          color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
-        ),
-      );
+    child: Icon(
+      Icons.gavel_rounded,
+      size: compact ? 24 : 28,
+      color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
+    ),
+  );
 }
 
 // ─── Host row ─────────────────────────────────────────────────────────────────
@@ -366,66 +366,72 @@ class _MetaChips extends StatelessWidget {
     final chips = <Widget>[];
 
     if (auction.effectiveEscrowEnabled) {
-      chips.add(_chip(
-        scheme,
-        icon: Icons.account_balance_wallet_outlined,
-        label: l10n.tOr('escrow', 'Escrow'),
-        fg: scheme.tertiary,
-        bg: scheme.tertiaryContainer,
-      ));
+      chips.add(
+        _chip(
+          scheme,
+          icon: Icons.account_balance_wallet_outlined,
+          label: l10n.tOr('escrow', 'Escrow'),
+          fg: scheme.tertiary,
+          bg: scheme.tertiaryContainer,
+        ),
+      );
     }
     if (auction.hasFulfillmentLifecycle) {
-      chips.add(_chip(
-        scheme,
-        icon: Icons.local_shipping_outlined,
-        label: auction.fulfillmentStatus!,
-        fg: scheme.secondary,
-        bg: scheme.secondaryContainer,
-      ));
+      chips.add(
+        _chip(
+          scheme,
+          icon: Icons.local_shipping_outlined,
+          label: auction.fulfillmentStatus!,
+          fg: scheme.secondary,
+          bg: scheme.secondaryContainer,
+        ),
+      );
     }
     if (auction.hasLive) {
-      chips.add(_chip(
-        scheme,
-        icon: Icons.live_tv_outlined,
-        label: l10n.t('live'),
-        fg: scheme.error,
-        bg: scheme.errorContainer,
-      ));
-    }
-    if (auction.hasPost) {
-      chips.add(_chip(
-        scheme,
-        icon: Icons.video_file_outlined,
-        label: l10n.tOr('post', 'Post'),
-        fg: scheme.primary,
-        bg: scheme.primaryContainer,
-      ));
+      chips.add(
+        _chip(
+          scheme,
+          icon: Icons.live_tv_outlined,
+          label: l10n.t('live'),
+          fg: scheme.error,
+          bg: scheme.errorContainer,
+        ),
+      );
     }
     if (auction.hasWinner) {
-      chips.add(_chip(
-        scheme,
-        icon: Icons.emoji_events_outlined,
-        label: l10n.tOr('winner', 'Winner'),
-        fg: scheme.tertiary,
-        bg: scheme.tertiaryContainer,
-      ));
+      chips.add(
+        _chip(
+          scheme,
+          icon: Icons.emoji_events_outlined,
+          label: l10n.tOr('winner', 'Winner'),
+          fg: scheme.tertiary,
+          bg: scheme.tertiaryContainer,
+        ),
+      );
     }
     final gifts = auction.giftTransactionCount;
     if (gifts > 0) {
-      chips.add(_chip(
-        scheme,
-        icon: Icons.card_giftcard_outlined,
-        label: '$gifts',
-        fg: scheme.onSurfaceVariant,
-        bg: scheme.surfaceContainerHighest,
-      ));
+      chips.add(
+        _chip(
+          scheme,
+          icon: Icons.card_giftcard_outlined,
+          label: '$gifts',
+          fg: scheme.onSurfaceVariant,
+          bg: scheme.surfaceContainerHighest,
+        ),
+      );
     }
 
-    if (chips.isEmpty) return const SizedBox.shrink();
+    final height = compact ? 18.0 : 20.0;
+
+    if (chips.isEmpty) {
+      return SizedBox(height: height);
+    }
 
     return SizedBox(
-      height: compact ? 18 : 20,
+      height: height,
       child: ListView.separated(
+        padding: EdgeInsets.zero,
         scrollDirection: Axis.horizontal,
         itemCount: chips.length,
         separatorBuilder: (_, _) => const SizedBox(width: 4),
@@ -442,10 +448,7 @@ class _MetaChips extends StatelessWidget {
     required Color bg,
   }) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 5 : 6,
-        vertical: 2,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 6, vertical: 2),
       decoration: BoxDecoration(
         color: bg.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
@@ -564,15 +567,19 @@ class _TimestampRow extends StatelessWidget {
           color: scheme.onSurfaceVariant,
         ),
         SizedBox(width: compact ? 3 : 4),
-        Text(
-          ended != null
-              ? '${fmt.format(auction.startedAt.toLocal())} → ${fmt.format(ended.toLocal())}'
-              : fmt.format(auction.startedAt.toLocal()),
-          style: TextStyle(
-            fontSize: fontSize,
-            color: scheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
-            height: 1.1,
+        Flexible(
+          child: Text(
+            ended != null
+                ? '${fmt.format(auction.startedAt.toLocal())} → ${fmt.format(ended.toLocal())}'
+                : fmt.format(auction.startedAt.toLocal()),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: fontSize,
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+              height: 1.1,
+            ),
           ),
         ),
       ],
@@ -720,8 +727,12 @@ class _AuctionCardSkeletonState extends State<AuctionCardSkeleton>
     );
   }
 
-  Widget _shimmerBox(Color color, double width, double height,
-      {double radius = 6}) {
+  Widget _shimmerBox(
+    Color color,
+    double width,
+    double height, {
+    double radius = 6,
+  }) {
     return Container(
       width: width,
       height: height,

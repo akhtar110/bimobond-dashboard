@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/report_entity.dart';
+import '../../domain/entities/reports_query_params.dart';
 import '../bloc/reports_bloc.dart';
 import '../utils/report_target_navigation.dart';
 import '../widgets/report_action_bar.dart';
@@ -927,8 +928,63 @@ class _ModerationToolbar extends StatelessWidget {
   }
 }
 
-class _FilterBar extends StatelessWidget {
+class _FilterBar extends StatefulWidget {
   const _FilterBar();
+
+  @override
+  State<_FilterBar> createState() => _FilterBarState();
+}
+
+class _FilterBarState extends State<_FilterBar> {
+  bool _showAdvanced = false;
+  final _searchController = TextEditingController();
+  final _reporterIdController = TextEditingController();
+  final _reportedUserIdController = TextEditingController();
+  final _postIdController = TextEditingController();
+  final _commentIdController = TextEditingController();
+  final _storyIdController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _reporterIdController.dispose();
+    _reportedUserIdController.dispose();
+    _postIdController.dispose();
+    _commentIdController.dispose();
+    _storyIdController.dispose();
+    super.dispose();
+  }
+
+  void _applyAdvanced(BuildContext context, ReportsQueryParams base) {
+    context.read<ReportsBloc>().add(
+          FilterReportsEvent(
+            status: base.status,
+            type: base.type,
+            reporterId: _reporterIdController.text.trim().isEmpty
+                ? null
+                : _reporterIdController.text.trim(),
+            reportedUserId: _reportedUserIdController.text.trim().isEmpty
+                ? null
+                : _reportedUserIdController.text.trim(),
+            postId: _postIdController.text.trim().isEmpty
+                ? null
+                : _postIdController.text.trim(),
+            commentId: _commentIdController.text.trim().isEmpty
+                ? null
+                : _commentIdController.text.trim(),
+            storyId: _storyIdController.text.trim().isEmpty
+                ? null
+                : _storyIdController.text.trim(),
+            search: _searchController.text.trim().isEmpty
+                ? null
+                : _searchController.text.trim(),
+            sortBy: base.sortBy,
+            sortOrder: base.sortOrder,
+            startDate: base.startDate,
+            endDate: base.endDate,
+          ),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -941,15 +997,15 @@ class _FilterBar extends StatelessWidget {
     return BlocBuilder<ReportsBloc, ReportsState>(
       buildWhen: (prev, next) {
         if (prev is ReportsLoaded && next is ReportsLoaded) {
-          return prev.statusFilter != next.statusFilter ||
-              prev.typeFilter != next.typeFilter;
+          return prev.filters != next.filters;
         }
         return prev.runtimeType != next.runtimeType;
       },
       builder: (context, state) {
-        final activeStatus =
-            state is ReportsLoaded ? state.statusFilter : null;
-        final activeType = state is ReportsLoaded ? state.typeFilter : null;
+        final filters =
+            state is ReportsLoaded ? state.filters : const ReportsQueryParams();
+        final activeStatus = filters.status;
+        final activeType = filters.type;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -973,6 +1029,7 @@ class _FilterBar extends StatelessWidget {
                           FilterReportsEvent(
                             status: f.value,
                             type: activeType,
+                            resetStatus: f.value == null,
                           ),
                         ),
                   );
@@ -997,12 +1054,197 @@ class _FilterBar extends StatelessWidget {
                           FilterReportsEvent(
                             status: activeStatus,
                             type: f.value,
+                            resetType: f.value == null,
                           ),
                         ),
                   );
                 },
               ),
             ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+              icon: Icon(
+                _showAdvanced ? Icons.expand_less : Icons.expand_more,
+                size: 18,
+              ),
+              label: Text(l10n.tOr('advancedFilters', 'Advanced filters')),
+            ),
+            if (_showAdvanced) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        labelText: l10n.t('search'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: TextField(
+                      controller: _reporterIdController,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('reporterId', 'Reporter ID'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: TextField(
+                      controller: _reportedUserIdController,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('reportedUserId', 'Reported User ID'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: TextField(
+                      controller: _postIdController,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('postId', 'Post ID'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: TextField(
+                      controller: _commentIdController,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('commentId', 'Comment ID'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: TextField(
+                      controller: _storyIdController,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('storyId', 'Story ID'),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: filters.sortBy,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('sortBy', 'Sort By'),
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text(l10n.tOr('defaultSort', 'Default')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'createdAt',
+                          child: Text(l10n.tOr('createdAt', 'Created At')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'updatedAt',
+                          child: Text(l10n.tOr('updatedAt', 'Updated At')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'status',
+                          child: Text(l10n.t('status')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'reason',
+                          child: Text(l10n.tOr('reason', 'Reason')),
+                        ),
+                      ],
+                      onChanged: (value) => context.read<ReportsBloc>().add(
+                            FilterReportsEvent(
+                              status: activeStatus,
+                              type: activeType,
+                              sortBy: value,
+                            ),
+                          ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: filters.sortOrder,
+                      decoration: InputDecoration(
+                        labelText: l10n.tOr('sortOrder', 'Sort Order'),
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: null,
+                          child: Text(l10n.tOr('defaultSort', 'Default')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'NEWEST',
+                          child: Text(l10n.tOr('newest', 'Newest')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'OLDEST',
+                          child: Text(l10n.tOr('oldest', 'Oldest')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ASC',
+                          child: Text(l10n.tOr('ascending', 'Ascending')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'DESC',
+                          child: Text(l10n.tOr('descending', 'Descending')),
+                        ),
+                      ],
+                      onChanged: (value) => context.read<ReportsBloc>().add(
+                            FilterReportsEvent(
+                              status: activeStatus,
+                              type: activeType,
+                              sortOrder: value,
+                            ),
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  FilledButton(
+                    onPressed: () => _applyAdvanced(context, filters),
+                    child: Text(l10n.t('apply')),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      _reporterIdController.clear();
+                      _reportedUserIdController.clear();
+                      _postIdController.clear();
+                      _commentIdController.clear();
+                      _storyIdController.clear();
+                      context.read<ReportsBloc>().add(
+                            FilterReportsEvent(
+                              status: activeStatus,
+                              type: activeType,
+                              clearAdvanced: true,
+                            ),
+                          );
+                    },
+                    child: Text(l10n.tOr('clearFilters', 'Clear filters')),
+                  ),
+                ],
+              ),
+            ],
           ],
         );
       },

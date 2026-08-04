@@ -177,24 +177,24 @@ class _PostAuthorCardState extends State<PostAuthorCard> {
                       label: l10n.t('viewProfile'),
                       onTap: () => _navigate(context),
                     ),
-                    _AuthorActionButton(
-                      icon: Icons.timeline_outlined,
-                      label: l10n.t('userActivityNav'),
-                      onTap: () => _navigate(context),
-                    ),
-                    _AuthorActionButton(
-                      icon: Icons.history_rounded,
-                      label: l10n.t('moderationHistory'),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.t('banUserComingSoon')),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                      outlined: true,
-                    ),
+                    // _AuthorActionButton(
+                    //   icon: Icons.timeline_outlined,
+                    //   label: l10n.t('userActivityNav'),
+                    //   onTap: () => _navigate(context),
+                    // ),
+                    // _AuthorActionButton(
+                    //   icon: Icons.history_rounded,
+                    //   label: l10n.t('moderationHistory'),
+                    //   onTap: () {
+                    //     ScaffoldMessenger.of(context).showSnackBar(
+                    //       SnackBar(
+                    //         content: Text(l10n.t('banUserComingSoon')),
+                    //         behavior: SnackBarBehavior.floating,
+                    //       ),
+                    //     );
+                    //   },
+                    //   outlined: true,
+                    // ),
                   ],
                 ),
               ],

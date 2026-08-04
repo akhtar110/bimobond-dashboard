@@ -57,6 +57,7 @@ dependencies:
   geolocator: ^14.0.3
   lottie: ^3.3.3
   archive: ^4.0.0
+  pdf: ^3.11.3
   just_audio: ^0.10.6
   audio_session: ^0.2.4
   flutter_colorpicker: ^1.1.0

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -178,27 +179,54 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: icon != null ? Icon(icon, size: 20) : null,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      prefixIcon: icon != null
+          ? Icon(icon, size: 20, color: scheme.onSurfaceVariant)
+          : null,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.primary, width: 1.5),
       ),
       filled: true,
       fillColor: scheme.surfaceContainerLowest,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 
-  Widget _sectionLabel(BuildContext context, String text) {
+  Widget _sectionLabel(
+    BuildContext context, {
+    required String text,
+    required IconData icon,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10, top: 4),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.primary,
+      padding: const EdgeInsets.only(bottom: 12, top: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: scheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            text.toUpperCase(),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: scheme.primary,
+                ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Divider(
+              color: scheme.outlineVariant.withValues(alpha: 0.4),
+              height: 1,
             ),
+          ),
+        ],
       ),
     );
   }
@@ -208,232 +236,356 @@ class _AuctionEditDialogState extends State<AuctionEditDialog> {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final auction = widget.auction;
-    final screenW = MediaQuery.sizeOf(context).width;
-    final dialogW = screenW < 560 ? screenW * 0.94 : 560.0;
+    final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final screenH = media.size.height;
+    final dialogW = math.min(screenW * 0.94, 540.0);
+    final maxContentH = math.min(screenH * 0.75, 620.0);
     final canSave = !_buildDirtyBody().isEmpty;
     final dateFmt = DateFormat.yMMMd().add_Hm();
 
-    return AlertDialog(
+    return Dialog(
       insetPadding: EdgeInsets.symmetric(
         horizontal: screenW < 560 ? 12 : 24,
-        vertical: 20,
+        vertical: 24,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      title: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Icon(
-                Icons.gavel_rounded,
-                color: scheme.onPrimaryContainer,
-                size: 22,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.tOr('edit_auction', 'Edit auction'),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.tOr(
-                    'editAuctionHint',
-                    'Update listing details. Only changed fields are sent.',
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: scheme.surface,
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
         width: dialogW,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _sectionLabel(
-                  context,
-                  l10n.tOr('basicInformation', 'Basic information'),
-                ),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: _fieldDecoration(
-                    context,
-                    label: l10n.tOr('item_name', 'Item name'),
-                    icon: Icons.inventory_2_outlined,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header Bar
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                border: Border(
+                  bottom: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
                   ),
-                  textInputAction: TextInputAction.next,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return l10n.tOr(
-                        'auctionItemNameRequired',
-                        'Item name is required',
-                      );
-                    }
-                    return null;
-                  },
-                  onChanged: (_) => setState(() {}),
                 ),
-                const SizedBox(height: 16),
-                _sectionLabel(
-                  context,
-                  l10n.tOr('pricing', 'Pricing'),
-                ),
-                _ReadOnlyPricingCard(auction: auction),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _targetPriceController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: _fieldDecoration(
-                    context,
-                    label: l10n.tOr(
-                      'auctionTargetMoney',
-                      'Target price (money)',
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    icon: Icons.payments_outlined,
-                  ),
-                  validator: (value) {
-                    final text = value?.trim() ?? '';
-                    if (text.isEmpty) return null;
-                    final parsed = double.tryParse(text);
-                    if (parsed == null || parsed <= 0) {
-                      return l10n.tOr(
-                        'auctionTargetMoneyInvalid',
-                        'Enter a valid target price',
-                      );
-                    }
-                    return null;
-                  },
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 52,
-                  child: _PreviewStrip(
-                    loading: _previewLoading,
-                    preview: _preview,
-                    error: _previewError,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _sectionLabel(
-                  context,
-                  l10n.tOr('status', 'Status'),
-                ),
-                DropdownButtonFormField<String>(
-                  // ignore: deprecated_member_use
-                  value: _status,
-                  decoration: _fieldDecoration(
-                    context,
-                    label: l10n.tOr('auctionStatus', 'Auction status'),
-                    icon: Icons.flag_outlined,
-                  ),
-                  items: const [
-                    'ACTIVE',
-                    'COMPLETED',
-                    'SETTLED',
-                    'CANCELLED',
-                    'BANNED',
-                    'DISPUTED',
-                  ]
-                      .map(
-                        (s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(s),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _status = value);
-                  },
-                ),
-                if (widget.auction.isCancelled) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.tOr(
-                      'auctionCancelledReactivateHint',
-                      'Editing a cancelled auction reactivates it to ACTIVE (or set status explicitly).',
+                    child: Icon(
+                      Icons.edit_note_rounded,
+                      color: scheme.onPrimaryContainer,
+                      size: 24,
                     ),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.tOr('edit_auction', 'Edit auction'),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.2,
+                                  ),
                         ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.tOr(
+                            'editAuctionHint',
+                            'Update listing details. Only changed fields are sent.',
+                          ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    height: 1.25,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: scheme.onSurfaceVariant,
+                      size: 20,
+                    ),
+                    tooltip: l10n.tOr('close', 'Close'),
                   ),
                 ],
-                const SizedBox(height: 16),
-                _sectionLabel(
-                  context,
-                  l10n.tOr('auctionTiming', 'Auction timing'),
-                ),
-                _DateTimeField(
-                  label: l10n.tOr('started_at', 'Started at'),
-                  value: _startedAt,
-                  formatter: dateFmt,
-                  onTap: () => _pickDateTime(
-                    current: _startedAt,
-                    onPicked: (v) => setState(() => _startedAt = v),
-                    allowClear: false,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _DateTimeField(
-                  label: l10n.tOr('ended_at', 'Ended at'),
-                  value: _endedAt,
-                  formatter: dateFmt,
-                  onTap: () => _pickDateTime(
-                    current: _endedAt ?? _startedAt ?? DateTime.now(),
-                    onPicked: (v) => setState(() => _endedAt = v),
-                    allowClear: true,
-                  ),
-                  onClear: _endedAt == null
-                      ? null
-                      : () => setState(() => _endedAt = null),
-                ),
-              ],
+              ),
             ),
-          ),
+            // Form Content
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxContentH),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    shrinkWrap: true,
+                    children: [
+                      _sectionLabel(
+                        context,
+                        text: l10n.tOr('basicInformation', 'Basic information'),
+                        icon: Icons.inventory_2_outlined,
+                      ),
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: _fieldDecoration(
+                          context,
+                          label: l10n.tOr('item_name', 'Item name'),
+                          icon: Icons.label_outlined,
+                        ),
+                        textInputAction: TextInputAction.next,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return l10n.tOr(
+                              'auctionItemNameRequired',
+                              'Item name is required',
+                            );
+                          }
+                          return null;
+                        },
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 18),
+                      _sectionLabel(
+                        context,
+                        text: l10n.tOr('pricing', 'Pricing'),
+                        icon: Icons.payments_outlined,
+                      ),
+                      _ReadOnlyPricingCard(auction: auction),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _targetPriceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*'),
+                          ),
+                        ],
+                        decoration: _fieldDecoration(
+                          context,
+                          label: l10n.tOr(
+                            'auctionTargetMoney',
+                            'Target price (money)',
+                          ),
+                          icon: Icons.attach_money_rounded,
+                        ),
+                        validator: (value) {
+                          final text = value?.trim() ?? '';
+                          if (text.isEmpty) return null;
+                          final parsed = double.tryParse(text);
+                          if (parsed == null || parsed <= 0) {
+                            return l10n.tOr(
+                              'auctionTargetMoneyInvalid',
+                              'Enter a valid target price',
+                            );
+                          }
+                          return null;
+                        },
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 10),
+                      _PreviewStrip(
+                        loading: _previewLoading,
+                        preview: _preview,
+                        error: _previewError,
+                      ),
+                      const SizedBox(height: 18),
+                      _sectionLabel(
+                        context,
+                        text: l10n.tOr('status', 'Status'),
+                        icon: Icons.flag_outlined,
+                      ),
+                      DropdownButtonFormField<String>(
+                        // ignore: deprecated_member_use
+                        value: _status,
+                      decoration: _fieldDecoration(
+                        context,
+                        label: l10n.tOr('auctionStatus', 'Auction status'),
+                        icon: Icons.tune_rounded,
+                      ),
+                      items: _statusOptions(context),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _status = value);
+                      },
+                    ),
+                    if (widget.auction.isCancelled) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: scheme.tertiaryContainer.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: scheme.tertiary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 16,
+                              color: scheme.tertiary,
+                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  l10n.tOr(
+                                    'auctionCancelledReactivateHint',
+                                    'Editing a cancelled auction reactivates it to ACTIVE (or set status explicitly).',
+                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                        fontSize: 11.5,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      _sectionLabel(
+                        context,
+                        text: l10n.tOr('auctionTiming', 'Auction timing'),
+                        icon: Icons.schedule_rounded,
+                      ),
+                      _DateTimeField(
+                        label: l10n.tOr('started_at', 'Started at'),
+                        value: _startedAt,
+                        formatter: dateFmt,
+                        onTap: () => _pickDateTime(
+                          current: _startedAt,
+                          onPicked: (v) => setState(() => _startedAt = v),
+                          allowClear: false,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _DateTimeField(
+                        label: l10n.tOr('ended_at', 'Ended at'),
+                        value: _endedAt,
+                        formatter: dateFmt,
+                        onTap: () => _pickDateTime(
+                          current: _endedAt ?? _startedAt ?? DateTime.now(),
+                          onPicked: (v) => setState(() => _endedAt = v),
+                          allowClear: true,
+                        ),
+                        onClear: _endedAt == null
+                            ? null
+                            : () => setState(() => _endedAt = null),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Actions Footer
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                border: Border(
+                  top: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(90, 42),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(l10n.t('cancel')),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: canSave ? _save : null,
+                    icon: const Icon(Icons.check_circle_outline_rounded,
+                        size: 18),
+                    label: Text(l10n.tOr('update_auction', 'Update auction')),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(140, 42),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.t('cancel')),
-        ),
-        FilledButton(
-          onPressed: canSave ? _save : null,
-          child: Text(l10n.tOr('update_auction', 'Update auction')),
-        ),
-      ],
     );
+  }
+
+  List<DropdownMenuItem<String>> _statusOptions(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final statuses = const [
+      'ACTIVE',
+      'COMPLETED',
+      'SETTLED',
+      'CANCELLED',
+      'BANNED',
+      'DISPUTED',
+    ];
+
+    Color colorFor(String s) => switch (s) {
+          'ACTIVE' => scheme.primary,
+          'COMPLETED' => scheme.secondary,
+          'SETTLED' => scheme.tertiary,
+          'CANCELLED' => scheme.error,
+          'BANNED' => scheme.onErrorContainer,
+          'DISPUTED' => Colors.amber.shade700,
+          _ => scheme.onSurfaceVariant,
+        };
+
+    return statuses.map((s) {
+      final c = colorFor(s);
+      return DropdownMenuItem(
+        value: s,
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              s,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 }
 
@@ -460,23 +612,33 @@ class _DateTimeField extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: const Icon(Icons.schedule_outlined, size: 20),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          prefixIcon: Icon(
+            Icons.calendar_month_rounded,
+            size: 20,
+            color: scheme.onSurfaceVariant,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: scheme.outlineVariant),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.7),
+            ),
           ),
           filled: true,
           fillColor: scheme.surfaceContainerLowest,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           suffixIcon: onClear != null
               ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
+                  icon: Icon(
+                    Icons.cancel_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
                   onPressed: onClear,
                 )
               : null,
@@ -505,60 +667,62 @@ class _ReadOnlyPricingCard extends StatelessWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
-    return DecoratedBox(
+    return Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.65)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              l10n.tOr('auctionCurrentPricing', 'Current pricing'),
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.tOr('auctionCurrentPricing', 'Current pricing'),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _PricingFact(
+                  icon: Icons.monetization_on_outlined,
+                  label: l10n.t('auctionGoal'),
+                  value: CoinFormat.coins(auction.targetPriceCoins),
+                ),
+              ),
+              if (auction.hasMoneyTarget) ...[
+                const SizedBox(width: 12),
                 Expanded(
                   child: _PricingFact(
-                    icon: Icons.monetization_on_outlined,
-                    label: l10n.t('auctionGoal'),
-                    value: CoinFormat.coins(auction.targetPriceCoins),
+                    icon: Icons.attach_money_rounded,
+                    label: l10n.tOr('auctionTargetValue', 'Target value'),
+                    value: MoneyFormat.format(
+                      auction.targetPrice!,
+                      auction.currencyCode!,
+                    ),
                   ),
                 ),
-                if (auction.hasMoneyTarget) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _PricingFact(
-                      icon: Icons.attach_money_rounded,
-                      label: l10n.tOr('auctionTargetValue', 'Target value'),
-                      value: MoneyFormat.format(
-                        auction.targetPrice!,
-                        auction.currencyCode!,
-                      ),
-                    ),
-                  ),
-                ],
               ],
-            ),
-            if (auction.currencyCode != null &&
-                auction.currencyCode!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                '${l10n.tOr('currencyCode', 'Currency')}: ${auction.currencyCode}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-              ),
             ],
+          ),
+          if (auction.currencyCode != null &&
+              auction.currencyCode!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${l10n.tOr('currencyCode', 'Currency')}: ${auction.currencyCode}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -581,7 +745,14 @@ class _PricingFact extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(icon, size: 18, color: scheme.primary),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: scheme.primary),
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -591,6 +762,7 @@ class _PricingFact extends StatelessWidget {
                 label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
+                      fontSize: 10.5,
                     ),
               ),
               Text(
@@ -599,6 +771,7 @@ class _PricingFact extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
+                      fontSize: 13,
                     ),
               ),
             ],
@@ -626,30 +799,38 @@ class _PreviewStrip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     if (loading) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: scheme.primary,
-          ),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              l10n.tOr('calculatingPreview', 'Calculating pricing...'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
         ),
       );
     }
 
     if (error != null) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          error!,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.error,
-              ),
-        ),
+      return Text(
+        error!,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.error,
+            ),
       );
     }
 
@@ -672,23 +853,35 @@ class _PreviewStrip extends StatelessWidget {
 
     if (parts.isEmpty) return const SizedBox.shrink();
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.primaryContainer.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(10),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: scheme.primary.withValues(alpha: 0.2),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            parts.join(' · '),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w600,
-                ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.auto_awesome_rounded,
+            size: 14,
+            color: scheme.primary,
           ),
-        ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              parts.join('  ·  '),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11.5,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }

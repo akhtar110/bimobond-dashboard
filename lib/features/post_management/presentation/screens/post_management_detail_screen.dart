@@ -13,10 +13,14 @@ import '../../domain/entities/post_management_route_args.dart';
 import '../bloc/post_management_bloc.dart';
 import '../utils/moderation_confirm_dialog.dart';
 import '../utils/post_detail_labels.dart';
-import '../utils/post_status_confirm_dialog.dart';
+import '../utils/post_status_update_dialog.dart';
+import '../services/post_detail_export_data.dart';
+import '../services/post_detail_export_service.dart';
+import '../utils/post_detail_export_menu.dart';
 import '../widgets/investigation/investigation_header.dart';
 import '../widgets/investigation/investigation_skeleton.dart';
 import '../widgets/investigation/post_investigation_layout.dart';
+import '../widgets/investigation/post_detail_supplementary_sections.dart';
 
 class PostManagementDetailScreen extends StatelessWidget {
   const PostManagementDetailScreen({
@@ -136,99 +140,10 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
     BuildContext context,
     String currentStatus,
   ) async {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-
-    var selected = kPostAdminStatuses.contains(currentStatus.toUpperCase())
-        ? currentStatus.toUpperCase()
-        : kPostAdminStatuses.first;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(l10n.t('changeStatus')),
-            content: SizedBox(
-              width: 360,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: kPostAdminStatuses.map((status) {
-                  final isSelected = selected == status;
-                  final label = postStatusLabel(l10n, status);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Material(
-                      color: isSelected
-                          ? scheme.primaryContainer
-                          : scheme.surfaceContainerHighest.withValues(
-                              alpha: 0.4,
-                            ),
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        onTap: () => setState(() => selected = status),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isSelected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_off,
-                                size: 18,
-                                color: isSelected
-                                    ? scheme.primary
-                                    : scheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontWeight: isSelected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(l10n.t('cancel')),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(l10n.t('apply')),
-              ),
-            ],
-          );
-        },
-      ),
+    await showPostStatusUpdateDialog(
+      context,
+      currentStatus: currentStatus,
     );
-
-    if (confirmed == true && context.mounted) {
-      await requestPostStatusChange(
-        context,
-        currentStatus: currentStatus,
-        newStatus: selected,
-      );
-    }
   }
 
   void _handleBack(BuildContext context) {
@@ -238,6 +153,33 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
       return;
     }
     Navigator.pop(context);
+  }
+
+  Future<void> _handleExport(BuildContext context) async {
+    final bloc = context.read<PostManagementBloc>();
+    final state = bloc.state;
+    if (state is! PostManagementLoaded) return;
+
+    final format = await showPostDetailExportMenu(context);
+    if (format == null || !context.mounted) return;
+
+    final l10n = context.l10n;
+    try {
+      final data = PostDetailExportData.fromLoaded(state: state, l10n: l10n);
+      await PostDetailExportService.export(data: data, format: format);
+      if (!context.mounted) return;
+      _showSnack(
+        context,
+        l10n.tOr('postDetailExportSuccess', 'Post details exported successfully'),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      _showSnack(
+        context,
+        l10n.tOr('postDetailExportFailed', 'Failed to export post details'),
+        isError: true,
+      );
+    }
   }
 
   @override
@@ -268,12 +210,22 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
           });
           if (state.successMessage != null) {
             _updatedPost = state.post;
-            final text = state.successMessage == 'commentDeleted'
-                ? l10n.t('commentDeleted')
-                : state.successMessage!;
+            final text = switch (state.successMessage) {
+              'commentDeleted' => l10n.t('commentDeleted'),
+              'noteAdded' => l10n.tOr('noteAdded', 'Note added successfully'),
+              'statusUpdated' =>
+                l10n.tOr('statusUpdated', 'Post status updated successfully'),
+              _ => state.successMessage!,
+            };
             _showSnack(context, text);
+            context.read<PostManagementBloc>().add(
+                  ClearPostManagementMessagesEvent(),
+                );
           } else if (state.errorMessage != null) {
             _showSnack(context, state.errorMessage!, isError: true);
+            context.read<PostManagementBloc>().add(
+                  ClearPostManagementMessagesEvent(),
+                );
           }
         }
         if (state is PostManagementDeleted) {
@@ -286,9 +238,11 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
       },
       builder: (context, state) {
         final loaded = state is PostManagementLoaded ? state : null;
-        final isBusy =
-            loaded != null &&
-            (loaded.isSaving || loaded.isDeleting || loaded.isActioning);
+        final isBusy = loaded != null &&
+            (loaded.isSaving ||
+                loaded.isDeleting ||
+                loaded.isActioning ||
+                loaded.isSubmittingNote);
         final dirty =
             loaded != null && hasDraftChanges(loaded.post, loaded.draft);
 
@@ -313,7 +267,12 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (loaded != null)
-                  InvestigationHeader(onBack: () => _handleBack(context)),
+                  InvestigationHeader(
+                    onBack: () => _handleBack(context),
+                    exportEnabled: true,
+                    onExport: () => _handleExport(context),
+                    postId: loaded.post.id,
+                  ),
                 Expanded(
                   child: switch (state) {
                     PostManagementLoading() ||
@@ -331,6 +290,7 @@ class _PostManagementDetailViewState extends State<_PostManagementDetailView> {
                       dirty: dirty,
                       hideComments: widget.seedPost.isStory,
                       captionController: _captionController,
+                      detailExtras: const PostDetailSupplementarySections(),
                       onCaptionChanged: () => _patchDraftFromControllers(
                         context.read<PostManagementBloc>(),
                       ),

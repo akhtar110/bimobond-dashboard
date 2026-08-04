@@ -21,6 +21,7 @@ class UserPostModel extends UserPostEntity {
     required super.commentCount,
     required super.saveCount,
     super.repostCount,
+    super.reportCount,
     super.duration,
     super.videoWidth,
     super.videoHeight,
@@ -88,6 +89,16 @@ class UserPostModel extends UserPostEntity {
       commentCount: _int(json['commentCount']) ?? 0,
       saveCount: _int(json['saveCount']) ?? 0,
       repostCount: _int(json['repostCount']) ?? 0,
+      reportCount: _int(json['reportCount']) ??
+          _int(json['reportsCount']) ??
+          _int(json['report_count']) ??
+          _int(json['reports_count']) ??
+          _int((json['_count'] as Map?)?['reports']) ??
+          _int((json['_count'] as Map?)?['report']) ??
+          (json['reports'] is List
+              ? (json['reports'] as List).length
+              : _int(json['reports'])) ??
+          0,
       duration: _int(json['duration']),
       videoWidth: _int(json['videoWidth']),
       videoHeight: _int(json['videoHeight']),

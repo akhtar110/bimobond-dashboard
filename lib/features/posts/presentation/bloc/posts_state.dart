@@ -19,6 +19,7 @@ class PostsLoaded extends PostsState {
     required this.total,
     required this.hasReachedMax,
     required this.filters,
+    this.pageSize = 20,
     this.isLoadingMore = false,
     this.isApplyingFilters = false,
     this.viewType = PostsViewType.grid,
@@ -33,6 +34,7 @@ class PostsLoaded extends PostsState {
   final int currentPage;
   final int lastPage;
   final int total;
+  final int pageSize;
   final bool hasReachedMax;
   final bool isLoadingMore;
   final bool isApplyingFilters;
@@ -62,6 +64,7 @@ class PostsLoaded extends PostsState {
     int? currentPage,
     int? lastPage,
     int? total,
+    int? pageSize,
     bool? hasReachedMax,
     bool? isLoadingMore,
     bool? isApplyingFilters,
@@ -80,6 +83,7 @@ class PostsLoaded extends PostsState {
       currentPage: currentPage ?? this.currentPage,
       lastPage: lastPage ?? this.lastPage,
       total: total ?? this.total,
+      pageSize: pageSize ?? this.pageSize,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       isApplyingFilters: isApplyingFilters ?? this.isApplyingFilters,
@@ -103,6 +107,7 @@ class PostsLoaded extends PostsState {
         currentPage,
         lastPage,
         total,
+        pageSize,
         hasReachedMax,
         isLoadingMore,
         isApplyingFilters,

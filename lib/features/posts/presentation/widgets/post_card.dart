@@ -12,10 +12,6 @@ import 'post_list_location.dart';
 import 'post_list_thumbnail.dart';
 import 'posts_table_view.dart';
 
-/// Compact thumbnail aspect — wider than tall so cards stay shorter.
-const double kPostCardThumbnailAspectCompact = 1.65;
-const double kPostCardThumbnailAspect = 1.75;
-
 class PostCard extends StatefulWidget {
   const PostCard({
     super.key,
@@ -174,7 +170,6 @@ class _MediaOverlayCardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaUrl = _mediaUrl;
-    final compact = metrics.compact;
 
     return AspectRatio(
       aspectRatio: metrics.thumbnailAspect,
@@ -196,12 +191,12 @@ class _MediaOverlayCardBody extends StatelessWidget {
             _MediaPlaceholder(isDark: isDark, isVideo: _isVideo),
 
           // Gradient rising from the bottom up through the author name
-          const Align(
+          Align(
             alignment: Alignment.bottomCenter,
             child: FractionallySizedBox(
               widthFactor: 1,
-              heightFactor: 0.58,
-              child: DecoratedBox(
+              heightFactor: metrics.overlayGradientHeightFactor,
+              child: const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
@@ -220,12 +215,15 @@ class _MediaOverlayCardBody extends StatelessWidget {
             ),
           ),
 
-          if (_isVideo) Center(child: _GlassPlayBadge(compact: compact)),
+          if (_isVideo) Center(child: _GlassPlayBadge(metrics: metrics)),
           if (_isCarousel)
             Positioned(
-              top: compact ? 8 : 10,
-              right: compact ? 8 : 10,
-              child: const _GlassMediaBadge(icon: Icons.collections_rounded),
+              top: metrics.mediaBadgeInset,
+              right: metrics.mediaBadgeInset,
+              child: _GlassMediaBadge(
+                icon: Icons.collections_rounded,
+                metrics: metrics,
+              ),
             ),
 
           // Details pinned to the bottom over the gradient
@@ -273,13 +271,13 @@ class _CardContent extends StatelessWidget {
             metrics: metrics,
             premiumBlack: true,
           ),
-          SizedBox(height: metrics.sectionGap + 2),
+          SizedBox(height: metrics.contentSectionGap),
           _CategoryStatusRow(
             post: post,
             metrics: metrics,
             premiumBlack: true,
           ),
-          SizedBox(height: metrics.sectionGap + 2),
+          SizedBox(height: metrics.contentSectionGap),
           PostListMetaRow(
             post: post,
             metrics: metrics,
@@ -293,14 +291,14 @@ class _CardContent extends StatelessWidget {
 }
 
 class _GlassPlayBadge extends StatelessWidget {
-  const _GlassPlayBadge({required this.compact});
+  const _GlassPlayBadge({required this.metrics});
 
-  final bool compact;
+  final PostCardMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final size = compact ? 34.0 : 38.0;
+    final size = metrics.playBadgeSize;
 
     return Container(
       width: size,
@@ -320,26 +318,30 @@ class _GlassPlayBadge extends StatelessWidget {
       child: Icon(
         Icons.play_arrow_rounded,
         color: scheme.onPrimary,
-        size: compact ? 20 : 22,
+        size: metrics.playBadgeIconSize,
       ),
     );
   }
 }
 
 class _GlassMediaBadge extends StatelessWidget {
-  const _GlassMediaBadge({required this.icon});
+  const _GlassMediaBadge({
+    required this.icon,
+    required this.metrics,
+  });
 
   final IconData icon;
+  final PostCardMetrics metrics;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: metrics.glassMediaBadgePadding,
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(metrics.glassMediaBadgeRadius),
         border: Border.all(color: scheme.onPrimary.withValues(alpha: 0.45)),
         boxShadow: [
           BoxShadow(
@@ -349,7 +351,11 @@ class _GlassMediaBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(icon, color: scheme.onPrimary, size: 12),
+      child: Icon(
+        icon,
+        color: scheme.onPrimary,
+        size: metrics.glassMediaBadgeIconSize,
+      ),
     );
   }
 }
@@ -405,10 +411,11 @@ class _AuthorRow extends StatelessWidget {
           name: name,
           isDark: isDark,
           radius: metrics.avatarRadius,
-          fontSize: metrics.compact ? 10 : 11,
+          fontSize: metrics.avatarFontSize,
+          ringPadding: metrics.avatarRingPadding,
           premiumBlack: premiumBlack,
         ),
-        SizedBox(width: metrics.compact ? 8 : 10),
+        SizedBox(width: metrics.authorAvatarGap),
         Expanded(
           child: Text(
             name,
@@ -418,7 +425,7 @@ class _AuthorRow extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
               fontSize: metrics.authorFontSize + (premiumBlack ? 0.5 : 0),
-              height: 1.25,
+              height: metrics.authorLineHeight,
               letterSpacing: premiumBlack ? 0.15 : -0.1,
               color: premiumBlack
                   ? PostCardPremiumColors.textPrimary
@@ -438,6 +445,7 @@ class _Avatar extends StatelessWidget {
     required this.isDark,
     required this.radius,
     required this.fontSize,
+    required this.ringPadding,
     this.premiumBlack = false,
   });
 
@@ -446,6 +454,7 @@ class _Avatar extends StatelessWidget {
   final bool isDark;
   final double radius;
   final double fontSize;
+  final double ringPadding;
   final bool premiumBlack;
 
   @override
@@ -456,7 +465,7 @@ class _Avatar extends StatelessWidget {
         : scheme.primary.withValues(alpha: 0.22);
 
     return Container(
-      padding: const EdgeInsets.all(1.5),
+      padding: EdgeInsets.all(ringPadding),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: ringColor, width: premiumBlack ? 1.2 : 1),
@@ -522,8 +531,8 @@ class _CategoryStatusRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: metrics.compact ? 6 : 8,
-      runSpacing: metrics.compact ? 4 : 5,
+      spacing: metrics.badgeWrapSpacing,
+      runSpacing: metrics.badgeWrapRunSpacing,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (post.categoryEntity != null || post.category != null)
@@ -531,11 +540,19 @@ class _CategoryStatusRow extends StatelessWidget {
             category: post.categoryEntity,
             fallbackName: post.category,
             fontSize: metrics.badgeFontSize,
+            padding: metrics.badgePadding,
+            borderRadius: metrics.badgeBorderRadius,
+            iconSize: metrics.categoryIconSize,
+            iconGap: metrics.badgeIconGap,
             premiumBlack: premiumBlack,
           ),
         _StatusBadge(
           status: post.status,
           fontSize: metrics.badgeFontSize,
+          padding: metrics.badgePadding,
+          borderRadius: metrics.badgeBorderRadius,
+          iconSize: metrics.statusIconSize,
+          iconGap: metrics.badgeIconGap,
           premiumBlack: premiumBlack,
         ),
       ],
@@ -547,11 +564,19 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge({
     required this.status,
     required this.fontSize,
+    required this.padding,
+    required this.borderRadius,
+    required this.iconSize,
+    required this.iconGap,
     this.premiumBlack = false,
   });
 
   final String status;
   final double fontSize;
+  final EdgeInsets padding;
+  final double borderRadius;
+  final double iconSize;
+  final double iconGap;
   final bool premiumBlack;
 
   @override
@@ -565,15 +590,14 @@ class _StatusBadge extends StatelessWidget {
         premiumBlack ? PostCardPremiumColors.accentGold : fg;
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: fontSize < 10 ? 7 : 8,
-        vertical: premiumBlack ? 4 : 3,
-      ),
+      padding: padding,
       decoration: BoxDecoration(
         color: premiumBlack
             ? displayColor.withValues(alpha: 0.1)
             : fg.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(premiumBlack ? 20 : 8),
+        borderRadius: BorderRadius.circular(
+          premiumBlack ? borderRadius : 8,
+        ),
         border: Border.all(
           color: premiumBlack
               ? displayColor.withValues(alpha: 0.38)
@@ -583,8 +607,8 @@ class _StatusBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: fontSize + 1, color: displayColor),
-          const SizedBox(width: 4),
+          Icon(icon, size: iconSize, color: displayColor),
+          SizedBox(width: iconGap),
           Text(
             label,
             style: TextStyle(
@@ -605,12 +629,20 @@ class _CategoryBadge extends StatelessWidget {
     this.category,
     this.fallbackName,
     required this.fontSize,
+    required this.padding,
+    required this.borderRadius,
+    required this.iconSize,
+    required this.iconGap,
     this.premiumBlack = false,
   });
 
   final CategoryEntity? category;
   final String? fallbackName;
   final double fontSize;
+  final EdgeInsets padding;
+  final double borderRadius;
+  final double iconSize;
+  final double iconGap;
   final bool premiumBlack;
 
   static const _palette = [
@@ -639,15 +671,14 @@ class _CategoryBadge extends StatelessWidget {
         premiumBlack ? PostCardPremiumColors.textSecondary : color;
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: fontSize < 10 ? 7 : 8,
-        vertical: premiumBlack ? 4 : 3,
-      ),
+      padding: padding,
       decoration: BoxDecoration(
         color: premiumBlack
             ? PostCardPremiumColors.surfaceInset
             : color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(premiumBlack ? 20 : 8),
+        borderRadius: BorderRadius.circular(
+          premiumBlack ? borderRadius : 8,
+        ),
         border: Border.all(
           color: premiumBlack
               ? PostCardPremiumColors.borderSoft
@@ -661,7 +692,7 @@ class _CategoryBadge extends StatelessWidget {
             category: category,
             iconUrl: category?.iconUrl,
             name: name,
-            size: fontSize + 4,
+            size: iconSize,
             borderRadius: BorderRadius.circular(4),
             backgroundColor: premiumBlack
                 ? PostCardPremiumColors.borderSubtle
@@ -669,7 +700,7 @@ class _CategoryBadge extends StatelessWidget {
             iconColor: displayColor,
             fallbackIcon: Icons.label_outline_rounded,
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: iconGap),
           Flexible(
             child: Text(
               name,
@@ -799,12 +830,12 @@ class _PostCardSkeletonBody extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             _ShimmerBox(isDark: isDark),
-            const Align(
+            Align(
               alignment: Alignment.bottomCenter,
               child: FractionallySizedBox(
                 widthFactor: 1,
-                heightFactor: 0.58,
-                child: DecoratedBox(
+                heightFactor: metrics.overlayGradientHeightFactor,
+                child: const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
@@ -859,22 +890,22 @@ class _SkeletonContent extends StatelessWidget {
         Row(
           children: [
             CircleAvatar(radius: metrics.avatarRadius, backgroundColor: base),
-            SizedBox(width: metrics.compact ? 5 : 6),
-            _SkeletonLine(width: 80, height: 10, base: base),
+            SizedBox(width: metrics.authorAvatarGap),
+            _SkeletonLine(width: 80, height: 9, base: base),
           ],
         ),
-        SizedBox(height: metrics.sectionGap),
+        SizedBox(height: metrics.contentSectionGap),
         Row(
           children: [
-            _SkeletonLine(width: 56, height: 18, base: base, radius: 8),
-            SizedBox(width: metrics.compact ? 4 : 6),
-            _SkeletonLine(width: 48, height: 18, base: base, radius: 8),
+            _SkeletonLine(width: 56, height: 16, base: base, radius: 8),
+            SizedBox(width: metrics.badgeWrapSpacing),
+            _SkeletonLine(width: 48, height: 16, base: base, radius: 8),
           ],
         ),
-        SizedBox(height: metrics.sectionGap),
+        SizedBox(height: metrics.contentSectionGap),
         _SkeletonLine(
           width: double.infinity,
-          height: metrics.stackMetaRow ? 36 : 24,
+          height: metrics.stackMetaRow ? 32 : 22,
           base: base,
           radius: 8,
         ),
