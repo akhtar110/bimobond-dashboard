@@ -18,12 +18,14 @@ class PostEngagementPanel extends StatefulWidget {
     this.hideComments = false,
     this.highlightCommentId,
     this.initialTabIndex = 0,
+    this.embedded = false,
   });
 
   final bool isBusy;
   final bool hideComments;
   final String? highlightCommentId;
   final int initialTabIndex;
+  final bool embedded;
 
   @override
   State<PostEngagementPanel> createState() => _PostEngagementPanelState();
@@ -90,11 +92,10 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
-    return PostSurfaceCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!widget.embedded)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
@@ -114,24 +115,24 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
               ],
             ),
           ),
-          TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelColor: scheme.primary,
-            unselectedLabelColor: scheme.onSurfaceVariant,
-            indicatorColor: scheme.primary,
-            dividerColor: scheme.outlineVariant.withValues(alpha: 0.4),
-            tabs: [
-              if (!widget.hideComments) Tab(text: l10n.t('comments')),
-              Tab(text: l10n.t('reposts')),
-              Tab(text: l10n.t('likes')),
-              Tab(text: l10n.t('mentions')),
-              Tab(text: l10n.tOr('postViews', 'Post Views')),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
+        TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelColor: scheme.primary,
+          unselectedLabelColor: scheme.onSurfaceVariant,
+          indicatorColor: scheme.primary,
+          dividerColor: scheme.outlineVariant.withValues(alpha: 0.4),
+          tabs: [
+            if (!widget.hideComments) Tab(text: l10n.t('comments')),
+            Tab(text: l10n.t('reposts')),
+            Tab(text: l10n.t('likes')),
+            Tab(text: l10n.t('mentions')),
+            Tab(text: l10n.tOr('postViews', 'Post Views')),
+          ],
+        ),
+        Padding(
+          padding: EdgeInsets.all(widget.embedded ? 0 : 16),
             child: AnimatedBuilder(
               animation: _tabController,
               builder: (context, _) {
@@ -217,7 +218,9 @@ class _PostEngagementPanelState extends State<PostEngagementPanel>
             ),
           ),
         ],
-      ),
-    );
+      );
+
+    if (widget.embedded) return body;
+    return PostSurfaceCard(padding: EdgeInsets.zero, child: body);
   }
 }

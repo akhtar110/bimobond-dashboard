@@ -13,7 +13,8 @@ import 'moderation_sidebar.dart';
 import '../post_media_snapshot.dart';
 import 'portrait_media_panel.dart';
 import 'post_content_section.dart';
-import 'post_engagement_panel.dart';
+import 'post_detail_insights_panel.dart';
+import 'post_internal_notes_section.dart';
 import 'post_status_actions_panel.dart';
 import 'post_user_sidebar.dart';
 
@@ -25,6 +26,7 @@ class PostInvestigationLayout extends StatelessWidget {
     required this.isSaving,
     required this.dirty,
     this.hideComments = false,
+    this.detailExtras,
     required this.captionController,
     required this.onCaptionChanged,
     required this.onCategorySelected,
@@ -39,6 +41,7 @@ class PostInvestigationLayout extends StatelessWidget {
   final bool isSaving;
   final bool dirty;
   final bool hideComments;
+  final Widget? detailExtras;
   final TextEditingController captionController;
   final VoidCallback onCaptionChanged;
   final void Function(CategoryEntity) onCategorySelected;
@@ -65,6 +68,7 @@ class PostInvestigationLayout extends StatelessWidget {
           isSaving: isSaving,
           dirty: dirty,
           hideComments: hideComments,
+          detailExtras: detailExtras,
           captionController: captionController,
           onCaptionChanged: onCaptionChanged,
           onCategorySelected: onCategorySelected,
@@ -86,6 +90,7 @@ class _InvestigationBody extends StatelessWidget {
     required this.isSaving,
     required this.dirty,
     required this.hideComments,
+    this.detailExtras,
     required this.captionController,
     required this.onCaptionChanged,
     required this.onCategorySelected,
@@ -101,6 +106,7 @@ class _InvestigationBody extends StatelessWidget {
   final bool isSaving;
   final bool dirty;
   final bool hideComments;
+  final Widget? detailExtras;
   final TextEditingController captionController;
   final VoidCallback onCaptionChanged;
   final void Function(CategoryEntity) onCategorySelected;
@@ -176,6 +182,8 @@ class _InvestigationBody extends StatelessWidget {
                 onDelete: onDelete,
                 onSave: onSave,
               ),
+              const SizedBox(height: InvestigationTheme.s12),
+              PostInternalNotesSection(isBusy: isBusy),
             ],
           );
         },
@@ -214,6 +222,10 @@ class _InvestigationBody extends StatelessWidget {
                 onCategorySelected: onCategorySelected,
                 onPrivacyChanged: onPrivacyChanged,
               ),
+              if (detailExtras != null) ...[
+                const SizedBox(height: InvestigationTheme.s8),
+                detailExtras!,
+              ],
             ],
           );
         },
@@ -263,7 +275,7 @@ class _InvestigationBody extends StatelessWidget {
                       mediaConstraints.maxWidth > 0
                   ? mediaConstraints.maxWidth
                   : width;
-              final cap = parentW.clamp(280.0, 750.0);
+              final cap = parentW.clamp(280.0, 520.0);
               return Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
@@ -335,11 +347,11 @@ class _InvestigationBody extends StatelessWidget {
                       children: [
                         columns,
                         const SizedBox(height: InvestigationTheme.s24),
-                        PostEngagementPanel(
+                        PostDetailInsightsPanel(
                           isBusy: isBusy,
                           hideComments: hideComments,
                           highlightCommentId: highlightId,
-                          initialTabIndex: _engagementTabIndex(
+                          engagementInitialTabIndex: _engagementTabIndex(
                             state.activityContext,
                             hideComments: hideComments,
                           ),

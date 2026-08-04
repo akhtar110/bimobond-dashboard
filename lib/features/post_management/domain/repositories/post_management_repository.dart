@@ -1,6 +1,7 @@
 import '../entities/comment_entity.dart';
 import '../entities/managed_post_entity.dart';
 import '../entities/post_engagement_user_item.dart';
+import '../entities/post_moderation_entities.dart';
 
 abstract class PostManagementRepository {
   Future<ManagedPostEntity> getManagedPostById(String postId);
@@ -18,7 +19,20 @@ abstract class PostManagementRepository {
   });
   Future<ManagedPostEntity> hidePost(String postId);
   Future<ManagedPostEntity> banPost(String postId);
-  Future<ManagedPostEntity> updatePostStatus(String postId, String status);
+  Future<ManagedPostEntity> updatePostStatus(
+    String postId,
+    String status, {
+    String? reason,
+    String? note,
+  });
+
+  Future<void> addPostNote(String postId, String note);
+
+  Future<PostModerationTimelinePage> getPostModerationTimeline(
+    String postId, {
+    required int page,
+    required int limit,
+  });
 
   Future<PostCommentsPageEntity> getPostComments(
     String postId, {

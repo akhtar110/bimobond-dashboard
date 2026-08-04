@@ -54,8 +54,7 @@ class ReportsLoaded extends ReportsState {
     required this.currentPage,
     required this.lastPage,
     required this.total,
-    this.statusFilter,
-    this.typeFilter,
+    this.filters = const ReportsQueryParams(),
     this.isLoadingMore = false,
     this.updatingId,
     this.errorMessage,
@@ -66,9 +65,12 @@ class ReportsLoaded extends ReportsState {
   final int currentPage;
   final int lastPage;
   final int total;
-  final String? statusFilter;
-  final String? typeFilter;
+  final ReportsQueryParams filters;
   final bool isLoadingMore;
+
+  /// Backward-compatible accessors for existing UI.
+  String? get statusFilter => filters.status;
+  String? get typeFilter => filters.type;
 
   /// The ID of the report whose status is currently being changed.
   final String? updatingId;
@@ -86,8 +88,7 @@ class ReportsLoaded extends ReportsState {
     int? currentPage,
     int? lastPage,
     int? total,
-    String? statusFilter,
-    String? typeFilter,
+    ReportsQueryParams? filters,
     bool? isLoadingMore,
     String? updatingId,
     bool clearUpdatingId = false,
@@ -100,8 +101,7 @@ class ReportsLoaded extends ReportsState {
         currentPage: currentPage ?? this.currentPage,
         lastPage: lastPage ?? this.lastPage,
         total: total ?? this.total,
-        statusFilter: statusFilter ?? this.statusFilter,
-        typeFilter: typeFilter ?? this.typeFilter,
+        filters: filters ?? this.filters,
         isLoadingMore: isLoadingMore ?? this.isLoadingMore,
         updatingId: clearUpdatingId ? null : (updatingId ?? this.updatingId),
         errorMessage: errorMessage,

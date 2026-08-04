@@ -183,6 +183,8 @@ import 'features/post_management/domain/usecases/update_post_details_usecase.dar
 import 'features/post_management/domain/usecases/delete_comment_admin.dart';
 import 'features/post_management/domain/usecases/get_post_comments.dart';
 import 'features/post_management/domain/usecases/get_post_engagement_users.dart';
+import 'features/post_management/domain/usecases/add_post_note_usecase.dart';
+import 'features/post_management/domain/usecases/get_post_moderation_timeline_usecase.dart';
 import 'features/post_management/domain/usecases/update_post_status_usecase.dart';
 import 'features/post_management/presentation/bloc/post_management_bloc.dart';
 
@@ -1187,6 +1189,12 @@ Future<void> init() async {
     () => UpdatePostStatus(sl<PostManagementRepository>()),
   );
   sl.registerLazySingleton(
+    () => AddPostNote(sl<PostManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPostModerationTimeline(sl<PostManagementRepository>()),
+  );
+  sl.registerLazySingleton(
     () => GetPostComments(sl<PostManagementRepository>()),
   );
   sl.registerLazySingleton(
@@ -1206,6 +1214,14 @@ Future<void> init() async {
       hidePost: sl<HidePost>(),
       banPost: sl<BanPost>(),
       updatePostStatus: sl<UpdatePostStatus>(),
+      addPostNote: sl<AddPostNote>(),
+      getPostModerationTimeline: sl<GetPostModerationTimeline>(),
+      getPostReportDetail: sl<GetPostReportDetail>(),
+      getCameraFilter: sl<GetCameraFilterUseCase>(),
+      getCameraEffect: sl<GetCameraEffectUseCase>(),
+      getCameraFilters: sl<GetCameraFiltersUseCase>(),
+      getCameraEffects: sl<GetCameraEffectsUseCase>(),
+      getReports: sl<GetReports>(),
       getPostComments: sl<GetPostComments>(),
       deleteCommentAdmin: sl<DeleteCommentAdmin>(),
       getPostEngagementUsers: sl<GetPostEngagementUsers>(),

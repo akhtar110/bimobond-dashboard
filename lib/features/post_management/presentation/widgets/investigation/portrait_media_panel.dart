@@ -170,10 +170,10 @@ class _PortraitMediaPanelState extends State<PortraitMediaPanel> {
         // Leave room for app chrome / side panels; prefer tall portrait frames.
         final viewportCap = size.height *
             (size.width < InvestigationTheme.tablet
-                ? 0.78
+                ? 0.62
                 : size.width < InvestigationTheme.desktop
-                    ? 0.82
-                    : 0.88);
+                    ? 0.68
+                    : 0.72);
         final availableHeight = constraints.maxHeight.isFinite &&
                 constraints.maxHeight > 0 &&
                 constraints.maxHeight < viewportCap

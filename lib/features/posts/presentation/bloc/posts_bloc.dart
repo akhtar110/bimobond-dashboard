@@ -59,14 +59,15 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<SetPublicSelectedPostsEvent>(_onBulkAction);
     on<SetPrivateSelectedPostsEvent>(_onBulkAction);
     on<SetFollowersOnlySelectedPostsEvent>(_onBulkAction);
+    on<ChangePostsPageSizeEvent>(_onChangePageSize);
   }
 
   final GetAllPosts getAllPosts;
   final BulkPostActionUseCase bulkPostAction;
 
   static const pageLimit = 20;
-  static const _limit = pageLimit;
 
+  int _pageSize = 20;
   int _loadRequestId = 0;
   bool _loadMoreBusy = false;
   bool _goToPageBusy = false;
@@ -76,6 +77,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   PostsViewType _viewType = PostsViewType.grid;
   Set<String> _selectedPostIds = {};
 
+  int get pageSize => _pageSize;
   PostFilters get activeFilters => _filters;
   UserEntity? get filterUser => _filterUser;
   PostsViewType get activeViewType => _viewType;
@@ -439,6 +441,15 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     await _loadFirstPage(emit);
   }
 
+  Future<void> _onChangePageSize(
+    ChangePostsPageSizeEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    if (_pageSize == event.pageSize) return;
+    _pageSize = event.pageSize;
+    await _loadFirstPage(emit);
+  }
+
   Future<void> _loadFirstPage(Emitter<PostsState> emit) async {
     final current = state;
     final filtersChanged =
@@ -470,7 +481,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     try {
       final page = await getAllPosts(
         page: 1,
-        limit: _limit,
+        limit: _pageSize,
         filters: filtersSnapshot,
       );
 
@@ -485,6 +496,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
             currentPage: page.currentPage,
             lastPage: page.lastPage,
             total: page.total,
+            pageSize: _pageSize,
             hasReachedMax: page.hasReachedMax,
             filters: _filters,
             filterUser: _filterUser,
@@ -515,7 +527,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       final nextPage = current.currentPage + 1;
       final page = await getAllPosts(
         page: nextPage,
-        limit: _limit,
+        limit: _pageSize,
         filters: _filters,
       );
       emit(
@@ -525,6 +537,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
             currentPage: page.currentPage,
             lastPage: page.lastPage,
             total: page.total,
+            pageSize: _pageSize,
             hasReachedMax: page.hasReachedMax,
             isLoadingMore: false,
           ),
@@ -546,7 +559,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     final current = state;
     if (current is PostsLoaded) {
       if (event.page == current.currentPage &&
-          current.posts.length <= _limit) {
+          current.posts.length <= _pageSize) {
         return;
       }
       _goToPageBusy = true;
@@ -566,7 +579,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     try {
       final page = await getAllPosts(
         page: event.page,
-        limit: _limit,
+        limit: _pageSize,
         filters: filtersSnapshot,
       );
 
@@ -583,6 +596,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
             currentPage: page.currentPage,
             lastPage: page.lastPage,
             total: page.total,
+            pageSize: _pageSize,
             hasReachedMax: page.hasReachedMax,
             filters: _filters,
             filterUser: _filterUser,

@@ -29,7 +29,7 @@ class AppTheme {
     final isDark = brightness == Brightness.dark;
     final fontFamily = AppFonts.forLocale(locale);
     final scheme = ColorScheme.fromSeed(
-      seedColor: Colors.pink,
+      seedColor: Colors.blue,
       brightness: brightness,
     );
     final textTheme = _textTheme(brightness, fontFamily);

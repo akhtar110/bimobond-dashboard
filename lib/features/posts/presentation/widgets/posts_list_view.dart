@@ -3,12 +3,15 @@
 import '../../../../core/localization/localization.dart';
 import '../../../../features/post_management/domain/entities/managed_post_entity.dart';
 import '../bloc/posts_bloc.dart';
+import '../utils/posts_date_grouping.dart';
+import '../utils/posts_grouped_cache.dart';
 import '../utils/posts_responsive.dart';
+import 'posts_group_header.dart';
 import 'posts_pagination_indicators.dart';
 import 'posts_table_view.dart';
 import 'selectable_post_card_wrapper.dart';
 
-class PostsListView extends StatelessWidget {
+class PostsListView extends StatefulWidget {
   const PostsListView({
     super.key,
     required this.state,
@@ -23,9 +26,16 @@ class PostsListView extends StatelessWidget {
   final bool useInfiniteScroll;
 
   @override
+  State<PostsListView> createState() => _PostsListViewState();
+}
+
+class _PostsListViewState extends State<PostsListView> {
+  final _groupCache = PostsGroupedCache();
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final posts = state.posts;
+    final groups = _groupCache.resolve(widget.state.posts);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -35,22 +45,24 @@ class PostsListView extends StatelessWidget {
 
         return PostsDataListCard(
           metrics: metrics,
-          count: posts.length,
+          count: widget.state.posts.length,
           countLabel: l10n.t('posts'),
           child: metrics.useCompactTable
               ? _PostsCompactScrollList(
-                  state: state,
+                  groups: groups,
+                  state: widget.state,
                   metrics: metrics,
-                  scrollController: scrollController,
-                  onPostTap: onPostTap,
-                  useInfiniteScroll: useInfiniteScroll,
+                  scrollController: widget.scrollController,
+                  onPostTap: widget.onPostTap,
+                  useInfiniteScroll: widget.useInfiniteScroll,
                 )
               : _PostsDesktopTableList(
-                  state: state,
+                  groups: groups,
+                  state: widget.state,
                   metrics: metrics,
-                  scrollController: scrollController,
-                  onPostTap: onPostTap,
-                  useInfiniteScroll: useInfiniteScroll,
+                  scrollController: widget.scrollController,
+                  onPostTap: widget.onPostTap,
+                  useInfiniteScroll: widget.useInfiniteScroll,
                 ),
         );
       },
@@ -118,6 +130,7 @@ class PostsDataListCard extends StatelessWidget {
 
 class _PostsCompactScrollList extends StatelessWidget {
   const _PostsCompactScrollList({
+    required this.groups,
     required this.state,
     required this.metrics,
     required this.scrollController,
@@ -125,6 +138,7 @@ class _PostsCompactScrollList extends StatelessWidget {
     required this.useInfiniteScroll,
   });
 
+  final List<PostsDateGroup> groups;
   final PostsLoaded state;
   final PostsLayoutMetrics metrics;
   final ScrollController scrollController;
@@ -134,48 +148,65 @@ class _PostsCompactScrollList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final posts = state.posts;
-    final itemCount = posts.length +
-        (useInfiniteScroll && state.isLoadingMore ? 1 : 0) +
-        (useInfiniteScroll && state.hasReachedMax && posts.isNotEmpty ? 1 : 0);
 
-    return ListView.builder(
+    return CustomScrollView(
       controller: scrollController,
       physics: metrics.listScrollPhysics,
-      padding: EdgeInsets.fromLTRB(
-        metrics.cardPadding - 4,
-        0,
-        metrics.cardPadding - 4,
-        metrics.cardPadding,
-      ),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        if (index < posts.length) {
-          final post = posts[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: PostsCompactCard(
-              post: post,
-              isSelected: state.selectedPostIds.contains(post.id),
-              onSelectionChanged: (selected) => togglePostSelection(
-                context,
-                post.id,
-                selected ?? false,
-              ),
-              onTap: () => onPostTap(post),
+      slivers: [
+        for (var g = 0; g < groups.length; g++) ...[
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              metrics.cardPadding - 4,
+              g == 0 ? 0 : 0,
+              metrics.cardPadding - 4,
+              0,
             ),
-          );
-        }
-        if (useInfiniteScroll && state.isLoadingMore) {
-          return const PostsLoadMoreIndicator();
-        }
-        return PostsEndOfListLabel();
-      },
+            sliver: SliverToBoxAdapter(
+              child: PostsDateGroupHeader(
+                group: groups[g],
+                isFirst: g == 0,
+                metrics: metrics,
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: metrics.cardPadding - 4),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final post = groups[g].posts[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: PostsCompactCard(
+                      post: post,
+                      isSelected: state.selectedPostIds.contains(post.id),
+                      onSelectionChanged: (selected) => togglePostSelection(
+                        context,
+                        post.id,
+                        selected ?? false,
+                      ),
+                      onTap: () => onPostTap(post),
+                    ),
+                  );
+                },
+                childCount: groups[g].posts.length,
+              ),
+            ),
+          ),
+        ],
+        if (useInfiniteScroll && state.isLoadingMore)
+          const SliverToBoxAdapter(child: PostsLoadMoreIndicator()),
+        if (useInfiniteScroll && state.hasReachedMax && posts.isNotEmpty)
+          SliverToBoxAdapter(child: PostsEndOfListLabel()),
+        SliverToBoxAdapter(child: SizedBox(height: metrics.cardPadding)),
+      ],
     );
   }
 }
 
 class _PostsDesktopTableList extends StatelessWidget {
   const _PostsDesktopTableList({
+    required this.groups,
     required this.state,
     required this.metrics,
     required this.scrollController,
@@ -183,6 +214,7 @@ class _PostsDesktopTableList extends StatelessWidget {
     required this.useInfiniteScroll,
   });
 
+  final List<PostsDateGroup> groups;
   final PostsLoaded state;
   final PostsLayoutMetrics metrics;
   final ScrollController scrollController;
@@ -223,41 +255,60 @@ class _PostsDesktopTableList extends StatelessWidget {
                   someVisibleSelected: state.someVisibleSelected,
                 ),
               ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final post = posts[index];
-                    final isLast = index == posts.length - 1;
-                    return DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: isLast
-                            ? null
-                            : Border(
-                                bottom: BorderSide(
-                                  color: scheme.outlineVariant
-                                      .withValues(alpha: 0.35),
-                                ),
-                              ),
-                      ),
-                      child: PostsTableRow(
-                        post: post,
-                        density: density,
-                        striped: index.isOdd,
-                        isSelected:
-                            state.selectedPostIds.contains(post.id),
-                        onSelectionChanged: (selected) =>
-                            togglePostSelection(
-                          context,
-                          post.id,
-                          selected ?? false,
-                        ),
-                        onTap: () => onPostTap(post),
-                      ),
-                    );
-                  },
-                  childCount: posts.length,
+              for (var g = 0; g < groups.length; g++) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      metrics.cardPadding,
+                      g == 0 ? 8 : 0,
+                      metrics.cardPadding,
+                      0,
+                    ),
+                    child: PostsDateGroupHeader(
+                      group: groups[g],
+                      isFirst: g == 0,
+                      metrics: metrics,
+                    ),
+                  ),
                 ),
-              ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final post = groups[g].posts[index];
+                      final isLastInGroup =
+                          index == groups[g].posts.length - 1;
+                      final isLastGroup = g == groups.length - 1;
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: isLastInGroup && isLastGroup
+                              ? null
+                              : Border(
+                                  bottom: BorderSide(
+                                    color: scheme.outlineVariant
+                                        .withValues(alpha: 0.35),
+                                  ),
+                                ),
+                        ),
+                        child: PostsTableRow(
+                          post: post,
+                          density: density,
+                          striped: index.isOdd,
+                          isSelected:
+                              state.selectedPostIds.contains(post.id),
+                          onSelectionChanged: (selected) =>
+                              togglePostSelection(
+                            context,
+                            post.id,
+                            selected ?? false,
+                          ),
+                          onTap: () => onPostTap(post),
+                        ),
+                      );
+                    },
+                    childCount: groups[g].posts.length,
+                  ),
+                ),
+              ],
               if (useInfiniteScroll && state.isLoadingMore)
                 const SliverToBoxAdapter(child: PostsLoadMoreIndicator()),
               if (useInfiniteScroll &&

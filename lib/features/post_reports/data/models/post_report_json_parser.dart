@@ -160,6 +160,61 @@ abstract final class PostReportJsonParser {
       repostCount: asInt(m['repostCount'] ?? m['reposts']),
       shareCount: asInt(m['shareCount'] ?? m['shares']),
       downloadCount: asInt(m['downloadCount'] ?? m['downloads']),
+      engagementRate: asDouble(m['engagementRate']),
+      totalWatchTimeSeconds:
+          asInt(m['totalWatchTimeSeconds'] ?? m['watchTimeSeconds']),
+      viewerRetentionRate: asDouble(m['viewerRetentionRate']),
+      completionRate: asDouble(m['completionRate']),
+      trafficSourceBreakdown: parseTrafficSourceBreakdown(
+        m['trafficSourceBreakdown'],
+      ),
+    );
+  }
+
+  static PostReportTrafficSourceBreakdown parseTrafficSourceBreakdown(
+    dynamic value,
+  ) {
+    if (value is! Map) return const PostReportTrafficSourceBreakdown();
+    final m = Map<String, dynamic>.from(value);
+    return PostReportTrafficSourceBreakdown(
+      forYou: asInt(m['FOR_YOU'] ?? m['forYou']),
+      profile: asInt(m['PROFILE'] ?? m['profile']),
+      search: asInt(m['SEARCH'] ?? m['search']),
+      hashtags: asInt(m['HASHTAGS'] ?? m['hashtags']),
+      shares: asInt(m['SHARES'] ?? m['shares']),
+    );
+  }
+
+  static PostReportModerationLog parseModerationLog(Map<String, dynamic> m) {
+    final moderatorRaw = m['moderator'] ?? m['admin'] ?? m['user'];
+    return PostReportModerationLog(
+      id: asString(m['id']) ?? '',
+      status: (asString(m['status']) ?? asString(m['action']) ?? '')
+          .toUpperCase(),
+      reason: asString(m['reason']),
+      note: asString(m['note']) ?? asString(m['internalNote']),
+      createdAt: _parseDate(m['createdAt'] ?? m['timestamp'] ?? m['actionDate']) ??
+          DateTime.now(),
+      moderator: parseAdminUser(moderatorRaw),
+    );
+  }
+
+  static PostReportModerationSummary? parseModerationSummary(dynamic value) {
+    if (value is! Map) return null;
+    final m = Map<String, dynamic>.from(value);
+    final timelineRaw = m['actionTimeline'] ?? m['timeline'];
+    final timeline = timelineRaw is List
+        ? timelineRaw
+            .whereType<Map>()
+            .map((e) => parseModerationLog(Map<String, dynamic>.from(e)))
+            .toList()
+        : const <PostReportModerationLog>[];
+
+    return PostReportModerationSummary(
+      latestModerator: parseAdminUser(m['latestModerator']),
+      latestStatusChangeReason: asString(m['latestStatusChangeReason']),
+      latestActionDate: _parseDate(m['latestActionDate']),
+      actionTimeline: timeline,
     );
   }
 

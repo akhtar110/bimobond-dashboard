@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/localization/localization.dart';
-import '../../utils/post_status_confirm_dialog.dart';
+import '../../../domain/utils/post_status_utils.dart';
 import '../../utils/post_detail_labels.dart';
+import '../../utils/post_status_confirm_dialog.dart';
 import 'investigation_theme.dart';
 import 'post_surface_card.dart';
 
@@ -23,7 +24,7 @@ class PostStatusActionsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final active = currentStatus.toUpperCase();
+    final active = normalizePostStatus(currentStatus);
 
     return PostSurfaceCard(
       child: Column(

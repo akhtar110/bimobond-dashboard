@@ -27,8 +27,8 @@ abstract final class InvestigationTheme {
   /// Portrait framing for mobile-style post preview (9:16).
   static const portraitAspect = 9 / 16;
 
-  /// Admin media preview card — sized for full portrait visibility.
-  static const mediaPreviewMaxWidth = 520.0;
+  /// Admin media preview card — compact portrait framing for moderation UI.
+  static const mediaPreviewMaxWidth = 380.0;
   static const mediaPreviewHeight = mediaPreviewMaxWidth / portraitAspect;
 
   static ColorScheme schemeOf(BuildContext context) =>

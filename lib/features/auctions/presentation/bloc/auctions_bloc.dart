@@ -182,17 +182,14 @@ class AuctionsLoaded extends AuctionsState {
   int get totalCount => total;
   bool get hasReachedMax => currentPage >= lastPage;
 
-  int get activeCount =>
-      auctions.where((a) => a.status == 'ACTIVE').length;
+  int get activeCount => auctions.where((a) => a.status == 'ACTIVE').length;
   int get completedCount =>
       auctions.where((a) => a.status == 'COMPLETED').length;
   int get cancelledCount =>
       auctions.where((a) => a.status == 'CANCELLED').length;
   int get bannedCount => auctions.where((a) => a.status == 'BANNED').length;
-  int get disputedCount =>
-      auctions.where((a) => a.status == 'DISPUTED').length;
-  int get settledCount =>
-      auctions.where((a) => a.status == 'SETTLED').length;
+  int get disputedCount => auctions.where((a) => a.status == 'DISPUTED').length;
+  int get settledCount => auctions.where((a) => a.status == 'SETTLED').length;
 
   AuctionsLoaded copyWith({
     List<AuctionEntity>? auctions,
@@ -234,30 +231,38 @@ class AuctionsLoaded extends AuctionsState {
       currentPage: currentPage ?? this.currentPage,
       lastPage: lastPage ?? this.lastPage,
       total: total ?? this.total,
-      statusFilter:
-          clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+      statusFilter: clearStatusFilter
+          ? null
+          : (statusFilter ?? this.statusFilter),
       searchQuery: searchQuery ?? this.searchQuery,
       sortOption: sortOption ?? this.sortOption,
       typeFilter: typeFilter ?? this.typeFilter,
       dateRange: clearDateRange ? null : (dateRange ?? this.dateRange),
       hostFilter: clearHostFilter ? null : (hostFilter ?? this.hostFilter),
-      winnerFilter:
-          clearWinnerFilter ? null : (winnerFilter ?? this.winnerFilter),
-      postIdFilter:
-          clearPostFilter ? null : (postIdFilter ?? this.postIdFilter),
-      postLabelFilter:
-          clearPostFilter ? null : (postLabelFilter ?? this.postLabelFilter),
-      liveIdFilter:
-          clearLiveFilter ? null : (liveIdFilter ?? this.liveIdFilter),
-      liveLabelFilter:
-          clearLiveFilter ? null : (liveLabelFilter ?? this.liveLabelFilter),
+      winnerFilter: clearWinnerFilter
+          ? null
+          : (winnerFilter ?? this.winnerFilter),
+      postIdFilter: clearPostFilter
+          ? null
+          : (postIdFilter ?? this.postIdFilter),
+      postLabelFilter: clearPostFilter
+          ? null
+          : (postLabelFilter ?? this.postLabelFilter),
+      liveIdFilter: clearLiveFilter
+          ? null
+          : (liveIdFilter ?? this.liveIdFilter),
+      liveLabelFilter: clearLiveFilter
+          ? null
+          : (liveLabelFilter ?? this.liveLabelFilter),
       hasWinnerFilter: clearHasWinnerFilter
           ? null
           : (hasWinnerFilter ?? this.hasWinnerFilter),
-      hasPostFilter:
-          clearHasPostFilter ? null : (hasPostFilter ?? this.hasPostFilter),
-      hasLiveFilter:
-          clearHasLiveFilter ? null : (hasLiveFilter ?? this.hasLiveFilter),
+      hasPostFilter: clearHasPostFilter
+          ? null
+          : (hasPostFilter ?? this.hasPostFilter),
+      hasLiveFilter: clearHasLiveFilter
+          ? null
+          : (hasLiveFilter ?? this.hasLiveFilter),
       isActioning: isActioning ?? this.isActioning,
       isFetching: isFetching ?? this.isFetching,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
@@ -279,10 +284,10 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     required GetAllAuctions getAllAuctions,
     required AdminCancelAuction cancelAuction,
     AuctionsListSync? listSync,
-  })  : _getAllAuctions = getAllAuctions,
-        _cancelAuction = cancelAuction,
-        _listSync = listSync,
-        super(AuctionsInitial()) {
+  }) : _getAllAuctions = getAllAuctions,
+       _cancelAuction = cancelAuction,
+       _listSync = listSync,
+       super(AuctionsInitial()) {
     on<LoadAllAuctionsEvent>(_onLoad);
     on<GoToAuctionsPageEvent>(_onGoToPage);
     on<LoadMoreAuctionsEvent>(_onLoadMore);
@@ -350,13 +355,13 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
   bool? get activeHasLiveFilter => _hasLiveFilter;
 
   AdminAuctionsSortOrder _mapSort(AuctionSortOption sort) => switch (sort) {
-        AuctionSortOption.newestFirst => AdminAuctionsSortOrder.newest,
-        AuctionSortOption.oldestFirst => AdminAuctionsSortOrder.oldest,
-        AuctionSortOption.highestBid => AdminAuctionsSortOrder.highestTotal,
-        AuctionSortOption.lowestBid => AdminAuctionsSortOrder.lowestTotal,
-        AuctionSortOption.targetPrice => AdminAuctionsSortOrder.targetPrice,
-        AuctionSortOption.endingSoon => AdminAuctionsSortOrder.recentlyEnded,
-      };
+    AuctionSortOption.newestFirst => AdminAuctionsSortOrder.newest,
+    AuctionSortOption.oldestFirst => AdminAuctionsSortOrder.oldest,
+    AuctionSortOption.highestBid => AdminAuctionsSortOrder.highestTotal,
+    AuctionSortOption.lowestBid => AdminAuctionsSortOrder.lowestTotal,
+    AuctionSortOption.targetPrice => AdminAuctionsSortOrder.targetPrice,
+    AuctionSortOption.endingSoon => AdminAuctionsSortOrder.recentlyEnded,
+  };
 
   AdminAuctionsQuery _buildQuery() {
     bool? hasLive = _hasLiveFilter;
@@ -428,12 +433,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     if (showLoading && previous is! AuctionsLoaded) {
       emit(AuctionsLoading());
     } else if (previous is AuctionsLoaded) {
-      emit(
-        previous.copyWith(
-          isFetching: !append,
-          isLoadingMore: append,
-        ),
-      );
+      emit(previous.copyWith(isFetching: !append, isLoadingMore: append));
     }
 
     try {
@@ -462,35 +462,35 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
 
       final displayed = _applyLocalFilters(auctions);
 
-      emit(AuctionsLoaded(
-        auctions: auctions,
-        currentPage: response.currentPage,
-        lastPage: response.lastPage,
-        total: response.total,
-        statusFilter: _statusFilter,
-        searchQuery: _searchQuery,
-        sortOption: _sortOption,
-        typeFilter: _typeFilter,
-        dateRange: _dateRange,
-        hostFilter: _hostFilter,
-        winnerFilter: _winnerFilter,
-        postIdFilter: _postIdFilter,
-        postLabelFilter: _postLabelFilter,
-        liveIdFilter: _liveIdFilter,
-        liveLabelFilter: _liveLabelFilter,
-        hasWinnerFilter: _hasWinnerFilter,
-        hasPostFilter: _hasPostFilter,
-        hasLiveFilter: _hasLiveFilter,
-        displayedAuctions: displayed,
-        isFetching: false,
-        isLoadingMore: false,
-      ));
+      emit(
+        AuctionsLoaded(
+          auctions: auctions,
+          currentPage: response.currentPage,
+          lastPage: response.lastPage,
+          total: response.total,
+          statusFilter: _statusFilter,
+          searchQuery: _searchQuery,
+          sortOption: _sortOption,
+          typeFilter: _typeFilter,
+          dateRange: _dateRange,
+          hostFilter: _hostFilter,
+          winnerFilter: _winnerFilter,
+          postIdFilter: _postIdFilter,
+          postLabelFilter: _postLabelFilter,
+          liveIdFilter: _liveIdFilter,
+          liveLabelFilter: _liveLabelFilter,
+          hasWinnerFilter: _hasWinnerFilter,
+          hasPostFilter: _hasPostFilter,
+          hasLiveFilter: _hasLiveFilter,
+          displayedAuctions: displayed,
+          isFetching: false,
+          isLoadingMore: false,
+        ),
+      );
     } catch (e) {
       if (token != _loadToken) return;
       if (previous is AuctionsLoaded) {
-        emit(
-          previous.copyWith(isFetching: false, isLoadingMore: false),
-        );
+        emit(previous.copyWith(isFetching: false, isLoadingMore: false));
       } else {
         emit(AuctionsError(e.toString()));
       }
@@ -509,24 +509,14 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
   ) async {
     final page = event.refresh ? 1 : (event.page ?? _currentPage);
     final hasData = state is AuctionsLoaded;
-    await _fetchPage(
-      emit,
-      page: page,
-      showLoading: !hasData,
-      append: false,
-    );
+    await _fetchPage(emit, page: page, showLoading: !hasData, append: false);
   }
 
   Future<void> _onGoToPage(
     GoToAuctionsPageEvent event,
     Emitter<AuctionsState> emit,
   ) async {
-    await _fetchPage(
-      emit,
-      page: event.page,
-      showLoading: false,
-      append: false,
-    );
+    await _fetchPage(emit, page: event.page, showLoading: false, append: false);
   }
 
   Future<void> _onLoadMore(
@@ -605,11 +595,13 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     _dateRange = event.dateRange;
     final current = state;
     if (current is AuctionsLoaded) {
-      emit(current.copyWith(
-        dateRange: event.dateRange,
-        clearDateRange: event.dateRange == null,
-        displayedAuctions: _applyLocalFilters(current.auctions),
-      ));
+      emit(
+        current.copyWith(
+          dateRange: event.dateRange,
+          clearDateRange: event.dateRange == null,
+          displayedAuctions: _applyLocalFilters(current.auctions),
+        ),
+      );
     }
   }
 
@@ -691,25 +683,23 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     emit(current.copyWith(isActioning: true, clearActionError: true));
     try {
       final updated = await _cancelAuction(event.auctionId);
-      final idx =
-          current.auctions.indexWhere((a) => a.id == event.auctionId);
+      final idx = current.auctions.indexWhere((a) => a.id == event.auctionId);
       if (idx != -1) {
         final list = List<AuctionEntity>.from(current.auctions);
         list[idx] = updated;
-        emit(current.copyWith(
-          auctions: list,
-          displayedAuctions: _applyLocalFilters(list),
-          isActioning: false,
-          clearActionError: true,
-        ));
+        emit(
+          current.copyWith(
+            auctions: list,
+            displayedAuctions: _applyLocalFilters(list),
+            isActioning: false,
+            clearActionError: true,
+          ),
+        );
       } else {
         add(LoadAllAuctionsEvent(page: current.currentPage));
       }
     } catch (e) {
-      emit(current.copyWith(
-        isActioning: false,
-        actionError: e.toString(),
-      ));
+      emit(current.copyWith(isActioning: false, actionError: e.toString()));
     }
   }
 
@@ -720,16 +710,17 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
     final current = state;
     if (current is! AuctionsLoaded) return;
 
-    final idx =
-        current.auctions.indexWhere((a) => a.id == event.auction.id);
+    final idx = current.auctions.indexWhere((a) => a.id == event.auction.id);
     if (idx == -1) return;
 
     final updated = List<AuctionEntity>.from(current.auctions);
     updated[idx] = event.auction;
-    emit(current.copyWith(
-      auctions: updated,
-      displayedAuctions: _applyLocalFilters(updated),
-    ));
+    emit(
+      current.copyWith(
+        auctions: updated,
+        displayedAuctions: _applyLocalFilters(updated),
+      ),
+    );
   }
 
   @override

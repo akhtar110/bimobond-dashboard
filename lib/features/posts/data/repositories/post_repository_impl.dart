@@ -163,6 +163,25 @@ class PostListRepositoryImpl implements PostListRepository {
   ) {
     var output = posts;
 
+    if (filters.isAuctionable == true) {
+      output = output
+          .where(
+            (post) =>
+                post.isAuctionable || post.type.toUpperCase() == 'AUCTION',
+          )
+          .toList(growable: false);
+    } else if (filters.isAd == true) {
+      output = output.where((post) => post.isAd).toList(growable: false);
+    } else {
+      // Default "Posts" filter: Regular Posts + Ads (excluding Auctions)
+      output = output
+          .where(
+            (post) =>
+                !post.isAuctionable && post.type.toUpperCase() != 'AUCTION',
+          )
+          .toList(growable: false);
+    }
+
     final userId = filters.userId?.trim();
     if (userId != null && userId.isNotEmpty) {
       output = output
@@ -202,12 +221,7 @@ class PostListRepositoryImpl implements PostListRepository {
     required PostFilters filters,
     required bool filteredCountChanged,
   }) {
-    final userId = filters.userId?.trim();
-    final privacy = filters.privacyStatus?.trim();
-    if ((userId != null && userId.isNotEmpty && filteredCountChanged) ||
-        ((filters.hasDateRange || filters.hasTimeRange) &&
-            filteredCountChanged) ||
-        (privacy != null && privacy.isNotEmpty && filteredCountChanged)) {
+    if (filteredCountChanged) {
       return filteredCount;
     }
     return modelTotal;

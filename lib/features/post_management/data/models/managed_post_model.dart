@@ -3,6 +3,7 @@ import '../../../categories/data/models/category_model.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/utils/post_status_utils.dart';
 import 'managed_post_sound_model.dart';
+import 'managed_post_filter_effect_model.dart';
 import 'post_engagement_user_model.dart';
 
 class ManagedPostModel extends ManagedPostEntity {
@@ -36,6 +37,7 @@ class ManagedPostModel extends ManagedPostEntity {
     required super.commentCount,
     required super.saveCount,
     super.repostCount = 0,
+    super.reportCount = 0,
     super.recentReposts = const [],
     super.recentLikes = const [],
     super.recentViews = const [],
@@ -58,6 +60,10 @@ class ManagedPostModel extends ManagedPostEntity {
     super.soundId,
     super.sound,
     super.originalPostId,
+    super.filterId,
+    super.effectId,
+    super.appliedFilter,
+    super.appliedEffect,
   });
 
   factory ManagedPostModel.fromEntity(ManagedPostEntity entity) {
@@ -91,6 +97,7 @@ class ManagedPostModel extends ManagedPostEntity {
       commentCount: entity.commentCount,
       saveCount: entity.saveCount,
       repostCount: entity.repostCount,
+      reportCount: entity.reportCount,
       recentReposts: entity.recentReposts,
       recentLikes: entity.recentLikes,
       recentViews: entity.recentViews,
@@ -113,6 +120,10 @@ class ManagedPostModel extends ManagedPostEntity {
       soundId: entity.soundId,
       sound: entity.sound,
       originalPostId: entity.originalPostId,
+      filterId: entity.filterId,
+      effectId: entity.effectId,
+      appliedFilter: entity.appliedFilter,
+      appliedEffect: entity.appliedEffect,
     );
   }
 
@@ -202,6 +213,16 @@ class ManagedPostModel extends ManagedPostEntity {
               ? (json['reposts'] as List).length
               : _readInt(json['reposts'])) ??
           0,
+      reportCount: _readInt(json['reportCount']) ??
+          _readInt(json['reportsCount']) ??
+          _readInt(json['report_count']) ??
+          _readInt(json['reports_count']) ??
+          _readInt((json['_count'] as Map?)?['reports']) ??
+          _readInt((json['_count'] as Map?)?['report']) ??
+          (json['reports'] is List
+              ? (json['reports'] as List).length
+              : _readInt(json['reports'])) ??
+          0,
       recentReposts: _parseRecentRepostMaps(json),
       recentLikes: parseEngagementUserList(
         json['recentLikes'] ?? json['likes'],
@@ -239,6 +260,10 @@ class ManagedPostModel extends ManagedPostEntity {
         soundId: readManagedPostSoundId(json),
       ),
       originalPostId: json['originalPostId'] as String?,
+      appliedFilter: parsePostAppliedFilter(json),
+      appliedEffect: parsePostAppliedEffect(json),
+      filterId: readManagedPostFilterCatalogId(json),
+      effectId: readManagedPostEffectCatalogId(json),
     );
   }
 

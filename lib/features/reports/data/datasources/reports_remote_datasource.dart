@@ -8,6 +8,16 @@ abstract class ReportsRemoteDataSource {
     int limit = 15,
     String? status,
     String? type,
+    String? reporterId,
+    String? reportedUserId,
+    String? postId,
+    String? commentId,
+    String? storyId,
+    String? search,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? sortBy,
+    String? sortOrder,
   });
 
   Future<ReportModel> getReportById(String id);
@@ -29,12 +39,39 @@ class ReportsRemoteDataSourceImpl implements ReportsRemoteDataSource {
     int limit = 15,
     String? status,
     String? type,
+    String? reporterId,
+    String? reportedUserId,
+    String? postId,
+    String? commentId,
+    String? storyId,
+    String? search,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? sortBy,
+    String? sortOrder,
   }) async {
     final params = <String, dynamic>{
       'page': page,
       'limit': limit,
       if (status != null && status.isNotEmpty) 'status': status,
       if (type != null && type.isNotEmpty) 'type': type,
+      if (reporterId != null && reporterId.isNotEmpty)
+        'reporterId': reporterId,
+      if (reportedUserId != null && reportedUserId.isNotEmpty) ...{
+        'userId': reportedUserId,
+        'reportedUserId': reportedUserId,
+      },
+      if (postId != null && postId.isNotEmpty) 'postId': postId,
+      if (commentId != null && commentId.isNotEmpty) 'commentId': commentId,
+      if (storyId != null && storyId.isNotEmpty) 'storyId': storyId,
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (startDate != null) 'from': startDate.toUtc().toIso8601String(),
+      if (startDate != null) 'startDate': startDate.toUtc().toIso8601String(),
+      if (endDate != null) 'to': endDate.toUtc().toIso8601String(),
+      if (endDate != null) 'endDate': endDate.toUtc().toIso8601String(),
+      if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
+      if (sortOrder != null && sortOrder.isNotEmpty) 'sortOrder': sortOrder,
+      if (sortOrder != null && sortOrder.isNotEmpty) 'sort': sortOrder,
     };
 
     final response = await _dio.get('/reports', queryParameters: params);

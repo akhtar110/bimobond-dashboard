@@ -18,6 +18,17 @@ import '../../domain/usecases/hide_post_usecase.dart';
 import '../../domain/usecases/update_managed_post.dart';
 import '../../domain/usecases/update_post_details_usecase.dart';
 import '../../domain/usecases/update_post_status_usecase.dart';
+import '../../domain/usecases/add_post_note_usecase.dart';
+import '../../domain/usecases/get_post_moderation_timeline_usecase.dart';
+import '../../domain/entities/post_moderation_entities.dart';
+import '../services/post_applied_catalog_resolver.dart';
+import '../utils/post_detail_labels.dart';
+import '../../../post_reports/domain/entities/post_report_entities.dart';
+import '../../../post_reports/domain/usecases/get_post_report_detail.dart';
+import '../../../filters_effects/domain/entities/filters_effects_entities.dart';
+import '../../../filters_effects/domain/usecases/filters_effects_usecases.dart';
+import '../../../reports/domain/entities/report_entity.dart';
+import '../../../reports/domain/usecases/get_reports_usecase.dart';
 
 sealed class PostManagementEvent {}
 
@@ -55,9 +66,39 @@ class HidePostEvent extends PostManagementEvent {}
 class BanPostEvent extends PostManagementEvent {}
 
 class UpdatePostStatusEvent extends PostManagementEvent {
-  UpdatePostStatusEvent(this.status);
+  UpdatePostStatusEvent(
+    this.status, {
+    this.reason,
+    this.note,
+  });
+
   final String status;
+  final String? reason;
+  final String? note;
 }
+
+class SubmitPostInternalNoteEvent extends PostManagementEvent {
+  SubmitPostInternalNoteEvent(this.note);
+  final String note;
+}
+
+class LoadPostModerationTimelineEvent extends PostManagementEvent {
+  LoadPostModerationTimelineEvent({this.refresh = false});
+  final bool refresh;
+}
+
+class LoadMorePostModerationTimelineEvent extends PostManagementEvent {}
+
+class LoadPostAdvancedAnalyticsEvent extends PostManagementEvent {}
+
+class LoadPostFilterEffectEvent extends PostManagementEvent {}
+
+class LoadPostModerationReportsEvent extends PostManagementEvent {
+  LoadPostModerationReportsEvent({this.refresh = false});
+  final bool refresh;
+}
+
+class ClearPostManagementMessagesEvent extends PostManagementEvent {}
 
 class LoadPostCommentsEvent extends PostManagementEvent {}
 
@@ -147,6 +188,24 @@ class PostManagementLoaded extends PostManagementState {
     this.views = const PostEngagementListState(),
     this.mentions = const PostEngagementListState(),
     this.reposts = const PostEngagementListState(),
+    this.isSubmittingNote = false,
+    this.isTimelineLoading = false,
+    this.isTimelineLoadingMore = false,
+    this.timelineError,
+    this.timelineEntries = const [],
+    this.timelinePage = 0,
+    this.timelineHasMore = false,
+    this.isAnalyticsLoading = false,
+    this.analyticsError,
+    this.analyticsDetail,
+    this.isFilterEffectLoading = false,
+    this.filterEffectError,
+    this.postFilter,
+    this.postEffect,
+    this.isModerationReportsLoading = false,
+    this.moderationReportsError,
+    this.moderationReports = const [],
+    this.moderationReportsTotal = 0,
   });
 
   final ManagedPostEntity post;
@@ -170,6 +229,27 @@ class PostManagementLoaded extends PostManagementState {
   final PostEngagementListState views;
   final PostEngagementListState mentions;
   final PostEngagementListState reposts;
+
+  final bool isSubmittingNote;
+  final bool isTimelineLoading;
+  final bool isTimelineLoadingMore;
+  final String? timelineError;
+  final List<PostModerationTimelineEntry> timelineEntries;
+  final int timelinePage;
+  final bool timelineHasMore;
+  final bool isAnalyticsLoading;
+  final String? analyticsError;
+  final PostReportDetailEntity? analyticsDetail;
+
+  final bool isFilterEffectLoading;
+  final String? filterEffectError;
+  final CameraFilterEntity? postFilter;
+  final CameraEffectEntity? postEffect;
+
+  final bool isModerationReportsLoading;
+  final String? moderationReportsError;
+  final List<ReportEntity> moderationReports;
+  final int moderationReportsTotal;
 
   PostEngagementListState engagementFor(PostEngagementKind kind) {
     return switch (kind) {
@@ -204,6 +284,31 @@ class PostManagementLoaded extends PostManagementState {
     PostEngagementListState? views,
     PostEngagementListState? mentions,
     PostEngagementListState? reposts,
+    bool? isSubmittingNote,
+    bool? isTimelineLoading,
+    bool? isTimelineLoadingMore,
+    String? timelineError,
+    bool clearTimelineError = false,
+    List<PostModerationTimelineEntry>? timelineEntries,
+    int? timelinePage,
+    bool? timelineHasMore,
+    bool? isAnalyticsLoading,
+    String? analyticsError,
+    bool clearAnalyticsError = false,
+    PostReportDetailEntity? analyticsDetail,
+    bool clearAnalyticsDetail = false,
+    bool? isFilterEffectLoading,
+    String? filterEffectError,
+    bool clearFilterEffectError = false,
+    CameraFilterEntity? postFilter,
+    bool clearPostFilter = false,
+    CameraEffectEntity? postEffect,
+    bool clearPostEffect = false,
+    bool? isModerationReportsLoading,
+    String? moderationReportsError,
+    bool clearModerationReportsError = false,
+    List<ReportEntity>? moderationReports,
+    int? moderationReportsTotal,
   }) {
     return PostManagementLoaded(
       post: post ?? this.post,
@@ -232,6 +337,36 @@ class PostManagementLoaded extends PostManagementState {
       views: views ?? this.views,
       mentions: mentions ?? this.mentions,
       reposts: reposts ?? this.reposts,
+      isSubmittingNote: isSubmittingNote ?? this.isSubmittingNote,
+      isTimelineLoading: isTimelineLoading ?? this.isTimelineLoading,
+      isTimelineLoadingMore:
+          isTimelineLoadingMore ?? this.isTimelineLoadingMore,
+      timelineError:
+          clearTimelineError ? null : (timelineError ?? this.timelineError),
+      timelineEntries: timelineEntries ?? this.timelineEntries,
+      timelinePage: timelinePage ?? this.timelinePage,
+      timelineHasMore: timelineHasMore ?? this.timelineHasMore,
+      isAnalyticsLoading: isAnalyticsLoading ?? this.isAnalyticsLoading,
+      analyticsError:
+          clearAnalyticsError ? null : (analyticsError ?? this.analyticsError),
+      analyticsDetail: clearAnalyticsDetail
+          ? null
+          : (analyticsDetail ?? this.analyticsDetail),
+      isFilterEffectLoading:
+          isFilterEffectLoading ?? this.isFilterEffectLoading,
+      filterEffectError: clearFilterEffectError
+          ? null
+          : (filterEffectError ?? this.filterEffectError),
+      postFilter: clearPostFilter ? null : (postFilter ?? this.postFilter),
+      postEffect: clearPostEffect ? null : (postEffect ?? this.postEffect),
+      isModerationReportsLoading:
+          isModerationReportsLoading ?? this.isModerationReportsLoading,
+      moderationReportsError: clearModerationReportsError
+          ? null
+          : (moderationReportsError ?? this.moderationReportsError),
+      moderationReports: moderationReports ?? this.moderationReports,
+      moderationReportsTotal:
+          moderationReportsTotal ?? this.moderationReportsTotal,
     );
   }
 }
@@ -253,6 +388,14 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     required this.hidePost,
     required this.banPost,
     required this.updatePostStatus,
+    required this.addPostNote,
+    required this.getPostModerationTimeline,
+    required this.getPostReportDetail,
+    required this.getCameraFilter,
+    required this.getCameraEffect,
+    required this.getCameraFilters,
+    required this.getCameraEffects,
+    required this.getReports,
     required this.getPostComments,
     required this.deleteCommentAdmin,
     required this.getPostEngagementUsers,
@@ -265,6 +408,13 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     on<HidePostEvent>(_onHide);
     on<BanPostEvent>(_onBan);
     on<UpdatePostStatusEvent>(_onUpdateStatus);
+    on<SubmitPostInternalNoteEvent>(_onSubmitNote);
+    on<LoadPostModerationTimelineEvent>(_onLoadTimeline);
+    on<LoadMorePostModerationTimelineEvent>(_onLoadMoreTimeline);
+    on<LoadPostAdvancedAnalyticsEvent>(_onLoadAnalytics);
+    on<LoadPostFilterEffectEvent>(_onLoadFilterEffect);
+    on<LoadPostModerationReportsEvent>(_onLoadModerationReports);
+    on<ClearPostManagementMessagesEvent>(_onClearMessages);
     on<LoadPostCommentsEvent>(_onLoadComments);
     on<LoadMorePostCommentsEvent>(_onLoadMoreComments);
     on<DeletePostCommentAdminEvent>(_onDeleteComment);
@@ -274,6 +424,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
   static const int _commentsLimit = 20;
   static const int _engagementLimit = 20;
+  static const int _timelineLimit = 20;
 
   final GetManagedPostById getManagedPostById;
   final GetUserById getUserById;
@@ -283,6 +434,14 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
   final HidePost hidePost;
   final BanPost banPost;
   final UpdatePostStatus updatePostStatus;
+  final AddPostNote addPostNote;
+  final GetPostModerationTimeline getPostModerationTimeline;
+  final GetPostReportDetail getPostReportDetail;
+  final GetCameraFilterUseCase getCameraFilter;
+  final GetCameraEffectUseCase getCameraEffect;
+  final GetCameraFiltersUseCase getCameraFilters;
+  final GetCameraEffectsUseCase getCameraEffects;
+  final GetReports getReports;
   final GetPostComments getPostComments;
   final DeleteCommentAdmin deleteCommentAdmin;
   final GetPostEngagementUsers getPostEngagementUsers;
@@ -308,6 +467,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     if (!event.skipComments) {
       add(LoadPostCommentsEvent());
     }
+    add(LoadPostFilterEffectEvent());
+    add(LoadPostModerationReportsEvent());
 
     try {
       final fresh = await getManagedPostById(event.post.id);
@@ -330,6 +491,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
             draft: hydrated,
           ),
         );
+        add(LoadPostFilterEffectEvent());
+        add(LoadPostModerationReportsEvent(refresh: true));
       } else {
         emit(
           _loadedFromPost(
@@ -342,6 +505,8 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         if (!event.skipComments) {
           add(LoadPostCommentsEvent());
         }
+        add(LoadPostFilterEffectEvent());
+        add(LoadPostModerationReportsEvent());
       }
     } catch (_) {
       // Keep the navigation stub already shown above.
@@ -498,17 +663,15 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
     emit(current.copyWith(isSaving: true, clearMessages: true));
 
     try {
+      final updateData = buildManagedPostUpdateDiff(current.post, current.draft);
+      if (!managedPostUpdateDataHasChanges(updateData)) {
+        emit(current.copyWith(isSaving: false));
+        return;
+      }
+
       final raw = await updateManagedPost(
         current.draft.id,
-        ManagedPostUpdateData(
-          description: current.draft.description,
-          categoryId: current.draft.categoryEntity?.id,
-          privacyStatus: current.draft.privacyStatus,
-          status: current.draft.status,
-          allowComments: current.draft.allowComments,
-          allowDuets: current.draft.allowDuets,
-          allowStitch: current.draft.allowStitch,
-        ),
+        updateData,
       );
       final updated = mergeManagedPostForListDisplay(current.post, raw);
 
@@ -520,6 +683,7 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
           successMessage: 'Post updated successfully',
         ),
       );
+      add(LoadPostModerationTimelineEvent(refresh: true));
     } catch (e) {
       emit(
         current.copyWith(
@@ -652,16 +816,25 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
 
     emit(current.copyWith(isActioning: true, clearMessages: true));
     try {
-      final raw = await updatePostStatus(current.post.id, event.status);
+      final raw = await updatePostStatus(
+        current.post.id,
+        event.status,
+        reason: event.reason,
+        note: event.note,
+      );
       final updated = mergeManagedPostForListDisplay(current.post, raw);
       emit(
         current.copyWith(
           post: updated,
           draft: updated,
           isActioning: false,
-          successMessage: 'Status changed to ${event.status}',
+          successMessage: 'statusUpdated',
         ),
       );
+      add(LoadPostModerationTimelineEvent(refresh: true));
+      if (current.analyticsDetail != null) {
+        add(LoadPostAdvancedAnalyticsEvent());
+      }
     } catch (e) {
       emit(
         current.copyWith(
@@ -670,6 +843,254 @@ class PostManagementBloc extends Bloc<PostManagementEvent, PostManagementState> 
         ),
       );
     }
+  }
+
+  Future<void> _onSubmitNote(
+    SubmitPostInternalNoteEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+    final note = event.note.trim();
+    if (note.isEmpty) return;
+
+    emit(current.copyWith(isSubmittingNote: true, clearMessages: true));
+    try {
+      await addPostNote(current.post.id, note);
+      emit(
+        current.copyWith(
+          isSubmittingNote: false,
+          successMessage: 'noteAdded',
+        ),
+      );
+      add(LoadPostModerationTimelineEvent(refresh: true));
+    } catch (e) {
+      emit(
+        current.copyWith(
+          isSubmittingNote: false,
+          errorMessage: _messageFrom(e),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadTimeline(
+    LoadPostModerationTimelineEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+
+    emit(
+      current.copyWith(
+        isTimelineLoading: true,
+        clearTimelineError: true,
+        timelineEntries: event.refresh ? [] : current.timelineEntries,
+        timelinePage: event.refresh ? 0 : current.timelinePage,
+        timelineHasMore: event.refresh ? false : current.timelineHasMore,
+      ),
+    );
+
+    try {
+      final page = await getPostModerationTimeline(
+        current.post.id,
+        page: 1,
+        limit: _timelineLimit,
+      );
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isTimelineLoading: false,
+          timelineEntries: page.items,
+          timelinePage: page.page,
+          timelineHasMore: page.hasMore,
+        ),
+      );
+      if (page.items.isEmpty &&
+          (state as PostManagementLoaded).analyticsDetail == null) {
+        add(LoadPostAdvancedAnalyticsEvent());
+      }
+    } catch (e) {
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isTimelineLoading: false,
+          timelineError: _messageFrom(e),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadMoreTimeline(
+    LoadMorePostModerationTimelineEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded ||
+        !current.timelineHasMore ||
+        current.isTimelineLoadingMore) {
+      return;
+    }
+
+    emit(current.copyWith(isTimelineLoadingMore: true));
+    try {
+      final nextPage = current.timelinePage + 1;
+      final page = await getPostModerationTimeline(
+        current.post.id,
+        page: nextPage,
+        limit: _timelineLimit,
+      );
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isTimelineLoadingMore: false,
+          timelineEntries: [...current.timelineEntries, ...page.items],
+          timelinePage: page.page,
+          timelineHasMore: page.hasMore,
+        ),
+      );
+    } catch (e) {
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isTimelineLoadingMore: false,
+          timelineError: _messageFrom(e),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadAnalytics(
+    LoadPostAdvancedAnalyticsEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+    if (current.isAnalyticsLoading) return;
+
+    emit(current.copyWith(isAnalyticsLoading: true, clearAnalyticsError: true));
+    try {
+      final detail = await getPostReportDetail(
+        postId: current.post.id,
+        query: const ReportPeriodQuery(days: 30),
+      );
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isAnalyticsLoading: false,
+          analyticsDetail: detail,
+        ),
+      );
+    } catch (e) {
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isAnalyticsLoading: false,
+          analyticsError: _messageFrom(e),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadFilterEffect(
+    LoadPostFilterEffectEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+
+    final appliedFilter = current.post.appliedFilter;
+    final appliedEffect = current.post.appliedEffect;
+    final hasFilter = appliedFilter?.hasData ?? false;
+    final hasEffect = appliedEffect?.hasData ?? false;
+    if (!hasFilter && !hasEffect) {
+      emit(
+        current.copyWith(
+          isFilterEffectLoading: false,
+          clearFilterEffectError: true,
+          clearPostFilter: true,
+          clearPostEffect: true,
+        ),
+      );
+      return;
+    }
+
+    if (current.isFilterEffectLoading) return;
+
+    emit(
+      current.copyWith(
+        isFilterEffectLoading: true,
+        clearFilterEffectError: true,
+      ),
+    );
+
+    CameraFilterEntity? filter;
+    CameraEffectEntity? effect;
+
+    if (hasFilter) {
+      filter = await PostAppliedCatalogResolver.resolveFilter(
+        ref: appliedFilter!,
+        getById: getCameraFilter,
+        listFilters: getCameraFilters,
+      );
+    }
+    if (hasEffect) {
+      effect = await PostAppliedCatalogResolver.resolveEffect(
+        ref: appliedEffect!,
+        getById: getCameraEffect,
+        listEffects: getCameraEffects,
+      );
+    }
+
+    emit(
+      (state as PostManagementLoaded).copyWith(
+        isFilterEffectLoading: false,
+        postFilter: filter,
+        postEffect: effect,
+        clearFilterEffectError: true,
+      ),
+    );
+  }
+
+  Future<void> _onLoadModerationReports(
+    LoadPostModerationReportsEvent event,
+    Emitter<PostManagementState> emit,
+  ) async {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+    if (current.isModerationReportsLoading && !event.refresh) return;
+
+    emit(
+      current.copyWith(
+        isModerationReportsLoading: true,
+        clearModerationReportsError: true,
+      ),
+    );
+
+    try {
+      final result = await getReports(
+        postId: current.post.id,
+        page: 1,
+        limit: 20,
+      );
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isModerationReportsLoading: false,
+          moderationReports: result.reports,
+          moderationReportsTotal: result.total,
+        ),
+      );
+    } catch (e) {
+      emit(
+        (state as PostManagementLoaded).copyWith(
+          isModerationReportsLoading: false,
+          moderationReportsError: _messageFrom(e),
+        ),
+      );
+    }
+  }
+
+  void _onClearMessages(
+    ClearPostManagementMessagesEvent event,
+    Emitter<PostManagementState> emit,
+  ) {
+    final current = state;
+    if (current is! PostManagementLoaded) return;
+    emit(current.copyWith(clearMessages: true));
   }
 
   Future<void> _onLoadComments(
