@@ -15,6 +15,7 @@ import '../bloc/logs_event.dart';
 import '../bloc/logs_state.dart';
 import '../utils/logs_labels.dart';
 import '../utils/logs_responsive.dart';
+import '../widgets/logs_export_button.dart';
 import '../widgets/logs_filter_popup.dart';
 import '../widgets/logs_table.dart';
 
@@ -49,21 +50,41 @@ class _LogsPageView extends StatelessWidget {
         return BlocConsumer<LogsBloc, LogsState>(
           listenWhen: (prev, curr) {
             if (curr is! LogsLoaded) return false;
-            return curr.errorMessage != null &&
-                (prev is! LogsLoaded || prev.errorMessage != curr.errorMessage);
+            final prevLoaded = prev is LogsLoaded ? prev : null;
+            final hasNewError = curr.errorMessage != null &&
+                prevLoaded?.errorMessage != curr.errorMessage;
+            final hasNewExportMessage = curr.exportMessage != null &&
+                prevLoaded?.exportMessage != curr.exportMessage;
+            return hasNewError || hasNewExportMessage;
           },
           listener: (context, state) {
-            if (state is! LogsLoaded || state.errorMessage == null) return;
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                SnackBar(
-                  content: Text(state.errorMessage!),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                ),
-              );
-            context.read<LogsBloc>().add(const ClearLogsMessageEvent());
+            if (state is! LogsLoaded) return;
+            final scheme = Theme.of(context).colorScheme;
+
+            if (state.errorMessage != null) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.errorMessage!),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: scheme.error,
+                  ),
+                );
+              context.read<LogsBloc>().add(const ClearLogsMessageEvent());
+            } else if (state.exportMessage != null) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.exportMessage!),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor:
+                        state.exportIsError ? scheme.error : scheme.primary,
+                  ),
+                );
+              context.read<LogsBloc>().add(const ClearLogsExportMessageEvent());
+            }
           },
           builder: (context, state) {
             final loaded = state is LogsLoaded ? state : null;
@@ -94,6 +115,12 @@ class _LogsPageView extends StatelessWidget {
                           style: titleStyle,
                         ),
                       ),
+                      LogsExportButton(
+                        height: 42,
+                        isExporting: loaded?.isExporting == true,
+                        enabled: loaded != null && !isInitialLoad,
+                      ),
+                      const SizedBox(width: 8),
                       _LogsFilterButton(
                         query: loaded?.query,
                         enabled: loaded != null,

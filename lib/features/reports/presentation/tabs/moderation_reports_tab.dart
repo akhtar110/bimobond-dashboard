@@ -157,7 +157,7 @@ class _ModerationTable extends StatelessWidget {
                     : ListView.separated(
                         controller: scrollController,
                         itemCount: state.reports.length,
-                        separatorBuilder: (_, __) => Divider(
+                        separatorBuilder: (_, _) => Divider(
                           height: 1,
                           color: scheme.outlineVariant.withValues(alpha: 0.45),
                         ),
@@ -959,7 +959,7 @@ class _FilterBar extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: statusFilters.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
                   final f = statusFilters[i];
                   final selected = activeStatus == f.value;
@@ -985,7 +985,7 @@ class _FilterBar extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: typeFilters.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
                 itemBuilder: (context, i) {
                   final f = typeFilters[i];
                   final selected = activeType == f.value;

@@ -10,6 +10,18 @@ abstract class ReportsRepository {
     int limit = 15,
     String? status,
     String? type,
+    String? userId,
+    String? reportedUserId,
+    String? reporterId,
+    String? postId,
+    String? commentId,
+    String? storyId,
+    String? search,
+    DateTime? from,
+    DateTime? to,
+    String? sortBy,
+    String? sortOrder,
+    String? sort,
   });
 
   Future<ReportEntity> getReportById(String id);

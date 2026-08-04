@@ -6,6 +6,7 @@ class UsersTableConfig {
     required this.showAccount,
     required this.showEngagement,
     required this.showLocation,
+    required this.showOnlineStatus,
     required this.compactActions,
     required this.minWidth,
     this.checkboxWidth = 44,
@@ -14,6 +15,7 @@ class UsersTableConfig {
   final bool showAccount;
   final bool showEngagement;
   final bool showLocation;
+  final bool showOnlineStatus;
   final bool compactActions;
   final double minWidth;
   final double checkboxWidth;
@@ -29,6 +31,8 @@ class UsersTableConfig {
       // Keep followers / posts / likes visible whenever the table is shown.
       showEngagement: true,
       showLocation: true,
+      // Online Status column: show on desktop only (tablet/mobile hide to save space)
+      showOnlineStatus: device == DeviceType.desktop,
       // Inline action chips need room; collapse to overflow menu earlier
       // on laptop/tablet content widths to avoid overlap.
       compactActions: width < 1500 ||

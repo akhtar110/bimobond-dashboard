@@ -6,6 +6,7 @@ import '../../domain/entities/user_entity.dart';
 import 'user_action_buttons.dart';
 import 'user_engagement_bar.dart';
 import 'user_location_cell.dart';
+import 'user_online_status_cell.dart';
 import 'user_privacy_badges.dart';
 import 'user_status_badge.dart';
 import 'users_table_config.dart';
@@ -164,6 +165,13 @@ class UsersTableRow extends StatelessWidget {
                   ),
                 ),
               ),
+              if (config.showOnlineStatus) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 16,
+                  child: UserOnlineStatusCell(user: user),
+                ),
+              ],
               if (config.showEngagement) ...[
                 const SizedBox(width: 8),
                 Expanded(

@@ -13,6 +13,9 @@ abstract class UsersRepository {
     bool? isVerified,
     bool? isBanned,
     String? location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
   });
 
   Future<void> blockUser({

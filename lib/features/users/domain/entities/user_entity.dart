@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import 'message_permission.dart';
 import 'user_last_location_entity.dart';
 import 'user_wallet_entity.dart';
@@ -78,6 +80,8 @@ class UserEntity {
     this.fcmToken,
     this.createdAt,
     this.updatedAt,
+    this.lastActive,
+    this.isOnlineOverride,
     required this.roles,
     this.wallet,
     this.relationCounts,
@@ -150,6 +154,24 @@ class UserEntity {
   final String? fcmToken;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final DateTime? lastActive;
+  final bool? isOnlineOverride;
+
+  DateTime? get lastSeen => lastActive ?? updatedAt ?? createdAt;
+
+  bool get isOnline =>
+      isOnlineOverride ??
+      (lastSeen != null && DateTime.now().difference(lastSeen!).inMinutes < 3);
+
+  String get lastSeenFormatted {
+    if (lastSeen == null) return '—';
+    final diff = DateTime.now().difference(lastSeen!);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 2) return 'Yesterday';
+    return DateFormat('MMM d, yyyy').format(lastSeen!);
+  }
 
   final List<UserRole> roles;
 

@@ -261,8 +261,10 @@ class LogsQuery extends Equatable {
       'limit': limit.clamp(1, 100),
       if (resolvedUserId != null && resolvedUserId.isNotEmpty)
         'userId': resolvedUserId,
-      if (resolvedRole != null) 'actorRole': resolvedRole,
-      if (resolvedCategory != null) 'category': resolvedCategory,
+      if (resolvedRole != null && resolvedRole.isNotEmpty)
+        'actorRole': resolvedRole,
+      if (resolvedCategory != null && resolvedCategory.isNotEmpty)
+        'category': resolvedCategory,
       if (act != null && act.isNotEmpty) 'action': act,
       if (from != null) 'from': _iso(from)!,
       if (to != null) 'to': _iso(to)!,

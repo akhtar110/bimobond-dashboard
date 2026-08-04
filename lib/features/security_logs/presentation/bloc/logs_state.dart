@@ -26,8 +26,11 @@ class LogsLoaded extends LogsState {
     required this.query,
     this.isRefreshing = false,
     this.isPaginating = false,
+    this.isExporting = false,
     this.errorMessage,
     this.successMessage,
+    this.exportMessage,
+    this.exportIsError = false,
   });
 
   final List<LogEntity> logs;
@@ -35,8 +38,11 @@ class LogsLoaded extends LogsState {
   final LogsQuery query;
   final bool isRefreshing;
   final bool isPaginating;
+  final bool isExporting;
   final String? errorMessage;
   final String? successMessage;
+  final String? exportMessage;
+  final bool exportIsError;
 
   UserEntity? get selectedUser => query.user;
   String? get selectedActorRole => query.actorRole;
@@ -53,9 +59,13 @@ class LogsLoaded extends LogsState {
     LogsQuery? query,
     bool? isRefreshing,
     bool? isPaginating,
+    bool? isExporting,
     String? errorMessage,
     String? successMessage,
+    String? exportMessage,
+    bool? exportIsError,
     bool clearMessages = false,
+    bool clearExportMessage = false,
   }) {
     return LogsLoaded(
       logs: logs ?? this.logs,
@@ -63,10 +73,14 @@ class LogsLoaded extends LogsState {
       query: query ?? this.query,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       isPaginating: isPaginating ?? this.isPaginating,
+      isExporting: isExporting ?? this.isExporting,
       errorMessage:
           clearMessages ? null : (errorMessage ?? this.errorMessage),
       successMessage:
           clearMessages ? null : (successMessage ?? this.successMessage),
+      exportMessage:
+          clearExportMessage ? null : (exportMessage ?? this.exportMessage),
+      exportIsError: exportIsError ?? this.exportIsError,
     );
   }
 
@@ -77,8 +91,11 @@ class LogsLoaded extends LogsState {
         query,
         isRefreshing,
         isPaginating,
+        isExporting,
         errorMessage,
         successMessage,
+        exportMessage,
+        exportIsError,
       ];
 }
 

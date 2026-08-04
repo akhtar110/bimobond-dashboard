@@ -52,7 +52,7 @@ class ReportsDetailSection extends StatelessWidget {
                     style: ReportsCenterTheme.sectionTitle(theme),
                   ),
                 ),
-                if (trailing != null) trailing!,
+                ?trailing,
               ],
             ),
             SizedBox(height: compact ? 10 : 12),

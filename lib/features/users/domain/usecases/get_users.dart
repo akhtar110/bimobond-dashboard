@@ -13,6 +13,9 @@ class GetUsers {
     bool? isVerified,
     bool? isBanned,
     String? location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
   }) {
     return repository.getUsers(
       page: page,
@@ -21,6 +24,9 @@ class GetUsers {
       isVerified: isVerified,
       isBanned: isBanned,
       location: location,
+      role: role,
+      createdFrom: createdFrom,
+      createdTo: createdTo,
     );
   }
 }

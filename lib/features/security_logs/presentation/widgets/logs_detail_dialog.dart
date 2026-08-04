@@ -136,6 +136,23 @@ class _LogsDetailDialog extends StatelessWidget {
                   l10n.tOr('logsColDescription', 'Description'),
                   log.description!.trim(),
                 ),
+              if (log.meta != null) ...[
+                if (log.meta!['previousValue'] != null || log.meta!['oldValue'] != null || log.meta!['oldRole'] != null)
+                  row(
+                    l10n.tOr('previousValue', 'Previous value'),
+                    '${log.meta!['previousValue'] ?? log.meta!['oldValue'] ?? log.meta!['oldRole']}',
+                  ),
+                if (log.meta!['newValue'] != null || log.meta!['newRole'] != null)
+                  row(
+                    l10n.tOr('newValue', 'New value'),
+                    '${log.meta!['newValue'] ?? log.meta!['newRole']}',
+                  ),
+                if (log.meta!['reason'] != null || log.meta!['banReason'] != null)
+                  row(
+                    l10n.tOr('reason', 'Reason'),
+                    '${log.meta!['reason'] ?? log.meta!['banReason']}',
+                  ),
+              ],
               row(
                 l10n.tOr('logsColIp', 'IP Address'),
                 logsDash(log.ipAddress),

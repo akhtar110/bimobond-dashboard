@@ -60,7 +60,7 @@ class ReportSafeAvatar extends StatelessWidget {
           height: radius * 2,
           fit: BoxFit.cover,
           fadeInDuration: const Duration(milliseconds: 150),
-          placeholder: (_, __) => Center(
+          placeholder: (_, _) => Center(
             child: SizedBox(
               width: radius,
               height: radius,
@@ -70,7 +70,7 @@ class ReportSafeAvatar extends StatelessWidget {
               ),
             ),
           ),
-          errorWidget: (_, __, ___) => ColoredBox(
+          errorWidget: (_, _, _) => ColoredBox(
             color: scheme.primaryContainer,
             child: Center(
               child: Text(
@@ -130,7 +130,7 @@ class ReportSafeThumbnail extends StatelessWidget {
         height: height,
         fit: BoxFit.cover,
         fadeInDuration: const Duration(milliseconds: 150),
-        placeholder: (_, __) => Container(
+        placeholder: (_, _) => Container(
           width: width,
           height: height,
           color: scheme.surfaceContainerHigh,
@@ -145,7 +145,7 @@ class ReportSafeThumbnail extends StatelessWidget {
             ),
           ),
         ),
-        errorWidget: (_, __, ___) => Container(
+        errorWidget: (_, _, _) => Container(
           width: width,
           height: height,
           color: scheme.surfaceContainerHigh,

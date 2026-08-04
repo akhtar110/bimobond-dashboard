@@ -62,6 +62,8 @@ class UserModel extends UserEntity {
     super.fcmToken,
     super.createdAt,
     super.updatedAt,
+    super.lastActive,
+    super.isOnlineOverride,
     required super.roles,
     super.wallet,
     super.relationCounts,
@@ -175,6 +177,10 @@ class UserModel extends UserEntity {
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
+      lastActive: (json['lastActive'] ?? json['lastSeen'] ?? json['lastActiveAt'] ?? json['lastSeenAt']) != null
+          ? DateTime.tryParse((json['lastActive'] ?? json['lastSeen'] ?? json['lastActiveAt'] ?? json['lastSeenAt']).toString())
+          : null,
+      isOnlineOverride: json['isOnline'] is bool ? json['isOnline'] as bool : (json['online'] is bool ? json['online'] as bool : null),
       roles: json['roles'] is List
           ? (json['roles'] as List).map((e) => _mapRole(e.toString())).toList()
           : json['roles'] is Map

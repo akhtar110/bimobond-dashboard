@@ -150,21 +150,40 @@ class _UsersHeaderTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final width = MediaQuery.sizeOf(context).width;
-    final fontSize = width < 480 ? 18.0 : width < 900 ? 19.0 : 20.0;
+    final scheme = theme.colorScheme;
+    final fontSize = width < 480 ? 20.0 : width < 900 ? 22.0 : 24.0;
 
-    return Text(
-      l10n.t('users'),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.4,
-        color: scheme.onSurface,
-        height: 1.1,
-        fontSize: fontSize,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          l10n.t('users'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            color: scheme.onSurface,
+            fontSize: fontSize,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          l10n.tOr(
+            'usersPageSubtitle',
+            'Manage platform users, permissions, account verification, and moderation history.',
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+          ),
+        ),
+      ],
     );
   }
 }

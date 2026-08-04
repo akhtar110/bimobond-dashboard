@@ -139,7 +139,7 @@ class ReportsCenterNavRail extends StatelessWidget {
                   child: ListView.separated(
                     padding: const EdgeInsetsDirectional.fromSTEB(10, 4, 10, 12),
                     itemCount: reportsNavEntries.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 4),
+                    separatorBuilder: (_, _) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final entry = reportsNavEntries[index];
                       return _ReportsNavTile(
@@ -211,7 +211,7 @@ class ReportsCenterNavDrawer extends StatelessWidget {
               child: ListView.separated(
                 padding: const EdgeInsetsDirectional.fromSTEB(12, 12, 12, 12),
                 itemCount: reportsNavEntries.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 4),
+                separatorBuilder: (_, _) => const SizedBox(height: 4),
                 itemBuilder: (context, index) {
                   final entry = reportsNavEntries[index];
                   return _ReportsNavTile(

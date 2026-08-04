@@ -19,6 +19,7 @@ import '../../domain/usecases/unban_user.dart';
 import '../users_ui_filter.dart';
 import '../users_location_sort.dart';
 import '../utils/user_location_list_utils.dart';
+import '../utils/users_export_service.dart';
 
 sealed class UsersEvent {}
 
@@ -45,16 +46,33 @@ class FilterUsersEvent extends UsersEvent {
   final UsersUiFilter filter;
 }
 
-/// Applies username/email search and location filter together (AND).
+/// Applies username/email search, location filter, role, and date range filters together.
 class ApplyUsersListFiltersEvent extends UsersEvent {
   ApplyUsersListFiltersEvent({
     required this.search,
     required this.location,
+    this.role,
+    this.createdFrom,
+    this.createdTo,
   });
 
   final String search;
   final String location;
+  final String? role;
+  final DateTime? createdFrom;
+  final DateTime? createdTo;
 }
+
+/// Triggers user list export to Excel or CSV formats.
+class ExportUsersEvent extends UsersEvent {
+  ExportUsersEvent({
+    required this.format,
+  });
+
+  final UsersExportFormat format;
+}
+
+class ClearUsersExportFeedbackEvent extends UsersEvent {}
 
 class FilterUsersByLocationEvent extends UsersEvent {
   FilterUsersByLocationEvent(this.query);
@@ -148,6 +166,9 @@ class UsersLoaded extends UsersState {
     required this.filter,
     required this.query,
     this.locationQuery = '',
+    this.role,
+    this.createdFrom,
+    this.createdTo,
     this.locationSort = UsersLocationSortOrder.none,
     this.selectedUserIds = const {},
     this.isBulkActionLoading = false,
@@ -155,6 +176,9 @@ class UsersLoaded extends UsersState {
     this.bulkActionIsError = false,
     this.isLoadingMore = false,
     this.isRefreshing = false,
+    this.isExporting = false,
+    this.exportMessage,
+    this.exportIsError = false,
   });
 
   final List<UserEntity> users;
@@ -164,6 +188,9 @@ class UsersLoaded extends UsersState {
   final UsersUiFilter filter;
   final String query;
   final String locationQuery;
+  final String? role;
+  final DateTime? createdFrom;
+  final DateTime? createdTo;
   final UsersLocationSortOrder locationSort;
   final Set<String> selectedUserIds;
   final bool isBulkActionLoading;
@@ -171,6 +198,9 @@ class UsersLoaded extends UsersState {
   final bool bulkActionIsError;
   final bool isLoadingMore;
   final bool isRefreshing;
+  final bool isExporting;
+  final String? exportMessage;
+  final bool exportIsError;
 
   int get selectedCount => selectedUserIds.length;
   bool get hasSelection => selectedUserIds.isNotEmpty;
@@ -194,6 +224,9 @@ class UsersLoaded extends UsersState {
     UsersUiFilter? filter,
     String? query,
     String? locationQuery,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     UsersLocationSortOrder? locationSort,
     Set<String>? selectedUserIds,
     bool? isBulkActionLoading,
@@ -201,7 +234,11 @@ class UsersLoaded extends UsersState {
     bool? bulkActionIsError,
     bool? isLoadingMore,
     bool? isRefreshing,
+    bool? isExporting,
+    String? exportMessage,
+    bool? exportIsError,
     bool clearBulkActionMessage = false,
+    bool clearExportMessage = false,
   }) {
     return UsersLoaded(
       users: users ?? this.users,
@@ -211,6 +248,9 @@ class UsersLoaded extends UsersState {
       filter: filter ?? this.filter,
       query: query ?? this.query,
       locationQuery: locationQuery ?? this.locationQuery,
+      role: role ?? this.role,
+      createdFrom: createdFrom ?? this.createdFrom,
+      createdTo: createdTo ?? this.createdTo,
       locationSort: locationSort ?? this.locationSort,
       selectedUserIds: selectedUserIds ?? this.selectedUserIds,
       isBulkActionLoading: isBulkActionLoading ?? this.isBulkActionLoading,
@@ -220,6 +260,11 @@ class UsersLoaded extends UsersState {
       bulkActionIsError: bulkActionIsError ?? this.bulkActionIsError,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       isRefreshing: isRefreshing ?? this.isRefreshing,
+      isExporting: isExporting ?? this.isExporting,
+      exportMessage: clearExportMessage
+          ? null
+          : (exportMessage ?? this.exportMessage),
+      exportIsError: exportIsError ?? this.exportIsError,
     );
   }
 }
@@ -277,6 +322,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<BulkDemoteUsersEvent>(_onBulkDemote);
     on<ClearUsersBulkFeedbackEvent>(_onClearBulkFeedback);
     on<ResetUserPasswordEvent>(_onResetUserPassword);
+    on<ExportUsersEvent>(_onExportUsers);
+    on<ClearUsersExportFeedbackEvent>(_onClearExportFeedback);
   }
 
   final GetUsers getUsers;
@@ -306,14 +353,24 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
 
   String _query = '';
   String _locationQuery = '';
+  String? _role;
+  DateTime? _createdFrom;
+  DateTime? _createdTo;
   UsersLocationSortOrder _locationSort = UsersLocationSortOrder.none;
   UsersUiFilter _filter = UsersUiFilter.all;
+
+  bool _isExporting = false;
+  String? _exportMessage;
+  bool _exportIsError = false;
 
   final List<UserEntity> _users = [];
   final Set<String> _selectedUserIds = {};
 
   String get activeQuery => _query;
   String get activeLocationQuery => _locationQuery;
+  String? get activeRole => _role;
+  DateTime? get activeCreatedFrom => _createdFrom;
+  DateTime? get activeCreatedTo => _createdTo;
   UsersLocationSortOrder get activeLocationSort => _locationSort;
   UsersUiFilter get activeFilter => _filter;
 
@@ -368,6 +425,10 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
           location: _locationQuery.isEmpty ? null : _locationQuery,
           isVerified: _filter == UsersUiFilter.verified ? true : null,
           isBanned: _filter == UsersUiFilter.banned ? true : null,
+          // online/offline are client-side only; no backend param needed
+          role: _role,
+          createdFrom: _createdFrom,
+          createdTo: _createdTo,
         );
 
         if (generation != _listFetchGeneration) return;
@@ -407,6 +468,10 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         location: _locationQuery.isEmpty ? null : _locationQuery,
         isVerified: _filter == UsersUiFilter.verified ? true : null,
         isBanned: _filter == UsersUiFilter.banned ? true : null,
+        // online/offline are client-side only; no backend param needed
+        role: _role,
+        createdFrom: _createdFrom,
+        createdTo: _createdTo,
       );
 
       final existingIds = _users.map((u) => u.id).toSet();
@@ -443,9 +508,19 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     bool? bulkActionIsError,
     bool? isLoadingMore,
     bool? isRefreshing,
+    bool? isExporting,
+    String? exportMessage,
+    bool? exportIsError,
     bool clearBulkActionMessage = false,
+    bool clearExportMessage = false,
   }) {
-    final list = users ?? _users;
+    var list = users ?? _users;
+    // Apply client-side online / offline filter
+    if (_filter == UsersUiFilter.online) {
+      list = list.where((u) => u.isOnline).toList();
+    } else if (_filter == UsersUiFilter.offline) {
+      list = list.where((u) => !u.isOnline).toList();
+    }
     if (list.isEmpty) {
       emit(UsersEmpty());
       return;
@@ -460,6 +535,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         filter: _filter,
         query: _query,
         locationQuery: _locationQuery,
+        role: _role,
+        createdFrom: _createdFrom,
+        createdTo: _createdTo,
         locationSort: _locationSort,
         selectedUserIds: Set.of(_selectedUserIds),
         isBulkActionLoading: isBulkActionLoading ?? false,
@@ -469,17 +547,27 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         bulkActionIsError: bulkActionIsError ?? _pendingBulkIsError,
         isLoadingMore: isLoadingMore ?? false,
         isRefreshing: isRefreshing ?? false,
+        isExporting: isExporting ?? _isExporting,
+        exportMessage: clearExportMessage
+            ? null
+            : (exportMessage ?? _exportMessage),
+        exportIsError: exportIsError ?? _exportIsError,
       ),
     );
 
     _pendingBulkMessage = null;
     _pendingBulkIsError = false;
+    _exportMessage = null;
+    _exportIsError = false;
   }
 
   void _onSearch(SearchUsersEvent event, Emitter<UsersState> emit) {
     _applyListFilters(
       search: event.query.trim(),
       location: _locationQuery,
+      role: _role,
+      createdFrom: _createdFrom,
+      createdTo: _createdTo,
       emit: emit,
     );
   }
@@ -491,6 +579,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     _applyListFilters(
       search: event.search.trim(),
       location: event.location.trim(),
+      role: event.role,
+      createdFrom: event.createdFrom,
+      createdTo: event.createdTo,
       emit: emit,
     );
   }
@@ -498,11 +589,23 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   void _applyListFilters({
     required String search,
     required String location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     required Emitter<UsersState> emit,
   }) {
-    if (search == _query && location == _locationQuery) return;
+    if (search == _query &&
+        location == _locationQuery &&
+        role == _role &&
+        createdFrom == _createdFrom &&
+        createdTo == _createdTo) {
+      return;
+    }
     _query = search;
     _locationQuery = location;
+    _role = role;
+    _createdFrom = createdFrom;
+    _createdTo = createdTo;
     add(LoadUsersEvent(refresh: true));
   }
 
@@ -513,6 +616,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     _applyListFilters(
       search: _query,
       location: event.query.trim(),
+      role: _role,
+      createdFrom: _createdFrom,
+      createdTo: _createdTo,
       emit: emit,
     );
   }
@@ -523,6 +629,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   ) {
     final hadFilters = _query.isNotEmpty ||
         _locationQuery.isNotEmpty ||
+        _role != null ||
+        _createdFrom != null ||
+        _createdTo != null ||
         _filter != UsersUiFilter.all ||
         _locationSort != UsersLocationSortOrder.none;
 
@@ -530,6 +639,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
 
     _query = '';
     _locationQuery = '';
+    _role = null;
+    _createdFrom = null;
+    _createdTo = null;
     _filter = UsersUiFilter.all;
     _locationSort = UsersLocationSortOrder.none;
 
@@ -538,6 +650,85 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     }
 
     add(LoadUsersEvent(refresh: true));
+  }
+
+  Future<void> _onExportUsers(
+    ExportUsersEvent event,
+    Emitter<UsersState> emit,
+  ) async {
+    final current = state;
+    if (current is! UsersLoaded || _isExporting) return;
+
+    _isExporting = true;
+    _emitLoaded(emit, isExporting: true, clearExportMessage: true);
+
+    try {
+      final allUsers = <UserEntity>[];
+      final seenIds = <String>{};
+      int page = 1;
+      int lastPage = 1;
+
+      do {
+        final res = await getUsers(
+          page: page,
+          limit: 100, // fetch in larger chunks for export efficiency
+          search: _query,
+          location: _locationQuery.isEmpty ? null : _locationQuery,
+          isVerified: _filter == UsersUiFilter.verified ? true : null,
+          isBanned: _filter == UsersUiFilter.banned ? true : null,
+          role: _role,
+          createdFrom: _createdFrom,
+          createdTo: _createdTo,
+        );
+
+        for (final user in res.users) {
+          if (seenIds.add(user.id)) {
+            allUsers.add(user);
+          }
+        }
+        lastPage = res.lastPage < 1 ? 1 : res.lastPage;
+        page++;
+      } while (page <= lastPage && page <= 50); // safety cap: max 50 pages (5,000 users)
+
+      final exportList = allUsers.isNotEmpty ? allUsers : _users;
+
+      final params = UsersExportParams(
+        users: exportList,
+        filter: _filter,
+        searchQuery: _query,
+        locationQuery: _locationQuery,
+        role: _role,
+        createdFrom: _createdFrom,
+        createdTo: _createdTo,
+      );
+
+      await UsersExportService.exportUsers(
+        params: params,
+        format: event.format,
+      );
+
+      _isExporting = false;
+      _exportMessage =
+          'Export generated successfully (${exportList.length} users)';
+      _exportIsError = false;
+      _emitLoaded(emit, isExporting: false);
+    } catch (e) {
+      _isExporting = false;
+      _exportMessage =
+          'Export failed: ${e.toString().replaceFirst('Exception: ', '')}';
+      _exportIsError = true;
+      _emitLoaded(emit, isExporting: false);
+    }
+  }
+
+  void _onClearExportFeedback(
+    ClearUsersExportFeedbackEvent event,
+    Emitter<UsersState> emit,
+  ) {
+    final current = state;
+    if (current is UsersLoaded && current.exportMessage != null) {
+      emit(current.copyWith(clearExportMessage: true));
+    }
   }
 
   void _onLocationSort(SortUsersLocationEvent event, Emitter<UsersState> emit) {

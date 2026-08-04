@@ -543,8 +543,10 @@ class _ActionCluster extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
-        if (searchField != null) searchField,
-        if (searchField != null) const SizedBox(width: 8),
+        if (searchField != null) ...[
+          searchField,
+          const SizedBox(width: 8),
+        ],
         if (!hideRefresh) _RefreshButton(onRefresh: onRefresh, compact: false),
       ],
     );

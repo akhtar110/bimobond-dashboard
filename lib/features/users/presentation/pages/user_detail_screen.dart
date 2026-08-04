@@ -9,6 +9,8 @@ import '../bloc/user_detail_bloc.dart';
 import '../bloc/user_detail_event.dart';
 import '../bloc/user_detail_state.dart';
 import '../utils/user_detail_layout_metrics.dart';
+import '../utils/users_export_service.dart';
+import '../widgets/user_account_risk_section.dart';
 import '../widgets/user_admin_actions/user_admin_actions_section.dart';
 import '../widgets/user_detail_activity_tabs.dart';
 import '../widgets/user_detail_header.dart';
@@ -179,6 +181,17 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             ),
           ),
           centerTitle: false,
+          actions: [
+            BlocBuilder<UserDetailBloc, UserDetailState>(
+              builder: (context, state) {
+                final targetUser = state is UserDetailLoaded
+                    ? state.userDetail.user
+                    : widget.user;
+                return UserDetailExportButton(user: targetUser);
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: BlocBuilder<UserDetailBloc, UserDetailState>(
           builder: (context, state) {
@@ -282,6 +295,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       },
                     ),
                     SizedBox(height: metrics.sectionSpacing),
+                    UserAccountRiskSection(user: user),
+                    SizedBox(height: metrics.sectionSpacing),
                     if (user.isProfileLocked) ...[
                       UserDetailLockedCard(user: user),
                       SizedBox(height: metrics.sectionSpacing),
@@ -298,6 +313,156 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
             return const SizedBox.shrink();
           },
+        ),
+      ),
+    );
+  }
+}
+
+class UserDetailExportButton extends StatefulWidget {
+  const UserDetailExportButton({super.key, required this.user});
+
+  final UserEntity user;
+
+  @override
+  State<UserDetailExportButton> createState() => _UserDetailExportButtonState();
+}
+
+class _UserDetailExportButtonState extends State<UserDetailExportButton> {
+  bool _isExporting = false;
+
+  Future<void> _handleExport(UsersExportFormat format) async {
+    setState(() => _isExporting = true);
+    try {
+      await UsersExportService.exportSingleUser(
+        user: widget.user,
+        format: format,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'User details for @${widget.user.username} exported successfully',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to export user details: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+
+    if (_isExporting) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: scheme.primary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return PopupMenuButton<UsersExportFormat>(
+      tooltip: l10n.tOr('export', 'Export'),
+      offset: const Offset(0, 40),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      onSelected: _handleExport,
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          enabled: false,
+          height: 32,
+          child: Text(
+            l10n.tOr('exportUserDetails', 'EXPORT USER DETAILS'),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: scheme.primary,
+            ),
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.excel,
+          child: Row(
+            children: [
+              const Icon(Icons.table_chart_rounded, size: 18, color: Colors.green),
+              const SizedBox(width: 10),
+              Text(l10n.tOr('exportToExcel', 'Export to Excel (.xlsx)')),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.csv,
+          child: Row(
+            children: [
+              const Icon(Icons.description_rounded, size: 18, color: Colors.blue),
+              const SizedBox(width: 10),
+              Text(l10n.tOr('exportToCsv', 'Export to CSV (.csv)')),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.file_download_outlined,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              l10n.tOr('export', 'Export'),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );

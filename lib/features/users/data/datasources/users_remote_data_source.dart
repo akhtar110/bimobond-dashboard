@@ -21,6 +21,9 @@ abstract class UsersRemoteDataSource {
     bool? isVerified,
     bool? isBanned,
     String? location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
   });
 
   Future<void> blockUser({
@@ -121,6 +124,9 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     bool? isVerified,
     bool? isBanned,
     String? location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
@@ -134,6 +140,13 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
         if (isVerified != null) 'isVerified': isVerified,
         if (isBanned != null) 'isBanned': isBanned,
         if (location != null && location.isNotEmpty) 'location': location,
+        if (role != null && role.isNotEmpty) 'role': role,
+        if (createdFrom != null)
+          'createdFrom':
+              '${createdFrom.year}-${createdFrom.month.toString().padLeft(2, '0')}-${createdFrom.day.toString().padLeft(2, '0')}',
+        if (createdTo != null)
+          'createdTo':
+              '${createdTo.year}-${createdTo.month.toString().padLeft(2, '0')}-${createdTo.day.toString().padLeft(2, '0')}',
       },
       options: Options(
         headers: {

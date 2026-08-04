@@ -1,9 +1,10 @@
-﻿import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/user_entity.dart';
 import '../utils/user_detail_layout_metrics.dart';
+import 'user_online_status_cell.dart';
 import 'user_privacy_badges.dart';
 
 class UserDetailRoleChip extends StatelessWidget {
@@ -185,10 +186,12 @@ class UserDetailHeader extends StatelessWidget {
               ],
               const SizedBox(height: 8),
               Wrap(
-                spacing: 6,
+                spacing: 12,
                 runSpacing: 6,
                 alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  UserOnlineStatusCell(user: user),
                   UserPrivacyBadge(user: user),
                   MessagePermissionBadge(permission: user.messagePermission),
                 ],
