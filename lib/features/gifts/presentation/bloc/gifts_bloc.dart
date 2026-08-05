@@ -793,7 +793,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         _withUiState(
           current.copyWith(
             isPerformingBulkAction: false,
-            bulkActionMessage: e.toString().replaceFirst('Exception: ', ''),
+            bulkActionMessage: ApiErrorMessages.from(e),
             bulkActionIsError: true,
           ),
         ),
@@ -1196,7 +1196,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
       ));
     } catch (e) {
       emit(c.copyWith(
-        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+        errorMessage: ApiErrorMessages.from(e),
       ));
     }
   }
@@ -1218,7 +1218,7 @@ class GiftsBloc extends Bloc<GiftsEvent, GiftsState> {
         successMessage: 'Gift deleted successfully',
       )));
     } catch (e) {
-      emit(c.copyWith(isActioning: false, errorMessage: e.toString()));
+      emit(c.copyWith(isActioning: false, errorMessage: ApiErrorMessages.from(e)));
     }
   }
 
