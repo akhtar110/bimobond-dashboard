@@ -2,6 +2,18 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../notifications/presentation/bloc/user_notifications_bloc.dart';
+import '../../../promotions/presentation/bloc/location_intelligence_bloc.dart';
+import '../../../search_history/presentation/bloc/search_history_bloc.dart';
+import '../../../search_history/presentation/bloc/search_history_event.dart';
+import '../../../user_activity/presentation/bloc/user_activity_bloc.dart';
+import '../../../user_activity/presentation/bloc/user_comments_bloc.dart';
+import '../../../user_activity/presentation/bloc/user_likes_bloc.dart';
+import '../../../user_activity/presentation/bloc/user_unified_activity_bloc.dart';
+import '../../../user_history/presentation/bloc/user_history_bloc.dart';
+import '../../../user_history/presentation/bloc/user_history_event.dart';
+import '../../../user_interests/presentation/bloc/user_interests_bloc.dart';
+import '../../../user_interests/presentation/bloc/user_interests_event.dart';
 import '../../domain/entities/user_admin_action_type.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/user_wallet_entity.dart';
@@ -106,6 +118,76 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     );
   }
 
+  void _refreshAll(BuildContext context, UserEntity user) {
+    final userId = user.id;
+
+    // 1. Refresh primary User Detail profile, stats, wallet, risk, and privacy
+    context.read<UserDetailBloc>().add(RefreshUserDetailEvent());
+
+    // 2. Refresh Unified Activity Timeline
+    try {
+      context.read<UserUnifiedActivityBloc>()
+        ..add(SetUserUnifiedActivityUserId(userId))
+        ..add(RefreshUserUnifiedActivity());
+    } catch (_) {}
+
+    // 3. Refresh User Activity Posts
+    try {
+      context.read<UserActivityBloc>()
+        ..add(SetUserActivityUserId(userId))
+        ..add(LoadPosts());
+    } catch (_) {}
+
+    // 4. Refresh User Comments
+    try {
+      context.read<UserCommentsBloc>()
+        ..add(SetUserCommentsUserId(userId))
+        ..add(RefreshUserComments());
+    } catch (_) {}
+
+    // 5. Refresh User Likes
+    try {
+      context.read<UserLikesBloc>()
+        ..add(SetUserLikesUserId(userId))
+        ..add(RefreshUserLikes());
+    } catch (_) {}
+
+    // 6. Refresh User Notifications
+    try {
+      context.read<UserNotificationsBloc>().add(
+            RefreshUserNotifications(userId: userId),
+          );
+    } catch (_) {}
+
+    // 7. Refresh User History
+    try {
+      context.read<UserHistoryBloc>()
+        ..add(SetUserHistoryUserId(userId))
+        ..add(const RefreshUserHistory());
+    } catch (_) {}
+
+    // 8. Refresh Search History
+    try {
+      context.read<SearchHistoryBloc>().add(
+            LoadUserSearchHistory(userId: userId, page: 1),
+          );
+    } catch (_) {}
+
+    // 9. Refresh Topics & Interests
+    try {
+      context.read<UserInterestsBloc>().add(
+            RefreshUserInterestsEvent(userId),
+          );
+    } catch (_) {}
+
+    // 10. Refresh Location Intelligence
+    try {
+      context.read<LocationIntelligenceBloc>().add(
+            SelectLocationUserEvent(user),
+          );
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -189,6 +271,10 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               builder: (context, state) {
                 final isRefreshing =
                     state is UserDetailLoaded && state.isRefreshing;
+                final targetUser = state is UserDetailLoaded
+                    ? state.userDetail.user
+                    : widget.user;
+
                 return Tooltip(
                   message: l10n.tOr('refreshData', 'Reload all user information'),
                   child: IconButton(
@@ -208,11 +294,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                           ),
                     onPressed: isRefreshing
                         ? null
-                        : () {
-                            context
-                                .read<UserDetailBloc>()
-                                .add(RefreshUserDetailEvent());
-                          },
+                        : () => _refreshAll(context, targetUser),
                   ),
                 );
               },

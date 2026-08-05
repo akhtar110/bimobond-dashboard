@@ -190,7 +190,9 @@ class UserModel extends UserEntity {
                   }
                   return _mapRole(entry.value.toString());
                 }).toList()
-              : [],
+              : json['role'] != null
+                  ? [_mapRole(json['role'].toString())]
+                  : const [UserRole.user],
       wallet: wallet,
       relationCounts: relationCounts,
       lastLocation: UserLastLocationEntity.tryParse(json['lastLocation']),

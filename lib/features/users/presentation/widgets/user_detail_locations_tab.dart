@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/localization.dart';
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../domain/entities/user_entity.dart';
 import 'permission_denied_state.dart';
@@ -15,11 +16,15 @@ class UserDetailLocationsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return PermissionGate(
       permission: RbacPermissionKeys.userLocations,
       allowLegacyAdmin: true,
-      fallback: const PermissionDeniedState(
-        message: 'You do not have permission to view user locations.',
+      fallback: PermissionDeniedState(
+        message: l10n.tOr(
+          'userLocationsPermissionDenied',
+          'You do not have permission to view user locations.',
+        ),
       ),
       child: UserLocationIntelligencePanel(
         fixedUser: user,

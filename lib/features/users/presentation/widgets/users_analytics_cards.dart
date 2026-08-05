@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../bloc/users_bloc.dart';
-import '../users_ui_filter.dart';
 
 class UsersAnalyticsCards extends StatelessWidget {
   const UsersAnalyticsCards({super.key});
@@ -18,20 +17,23 @@ class UsersAnalyticsCards extends StatelessWidget {
       int onlineCount,
       int verifiedCount,
       int bannedCount,
-      UsersUiFilter activeFilter,
+      bool isTotalSelected,
+      bool isOnlineSelected,
+      bool isVerifiedSelected,
+      bool isBannedSelected,
       bool isLoading,
     })>(
       selector: (state) {
         if (state is UsersLoaded) {
-          final total = state.total;
-          final banned = state.users.where((u) => u.isBanned).length;
-          final verified = state.users.where((u) => u.isVerified).length;
           return (
-            total: total,
+            total: state.total,
             onlineCount: state.onlineCount,
-            verifiedCount: verified,
-            bannedCount: banned,
-            activeFilter: state.filter,
+            verifiedCount: state.verifiedCount,
+            bannedCount: state.bannedCount,
+            isTotalSelected: state.isCardTotalSelected,
+            isOnlineSelected: state.isCardOnlineSelected,
+            isVerifiedSelected: state.isCardVerifiedSelected,
+            isBannedSelected: state.isCardBannedSelected,
             isLoading: false,
           );
         }
@@ -41,7 +43,10 @@ class UsersAnalyticsCards extends StatelessWidget {
             onlineCount: 0,
             verifiedCount: 0,
             bannedCount: 0,
-            activeFilter: UsersUiFilter.all,
+            isTotalSelected: true,
+            isOnlineSelected: false,
+            isVerifiedSelected: false,
+            isBannedSelected: false,
             isLoading: false,
           );
         }
@@ -50,7 +55,10 @@ class UsersAnalyticsCards extends StatelessWidget {
           onlineCount: 0,
           verifiedCount: 0,
           bannedCount: 0,
-          activeFilter: UsersUiFilter.all,
+          isTotalSelected: true,
+          isOnlineSelected: false,
+          isVerifiedSelected: false,
+          isBannedSelected: false,
           isLoading: true,
         );
       },
@@ -83,8 +91,8 @@ class UsersAnalyticsCards extends StatelessWidget {
               icon: Icons.people_alt_rounded,
               accentColor: Theme.of(context).colorScheme.primary,
               isLoading: stats.isLoading,
-              isSelected: stats.activeFilter == UsersUiFilter.all,
-              onTap: () => bloc.add(FilterUsersEvent(UsersUiFilter.all)),
+              isSelected: stats.isTotalSelected,
+              onTap: () => bloc.add(ClearUsersListFiltersEvent()),
             );
 
             final onlineCard = _CompactStatCard(
@@ -94,8 +102,8 @@ class UsersAnalyticsCards extends StatelessWidget {
               accentColor: const Color(0xFF22C55E),
               isLoading: stats.isLoading,
               showPulse: !stats.isLoading && stats.onlineCount > 0,
-              isSelected: stats.activeFilter == UsersUiFilter.online,
-              onTap: () => bloc.add(FilterUsersEvent(UsersUiFilter.online)),
+              isSelected: stats.isOnlineSelected,
+              onTap: () => bloc.add(ToggleOnlineCardFilterEvent()),
             );
 
             final verifiedCard = _CompactStatCard(
@@ -104,8 +112,8 @@ class UsersAnalyticsCards extends StatelessWidget {
               icon: Icons.verified_user_rounded,
               accentColor: const Color(0xFF3B82F6),
               isLoading: stats.isLoading,
-              isSelected: stats.activeFilter == UsersUiFilter.verified,
-              onTap: () => bloc.add(FilterUsersEvent(UsersUiFilter.verified)),
+              isSelected: stats.isVerifiedSelected,
+              onTap: () => bloc.add(ToggleVerifiedCardFilterEvent()),
             );
 
             final suspendedCard = _CompactStatCard(
@@ -114,8 +122,8 @@ class UsersAnalyticsCards extends StatelessWidget {
               icon: Icons.gavel_rounded,
               accentColor: const Color(0xFFEF4444),
               isLoading: stats.isLoading,
-              isSelected: stats.activeFilter == UsersUiFilter.banned,
-              onTap: () => bloc.add(FilterUsersEvent(UsersUiFilter.banned)),
+              isSelected: stats.isBannedSelected,
+              onTap: () => bloc.add(ToggleBannedCardFilterEvent()),
             );
 
             if (!isWide) {
@@ -300,16 +308,34 @@ class _CompactStatCardState extends State<_CompactStatCard>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: titleFontSize,
-                          height: 1.1,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: widget.isSelected
+                                    ? widget.accentColor
+                                    : scheme.onSurfaceVariant,
+                                fontWeight: widget.isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                fontSize: titleFontSize,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                          if (widget.isSelected) ...[
+                            const SizedBox(width: 3),
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: titleFontSize + 2,
+                              color: widget.accentColor,
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 1),
                       if (widget.isLoading)

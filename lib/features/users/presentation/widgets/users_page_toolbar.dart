@@ -140,7 +140,6 @@ class _UsersToolbarRow extends StatelessWidget {
           );
         },
         builder: (context, filters) {
-          final l10n = context.l10n;
           final isSmallScreen = availableWidth < 520;
           final activeCount = usersAppliedFilterCount(
             filter: filters.status,
@@ -174,34 +173,6 @@ class _UsersToolbarRow extends StatelessWidget {
             UsersExportButton(
               height: controlHeight,
               isExporting: filters.isExporting,
-            ),
-            SizedBox(width: gap),
-            SizedBox(
-              height: controlHeight,
-              child: FilledButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        l10n.tOr('addUserWorkflowInitiated', 'Add User workflow initiated'),
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(
-                  isSmallScreen && availableWidth < 380
-                      ? l10n.tOr('add', 'Add')
-                      : l10n.tOr('addUser', 'Add User'),
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
             ),
           ];
 

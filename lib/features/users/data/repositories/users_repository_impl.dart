@@ -50,6 +50,8 @@ class UsersRepositoryImpl implements UsersRepository {
       page: result.page,
       lastPage: result.lastPage,
       onlineCount: result.onlineCount,
+      verifiedCount: result.verifiedCount,
+      bannedCount: result.bannedCount,
     );
   }
 

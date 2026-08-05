@@ -4,11 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/bloc/persistent_bloc_provider.dart';
 import '../../../../core/localization/localization.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
 import '../utils/responsive.dart';
-import '../widgets/user_detail_drawer.dart';
 import '../widgets/users_analytics_cards.dart';
 import '../widgets/users_page_header.dart';
 import '../widgets/users_selection_header.dart';
@@ -43,7 +43,6 @@ class _UsersPageView extends StatefulWidget {
 class _UsersPageViewState extends State<_UsersPageView> {
   final ScrollController _horizontalScrollController = ScrollController();
   final ScrollController _listScrollController = ScrollController();
-  UserEntity? _selectedDrawerUser;
 
   @override
   void initState() {
@@ -71,22 +70,11 @@ class _UsersPageViewState extends State<_UsersPageView> {
     }
   }
 
-  void _openUserDrawer(UserEntity user) {
-    setState(() => _selectedDrawerUser = user);
-  }
-
-  void _closeUserDrawer() {
-    setState(() => _selectedDrawerUser = null);
-  }
-
-  UserEntity? _resolveDrawerUser(UsersState state) {
-    if (_selectedDrawerUser == null) return null;
-    if (state is UsersLoaded) {
-      for (final u in state.users) {
-        if (u.id == _selectedDrawerUser!.id) return u;
-      }
-    }
-    return _selectedDrawerUser;
+  void _navigateToUserDetail(UserEntity user) {
+    Navigator.of(context).pushNamed(
+      AppRoutes.userDetail,
+      arguments: user,
+    );
   }
 
   @override
@@ -149,91 +137,53 @@ class _UsersPageViewState extends State<_UsersPageView> {
           context.read<UsersBloc>().add(ClearUsersExportFeedbackEvent());
         }
       },
-      child: Stack(
-        children: [
-          Scaffold(
-            body: SafeArea(
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (_) => false,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final metrics = UsersLayoutMetrics(
-                      getDeviceType(constraints.maxWidth),
-                    );
+      child: Scaffold(
+        body: SafeArea(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (_) => false,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final metrics = UsersLayoutMetrics(
+                  getDeviceType(constraints.maxWidth),
+                );
 
-                    return Padding(
-                      padding: EdgeInsetsDirectional.fromSTEB(
-                        metrics.pageHorizontalPadding,
-                        metrics.pageTopPadding,
-                        metrics.pageHorizontalPadding,
-                        metrics.pageBottomPadding,
+                return Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    metrics.pageHorizontalPadding,
+                    metrics.pageTopPadding,
+                    metrics.pageHorizontalPadding,
+                    metrics.pageBottomPadding,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      UsersPageHeader(
+                        metrics: metrics,
+                        onRefresh: () => context.read<UsersBloc>().add(
+                          LoadUsersEvent(refresh: true),
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          UsersPageHeader(
-                            metrics: metrics,
-                            onRefresh: () => context.read<UsersBloc>().add(
-                              LoadUsersEvent(refresh: true),
-                            ),
-                          ),
-                          SizedBox(height: metrics.sectionSpacing),
-                          const UsersAnalyticsCards(),
-                          SizedBox(height: metrics.sectionSpacing),
-                          UsersSelectionHeader(metrics: metrics),
-                          SizedBox(height: metrics.sectionSpacing),
-                          Expanded(
-                            child: UsersTablePanel(
-                              metrics: metrics,
-                              horizontalScrollController:
-                                  _horizontalScrollController,
-                              listScrollController: _listScrollController,
-                              onUserTap: _openUserDrawer,
-                            ),
-                          ),
-                        ],
+                      SizedBox(height: metrics.sectionSpacing),
+                      const UsersAnalyticsCards(),
+                      SizedBox(height: metrics.sectionSpacing),
+                      UsersSelectionHeader(metrics: metrics),
+                      SizedBox(height: metrics.sectionSpacing),
+                      Expanded(
+                        child: UsersTablePanel(
+                          metrics: metrics,
+                          horizontalScrollController:
+                              _horizontalScrollController,
+                          listScrollController: _listScrollController,
+                          onUserTap: _navigateToUserDetail,
+                        ),
                       ),
-                    );
-                  },
-                ),
-              ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-
-          // Right-Side Slide Drawer Overlay synced with UsersBloc live state
-          BlocBuilder<UsersBloc, UsersState>(
-            builder: (context, state) {
-              final activeDrawerUser = _resolveDrawerUser(state);
-              if (activeDrawerUser == null) return const SizedBox.shrink();
-
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: _closeUserDrawer,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        color: Colors.black.withValues(alpha: 0.35),
-                      ),
-                    ),
-                  ),
-                  Align(
-                    alignment: context.isRtl
-                        ? Alignment.centerLeft
-                        : Alignment.centerRight,
-                    child: SlideTransition(
-                      position: const AlwaysStoppedAnimation(Offset(0, 0)),
-                      child: UserDetailDrawer(
-                        user: activeDrawerUser,
-                        onClose: _closeUserDrawer,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
