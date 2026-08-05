@@ -461,7 +461,7 @@ class _PaginationData {
     required this.lastPage,
     required this.total,
     required this.itemCount,
-  }) : visible = true;
+  }) : visible = lastPage > 1 && total > UsersBloc.pageLimit && itemCount > 0;
 
   const _PaginationData.empty()
     : currentPage = 1,

@@ -158,8 +158,13 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
     _limit = widget.query.limit;
   }
 
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _apply(close: false);
+  }
+
   void _reset() {
-    setState(() {
+    _updateFilter(() {
       _user = null;
       _actorRole = null;
       _category = null;
@@ -175,7 +180,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
     if (nav.canPop()) nav.pop();
   }
 
-  void _apply() {
+  void _apply({bool close = false}) {
     final userId = _user?.id.trim();
     context.read<LogsBloc>().add(
           LogsApplyFiltersEvent(
@@ -189,7 +194,9 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
             limit: _limit,
           ),
         );
-    _close();
+    if (close) {
+      _close();
+    }
   }
 
   bool _selected(String? current, String? value) {
@@ -216,7 +223,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
     if (picked == null) return;
-    setState(() {
+    _updateFilter(() {
       _from = DateTime.utc(picked.year, picked.month, picked.day);
       if (_to != null && _from!.isAfter(_to!)) _to = _from;
     });
@@ -230,7 +237,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
     if (picked == null) return;
-    setState(() {
+    _updateFilter(() {
       _to = DateTime.utc(
         picked.year,
         picked.month,
@@ -256,25 +263,25 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
         GiftsActiveFilterItem(
           id: 'user',
           label: _user!.username,
-          onRemove: () => setState(() => _user = null),
+          onRemove: () => _updateFilter(() => _user = null),
         ),
       if (_actorRole != null)
         GiftsActiveFilterItem(
           id: 'actorRole',
           label: logsActorRoleLabel(l10n, _actorRole),
-          onRemove: () => setState(() => _actorRole = null),
+          onRemove: () => _updateFilter(() => _actorRole = null),
         ),
       if (_category != null)
         GiftsActiveFilterItem(
           id: 'category',
           label: logsCategoryLabel(l10n, _category),
-          onRemove: () => setState(() => _category = null),
+          onRemove: () => _updateFilter(() => _category = null),
         ),
       if (_action != null)
         GiftsActiveFilterItem(
           id: 'action',
           label: logsActionCodeLabel(l10n, _action),
-          onRemove: () => setState(() => _action = null),
+          onRemove: () => _updateFilter(() => _action = null),
         ),
       if (_from != null || _to != null)
         GiftsActiveFilterItem(
@@ -283,7 +290,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
             if (_from != null) dateFmt.format(_from!.toLocal()),
             if (_to != null) dateFmt.format(_to!.toLocal()),
           ].join(' – '),
-          onRemove: () => setState(() {
+          onRemove: () => _updateFilter(() {
             _from = null;
             _to = null;
           }),
@@ -294,7 +301,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
           label: l10n
               .tOr('logsPageSizeChip', 'Page size: {n}')
               .replaceAll('{n}', '$_limit'),
-          onRemove: () => setState(() => _limit = 50),
+          onRemove: () => _updateFilter(() => _limit = 50),
         ),
     ];
 
@@ -327,7 +334,8 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
                         'logsUserSearchHint',
                         'Search by username or name…',
                       ),
-                      onUserSelected: (user) => setState(() => _user = user),
+                      onUserSelected: (user) =>
+                          _updateFilter(() => _user = user),
                     ),
                   ),
                   GiftsFilterSection(
@@ -340,7 +348,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: logsActorRoleLabel(l10n, value),
                             selected: _selected(_actorRole, value),
-                            onTap: () => setState(
+                            onTap: () => _updateFilter(
                               () => _toggle(
                                 _actorRole,
                                 value,
@@ -361,7 +369,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: logsCategoryLabel(l10n, value),
                             selected: _selected(_category, value),
-                            onTap: () => setState(() {
+                            onTap: () => _updateFilter(() {
                               _toggle(_category, value, (v) {
                                 _category = v;
                                 if (_action == null || v == null) return;
@@ -387,7 +395,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: logsActionCodeLabel(l10n, value),
                             selected: _selected(_action, value),
-                            onTap: () => setState(() {
+                            onTap: () => _updateFilter(() {
                               _toggle(_action, value, (v) {
                                 _action = v;
                                 // Ban/Unban → `?action=USER_BAN` only.
@@ -428,7 +436,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
                         ),
                         if (_from != null || _to != null)
                           TextButton(
-                            onPressed: () => setState(() {
+                            onPressed: () => _updateFilter(() {
                               _from = null;
                               _to = null;
                             }),
@@ -447,7 +455,7 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: '$size',
                             selected: _limit == size,
-                            onTap: () => setState(() => _limit = size),
+                            onTap: () => _updateFilter(() => _limit = size),
                           ),
                       ],
                     ),
@@ -459,7 +467,6 @@ class _LogsFilterPopupState extends State<_LogsFilterPopup> {
             GiftsFilterFooter(
               onReset: _reset,
               onCancel: _close,
-              onApply: _apply,
             ),
           ],
         ),

@@ -52,7 +52,10 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
       if (mounted) {
         setState(() {
           _isSavingNotes = false;
-          _savedNotesSuccess = 'Moderator notes updated successfully';
+          _savedNotesSuccess = context.l10n.tOr(
+            'moderatorNotesSavedSuccess',
+            'Moderator notes updated successfully',
+          );
         });
       }
     });
@@ -188,8 +191,8 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
                     child: FilledButton.icon(
                       onPressed: () {
                         final msg = user.isBanned
-                            ? 'User activated successfully'
-                            : 'User suspended successfully';
+                            ? l10n.tOr('userActivatedSuccess', 'User activated successfully')
+                            : l10n.tOr('userSuspendedSuccess', 'User suspended successfully');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(msg)),
                         );
@@ -199,7 +202,9 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
                         size: 16,
                       ),
                       label: Text(
-                        user.isBanned ? 'Unsuspend' : 'Suspend',
+                        user.isBanned
+                            ? l10n.tOr('unsuspend', 'Unsuspend')
+                            : l10n.tOr('suspend', 'Suspend'),
                         style: const TextStyle(fontSize: 12),
                       ),
                       style: FilledButton.styleFrom(
@@ -220,12 +225,12 @@ class _UserDetailDrawerState extends State<UserDetailDrawer> with SingleTickerPr
               tabAlignment: TabAlignment.start,
               labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
               unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
-              tabs: const [
-                Tab(text: 'Overview'),
-                Tab(text: 'Analytics'),
-                Tab(text: 'Devices & Sessions'),
-                Tab(text: 'Activity'),
-                Tab(text: 'Moderation & Notes'),
+              tabs: [
+                Tab(text: l10n.tOr('tabOverview', 'Overview')),
+                Tab(text: l10n.tOr('tabAnalytics', 'Analytics')),
+                Tab(text: l10n.tOr('tabDevicesAndSessions', 'Devices & Sessions')),
+                Tab(text: l10n.tOr('tabActivity', 'Activity')),
+                Tab(text: l10n.tOr('tabModerationAndNotes', 'Moderation & Notes')),
               ],
             ),
 
@@ -266,21 +271,21 @@ class _OverviewTab extends StatelessWidget {
     final l10n = context.l10n;
 
     final infoMap = <String, String>{
-      'User ID': user.id,
-      'Firebase UID': user.firebaseUid ?? '—',
-      'Email': user.email ?? '—',
-      'Phone': user.phoneNumber ?? '—',
-      'Gender': user.gender ?? '—',
-      'Date of Birth': user.dateOfBirth != null
+      l10n.tOr('userId', 'User ID'): user.id,
+      l10n.tOr('firebaseUid', 'Firebase UID'): user.firebaseUid ?? '—',
+      l10n.tOr('email', 'Email'): user.email ?? '—',
+      l10n.tOr('phone', 'Phone'): user.phoneNumber ?? '—',
+      l10n.tOr('gender', 'Gender'): user.gender ?? '—',
+      l10n.tOr('dateOfBirth', 'Date of Birth'): user.dateOfBirth != null
           ? DateFormat('yyyy-MM-dd').format(user.dateOfBirth!)
           : '—',
-      'Country': user.country ?? '—',
-      'City': user.city ?? '—',
-      'Creator Category': user.creatorCategory ?? 'Standard',
-      'Account Type': user.accountType ?? 'Personal',
-      'Language': user.language,
-      'Theme': user.theme,
-      'Registration Date': user.createdAt != null
+      l10n.tOr('country', 'Country'): user.country ?? '—',
+      l10n.tOr('city', 'City'): user.city ?? '—',
+      l10n.tOr('creatorCategory', 'Creator Category'): user.creatorCategory ?? l10n.tOr('standardCategory', 'Standard'),
+      l10n.tOr('accountType', 'Account Type'): user.accountType ?? l10n.tOr('personalAccount', 'Personal'),
+      l10n.tOr('language', 'Language'): user.language,
+      l10n.tOr('theme', 'Theme'): user.theme,
+      l10n.tOr('registrationDate', 'Registration Date'): user.createdAt != null
           ? DateFormat('yyyy-MM-dd HH:mm').format(user.createdAt!.toLocal())
           : '—',
     };
@@ -452,7 +457,7 @@ class _AnalyticsTab extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Above average platform creator performance (Top 15%)',
+                l10n.tOr('aboveAveragePerformance', 'Above average platform creator performance (Top 15%)'),
                 style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
               ),
             ],
@@ -524,8 +529,8 @@ class _DevicesTab extends StatelessWidget {
           tileColor: scheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           leading: const Icon(Icons.phone_iphone_rounded, color: Colors.blue),
-          title: const Text('iPhone 15 Pro Max', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          subtitle: const Text('iOS 17.4 • App v2.4.1', style: TextStyle(fontSize: 11)),
+          title: Text(l10n.tOr('deviceIphone15', 'iPhone 15 Pro Max'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          subtitle: Text(l10n.tOr('deviceIphoneSubtitle', 'iOS 17.4 • App v2.4.1'), style: const TextStyle(fontSize: 11)),
         ),
         const SizedBox(height: 8),
         ListTile(
@@ -533,8 +538,8 @@ class _DevicesTab extends StatelessWidget {
           tileColor: scheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           leading: const Icon(Icons.laptop_mac_rounded, color: Colors.purple),
-          title: const Text('MacBook Pro (Chrome Web)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          subtitle: const Text('macOS Sonoma', style: TextStyle(fontSize: 11)),
+          title: Text(l10n.tOr('deviceMacbook', 'MacBook Pro (Chrome Web)'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          subtitle: Text(l10n.tOr('deviceMacbookSubtitle', 'macOS Sonoma'), style: const TextStyle(fontSize: 11)),
         ),
       ],
     );
@@ -557,23 +562,23 @@ class _ActivityTab extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
         const SizedBox(height: 12),
-        const _ActivityTile(
+        _ActivityTile(
           icon: Icons.post_add_rounded,
-          title: 'Published a short video',
-          time: '2 hours ago',
-          subtitle: 'Video ID: #vid_9421 • 1,240 views',
+          title: l10n.tOr('actPublishedVideo', 'Published a short video'),
+          time: l10n.tOr('time2HoursAgo', '2 hours ago'),
+          subtitle: l10n.tOr('actVideoSubtitle', 'Video ID: #vid_9421 • 1,240 views'),
         ),
-        const _ActivityTile(
+        _ActivityTile(
           icon: Icons.mode_comment_outlined,
-          title: 'Commented on post #8412',
-          time: '5 hours ago',
-          subtitle: '"Great content!"',
+          title: l10n.tOr('actCommentedPost', 'Commented on post #8412'),
+          time: l10n.tOr('time5HoursAgo', '5 hours ago'),
+          subtitle: l10n.tOr('actCommentSubtitle', '"Great content!"'),
         ),
-        const _ActivityTile(
+        _ActivityTile(
           icon: Icons.login_rounded,
-          title: 'Logged in from IP 197.230.12.44',
-          time: 'Yesterday at 14:22',
-          subtitle: 'Rabat, Morocco',
+          title: l10n.tOr('actLoggedInIp', 'Logged in from IP 197.230.12.44'),
+          time: l10n.tArgs('timeYesterdayAt', {'time': '14:22'}),
+          subtitle: l10n.tOr('actLocationSubtitle', 'Rabat, Morocco'),
         ),
       ],
     );
@@ -838,37 +843,37 @@ class _UserDrawerExportButtonState extends State<UserDrawerExportButton> {
     }
 
     return PopupMenuButton<UsersExportFormat>(
-      tooltip: l10n.tOr('export', 'Export Report'),
+      tooltip: l10n.tOr('exportReport', 'Export Report'),
       offset: const Offset(0, 36),
       onSelected: _handleExport,
       itemBuilder: (context) => [
         PopupMenuItem(
           value: UsersExportFormat.excel,
           child: Row(
-            children: const [
-              Icon(Icons.table_chart_rounded, size: 18, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Excel Report (.xlsx)', style: TextStyle(fontSize: 12.5)),
+            children: [
+              const Icon(Icons.table_chart_rounded, size: 18, color: Colors.green),
+              const SizedBox(width: 8),
+              Text(l10n.tOr('excelReport', 'Excel Report (.xlsx)'), style: const TextStyle(fontSize: 12.5)),
             ],
           ),
         ),
         PopupMenuItem(
           value: UsersExportFormat.csv,
           child: Row(
-            children: const [
-              Icon(Icons.description_rounded, size: 18, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('CSV Report (.csv)', style: TextStyle(fontSize: 12.5)),
+            children: [
+              const Icon(Icons.description_rounded, size: 18, color: Colors.blue),
+              const SizedBox(width: 8),
+              Text(l10n.tOr('csvReport', 'CSV Report (.csv)'), style: const TextStyle(fontSize: 12.5)),
             ],
           ),
         ),
         PopupMenuItem(
           value: UsersExportFormat.pdf,
           child: Row(
-            children: const [
-              Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.red),
-              SizedBox(width: 8),
-              Text('PDF Report (.pdf)', style: TextStyle(fontSize: 12.5)),
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(l10n.tOr('pdfReport', 'PDF Report (.pdf)'), style: const TextStyle(fontSize: 12.5)),
             ],
           ),
         ),
@@ -882,11 +887,11 @@ class _UserDrawerExportButtonState extends State<UserDrawerExportButton> {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.download_rounded, size: 16),
-            SizedBox(width: 4),
-            Text('Export', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            Icon(Icons.arrow_drop_down, size: 16),
+          children: [
+            const Icon(Icons.download_rounded, size: 16),
+            const SizedBox(width: 4),
+            Text(l10n.tOr('export', 'Export'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const Icon(Icons.arrow_drop_down, size: 16),
           ],
         ),
       ),

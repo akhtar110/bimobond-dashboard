@@ -19,6 +19,7 @@ class UsersRepositoryImpl implements UsersRepository {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    bool? isOnline,
     String? location,
     String? role,
     DateTime? createdFrom,
@@ -33,6 +34,7 @@ class UsersRepositoryImpl implements UsersRepository {
       search: search,
       isVerified: isVerified,
       isBanned: isBanned,
+      isOnline: isOnline,
       location: location,
       role: role,
       createdFrom: createdFrom,
@@ -48,6 +50,8 @@ class UsersRepositoryImpl implements UsersRepository {
       page: result.page,
       lastPage: result.lastPage,
       onlineCount: result.onlineCount,
+      verifiedCount: result.verifiedCount,
+      bannedCount: result.bannedCount,
     );
   }
 

@@ -45,8 +45,10 @@ class UserDetailAdminActionsTab extends StatelessWidget {
         )..add(const LoadUserAuditLogEvent(page: 1)),
         child: BlocListener<UserDetailBloc, UserDetailState>(
           listenWhen: (previous, current) {
-            if (current is UserDetailLoaded && previous is UserDetailLoaded) {
-              return current.actionFeedback != null ||
+            if (current is UserDetailLoaded) {
+              if (previous is! UserDetailLoaded) return true;
+              return current.isRefreshing ||
+                  current.actionFeedback != null ||
                   current.userDetail.user.updatedAt != previous.userDetail.user.updatedAt;
             }
             return false;
@@ -145,10 +147,10 @@ class _UserDetailAdminActionsView extends StatelessWidget {
                   : scheme.error;
 
           final statusText = isConnected
-              ? 'LIVE'
+              ? l10n.tOr('liveStatus', 'LIVE')
               : isReconnecting
-                  ? 'RECONNECTING...'
-                  : 'DISCONNECTED';
+                  ? l10n.tOr('reconnectingStatus', 'RECONNECTING...')
+                  : l10n.tOr('disconnectedStatus', 'DISCONNECTED');
 
           return Column(
             children: [

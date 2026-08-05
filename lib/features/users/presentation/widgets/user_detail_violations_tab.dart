@@ -12,6 +12,8 @@ import '../../../security_logs/presentation/bloc/user_violations_bloc.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
 import '../../../security_logs/presentation/widgets/admin_and_violation_detail_dialogs.dart';
 import '../../domain/entities/user_entity.dart';
+import '../bloc/user_detail_bloc.dart';
+import '../bloc/user_detail_state.dart';
 import 'permission_denied_state.dart';
 
 class UserDetailViolationsTab extends StatelessWidget {
@@ -41,7 +43,21 @@ class UserDetailViolationsTab extends StatelessWidget {
           userId: user.id,
           remoteDataSource: UserViolationsRemoteDataSourceImpl(di.sl()),
         )..add(const LoadUserViolationsEvent(page: 1)),
-        child: _UserDetailViolationsView(isDark: isDark),
+        child: BlocListener<UserDetailBloc, UserDetailState>(
+          listenWhen: (previous, current) {
+            if (current is UserDetailLoaded) {
+              if (previous is! UserDetailLoaded) return true;
+              return current.isRefreshing ||
+                  current.actionFeedback != null ||
+                  current.userDetail.user.updatedAt != previous.userDetail.user.updatedAt;
+            }
+            return false;
+          },
+          listener: (context, state) {
+            context.read<UserViolationsBloc>().add(const RefreshUserViolationsEvent());
+          },
+          child: _UserDetailViolationsView(isDark: isDark),
+        ),
       ),
     );
   }
@@ -131,79 +147,95 @@ class _UserDetailViolationsView extends StatelessWidget {
                   : scheme.error;
 
           final statusText = isConnected
-              ? 'LIVE'
+              ? l10n.tOr('liveStatus', 'LIVE')
               : isReconnecting
-                  ? 'RECONNECTING...'
-                  : 'DISCONNECTED';
+                  ? l10n.tOr('reconnectingStatus', 'RECONNECTING...')
+                  : l10n.tOr('disconnectedStatus', 'DISCONNECTED');
 
           return Column(
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${l10n.tOr('violationsHistoryTitle', 'Violations History')} (${state.meta.total})',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.red,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.5)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.circle, size: 6, color: statusColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                statusText,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: statusColor,
-                                ),
+                        Row(
+                          children: [
+                            Text(
+                              '${l10n.tOr('violationsHistoryTitle', 'Violations History')} (${state.meta.total})',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.circle, size: 6, color: statusColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    statusText,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            if (!isConnected && !isReconnecting)
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                ),
+                                onPressed: () {
+                                  context
+                                      .read<UserViolationsBloc>()
+                                      .add(const ReconnectViolationSocketEvent());
+                                },
+                                icon: const Icon(Icons.sync_problem_rounded, size: 14),
+                                label: Text(l10n.tOr('reconnect', 'Reconnect'), style: const TextStyle(fontSize: 11)),
+                              ),
+                            IconButton(
+                              tooltip: l10n.t('refresh'),
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              onPressed: () {
+                                context
+                                    .read<UserViolationsBloc>()
+                                    .add(const RefreshUserViolationsEvent());
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        if (!isConnected && !isReconnecting)
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                            ),
-                            onPressed: () {
-                              context
-                                  .read<UserViolationsBloc>()
-                                  .add(const ReconnectViolationSocketEvent());
-                            },
-                            icon: const Icon(Icons.sync_problem_rounded, size: 14),
-                            label: Text(l10n.tOr('reconnect', 'Reconnect'), style: const TextStyle(fontSize: 11)),
-                          ),
-                        IconButton(
-                          tooltip: l10n.t('refresh'),
-                          icon: const Icon(Icons.refresh_rounded, size: 18),
-                          onPressed: () {
-                            context
-                                .read<UserViolationsBloc>()
-                                .add(const RefreshUserViolationsEvent());
-                          },
-                        ),
-                      ],
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.tOr(
+                        'violationsHistoryDescription',
+                        'Record of community guidelines and terms of service breaches recorded against this account.',
+                      ),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -312,9 +344,9 @@ class _UserDetailViolationsView extends StatelessWidget {
                                           color: Colors.red,
                                         ),
                                         const SizedBox(width: 4),
-                                        const Text(
-                                          'VIOLATION',
-                                          style: TextStyle(
+                                        Text(
+                                          l10n.tOr('violationTag', 'VIOLATION'),
+                                          style: const TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.w700,
                                             color: Colors.red,

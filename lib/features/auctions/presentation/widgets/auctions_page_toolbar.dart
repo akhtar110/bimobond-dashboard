@@ -261,7 +261,7 @@ class AuctionsActiveFilterChips extends StatelessWidget {
 
   void _clearAll(BuildContext context) {
     final bloc = context.read<AuctionsBloc>();
-    bloc.add(FilterAuctionsEvent(null));
+    bloc.add(FilterAuctionsEvent('ACTIVE'));
     bloc.add(UpdateAuctionTypeFilterEvent(AuctionTypeFilter.all));
     bloc.add(UpdateAuctionSortEvent(AuctionsSortDropdown.defaultSort));
     bloc.add(UpdateAuctionDateRangeEvent(null));
@@ -307,12 +307,15 @@ class AuctionsActiveFilterChips extends StatelessWidget {
 
         final chips = <Widget>[];
 
-        if (state.statusFilter != null) {
+        if (state.statusFilter != 'ACTIVE') {
           chips.add(
             _ActiveFilterChip(
-              label: auctionStatusLabel(l10n, state.statusFilter!),
-              onRemove: () =>
-                  context.read<AuctionsBloc>().add(FilterAuctionsEvent(null)),
+              label: state.statusFilter == null
+                  ? l10n.t('all')
+                  : auctionStatusLabel(l10n, state.statusFilter!),
+              onRemove: () => context
+                  .read<AuctionsBloc>()
+                  .add(FilterAuctionsEvent('ACTIVE')),
             ),
           );
         }

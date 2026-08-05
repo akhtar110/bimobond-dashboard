@@ -49,7 +49,7 @@ int feAppliedFilterCount({
   required bool includeRenderType,
 }) {
   var count = 0;
-  if (query.status != FiltersEffectsStatusFilter.all) count++;
+  if (query.status != FiltersEffectsStatusFilter.active) count++;
   if (includeRenderType &&
       query.renderType != null &&
       query.renderType!.trim().isNotEmpty) {

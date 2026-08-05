@@ -29,6 +29,7 @@ import 'features/rbac/domain/usecases/get_user_roles.dart';
 import 'features/rbac/domain/usecases/update_role.dart';
 import 'features/rbac/presentation/bloc/rbac_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/services/navigation_persistence_service.dart';
 import 'features/auth/data/datasource/auth_local_data_source.dart';
 
 import 'features/settings/presentation/bloc/settings_cubit.dart';
@@ -393,6 +394,9 @@ Future<void> init() async {
 
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
+  sl.registerLazySingleton<NavigationPersistenceService>(
+    () => NavigationPersistenceService(sl<SharedPreferences>()),
+  );
 
   // =========================
   // Dio (GLOBAL API CLIENT)

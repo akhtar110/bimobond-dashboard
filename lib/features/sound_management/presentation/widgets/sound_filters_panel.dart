@@ -288,14 +288,19 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
   @override
   void initState() {
     super.initState();
-    _isActive = widget.query.isActive;
+    _isActive = widget.query.isActive ?? true;
     _isFromDashboard = widget.query.isFromDashboard;
     _sort = widget.query.sort;
   }
 
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _apply(close: false);
+  }
+
   void _reset() {
-    setState(() {
-      _isActive = null;
+    _updateFilter(() {
+      _isActive = true;
       _isFromDashboard = null;
       _sort = SoundSortMode.trending;
     });
@@ -306,7 +311,7 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
     if (nav.canPop()) nav.pop();
   }
 
-  void _apply() {
+  void _apply({bool close = false}) {
     // Notify host first (e.g. clear group tab) so Hidden/Active hits All Sounds.
     widget.onStatusChanged?.call();
     widget.soundsBloc.add(
@@ -316,7 +321,9 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
         sort: _sort,
       ),
     );
-    _close();
+    if (close) {
+      _close();
+    }
   }
 
   @override
@@ -326,13 +333,15 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
     final radius = widget.borderRadius ?? BorderRadius.circular(20);
 
     final activeItems = <GiftsActiveFilterItem>[
-      if (_isActive != null)
+      if (_isActive != true)
         GiftsActiveFilterItem(
           id: 'status',
-          label: _isActive!
-              ? l10n.t('soundStatusActive')
-              : l10n.t('soundStatusHidden'),
-          onRemove: () => setState(() => _isActive = null),
+          label: _isActive == null
+              ? l10n.t('all')
+              : (_isActive!
+                  ? l10n.t('soundStatusActive')
+                  : l10n.t('soundStatusHidden')),
+          onRemove: () => _updateFilter(() => _isActive = true),
         ),
       if (_isFromDashboard != null)
         GiftsActiveFilterItem(
@@ -340,7 +349,7 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
           label: _isFromDashboard!
               ? l10n.tOr('soundSourceDashboard', 'Dashboard Tracks')
               : l10n.tOr('soundSourceUser', 'User Uploads'),
-          onRemove: () => setState(() => _isFromDashboard = null),
+          onRemove: () => _updateFilter(() => _isFromDashboard = null),
         ),
       if (_sort != SoundSortMode.trending)
         GiftsActiveFilterItem(
@@ -350,7 +359,7 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
             SoundSortMode.recent => l10n.t('soundSortRecent'),
             SoundSortMode.alphabetical => l10n.t('soundSortName'),
           },
-          onRemove: () => setState(() => _sort = SoundSortMode.trending),
+          onRemove: () => _updateFilter(() => _sort = SoundSortMode.trending),
         ),
     ];
 
@@ -380,17 +389,17 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
                         GiftsFilterChoiceChip(
                           label: l10n.t('all'),
                           selected: _isActive == null,
-                          onTap: () => setState(() => _isActive = null),
+                          onTap: () => _updateFilter(() => _isActive = null),
                         ),
                         GiftsFilterChoiceChip(
                           label: l10n.t('soundStatusActive'),
                           selected: _isActive == true,
-                          onTap: () => setState(() => _isActive = true),
+                          onTap: () => _updateFilter(() => _isActive = true),
                         ),
                         GiftsFilterChoiceChip(
                           label: l10n.t('soundStatusHidden'),
                           selected: _isActive == false,
-                          onTap: () => setState(() => _isActive = false),
+                          onTap: () => _updateFilter(() => _isActive = false),
                         ),
                       ],
                     ),
@@ -402,17 +411,17 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
                         GiftsFilterChoiceChip(
                           label: l10n.t('all'),
                           selected: _isFromDashboard == null,
-                          onTap: () => setState(() => _isFromDashboard = null),
+                          onTap: () => _updateFilter(() => _isFromDashboard = null),
                         ),
                         GiftsFilterChoiceChip(
                           label: l10n.tOr('soundSourceDashboard', 'Dashboard Tracks'),
                           selected: _isFromDashboard == true,
-                          onTap: () => setState(() => _isFromDashboard = true),
+                          onTap: () => _updateFilter(() => _isFromDashboard = true),
                         ),
                         GiftsFilterChoiceChip(
                           label: l10n.tOr('soundSourceUser', 'User Uploads'),
                           selected: _isFromDashboard == false,
-                          onTap: () => setState(() => _isFromDashboard = false),
+                          onTap: () => _updateFilter(() => _isFromDashboard = false),
                         ),
                       ],
                     ),
@@ -431,7 +440,7 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
                                 l10n.t('soundSortName'),
                             },
                             selected: _sort == sort,
-                            onTap: () => setState(() => _sort = sort),
+                            onTap: () => _updateFilter(() => _sort = sort),
                           ),
                       ],
                     ),
@@ -443,7 +452,6 @@ class _SoundFilterPopupState extends State<_SoundFilterPopup> {
             GiftsFilterFooter(
               onReset: _reset,
               onCancel: _close,
-              onApply: _apply,
             ),
           ],
         ),

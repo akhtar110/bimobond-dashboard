@@ -50,7 +50,7 @@ class ArOverlaysBloc extends Bloc<ArOverlaysEvent, ArOverlaysState> {
   int _currentLimit = 20;
   GiftsViewType _viewType = GiftsViewType.grid;
   String _searchQuery = '';
-  ArOverlayStatusFilter _statusFilter = ArOverlayStatusFilter.all;
+  ArOverlayStatusFilter _statusFilter = ArOverlayStatusFilter.active;
 
   bool? get _isActiveQuery {
     return switch (_statusFilter) {

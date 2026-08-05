@@ -10,12 +10,12 @@ import '../../../gifts/presentation/widgets/gifts_filter_section.dart';
 import '../bloc/categories_bloc.dart';
 
 int categoriesAppliedFilterCount({
-  CategoryFilter filter = CategoryFilter.all,
+  CategoryFilter filter = CategoryFilter.active,
   CategoryTypeFilter typeFilter = CategoryTypeFilter.all,
   CategoryHasChildrenFilter hasChildrenFilter = CategoryHasChildrenFilter.all,
 }) {
   var count = 0;
-  if (filter != CategoryFilter.all) count++;
+  if (filter != CategoryFilter.active) count++;
   if (typeFilter != CategoryTypeFilter.all) count++;
   if (hasChildrenFilter != CategoryHasChildrenFilter.all) count++;
   return count;
@@ -176,15 +176,20 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
     if (navigator.canPop()) navigator.pop();
   }
 
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _apply(context, close: false);
+  }
+
   void _reset() {
-    setState(() {
-      _status = CategoryFilter.all;
+    _updateFilter(() {
+      _status = CategoryFilter.active;
       _type = CategoryTypeFilter.all;
       _hasChildren = CategoryHasChildrenFilter.all;
     });
   }
 
-  void _apply(BuildContext context) {
+  void _apply(BuildContext context, {bool close = false}) {
     final bloc = context.read<CategoriesBloc>();
     if (bloc.activeStatusFilter != _status) {
       bloc.add(ChangeCategoryFilterEvent(_status));
@@ -195,7 +200,9 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
     if (bloc.activeHasChildrenFilter != _hasChildren) {
       bloc.add(UpdateCategoryHasChildrenFilterEvent(_hasChildren));
     }
-    _close(context);
+    if (close) {
+      _close(context);
+    }
   }
 
   String _sectionTitle(String text, BuildContext context) {
@@ -205,12 +212,12 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
 
   List<GiftsActiveFilterItem> _activeItems(AppLocalizations l10n) {
     final items = <GiftsActiveFilterItem>[];
-    if (_status != CategoryFilter.all) {
+    if (_status != CategoryFilter.active) {
       items.add(
         GiftsActiveFilterItem(
           id: 'status',
           label: categoryStatusLabel(l10n, _status),
-          onRemove: () => setState(() => _status = CategoryFilter.all),
+          onRemove: () => _updateFilter(() => _status = CategoryFilter.active),
         ),
       );
     }
@@ -219,7 +226,7 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
         GiftsActiveFilterItem(
           id: 'type',
           label: categoryTypeLabel(l10n, _type),
-          onRemove: () => setState(() => _type = CategoryTypeFilter.all),
+          onRemove: () => _updateFilter(() => _type = CategoryTypeFilter.all),
         ),
       );
     }
@@ -228,8 +235,9 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
         GiftsActiveFilterItem(
           id: 'children',
           label: categoryHasChildrenLabel(l10n, _hasChildren),
-          onRemove: () =>
-              setState(() => _hasChildren = CategoryHasChildrenFilter.all),
+          onRemove: () => _updateFilter(
+            () => _hasChildren = CategoryHasChildrenFilter.all,
+          ),
         ),
       );
     }
@@ -305,7 +313,8 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: categoryStatusLabel(l10n, status),
                             selected: _status == status,
-                            onTap: () => setState(() => _status = status),
+                            onTap: () =>
+                                _updateFilter(() => _status = status),
                           ),
                       ],
                     ),
@@ -321,7 +330,7 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: categoryTypeLabel(l10n, type),
                             selected: _type == type,
-                            onTap: () => setState(() => _type = type),
+                            onTap: () => _updateFilter(() => _type = type),
                           ),
                       ],
                     ),
@@ -336,7 +345,7 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
                         GiftsFilterChoiceChip(
                           label: l10n.t('filterAll'),
                           selected: _hasChildren == CategoryHasChildrenFilter.all,
-                          onTap: () => setState(
+                          onTap: () => _updateFilter(
                             () => _hasChildren = CategoryHasChildrenFilter.all,
                           ),
                         ),
@@ -344,7 +353,7 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
                           label: l10n.tOr('hasChildrenYes', 'Has children'),
                           selected:
                               _hasChildren == CategoryHasChildrenFilter.yes,
-                          onTap: () => setState(
+                          onTap: () => _updateFilter(
                             () => _hasChildren = CategoryHasChildrenFilter.yes,
                           ),
                         ),
@@ -352,7 +361,7 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
                           label: l10n.tOr('hasChildrenNo', 'No children'),
                           selected:
                               _hasChildren == CategoryHasChildrenFilter.no,
-                          onTap: () => setState(
+                          onTap: () => _updateFilter(
                             () => _hasChildren = CategoryHasChildrenFilter.no,
                           ),
                         ),
@@ -365,7 +374,6 @@ class _CategoriesFilterPopupState extends State<CategoriesFilterPopup> {
             GiftsFilterFooter(
               onReset: _reset,
               onCancel: () => _close(context),
-              onApply: () => _apply(context),
             ),
           ],
         ),

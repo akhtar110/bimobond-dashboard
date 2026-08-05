@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/services/navigation_persistence_service.dart';
+import '../../../../injection_container.dart' as di;
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/utils/admin_access.dart';
 import 'auth_event.dart';
@@ -27,6 +29,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (!isDashboardStaff(user)) {
         await _repository.logout();
+        await di.sl<NavigationPersistenceService>().clearLastPage();
         emit(Unauthenticated());
         return;
       }
@@ -34,6 +37,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(Authenticated(user));
     } catch (_) {
       await _repository.logout();
+      await di.sl<NavigationPersistenceService>().clearLastPage();
       emit(Unauthenticated());
     }
   }
@@ -50,6 +54,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     if (!isDashboardStaff(user)) {
       await _repository.logout();
+      await di.sl<NavigationPersistenceService>().clearLastPage();
       emit(Unauthenticated());
       return;
     }
@@ -63,6 +68,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     await _repository.logout();
+    await di.sl<NavigationPersistenceService>().clearLastPage();
     emit(Unauthenticated());
   }
 }

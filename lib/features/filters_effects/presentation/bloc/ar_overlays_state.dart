@@ -23,7 +23,7 @@ class ArOverlaysLoaded extends ArOverlaysState {
     required this.overlays,
     required this.meta,
     this.searchQuery = '',
-    this.statusFilter = ArOverlayStatusFilter.all,
+    this.statusFilter = ArOverlayStatusFilter.active,
     this.viewType = GiftsViewType.grid,
     this.isActioning = false,
     this.successMessage,

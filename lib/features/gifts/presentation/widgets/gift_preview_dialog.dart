@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/localization/localization.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gift_type.dart';
+import '../utils/gift_animation_bytes.dart';
 import '../utils/gift_publisher_name.dart';
 import '../utils/gift_schedule_label.dart';
 import 'edit_gift_dialog.dart';
@@ -42,6 +43,72 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
 
   static const _thumbnailPreviewHeight = 240.0;
   static const _animationPreviewHeight = 320.0;
+
+  Uint8List? _prefetchedAnimationBytes;
+  var _prefetchingAnimation = false;
+  int _prefetchToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefetchGiftAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant GiftPreviewDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.gift.animationUrl != widget.gift.animationUrl) {
+      _prefetchGiftAnimation();
+    }
+  }
+
+  /// Create/edit dialogs pass picked bytes directly; the preview popup only has
+  /// a CDN URL — prefetch so Lottie/JSON/DotLottie sniffing matches create/edit.
+  Future<void> _prefetchGiftAnimation() async {
+    final url = widget.gift.animationUrl?.trim();
+    if (url == null || url.isEmpty) {
+      setState(() {
+        _prefetchedAnimationBytes = null;
+        _prefetchingAnimation = false;
+      });
+      return;
+    }
+
+    final cached = GiftAnimationBytesCache.peek(url);
+    if (cached != null && cached.isNotEmpty) {
+      setState(() {
+        _prefetchedAnimationBytes = cached;
+        _prefetchingAnimation = false;
+      });
+      return;
+    }
+
+    final token = ++_prefetchToken;
+    setState(() => _prefetchingAnimation = true);
+    try {
+      final bytes = await GiftAnimationBytesCache.get(url);
+      if (!mounted || token != _prefetchToken) return;
+      setState(() {
+        _prefetchedAnimationBytes = bytes;
+        _prefetchingAnimation = false;
+      });
+    } catch (_) {
+      if (!mounted || token != _prefetchToken) return;
+      setState(() {
+        _prefetchedAnimationBytes = null;
+        _prefetchingAnimation = false;
+      });
+    }
+  }
+
+  static String _animationFileName(String? url) {
+    if (url == null || url.trim().isEmpty) return 'animation.json';
+    final withoutQuery = url.split('?').first;
+    final segments = withoutQuery.split(RegExp(r'[/\\]'));
+    final name = segments.isNotEmpty ? segments.last : withoutQuery;
+    if (name.isNotEmpty) return name;
+    return 'animation.json';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -635,13 +702,33 @@ class _GiftPreviewDialogState extends State<GiftPreviewDialog> {
             height: _animationPreviewHeight,
             clipBehavior: Clip.antiAlias,
             decoration: _animationPreviewFrameDecoration(scheme, customColor),
-            child: GiftAnimationPreview(
-              key: const ValueKey('preview-gift-animation-tab'),
-              showChrome: false,
-              expandToFill: true,
-              clipBorderRadius: 16,
-              networkUrl: gift.animationUrl,
-              fileName: gift.animationUrl,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                GiftAnimationPreview(
+                  key: ValueKey('preview-gift-animation-${gift.animationUrl}'),
+                  showChrome: false,
+                  expandToFill: true,
+                  clipBorderRadius: 16,
+                  bytes: _prefetchedAnimationBytes,
+                  networkUrl: gift.animationUrl,
+                  fileName: _animationFileName(gift.animationUrl),
+                ),
+                if (_prefetchingAnimation && _prefetchedAnimationBytes == null)
+                  ColoredBox(
+                    color: scheme.surface.withValues(alpha: 0.72),
+                    child: Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

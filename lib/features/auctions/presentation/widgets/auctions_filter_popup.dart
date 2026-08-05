@@ -22,7 +22,7 @@ int auctionsAppliedFilterCount({
   bool? hasLiveFilter,
 }) {
   var count = 0;
-  if (statusFilter != null) count++;
+  if (statusFilter != 'ACTIVE') count++;
   if (typeFilter != AuctionTypeFilter.all) count++;
   if (hostFilter != null) count++;
   if (winnerFilter != null) count++;
@@ -208,9 +208,14 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
     if (navigator.canPop()) navigator.pop();
   }
 
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _apply(context, close: false);
+  }
+
   void _reset() {
-    setState(() {
-      _status = null;
+    _updateFilter(() {
+      _status = 'ACTIVE';
       _type = AuctionTypeFilter.all;
       _sort = AuctionsSortDropdown.defaultSort;
       _host = null;
@@ -229,7 +234,7 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
         bloc.activeHasLiveFilter != null;
   }
 
-  void _apply(BuildContext context) {
+  void _apply(BuildContext context, {bool close = false}) {
     final bloc = context.read<AuctionsBloc>();
     if (bloc.activeStatusFilter != _status) {
       bloc.add(FilterAuctionsEvent(_status));
@@ -256,7 +261,9 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
         ),
       );
     }
-    _close(context);
+    if (close) {
+      _close(context);
+    }
   }
 
   String _boolFilterLabel(
@@ -272,8 +279,13 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
 
   List<({String id, String label})> _activeTags(AppLocalizations l10n) {
     final tags = <({String id, String label})>[];
-    if (_status != null) {
-      tags.add((id: 'status', label: auctionStatusLabel(l10n, _status!)));
+    if (_status != 'ACTIVE') {
+      tags.add((
+        id: 'status',
+        label: _status == null
+            ? l10n.t('all')
+            : auctionStatusLabel(l10n, _status!),
+      ));
     }
     if (_type != AuctionTypeFilter.all) {
       tags.add((id: 'type', label: auctionTypeLabel(l10n, _type)));
@@ -297,10 +309,10 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
   }
 
   void _removeTag(String id) {
-    setState(() {
+    _updateFilter(() {
       switch (id) {
         case 'status':
-          _status = null;
+          _status = 'ACTIVE';
         case 'type':
           _type = AuctionTypeFilter.all;
         case 'sort':
@@ -413,7 +425,8 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                             PostsFilterChoiceChip(
                               label: label,
                               selected: _status == status,
-                              onTap: () => setState(() => _status = status),
+                              onTap: () =>
+                                  _updateFilter(() => _status = status),
                             ),
                         ],
                       ),
@@ -426,26 +439,30 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                           PostsFilterChoiceChip(
                             label: l10n.t('all'),
                             selected: _type == AuctionTypeFilter.all,
-                            onTap: () =>
-                                setState(() => _type = AuctionTypeFilter.all),
+                            onTap: () => _updateFilter(
+                              () => _type = AuctionTypeFilter.all,
+                            ),
                           ),
                           PostsFilterChoiceChip(
                             label: l10n.tOr('auctionTypeFixed', 'Fixed price'),
                             selected: _type == AuctionTypeFilter.fixed,
-                            onTap: () =>
-                                setState(() => _type = AuctionTypeFilter.fixed),
+                            onTap: () => _updateFilter(
+                              () => _type = AuctionTypeFilter.fixed,
+                            ),
                           ),
                           PostsFilterChoiceChip(
                             label: l10n.tOr('auctionTypeTimed', 'Timed'),
                             selected: _type == AuctionTypeFilter.timed,
-                            onTap: () =>
-                                setState(() => _type = AuctionTypeFilter.timed),
+                            onTap: () => _updateFilter(
+                              () => _type = AuctionTypeFilter.timed,
+                            ),
                           ),
                           PostsFilterChoiceChip(
                             label: l10n.t('live'),
                             selected: _type == AuctionTypeFilter.live,
-                            onTap: () =>
-                                setState(() => _type = AuctionTypeFilter.live),
+                            onTap: () => _updateFilter(
+                              () => _type = AuctionTypeFilter.live,
+                            ),
                           ),
                         ],
                       ),
@@ -459,7 +476,7 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                             PostsFilterChoiceChip(
                               label: label,
                               selected: _sort == sort,
-                              onTap: () => setState(() => _sort = sort),
+                              onTap: () => _updateFilter(() => _sort = sort),
                             ),
                         ],
                       ),
@@ -474,7 +491,8 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                         compact: true,
                         selectedUser: _host,
                         hintText: l10n.tOr('searchHost', 'Search host'),
-                        onUserSelected: (user) => setState(() => _host = user),
+                        onUserSelected: (user) =>
+                            _updateFilter(() => _host = user),
                       ),
                     ),
                     PostsFilterSection(
@@ -488,7 +506,7 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                         selectedUser: _winner,
                         hintText: l10n.tOr('searchWinner', 'Search winner'),
                         onUserSelected: (user) =>
-                            setState(() => _winner = user),
+                            _updateFilter(() => _winner = user),
                       ),
                     ),
                     PostsFilterSection(
@@ -496,7 +514,7 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
                       icon: Icons.check_circle_outline_rounded,
                       child: _triStateChips(
                         value: _hasWinner,
-                        onChanged: (v) => setState(() => _hasWinner = v),
+                        onChanged: (v) => _updateFilter(() => _hasWinner = v),
                         l10n: l10n,
                       ),
                     ),
@@ -506,7 +524,6 @@ class _AuctionsFilterPopupState extends State<AuctionsFilterPopup> {
               GiftsFilterFooter(
                 onReset: _reset,
                 onCancel: () => _close(context),
-                onApply: () => _apply(context),
               ),
             ],
           ),
