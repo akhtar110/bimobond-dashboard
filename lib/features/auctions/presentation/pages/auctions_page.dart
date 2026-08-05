@@ -46,8 +46,9 @@ class AuctionsPage extends StatelessWidget {
         create: () =>
             sl<AuctionsBloc>()..add(LoadAllAuctionsEvent(refresh: true)),
         child: BlocProvider(
-          create: (_) => sl<SellerVerificationBloc>()
-            ..add(const LoadSellerVerificationsEvent(refresh: true)),
+          create: (_) =>
+              sl<SellerVerificationBloc>()
+                ..add(const LoadSellerVerificationsEvent(refresh: true)),
           child: const _AuctionsPageView(),
         ),
       ),
@@ -93,8 +94,8 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
     if (position.pixels >= position.maxScrollExtent - 300) {
       if (_activeTab == AuctionsPageTab.sellerVerification) {
         context.read<SellerVerificationBloc>().add(
-              const LoadMoreSellerVerificationsEvent(),
-            );
+          const LoadMoreSellerVerificationsEvent(),
+        );
       } else {
         context.read<AuctionsBloc>().add(LoadMoreAuctionsEvent());
       }
@@ -103,9 +104,9 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
 
   void _onRefresh() {
     if (_activeTab == AuctionsPageTab.sellerVerification) {
-      context
-          .read<SellerVerificationBloc>()
-          .add(const LoadSellerVerificationsEvent(refresh: true));
+      context.read<SellerVerificationBloc>().add(
+        const LoadSellerVerificationsEvent(refresh: true),
+      );
     } else {
       context.read<AuctionsBloc>().add(LoadAllAuctionsEvent(refresh: true));
     }
@@ -128,7 +129,27 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
           body: BlocBuilder<SellerVerificationBloc, SellerVerificationState>(
             builder: (context, sellerState) {
               return BlocConsumer<AuctionsBloc, AuctionsState>(
-                listener: (context, state) {},
+                listenWhen: (previous, current) {
+                  if (current is! AuctionsLoaded ||
+                      current.actionError == null) {
+                    return false;
+                  }
+                  if (previous is! AuctionsLoaded) return true;
+                  return previous.actionError != current.actionError;
+                },
+                listener: (context, state) {
+                  if (state is! AuctionsLoaded || state.actionError == null) {
+                    return;
+                  }
+                  final scheme = Theme.of(context).colorScheme;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.actionError!),
+                      backgroundColor: scheme.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
                 builder: (context, state) {
                   final showAuctionsTab =
                       _activeTab == AuctionsPageTab.auctions;
@@ -155,8 +176,8 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
                               onTabChanged: (tab) {
                                 setState(() => _activeTab = tab);
                                 if (tab == AuctionsPageTab.sellerVerification) {
-                                  final sellerBloc =
-                                      context.read<SellerVerificationBloc>();
+                                  final sellerBloc = context
+                                      .read<SellerVerificationBloc>();
                                   if (sellerBloc.state
                                       is! SellerVerificationLoaded) {
                                     sellerBloc.add(
@@ -209,8 +230,9 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
                                     state.isLoadingMore)
                                   const SliverToBoxAdapter(
                                     child: Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 20),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 20,
+                                      ),
                                       child: Center(
                                         child: SizedBox(
                                           width: 24,
@@ -227,8 +249,9 @@ class _AuctionsPageViewState extends State<_AuctionsPageView> {
                               ] else if (state is AuctionsError) ...[
                                 _SliverError(message: state.message),
                               ],
-                            ] else if (PermissionManager
-                                .canReadSellerVerification(context)) ...[
+                            ] else if (PermissionManager.canReadSellerVerification(
+                              context,
+                            )) ...[
                               SliverToBoxAdapter(
                                 child: Center(
                                   child: ConstrainedBox(
@@ -404,10 +427,7 @@ class _AuctionsPageHeader extends StatelessWidget {
                       children: [
                         Expanded(child: titleText),
                         const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: tabs,
-                        ),
+                        Expanded(flex: 2, child: tabs),
                         const SizedBox(width: 8),
                         refreshBtn,
                       ],
@@ -430,10 +450,7 @@ class _AuctionsPageHeader extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(child: titleText),
-                      if (medium) ...[
-                        const SizedBox(width: 8),
-                        refreshBtn,
-                      ],
+                      if (medium) ...[const SizedBox(width: 8), refreshBtn],
                     ],
                   ),
                   SizedBox(height: compact ? 6 : 8),
@@ -465,10 +482,7 @@ class _AuctionsPageHeader extends StatelessWidget {
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 class _SliverPagination extends StatelessWidget {
-  const _SliverPagination({
-    required this.loaded,
-    required this.metrics,
-  });
+  const _SliverPagination({required this.loaded, required this.metrics});
 
   final AuctionsLoaded loaded;
   final AuctionsLayoutMetrics metrics;
@@ -564,10 +578,7 @@ class _AuctionCardWithImageState extends State<_AuctionCardWithImage> {
 // ─── Grid ─────────────────────────────────────────────────────────────────────
 
 class _SliverGrid extends StatelessWidget {
-  const _SliverGrid({
-    required this.loaded,
-    required this.metrics,
-  });
+  const _SliverGrid({required this.loaded, required this.metrics});
   final AuctionsLoaded loaded;
   final AuctionsLayoutMetrics metrics;
 
@@ -603,53 +614,52 @@ class _SliverGrid extends StatelessWidget {
             0,
           ),
           sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, rowIndex) {
-                final start = rowIndex * columns;
-                final end = (start + columns).clamp(0, auctions.length);
-                final rowAuctions = auctions.sublist(start, end);
+            delegate: SliverChildBuilderDelegate((context, rowIndex) {
+              final start = rowIndex * columns;
+              final end = (start + columns).clamp(0, auctions.length);
+              final rowAuctions = auctions.sublist(start, end);
 
-                return Padding(
-                  padding: EdgeInsets.only(
-                    bottom: rowIndex < rowCount - 1 ? gap : 0,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < columns; i++) ...[
-                        if (i > 0) SizedBox(width: gap),
-                        Expanded(
-                          child: i < rowAuctions.length
-                              ? _AuctionCardWithImage(
-                                  auction: rowAuctions[i],
-                                  onViewDetails: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      AppRoutes.auctionDetail,
-                                      arguments: rowAuctions[i],
-                                    );
-                                  },
-                                  onCancel: PermissionManager
-                                              .canModerateAuctions(context) &&
-                                          rowAuctions[i].canAdminCancelOrBan
-                                      ? () {
-                                          _confirmCancel(
-                                            context,
-                                            rowAuctions[i].id,
-                                            rowAuctions[i].itemName,
-                                          );
-                                        }
-                                      : null,
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: rowIndex < rowCount - 1 ? gap : 0,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < columns; i++) ...[
+                      if (i > 0) SizedBox(width: gap),
+                      Expanded(
+                        child: i < rowAuctions.length
+                            ? _AuctionCardWithImage(
+                                auction: rowAuctions[i],
+                                onViewDetails: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppRoutes.auctionDetail,
+                                    arguments: rowAuctions[i],
+                                  );
+                                },
+                                onCancel:
+                                    PermissionManager.canModerateAuctions(
+                                          context,
+                                        ) &&
+                                        rowAuctions[i].canAdminCancelOrBan
+                                    ? () {
+                                        _confirmCancel(
+                                          context,
+                                          rowAuctions[i].id,
+                                          rowAuctions[i].itemName,
+                                        );
+                                      }
+                                    : null,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                     ],
-                  ),
-                );
-              },
-              childCount: rowCount,
-            ),
+                  ],
+                ),
+              );
+            }, childCount: rowCount),
           ),
         );
       },
@@ -665,7 +675,10 @@ class _SliverGrid extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(l10n.t('forceCancelAuctionTitle')),
         content: Text(
-          'Cancel "${name ?? 'this auction'}"? This cannot be undone.',
+          l10n.tOr(
+            'forceCancelAuctionConfirm',
+            'Cancel "${name ?? l10n.tOr('thisAuction', 'this auction')}"? This cannot be undone.',
+          ),
         ),
         actions: [
           TextButton(
@@ -675,9 +688,9 @@ class _SliverGrid extends StatelessWidget {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context
-                  .read<AuctionsBloc>()
-                  .add(AdminCancelAuctionFromListEvent(id));
+              context.read<AuctionsBloc>().add(
+                AdminCancelAuctionFromListEvent(id),
+              );
             },
             style: FilledButton.styleFrom(
               backgroundColor: scheme.error,
@@ -720,25 +733,20 @@ class _SliverSkeletons extends StatelessWidget {
             0,
           ),
           sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, rowIndex) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: rowIndex < rows - 1 ? gap : 0),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var i = 0; i < columns; i++) ...[
-                          if (i > 0) SizedBox(width: gap),
-                          const Expanded(child: AuctionCardSkeleton()),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
-              childCount: rows,
-            ),
+            delegate: SliverChildBuilderDelegate((context, rowIndex) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: rowIndex < rows - 1 ? gap : 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < columns; i++) ...[
+                      if (i > 0) SizedBox(width: gap),
+                      const Expanded(child: AuctionCardSkeleton()),
+                    ],
+                  ],
+                ),
+              );
+            }, childCount: rows),
           ),
         );
       },
@@ -817,11 +825,7 @@ class _SliverError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.error_outline_rounded,
-                size: 44,
-                color: scheme.error,
-              ),
+              Icon(Icons.error_outline_rounded, size: 44, color: scheme.error),
               const SizedBox(height: 12),
               Text(
                 l10n.t('failedToLoadAuction'),
@@ -834,9 +838,9 @@ class _SliverError extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 14),
               FilledButton.icon(

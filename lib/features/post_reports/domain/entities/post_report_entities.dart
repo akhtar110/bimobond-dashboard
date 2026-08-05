@@ -136,6 +136,11 @@ class PostReportMetrics extends Equatable {
     this.repostCount = 0,
     this.shareCount = 0,
     this.downloadCount = 0,
+    this.engagementRate = 0,
+    this.totalWatchTimeSeconds = 0,
+    this.viewerRetentionRate = 0,
+    this.completionRate = 0,
+    this.trafficSourceBreakdown = const PostReportTrafficSourceBreakdown(),
   });
 
   final int viewCount;
@@ -145,6 +150,11 @@ class PostReportMetrics extends Equatable {
   final int repostCount;
   final int shareCount;
   final int downloadCount;
+  final double engagementRate;
+  final int totalWatchTimeSeconds;
+  final double viewerRetentionRate;
+  final double completionRate;
+  final PostReportTrafficSourceBreakdown trafficSourceBreakdown;
 
   @override
   List<Object?> get props => [
@@ -155,6 +165,75 @@ class PostReportMetrics extends Equatable {
         repostCount,
         shareCount,
         downloadCount,
+        engagementRate,
+        totalWatchTimeSeconds,
+        viewerRetentionRate,
+        completionRate,
+        trafficSourceBreakdown,
+      ];
+}
+
+class PostReportTrafficSourceBreakdown extends Equatable {
+  const PostReportTrafficSourceBreakdown({
+    this.forYou = 0,
+    this.profile = 0,
+    this.search = 0,
+    this.hashtags = 0,
+    this.shares = 0,
+  });
+
+  final int forYou;
+  final int profile;
+  final int search;
+  final int hashtags;
+  final int shares;
+
+  int get total => forYou + profile + search + hashtags + shares;
+
+  @override
+  List<Object?> get props => [forYou, profile, search, hashtags, shares];
+}
+
+class PostReportModerationLog extends Equatable {
+  const PostReportModerationLog({
+    required this.id,
+    required this.status,
+    required this.createdAt,
+    this.reason,
+    this.note,
+    this.moderator,
+  });
+
+  final String id;
+  final String status;
+  final DateTime createdAt;
+  final String? reason;
+  final String? note;
+  final ReportAdminUser? moderator;
+
+  @override
+  List<Object?> get props => [id, status, createdAt, reason, note, moderator];
+}
+
+class PostReportModerationSummary extends Equatable {
+  const PostReportModerationSummary({
+    this.latestModerator,
+    this.latestStatusChangeReason,
+    this.latestActionDate,
+    this.actionTimeline = const [],
+  });
+
+  final ReportAdminUser? latestModerator;
+  final String? latestStatusChangeReason;
+  final DateTime? latestActionDate;
+  final List<PostReportModerationLog> actionTimeline;
+
+  @override
+  List<Object?> get props => [
+        latestModerator,
+        latestStatusChangeReason,
+        latestActionDate,
+        actionTimeline,
       ];
 }
 
@@ -492,6 +571,7 @@ class PostReportDetailEntity extends Equatable {
     required this.recentViews,
     required this.recentGifts,
     required this.moderationFlags,
+    this.moderationSummary,
   });
 
   final ReportPeriod period;
@@ -505,6 +585,7 @@ class PostReportDetailEntity extends Equatable {
   final List<PostReportView> recentViews;
   final List<PostReportGiftTransaction> recentGifts;
   final PostReportModerationFlags moderationFlags;
+  final PostReportModerationSummary? moderationSummary;
 
   @override
   List<Object?> get props => [
@@ -519,5 +600,6 @@ class PostReportDetailEntity extends Equatable {
         recentViews,
         recentGifts,
         moderationFlags,
+        moderationSummary,
       ];
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -259,6 +259,7 @@ class _CategoriesDesktopPagination extends StatelessWidget {
       itemCount: visible.length,
       // Keep visible even for a single page so the footer is never missing.
       hideWhenSinglePage: false,
+      showBorder: false,
       borderRadius: BorderRadius.circular(12),
       onPageChanged: (page) =>
           context.read<CategoriesBloc>().add(GoToCategoriesPageEvent(page)),

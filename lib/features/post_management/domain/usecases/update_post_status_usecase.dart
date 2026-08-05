@@ -6,6 +6,16 @@ class UpdatePostStatus {
 
   final PostManagementRepository repository;
 
-  Future<ManagedPostEntity> call(String postId, String status) =>
-      repository.updatePostStatus(postId, status);
+  Future<ManagedPostEntity> call(
+    String postId,
+    String status, {
+    String? reason,
+    String? note,
+  }) =>
+      repository.updatePostStatus(
+        postId,
+        status,
+        reason: reason,
+        note: note,
+      );
 }

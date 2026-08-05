@@ -64,7 +64,7 @@ class SettingsSection extends StatelessWidget {
   }
 }
 
-/// Material 3 surface card used across settings sections.
+/// Material 3 borderless surface card used across settings and profile sections.
 class SettingsSurfaceCard extends StatefulWidget {
   const SettingsSurfaceCard({
     super.key,
@@ -93,18 +93,18 @@ class _SettingsSurfaceCardState extends State<SettingsSurfaceCard> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
-          color: scheme.surface,
+          color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _hovered
-                ? scheme.primary.withValues(alpha: 0.28)
-                : scheme.outlineVariant,
+                ? scheme.primary.withValues(alpha: 0.25)
+                : Colors.transparent,
           ),
           boxShadow: [
             BoxShadow(
-              color: scheme.shadow.withValues(alpha: _hovered ? 0.08 : 0.04),
-              blurRadius: _hovered ? 18 : 12,
-              offset: Offset(0, _hovered ? 5 : 2),
+              color: scheme.shadow.withValues(alpha: _hovered ? 0.06 : 0.02),
+              blurRadius: _hovered ? 12 : 6,
+              offset: Offset(0, _hovered ? 3 : 1),
             ),
           ],
         ),

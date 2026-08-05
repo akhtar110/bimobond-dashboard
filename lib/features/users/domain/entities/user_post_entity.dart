@@ -19,6 +19,7 @@ class UserPostEntity {
   final int commentCount;
   final int saveCount;
   final int repostCount;
+  final int reportCount;
   final int? duration;
   final int? videoWidth;
   final int? videoHeight;
@@ -67,6 +68,7 @@ class UserPostEntity {
     required this.commentCount,
     required this.saveCount,
     this.repostCount = 0,
+    this.reportCount = 0,
     this.duration,
     this.videoWidth,
     this.videoHeight,

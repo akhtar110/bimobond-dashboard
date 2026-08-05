@@ -29,7 +29,7 @@ class PostPreviewCard extends StatelessWidget {
         ? post.userFullName!
         : (post.userName ?? post.userId);
     final statusColor = postStatusColorFromScheme(scheme, post.status);
-    final avatarRadius = dense ? 16.0 : 20.0;
+    final avatarRadius = dense ? 14.0 : 18.0;
 
     return PostSurfaceCard(
       dense: dense,
@@ -89,7 +89,7 @@ class PostPreviewCard extends StatelessWidget {
                       )
                     : null,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

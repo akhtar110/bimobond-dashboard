@@ -47,6 +47,14 @@ import 'features/settings/presentation/bloc/app_settings_bloc.dart';
 import 'features/settings/presentation/bloc/economy_settings_bloc.dart';
 import 'core/sidebar/bloc/sidebar_bloc.dart';
 
+import 'features/profile/data/datasources/profile_remote_datasource.dart';
+import 'features/profile/data/repositories/profile_repository_impl.dart';
+import 'features/profile/domain/repositories/profile_repository.dart';
+import 'features/profile/domain/usecases/get_profile_usecase.dart';
+import 'features/profile/domain/usecases/update_profile_usecase.dart';
+import 'features/profile/domain/usecases/upload_avatar_usecase.dart';
+import 'features/profile/presentation/bloc/profile_bloc.dart';
+
 import 'features/user_reports/data/datasources/user_reports_remote_data_source.dart';
 import 'features/user_reports/data/repositories/user_reports_repository_impl.dart';
 import 'features/user_reports/domain/repositories/user_reports_repository.dart';
@@ -176,6 +184,8 @@ import 'features/post_management/domain/usecases/update_post_details_usecase.dar
 import 'features/post_management/domain/usecases/delete_comment_admin.dart';
 import 'features/post_management/domain/usecases/get_post_comments.dart';
 import 'features/post_management/domain/usecases/get_post_engagement_users.dart';
+import 'features/post_management/domain/usecases/add_post_note_usecase.dart';
+import 'features/post_management/domain/usecases/get_post_moderation_timeline_usecase.dart';
 import 'features/post_management/domain/usecases/update_post_status_usecase.dart';
 import 'features/post_management/presentation/bloc/post_management_bloc.dart';
 
@@ -242,6 +252,7 @@ import 'features/auctions/domain/repositories/auctions_repository.dart';
 import 'features/auctions/domain/usecases/admin_refund_fulfillment_usecase.dart';
 import 'features/auctions/domain/usecases/admin_release_fulfillment_usecase.dart';
 import 'features/auctions/domain/usecases/ban_auction_usecase.dart';
+import 'features/auctions/domain/usecases/unban_auction_usecase.dart';
 import 'features/auctions/domain/usecases/cancel_auction_usecase.dart';
 import 'features/auctions/domain/usecases/create_auction_usecase.dart';
 import 'features/auctions/domain/usecases/get_active_auctions_usecase.dart';
@@ -262,6 +273,7 @@ import 'features/seller_verification/presentation/bloc/seller_verification_bloc.
 import 'features/auctions/presentation/bloc/auction_detail_bloc.dart';
 import 'features/auctions/presentation/bloc/auctions_bloc.dart';
 import 'features/auctions/presentation/services/auction_image_lookup.dart';
+import 'features/auctions/presentation/services/auctions_list_sync.dart';
 
 import 'features/reports/data/datasources/reports_remote_datasource.dart';
 import 'features/reports/data/repositories/reports_repository_impl.dart';
@@ -1184,6 +1196,12 @@ Future<void> init() async {
     () => UpdatePostStatus(sl<PostManagementRepository>()),
   );
   sl.registerLazySingleton(
+    () => AddPostNote(sl<PostManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPostModerationTimeline(sl<PostManagementRepository>()),
+  );
+  sl.registerLazySingleton(
     () => GetPostComments(sl<PostManagementRepository>()),
   );
   sl.registerLazySingleton(
@@ -1203,6 +1221,14 @@ Future<void> init() async {
       hidePost: sl<HidePost>(),
       banPost: sl<BanPost>(),
       updatePostStatus: sl<UpdatePostStatus>(),
+      addPostNote: sl<AddPostNote>(),
+      getPostModerationTimeline: sl<GetPostModerationTimeline>(),
+      getPostReportDetail: sl<GetPostReportDetail>(),
+      getCameraFilter: sl<GetCameraFilterUseCase>(),
+      getCameraEffect: sl<GetCameraEffectUseCase>(),
+      getCameraFilters: sl<GetCameraFiltersUseCase>(),
+      getCameraEffects: sl<GetCameraEffectsUseCase>(),
+      getReports: sl<GetReports>(),
       getPostComments: sl<GetPostComments>(),
       deleteCommentAdmin: sl<DeleteCommentAdmin>(),
       getPostEngagementUsers: sl<GetPostEngagementUsers>(),
@@ -1402,6 +1428,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetAuctionDetails(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminCancelAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(() => AdminBanAuction(sl<AuctionsRepository>()));
+  sl.registerLazySingleton(() => AdminUnbanAuction(sl<AuctionsRepository>()));
   sl.registerLazySingleton(
     () => PreviewAuctionPricing(sl<AuctionsRepository>()),
   );
@@ -1421,11 +1448,13 @@ Future<void> init() async {
   sl.registerLazySingleton(
     () => AuctionImageLookup(sl<GetManagedPostById>(), sl<Dio>()),
   );
+  sl.registerLazySingleton(() => AuctionsListSync());
 
   sl.registerFactory(
     () => AuctionsBloc(
       getAllAuctions: sl<GetAllAuctions>(),
       cancelAuction: sl<AdminCancelAuction>(),
+      listSync: sl<AuctionsListSync>(),
     ),
   );
 
@@ -1434,6 +1463,7 @@ Future<void> init() async {
       getAuctionDetails: sl<GetAuctionDetails>(),
       cancelAuction: sl<AdminCancelAuction>(),
       banAuction: sl<AdminBanAuction>(),
+      unbanAuction: sl<AdminUnbanAuction>(),
       updateAuction: sl<AdminUpdateAuction>(),
       resolveAuction: sl<AdminResolveAuction>(),
       refundFulfillment: sl<AdminRefundFulfillment>(),
@@ -2219,6 +2249,28 @@ Future<void> init() async {
       deleteChatMessage: sl<DeleteChatMessage>(),
       bulkChatModeration: sl<BulkChatModeration>(),
       socketService: sl<ChatSocketService>(),
+    ),
+  );
+
+  // =========================================================
+  // PROFILE (logged-in admin)
+  // =========================================================
+  sl.registerLazySingleton<ProfileRemoteDataSource>(
+    () => ProfileRemoteDataSourceImpl(sl<Dio>()),
+  );
+  sl.registerLazySingleton<ProfileRepository>(
+    () => ProfileRepositoryImpl(sl<ProfileRemoteDataSource>()),
+  );
+  sl.registerLazySingleton(() => GetProfileUseCase(sl<ProfileRepository>()));
+  sl.registerLazySingleton(() => UpdateProfileUseCase(sl<ProfileRepository>()));
+  sl.registerLazySingleton(() => UploadAvatarUseCase(sl<ProfileRepository>()));
+  sl.registerFactory(
+    () => ProfileBloc(
+      getProfile: sl<GetProfileUseCase>(),
+      updateProfile: sl<UpdateProfileUseCase>(),
+      uploadAvatar: sl<UploadAvatarUseCase>(),
+      authBloc: sl<AuthBloc>(),
+      saveSession: sl<SaveSessionUseCase>(),
     ),
   );
 

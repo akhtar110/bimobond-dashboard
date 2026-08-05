@@ -179,6 +179,8 @@ class _PostsToolbarRow extends StatelessWidget {
                   PostsViewToggle(height: controlHeight),
                   SizedBox(width: gap),
                   createButton,
+                  SizedBox(width: gap),
+                  PostsPageSettingButton(height: controlHeight),
                 ],
               );
             },
@@ -388,7 +390,7 @@ class PostsActiveFilterChips extends StatelessWidget {
         if (filters.isAuctionable == true) {
           chips.add(
             _ActiveFilterChip(
-              label: l10n.t('postFilterAuctionOnly'),
+              label: l10n.tOr('postFilterAuctionOnly', 'Auctions Only'),
               onRemove: () => context.read<PostsBloc>().add(
                     UpdatePostFiltersEvent(
                       filters.copyWith(
@@ -402,7 +404,7 @@ class PostsActiveFilterChips extends StatelessWidget {
         } else if (filters.isAd == true) {
           chips.add(
             _ActiveFilterChip(
-              label: context.trOr('postFilterAdsOnly', 'Ads only'),
+              label: l10n.tOr('postFilterAdsOnly', 'Ads Only'),
               onRemove: () => context.read<PostsBloc>().add(
                     UpdatePostFiltersEvent(
                       filters.copyWith(
@@ -589,6 +591,122 @@ class PostsCreatePostButton extends StatelessWidget {
         l10n.t('createPost'),
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
       ),
+    );
+  }
+}
+
+/// Compact Page Setting button placed beside the 'Create Post' button.
+class PostsPageSettingButton extends StatelessWidget {
+  const PostsPageSettingButton({super.key, required this.height});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+
+    return BlocSelector<PostsBloc, PostsState, int>(
+      selector: (state) => switch (state) {
+        PostsLoaded(:final pageSize) => pageSize,
+        _ => context.read<PostsBloc>().pageSize,
+      },
+      builder: (context, currentSize) {
+        return PopupMenuButton<int>(
+          tooltip: l10n.tOr('pageSetting', 'Page Setting'),
+          offset: const Offset(0, 40),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          color: scheme.surface,
+          elevation: 4,
+          onSelected: (int newSize) {
+            context
+                .read<PostsBloc>()
+                .add(ChangePostsPageSizeEvent(newSize));
+          },
+          itemBuilder: (ctx) => [
+            PopupMenuItem<int>(
+              enabled: false,
+              height: 32,
+              child: Text(
+                l10n.tOr('postsPerPage', 'Posts per page'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: scheme.primary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            const PopupMenuDivider(height: 4),
+            for (final size in const [20, 50, 100])
+              PopupMenuItem<int>(
+                value: size,
+                height: 38,
+                child: Row(
+                  children: [
+                    Text(
+                      '$size ${l10n.tOr('perPage', 'per page')}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: currentSize == size
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                        color: currentSize == size
+                            ? scheme.primary
+                            : scheme.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (currentSize == size)
+                      Icon(
+                        Icons.check_rounded,
+                        size: 18,
+                        color: scheme.primary,
+                      ),
+                  ],
+                ),
+              ),
+          ],
+          child: Container(
+            height: height,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$currentSize',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down_rounded,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

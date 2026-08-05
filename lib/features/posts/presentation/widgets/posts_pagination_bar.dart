@@ -11,12 +11,14 @@ class PostsPaginationBar extends StatelessWidget {
     required this.currentPage,
     required this.lastPage,
     required this.total,
+    this.pageSize = PostsBloc.pageLimit,
     this.itemCount,
   });
 
   final int currentPage;
   final int lastPage;
   final int total;
+  final int pageSize;
   final int? itemCount;
 
   @override
@@ -25,8 +27,9 @@ class PostsPaginationBar extends StatelessWidget {
       currentPage: currentPage,
       lastPage: lastPage,
       total: total,
-      pageSize: PostsBloc.pageLimit,
+      pageSize: pageSize,
       itemCount: itemCount,
+      showBorder: false,
       borderRadius: BorderRadius.circular(12),
       onPageChanged: (page) =>
           context.read<PostsBloc>().add(GoToPostsPageEvent(page)),

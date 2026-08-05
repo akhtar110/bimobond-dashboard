@@ -16,6 +16,7 @@ class GiftEntity {
     this.sortOrder = 0,
     required this.isActive,
     this.publishedAt,
+    this.createdByName,
   });
 
   final String id;
@@ -33,6 +34,9 @@ class GiftEntity {
   final int sortOrder;
   final bool isActive;
   final DateTime? publishedAt;
+
+  /// Display name of the admin/user who created or published this gift.
+  final String? createdByName;
 
   bool get isScheduled {
     final at = publishedAt;
@@ -59,7 +63,9 @@ class GiftEntity {
     int? sortOrder,
     bool? isActive,
     DateTime? publishedAt,
+    String? createdByName,
     bool clearPublishedAt = false,
+    bool clearCreatedByName = false,
     bool clearAnimationUrl = false,
     bool clearAudioUrl = false,
     bool clearColor = false,
@@ -80,6 +86,9 @@ class GiftEntity {
       sortOrder: sortOrder ?? this.sortOrder,
       isActive: isActive ?? this.isActive,
       publishedAt: clearPublishedAt ? null : (publishedAt ?? this.publishedAt),
+      createdByName: clearCreatedByName
+          ? null
+          : (createdByName ?? this.createdByName),
     );
   }
 }

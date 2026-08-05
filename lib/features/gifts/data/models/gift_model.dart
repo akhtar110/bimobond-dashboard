@@ -18,6 +18,7 @@ class GiftModel extends GiftEntity {
     super.sortOrder,
     required super.isActive,
     super.publishedAt,
+    super.createdByName,
   });
 
   factory GiftModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +36,7 @@ class GiftModel extends GiftEntity {
       sortOrder: _i(json['sortOrder']),
       isActive: json['isActive'] as bool? ?? true,
       publishedAt: _parseDate(json['publishedAt']),
+      createdByName: _parseCreatedByName(json),
     );
   }
 
@@ -49,6 +51,54 @@ class GiftModel extends GiftEntity {
       return GiftType.audio;
     }
     return GiftType.image;
+  }
+
+  /// Resolves creator/admin full name from common API shapes.
+  static String? _parseCreatedByName(Map<String, dynamic> json) {
+    for (final key in const [
+      'createdByFullName',
+      'createdByName',
+      'publishedByName',
+      'publisherName',
+      'adminName',
+      'authorName',
+      'createdByUsername',
+    ]) {
+      final value = json[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+
+    for (final key in const [
+      'createdBy',
+      'created_by',
+      'publisher',
+      'publishedBy',
+      'admin',
+      'author',
+      'user',
+      'creator',
+    ]) {
+      final nested = json[key];
+      if (nested is String) {
+        final value = nested.trim();
+        if (value.isNotEmpty) return value;
+      }
+      if (nested is Map) {
+        final map = Map<String, dynamic>.from(nested);
+        // Prefer full/display name over username.
+        for (final nestedKey in const [
+          'fullName',
+          'displayName',
+          'name',
+          'username',
+          'email',
+        ]) {
+          final value = map[nestedKey]?.toString().trim();
+          if (value != null && value.isNotEmpty) return value;
+        }
+      }
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -67,6 +117,7 @@ class GiftModel extends GiftEntity {
       'isActive': isActive,
       if (publishedAt != null)
         'publishedAt': publishedAt!.toUtc().toIso8601String(),
+      if (createdByName != null) 'createdByName': createdByName,
     };
   }
 

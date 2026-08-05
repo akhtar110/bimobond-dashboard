@@ -92,6 +92,7 @@ Map<String, dynamic> userPostEntityToAdminJson(UserPostEntity post) {
     'commentCount': post.commentCount,
     'saveCount': post.saveCount,
     'repostCount': post.repostCount,
+    'reportCount': post.reportCount,
     if (post.duration != null) 'duration': post.duration,
     if (post.videoWidth != null) 'videoWidth': post.videoWidth,
     if (post.videoHeight != null) 'videoHeight': post.videoHeight,
