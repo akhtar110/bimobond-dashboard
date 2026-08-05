@@ -36,15 +36,18 @@ class _UserOnlineStatusCellState extends State<UserOnlineStatusCell> {
     super.dispose();
   }
 
-  String _relativeLastSeen() {
+  String _relativeLastSeen(BuildContext context) {
+    final l10n = context.l10n;
     final lastSeen = widget.user.lastSeen;
     if (lastSeen == null) return '—';
     final diff = DateTime.now().difference(lastSeen);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inSeconds < 60) return l10n.tOr('timeJustNow', 'Just now');
+    if (diff.inMinutes < 60) return l10n.tArgs('timeMinutesAgo', {'minutes': '${diff.inMinutes}'});
+    if (diff.inHours < 24) return l10n.tArgs('timeHoursAgo', {'hours': '${diff.inHours}'});
     if (diff.inDays < 2) {
-      return 'Yesterday, ${DateFormat('h:mm a').format(lastSeen.toLocal())}';
+      return l10n.tArgs('timeYesterdayAt', {
+        'time': DateFormat('h:mm a').format(lastSeen.toLocal()),
+      });
     }
     if (diff.inDays < 7) {
       return DateFormat('EEE, h:mm a').format(lastSeen.toLocal());
@@ -52,9 +55,10 @@ class _UserOnlineStatusCellState extends State<UserOnlineStatusCell> {
     return DateFormat('MMM d, yyyy').format(lastSeen.toLocal());
   }
 
-  String _exactTimestamp() {
+  String _exactTimestamp(BuildContext context) {
+    final l10n = context.l10n;
     final lastSeen = widget.user.lastSeen;
-    if (lastSeen == null) return 'Never seen';
+    if (lastSeen == null) return l10n.tOr('neverSeen', 'Never seen');
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(lastSeen.toLocal());
   }
 
@@ -67,8 +71,8 @@ class _UserOnlineStatusCellState extends State<UserOnlineStatusCell> {
     final labelText = isOnline
         ? l10n.tOr('online', 'Online')
         : l10n.tOr('offline', 'Offline');
-    final lastSeenText = _relativeLastSeen();
-    final exactTime = _exactTimestamp();
+    final lastSeenText = _relativeLastSeen(context);
+    final exactTime = _exactTimestamp(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,9 +241,10 @@ class _UserLastSeenBadgeState extends State<UserLastSeenBadge> {
     return DateFormat('MMM d, yyyy').format(lastSeen.toLocal());
   }
 
-  String _exactTimestamp() {
+  String _exactTimestamp(BuildContext context) {
+    final l10n = context.l10n;
     final lastSeen = widget.user.lastSeen;
-    if (lastSeen == null) return 'Never seen';
+    if (lastSeen == null) return l10n.tOr('neverSeen', 'Never seen');
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(lastSeen.toLocal());
   }
 
@@ -249,7 +254,7 @@ class _UserLastSeenBadgeState extends State<UserLastSeenBadge> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final lastSeenText = _relativeLastSeen(context);
-    final exactTime = _exactTimestamp();
+    final exactTime = _exactTimestamp(context);
 
     return Tooltip(
       message: '${l10n.tOr("exactActivity", "Last activity")}: $exactTime',

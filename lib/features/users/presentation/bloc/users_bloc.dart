@@ -58,7 +58,7 @@ class FilterUsersEvent extends UsersEvent {
   final UsersUiFilter filter;
 }
 
-/// Applies username/email search, location filter, role, and date range filters together.
+/// Applies search, location, role, date range, account status, and presence status filters together.
 class ApplyUsersListFiltersEvent extends UsersEvent {
   ApplyUsersListFiltersEvent({
     required this.search,
@@ -66,6 +66,8 @@ class ApplyUsersListFiltersEvent extends UsersEvent {
     this.role,
     this.createdFrom,
     this.createdTo,
+    this.statusFilter,
+    this.presenceFilter,
   });
 
   final String search;
@@ -73,6 +75,8 @@ class ApplyUsersListFiltersEvent extends UsersEvent {
   final String? role;
   final DateTime? createdFrom;
   final DateTime? createdTo;
+  final UsersUiFilter? statusFilter;
+  final UsersPresenceFilter? presenceFilter;
 }
 
 /// Triggers user list export to Excel or CSV formats.
@@ -93,6 +97,10 @@ class FilterUsersByLocationEvent extends UsersEvent {
 
 /// Clears search, location, and status filters and reloads the full list.
 class ClearUsersListFiltersEvent extends UsersEvent {}
+
+class ToggleOnlineCardFilterEvent extends UsersEvent {}
+class ToggleVerifiedCardFilterEvent extends UsersEvent {}
+class ToggleBannedCardFilterEvent extends UsersEvent {}
 
 class SortUsersLocationEvent extends UsersEvent {}
 
@@ -192,6 +200,11 @@ class UsersLoaded extends UsersState {
     this.exportMessage,
     this.exportIsError = false,
     this.onlineCount = 0,
+    this.verifiedCount = 0,
+    this.bannedCount = 0,
+    this.isCardOnlineSelected = false,
+    this.isCardVerifiedSelected = false,
+    this.isCardBannedSelected = false,
   });
 
   final List<UserEntity> users;
@@ -216,6 +229,17 @@ class UsersLoaded extends UsersState {
   final bool exportIsError;
   /// Live count of currently online users (from backend + WS updates).
   final int onlineCount;
+  final int verifiedCount;
+  final int bannedCount;
+  final bool isCardOnlineSelected;
+  final bool isCardVerifiedSelected;
+  final bool isCardBannedSelected;
+
+  bool get isCardTotalSelected =>
+      !isCardOnlineSelected &&
+      !isCardVerifiedSelected &&
+      !isCardBannedSelected &&
+      filter == UsersUiFilter.all;
 
   int get selectedCount => selectedUserIds.length;
   bool get hasSelection => selectedUserIds.isNotEmpty;
@@ -253,6 +277,8 @@ class UsersLoaded extends UsersState {
     String? exportMessage,
     bool? exportIsError,
     int? onlineCount,
+    int? verifiedCount,
+    int? bannedCount,
     bool clearBulkActionMessage = false,
     bool clearExportMessage = false,
   }) {
@@ -282,6 +308,11 @@ class UsersLoaded extends UsersState {
           : (exportMessage ?? this.exportMessage),
       exportIsError: exportIsError ?? this.exportIsError,
       onlineCount: onlineCount ?? this.onlineCount,
+      verifiedCount: verifiedCount ?? this.verifiedCount,
+      bannedCount: bannedCount ?? this.bannedCount,
+      isCardOnlineSelected: isCardOnlineSelected,
+      isCardVerifiedSelected: isCardVerifiedSelected,
+      isCardBannedSelected: isCardBannedSelected,
     );
   }
 }
@@ -323,6 +354,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     on<ApplyUsersListFiltersEvent>(_onApplyListFilters);
     on<FilterUsersByLocationEvent>(_onLocationFilter);
     on<ClearUsersListFiltersEvent>(_onClearListFilters);
+    on<ToggleOnlineCardFilterEvent>(_onToggleOnlineCardFilter);
+    on<ToggleVerifiedCardFilterEvent>(_onToggleVerifiedCardFilter);
+    on<ToggleBannedCardFilterEvent>(_onToggleBannedCardFilter);
     on<SortUsersLocationEvent>(_onLocationSort);
     on<SetUsersLocationSortEvent>(_onSetLocationSort);
     on<FilterUsersEvent>(_onFilter);
@@ -434,6 +468,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   int _lastPage = 1;
   int _total = 0;
   int _onlineCount = 0;
+  int _verifiedCount = 0;
+  int _bannedCount = 0;
   final Set<String> _onlineUserIds = {};
   bool _loadMoreBusy = false;
   bool _resetPasswordBusy = false;
@@ -447,6 +483,10 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   DateTime? _createdTo;
   UsersLocationSortOrder _locationSort = UsersLocationSortOrder.none;
   UsersUiFilter _filter = UsersUiFilter.all;
+  UsersPresenceFilter _presenceFilter = UsersPresenceFilter.all;
+  bool _cardOnlineFilter = false;
+  bool _cardVerifiedFilter = false;
+  bool _cardBannedFilter = false;
 
   bool _isExporting = false;
   String? _exportMessage;
@@ -507,14 +547,32 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
       }
 
       try {
+        final effectiveIsOnline = _cardOnlineFilter
+            ? true
+            : (_presenceFilter == UsersPresenceFilter.online
+                ? true
+                : (_presenceFilter == UsersPresenceFilter.offline
+                    ? false
+                    : (_filter == UsersUiFilter.online
+                        ? true
+                        : (_filter == UsersUiFilter.offline ? false : null))));
+
+        final effectiveIsVerified = _cardVerifiedFilter
+            ? true
+            : (_filter == UsersUiFilter.verified ? true : null);
+
+        final effectiveIsBanned = _cardBannedFilter
+            ? true
+            : (_filter == UsersUiFilter.banned ? true : null);
+
         final response = await getUsers(
           page: page,
           limit: _limit,
           search: _query,
           location: _locationQuery.isEmpty ? null : _locationQuery,
-          isVerified: _filter == UsersUiFilter.verified ? true : null,
-          isBanned: _filter == UsersUiFilter.banned ? true : null,
-          // online/offline are client-side only; no backend param needed
+          isVerified: effectiveIsVerified,
+          isBanned: effectiveIsBanned,
+          isOnline: effectiveIsOnline,
           role: _role,
           createdFrom: _createdFrom,
           createdTo: _createdTo,
@@ -529,6 +587,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         _lastPage = response.lastPage;
         _total = response.total;
         _onlineCount = response.onlineCount;
+        _verifiedCount = response.verifiedCount;
+        _bannedCount = response.bannedCount;
         _onlineUserIds
           ..clear()
           ..addAll(
@@ -565,7 +625,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         location: _locationQuery.isEmpty ? null : _locationQuery,
         isVerified: _filter == UsersUiFilter.verified ? true : null,
         isBanned: _filter == UsersUiFilter.banned ? true : null,
-        // online/offline are client-side only; no backend param needed
         role: _role,
         createdFrom: _createdFrom,
         createdTo: _createdTo,
@@ -613,12 +672,95 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     bool clearExportMessage = false,
   }) {
     var list = users ?? _users;
-    // Apply client-side online / offline filter
-    if (_filter == UsersUiFilter.online) {
+
+    // 1. Account status filter (Verified / Banned)
+    if (_cardVerifiedFilter || _filter == UsersUiFilter.verified) {
+      list = list.where((u) => u.isVerified).toList();
+    }
+    if (_cardBannedFilter || _filter == UsersUiFilter.banned) {
+      list = list.where((u) => u.isBanned).toList();
+    }
+
+    // 2. Presence status filter (Online / Offline)
+    final effectivePresence = _presenceFilter != UsersPresenceFilter.all
+        ? _presenceFilter
+        : (_filter == UsersUiFilter.online
+            ? UsersPresenceFilter.online
+            : (_filter == UsersUiFilter.offline
+                ? UsersPresenceFilter.offline
+                : UsersPresenceFilter.all));
+
+    if (_cardOnlineFilter || effectivePresence == UsersPresenceFilter.online) {
       list = list.where((u) => u.isOnline).toList();
-    } else if (_filter == UsersUiFilter.offline) {
+    } else if (effectivePresence == UsersPresenceFilter.offline) {
       list = list.where((u) => !u.isOnline).toList();
     }
+
+    // 3. User Role filter
+    if (_role != null && _role!.isNotEmpty) {
+      final roleLower = _role!.toLowerCase();
+      list = list.where((u) {
+        if (roleLower == 'user') {
+          return !u.roles.includesStaff;
+        } else if (roleLower == 'admin') {
+          return u.roles.includesAdmin;
+        } else if (roleLower == 'moderator') {
+          return u.roles.includesModerator;
+        } else if (roleLower == 'superadmin') {
+          return u.roles.any((r) => r == UserRole.superAdmin);
+        }
+        return u.roles.any((r) => r.name.toLowerCase() == roleLower);
+      }).toList();
+    }
+
+    // 4. Location filter (City, Region, Country)
+    if (_locationQuery.trim().isNotEmpty) {
+      final locLower = _locationQuery.trim().toLowerCase();
+      list = list.where((u) {
+        final city = (u.city ?? '').toLowerCase();
+        final region = (u.region ?? '').toLowerCase();
+        final country = (u.country ?? '').toLowerCase();
+        return city.contains(locLower) ||
+            region.contains(locLower) ||
+            country.contains(locLower);
+      }).toList();
+    }
+
+    // 5. Registration Date bounds (Full-day inclusive: 00:00:00 to 23:59:59)
+    if (_createdFrom != null) {
+      final startOfDay = DateTime(
+        _createdFrom!.year,
+        _createdFrom!.month,
+        _createdFrom!.day,
+        0,
+        0,
+        0,
+      );
+      list = list
+          .where((u) =>
+              u.createdAt != null &&
+              (u.createdAt!.isAfter(startOfDay) ||
+                  u.createdAt!.isAtSameMomentAs(startOfDay)))
+          .toList();
+    }
+    if (_createdTo != null) {
+      final endOfDay = DateTime(
+        _createdTo!.year,
+        _createdTo!.month,
+        _createdTo!.day,
+        23,
+        59,
+        59,
+        999,
+      );
+      list = list
+          .where((u) =>
+              u.createdAt != null &&
+              (u.createdAt!.isBefore(endOfDay) ||
+                  u.createdAt!.isAtSameMomentAs(endOfDay)))
+          .toList();
+    }
+
     if (list.isEmpty) {
       emit(UsersEmpty());
       return;
@@ -631,6 +773,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         lastPage: _lastPage,
         total: _total,
         onlineCount: _onlineCount,
+        verifiedCount: _verifiedCount,
+        bannedCount: _bannedCount,
         filter: _filter,
         query: _query,
         locationQuery: _locationQuery,
@@ -651,6 +795,9 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
             ? null
             : (exportMessage ?? _exportMessage),
         exportIsError: exportIsError ?? _exportIsError,
+        isCardOnlineSelected: _cardOnlineFilter,
+        isCardVerifiedSelected: _cardVerifiedFilter,
+        isCardBannedSelected: _cardBannedFilter,
       ),
     );
 
@@ -675,6 +822,12 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     ApplyUsersListFiltersEvent event,
     Emitter<UsersState> emit,
   ) {
+    if (event.statusFilter != null) {
+      _filter = event.statusFilter!;
+    }
+    if (event.presenceFilter != null) {
+      _presenceFilter = event.presenceFilter!;
+    }
     _applyListFilters(
       search: event.search.trim(),
       location: event.location.trim(),
@@ -693,13 +846,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     DateTime? createdTo,
     required Emitter<UsersState> emit,
   }) {
-    if (search == _query &&
-        location == _locationQuery &&
-        role == _role &&
-        createdFrom == _createdFrom &&
-        createdTo == _createdTo) {
-      return;
-    }
     _query = search;
     _locationQuery = location;
     _role = role;
@@ -722,26 +868,44 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
     );
   }
 
+  Future<void> _onToggleOnlineCardFilter(
+    ToggleOnlineCardFilterEvent event,
+    Emitter<UsersState> emit,
+  ) async {
+    _cardOnlineFilter = !_cardOnlineFilter;
+    await _fetchPage(emit, page: 1, replace: true);
+  }
+
+  Future<void> _onToggleVerifiedCardFilter(
+    ToggleVerifiedCardFilterEvent event,
+    Emitter<UsersState> emit,
+  ) async {
+    _cardVerifiedFilter = !_cardVerifiedFilter;
+    await _fetchPage(emit, page: 1, replace: true);
+  }
+
+  Future<void> _onToggleBannedCardFilter(
+    ToggleBannedCardFilterEvent event,
+    Emitter<UsersState> emit,
+  ) async {
+    _cardBannedFilter = !_cardBannedFilter;
+    await _fetchPage(emit, page: 1, replace: true);
+  }
+
   void _onClearListFilters(
     ClearUsersListFiltersEvent event,
     Emitter<UsersState> emit,
   ) {
-    final hadFilters = _query.isNotEmpty ||
-        _locationQuery.isNotEmpty ||
-        _role != null ||
-        _createdFrom != null ||
-        _createdTo != null ||
-        _filter != UsersUiFilter.all ||
-        _locationSort != UsersLocationSortOrder.none;
-
-    if (!hadFilters) return;
-
     _query = '';
     _locationQuery = '';
     _role = null;
     _createdFrom = null;
     _createdTo = null;
     _filter = UsersUiFilter.all;
+    _presenceFilter = UsersPresenceFilter.all;
+    _cardOnlineFilter = false;
+    _cardVerifiedFilter = false;
+    _cardBannedFilter = false;
     _locationSort = UsersLocationSortOrder.none;
 
     if (_selectedUserIds.isNotEmpty) {

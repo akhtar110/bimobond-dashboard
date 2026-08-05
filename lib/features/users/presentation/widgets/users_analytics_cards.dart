@@ -17,18 +17,23 @@ class UsersAnalyticsCards extends StatelessWidget {
       int onlineCount,
       int verifiedCount,
       int bannedCount,
+      bool isTotalSelected,
+      bool isOnlineSelected,
+      bool isVerifiedSelected,
+      bool isBannedSelected,
       bool isLoading,
     })>(
       selector: (state) {
         if (state is UsersLoaded) {
-          final total = state.total;
-          final banned = state.users.where((u) => u.isBanned).length;
-          final verified = state.users.where((u) => u.isVerified).length;
           return (
-            total: total,
+            total: state.total,
             onlineCount: state.onlineCount,
-            verifiedCount: verified,
-            bannedCount: banned,
+            verifiedCount: state.verifiedCount,
+            bannedCount: state.bannedCount,
+            isTotalSelected: state.isCardTotalSelected,
+            isOnlineSelected: state.isCardOnlineSelected,
+            isVerifiedSelected: state.isCardVerifiedSelected,
+            isBannedSelected: state.isCardBannedSelected,
             isLoading: false,
           );
         }
@@ -38,6 +43,10 @@ class UsersAnalyticsCards extends StatelessWidget {
             onlineCount: 0,
             verifiedCount: 0,
             bannedCount: 0,
+            isTotalSelected: true,
+            isOnlineSelected: false,
+            isVerifiedSelected: false,
+            isBannedSelected: false,
             isLoading: false,
           );
         }
@@ -46,6 +55,10 @@ class UsersAnalyticsCards extends StatelessWidget {
           onlineCount: 0,
           verifiedCount: 0,
           bannedCount: 0,
+          isTotalSelected: true,
+          isOnlineSelected: false,
+          isVerifiedSelected: false,
+          isBannedSelected: false,
           isLoading: true,
         );
       },
@@ -65,10 +78,53 @@ class UsersAnalyticsCards extends StatelessWidget {
         final verifiedTitle = l10n.tOr('verifiedUsers', 'Verified Users');
         final suspendedTitle = l10n.tOr('suspendedUsers', 'Suspended Users');
 
+        final bloc = context.read<UsersBloc>();
+
         return LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
             final isWide = width >= 960;
+
+            final totalCard = _CompactStatCard(
+              title: totalTitle,
+              value: totalText,
+              icon: Icons.people_alt_rounded,
+              accentColor: Theme.of(context).colorScheme.primary,
+              isLoading: stats.isLoading,
+              isSelected: stats.isTotalSelected,
+              onTap: () => bloc.add(ClearUsersListFiltersEvent()),
+            );
+
+            final onlineCard = _CompactStatCard(
+              title: onlineTitle,
+              value: onlineText,
+              icon: Icons.wifi_rounded,
+              accentColor: const Color(0xFF22C55E),
+              isLoading: stats.isLoading,
+              showPulse: !stats.isLoading && stats.onlineCount > 0,
+              isSelected: stats.isOnlineSelected,
+              onTap: () => bloc.add(ToggleOnlineCardFilterEvent()),
+            );
+
+            final verifiedCard = _CompactStatCard(
+              title: verifiedTitle,
+              value: verifiedText,
+              icon: Icons.verified_user_rounded,
+              accentColor: const Color(0xFF3B82F6),
+              isLoading: stats.isLoading,
+              isSelected: stats.isVerifiedSelected,
+              onTap: () => bloc.add(ToggleVerifiedCardFilterEvent()),
+            );
+
+            final suspendedCard = _CompactStatCard(
+              title: suspendedTitle,
+              value: bannedText,
+              icon: Icons.gavel_rounded,
+              accentColor: const Color(0xFFEF4444),
+              isLoading: stats.isLoading,
+              isSelected: stats.isBannedSelected,
+              onTap: () => bloc.add(ToggleBannedCardFilterEvent()),
+            );
 
             if (!isWide) {
               return Column(
@@ -76,51 +132,17 @@ class UsersAnalyticsCards extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: _CompactStatCard(
-                          title: totalTitle,
-                          value: totalText,
-                          icon: Icons.people_alt_rounded,
-                          accentColor:
-                              Theme.of(context).colorScheme.primary,
-                          isLoading: stats.isLoading,
-                        ),
-                      ),
+                      Expanded(child: totalCard),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: _CompactStatCard(
-                          title: onlineTitle,
-                          value: onlineText,
-                          icon: Icons.wifi_rounded,
-                          accentColor: const Color(0xFF22C55E),
-                          isLoading: stats.isLoading,
-                          showPulse: !stats.isLoading && stats.onlineCount > 0,
-                        ),
-                      ),
+                      Expanded(child: onlineCard),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(
-                        child: _CompactStatCard(
-                          title: verifiedTitle,
-                          value: verifiedText,
-                          icon: Icons.verified_user_rounded,
-                          accentColor: const Color(0xFF3B82F6),
-                          isLoading: stats.isLoading,
-                        ),
-                      ),
+                      Expanded(child: verifiedCard),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: _CompactStatCard(
-                          title: suspendedTitle,
-                          value: bannedText,
-                          icon: Icons.gavel_rounded,
-                          accentColor: const Color(0xFFEF4444),
-                          isLoading: stats.isLoading,
-                        ),
-                      ),
+                      Expanded(child: suspendedCard),
                     ],
                   ),
                 ],
@@ -129,46 +151,13 @@ class UsersAnalyticsCards extends StatelessWidget {
 
             return Row(
               children: [
-                Expanded(
-                  child: _CompactStatCard(
-                    title: totalTitle,
-                    value: totalText,
-                    icon: Icons.people_alt_rounded,
-                    accentColor: Theme.of(context).colorScheme.primary,
-                    isLoading: stats.isLoading,
-                  ),
-                ),
+                Expanded(child: totalCard),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _CompactStatCard(
-                    title: onlineTitle,
-                    value: onlineText,
-                    icon: Icons.wifi_rounded,
-                    accentColor: const Color(0xFF22C55E),
-                    isLoading: stats.isLoading,
-                    showPulse: !stats.isLoading && stats.onlineCount > 0,
-                  ),
-                ),
+                Expanded(child: onlineCard),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _CompactStatCard(
-                    title: verifiedTitle,
-                    value: verifiedText,
-                    icon: Icons.verified_user_rounded,
-                    accentColor: const Color(0xFF3B82F6),
-                    isLoading: stats.isLoading,
-                  ),
-                ),
+                Expanded(child: verifiedCard),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _CompactStatCard(
-                    title: suspendedTitle,
-                    value: bannedText,
-                    icon: Icons.gavel_rounded,
-                    accentColor: const Color(0xFFEF4444),
-                    isLoading: stats.isLoading,
-                  ),
-                ),
+                Expanded(child: suspendedCard),
               ],
             );
           },
@@ -193,6 +182,8 @@ class _CompactStatCard extends StatefulWidget {
     required this.accentColor,
     this.isLoading = false,
     this.showPulse = false,
+    this.isSelected = false,
+    this.onTap,
   });
 
   final String title;
@@ -201,6 +192,8 @@ class _CompactStatCard extends StatefulWidget {
   final Color accentColor;
   final bool isLoading;
   final bool showPulse;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
   @override
   State<_CompactStatCard> createState() => _CompactStatCardState();
@@ -263,26 +256,39 @@ class _CompactStatCardState extends State<_CompactStatCard>
         return MouseRegion(
           onEnter: (_) => setState(() => _isHovered = true),
           onExit: (_) => setState(() => _isHovered = false),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: padding,
-            decoration: BoxDecoration(
-              color: scheme.surface,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
               borderRadius: BorderRadius.circular(9),
-              border: Border.all(
-                color: _isHovered
-                    ? widget.accentColor.withValues(alpha: 0.4)
-                    : scheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.shadow.withValues(alpha: _isHovered ? 0.04 : 0.015),
-                  blurRadius: _isHovered ? 6 : 3,
-                  offset: const Offset(0, 1.5),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: padding,
+                decoration: BoxDecoration(
+                  color: widget.isSelected
+                      ? widget.accentColor.withValues(alpha: 0.08)
+                      : scheme.surface,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: widget.isSelected
+                        ? widget.accentColor
+                        : (_isHovered
+                            ? widget.accentColor.withValues(alpha: 0.4)
+                            : scheme.outlineVariant.withValues(alpha: 0.5)),
+                    width: widget.isSelected ? 1.6 : 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.shadow.withValues(
+                          alpha: widget.isSelected
+                              ? 0.06
+                              : (_isHovered ? 0.04 : 0.015)),
+                      blurRadius: widget.isSelected ? 8 : (_isHovered ? 6 : 3),
+                      offset: const Offset(0, 1.5),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Row(
+                child: Row(
               children: [
                 Container(
                   padding: EdgeInsets.all(iconPadding),
@@ -302,16 +308,34 @@ class _CompactStatCardState extends State<_CompactStatCard>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: titleFontSize,
-                          height: 1.1,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: widget.isSelected
+                                    ? widget.accentColor
+                                    : scheme.onSurfaceVariant,
+                                fontWeight: widget.isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                fontSize: titleFontSize,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                          if (widget.isSelected) ...[
+                            const SizedBox(width: 3),
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: titleFontSize + 2,
+                              color: widget.accentColor,
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 1),
                       if (widget.isLoading)
@@ -369,7 +393,9 @@ class _CompactStatCardState extends State<_CompactStatCard>
               ],
             ),
           ),
-        );
+        ),
+      ),
+    );
       },
     );
   }

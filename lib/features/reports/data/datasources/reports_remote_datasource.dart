@@ -168,14 +168,69 @@ class ReportsRemoteDataSourceImpl implements ReportsRemoteDataSource {
       options: Options(contentType: Headers.jsonContentType),
     );
     final data = response.data;
+    ReportModel report;
     if (data is Map<String, dynamic>) {
       final payload = data['data'] is Map<String, dynamic>
           ? data['data'] as Map<String, dynamic>
           : data['report'] is Map<String, dynamic>
               ? data['report'] as Map<String, dynamic>
               : data;
-      return ReportModel.fromJson(payload);
+      report = ReportModel.fromJson(payload);
+    } else {
+      report = await getReportById(id);
     }
-    throw Exception('Unexpected report status response format');
+
+    // Automatically convert confirmed valid report into a Violation record
+    if (status.toUpperCase() == 'RESOLVED') {
+      final targetUserId = report.reportedUserId ??
+          report.reportedUser?.id ??
+          report.post?.userId;
+
+      if (targetUserId != null && targetUserId.isNotEmpty) {
+        final reason = report.reason.isNotEmpty
+            ? report.reason
+            : 'Confirmed valid user report';
+        final targetType = report.postId != null
+            ? 'POST'
+            : (report.commentId != null ? 'COMMENT' : 'USER');
+        final targetId = report.postId ?? report.commentId ?? report.reportedUserId;
+
+        final violationPayload = {
+          'userId': targetUserId,
+          'action': 'CONFIRMED_VIOLATION',
+          'reason': reason,
+          'category': 'MODERATION',
+          'description': 'Confirmed valid report #$id: $reason',
+          'reportId': id,
+          'targetType': targetType,
+          if (targetId != null) 'targetId': targetId,
+        };
+
+        try {
+          await _dio.post(
+            '/user-reports/admin/users/$targetUserId/violations',
+            data: violationPayload,
+          );
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 404) {
+            try {
+              await _dio.post(
+                '/users/admin/$targetUserId/violations',
+                data: violationPayload,
+              );
+            } on DioException catch (_) {
+              try {
+                await _dio.post(
+                  '/user-history/admin/logs',
+                  data: violationPayload,
+                );
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    return report;
   }
 }

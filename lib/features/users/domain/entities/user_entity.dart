@@ -329,6 +329,8 @@ class UsersPageEntity {
   final int page;
   final int lastPage;
   final int onlineCount;
+  final int verifiedCount;
+  final int bannedCount;
 
   const UsersPageEntity({
     required this.users,
@@ -336,5 +338,7 @@ class UsersPageEntity {
     required this.page,
     required this.lastPage,
     this.onlineCount = 0,
+    this.verifiedCount = 0,
+    this.bannedCount = 0,
   });
 }

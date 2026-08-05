@@ -84,8 +84,8 @@ class UsersListActiveFilters extends StatelessWidget {
           final statusLabel = switch (snapshot.filter) {
             UsersUiFilter.verified => l10n.t('verified'),
             UsersUiFilter.banned => l10n.t('banned'),
-            UsersUiFilter.online => l10n.tOr('online', 'Online'),
-            UsersUiFilter.offline => l10n.tOr('offline', 'Offline'),
+            UsersUiFilter.online => l10n.tOr('online', context.isRtl ? 'متصل' : 'Online'),
+            UsersUiFilter.offline => l10n.tOr('offline', context.isRtl ? 'غير متصل' : 'Offline'),
             UsersUiFilter.all => l10n.t('all'),
           };
           addChip(

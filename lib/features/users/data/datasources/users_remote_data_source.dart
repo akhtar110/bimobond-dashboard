@@ -20,6 +20,7 @@ abstract class UsersRemoteDataSource {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    bool? isOnline,
     String? location,
     String? role,
     DateTime? createdFrom,
@@ -106,6 +107,8 @@ class UsersPageModel {
   final int page;
   final int lastPage;
   final int onlineCount;
+  final int verifiedCount;
+  final int bannedCount;
 
   UsersPageModel({
     required this.users,
@@ -113,6 +116,8 @@ class UsersPageModel {
     required this.page,
     required this.lastPage,
     this.onlineCount = 0,
+    this.verifiedCount = 0,
+    this.bannedCount = 0,
   });
 }
 
@@ -121,6 +126,61 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
 
   UsersRemoteDataSourceImpl(this._dio);
 
+  List<UserModel> _applyClientSideFilters(
+    List<UserModel> inputUsers, {
+    bool? isVerified,
+    bool? isBanned,
+    bool? isOnline,
+    String? role,
+    String? location,
+    DateTime? createdFrom,
+    DateTime? createdTo,
+  }) {
+    var users = List<UserModel>.from(inputUsers);
+    if (isVerified != null) {
+      users = users.where((u) => u.isVerified == isVerified).toList();
+    }
+    if (isBanned != null) {
+      users = users.where((u) => u.isBanned == isBanned).toList();
+    }
+    if (isOnline != null) {
+      users = users.where((u) => u.isOnline == isOnline).toList();
+    }
+    if (role != null && role.isNotEmpty) {
+      final roleLower = role.toLowerCase();
+      users = users.where((u) {
+        if (roleLower == 'user') {
+          return !u.roles.includesStaff;
+        } else if (roleLower == 'admin') {
+          return u.roles.includesAdmin;
+        } else if (roleLower == 'moderator') {
+          return u.roles.includesModerator;
+        } else if (roleLower == 'superadmin') {
+          return u.roles.any((r) => r == UserRole.superAdmin);
+        }
+        return u.roles.any((r) => r.name.toLowerCase() == roleLower);
+      }).toList();
+    }
+    if (location != null && location.isNotEmpty) {
+      final locLower = location.toLowerCase();
+      users = users.where((u) {
+        final city = (u.city ?? '').toLowerCase();
+        final region = (u.region ?? '').toLowerCase();
+        final country = (u.country ?? '').toLowerCase();
+        return city.contains(locLower) || region.contains(locLower) || country.contains(locLower);
+      }).toList();
+    }
+    if (createdFrom != null) {
+      final startOfDay = DateTime(createdFrom.year, createdFrom.month, createdFrom.day, 0, 0, 0);
+      users = users.where((u) => u.createdAt != null && (u.createdAt!.isAfter(startOfDay) || u.createdAt!.isAtSameMomentAs(startOfDay))).toList();
+    }
+    if (createdTo != null) {
+      final endOfDay = DateTime(createdTo.year, createdTo.month, createdTo.day, 23, 59, 59, 999);
+      users = users.where((u) => u.createdAt != null && (u.createdAt!.isBefore(endOfDay) || u.createdAt!.isAtSameMomentAs(endOfDay))).toList();
+    }
+    return users;
+  }
+
   @override
   Future<UsersPageModel> getUsers({
     required int page,
@@ -128,71 +188,109 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    bool? isOnline,
     String? location,
-    String? role,
-    DateTime? createdFrom,
-    DateTime? createdTo,
     String? city,
     String? region,
     String? country,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     final idToken = await user?.getIdToken();
-
-    final queryParams = <String, dynamic>{
-      'page': page,
-      'limit': limit,
-      if (search != null && search.isNotEmpty) 'search': search,
-      if (isVerified != null) 'isVerified': isVerified,
-      if (isBanned != null) 'isBanned': isBanned,
-      if (location != null && location.isNotEmpty) 'location': location,
-      if (city != null && city.isNotEmpty) 'city': city,
-      if (region != null && region.isNotEmpty) 'region': region,
-      if (country != null && country.isNotEmpty) 'country': country,
-      if (role != null && role.isNotEmpty) 'role': role,
-      if (createdFrom != null)
-        'createdFrom':
-            '${createdFrom.year}-${createdFrom.month.toString().padLeft(2, '0')}-${createdFrom.day.toString().padLeft(2, '0')}',
-      if (createdTo != null)
-        'createdTo':
-            '${createdTo.year}-${createdTo.month.toString().padLeft(2, '0')}-${createdTo.day.toString().padLeft(2, '0')}',
-    };
 
     final authHeaders = {
       'Authorization': 'Bearer $idToken',
       'Content-Type': 'application/json',
     };
 
-    // Use the admin/online endpoint which includes isOnline + onlineCount.
-    // Fall back to /users if the endpoint is not available.
-    Map<String, dynamic> data;
-    int onlineCount = 0;
-    try {
-      final response = await _dio.get(
-        '/users/admin/online',
-        queryParameters: queryParams,
-        options: Options(headers: authHeaders),
-      );
-      data = response.data as Map<String, dynamic>;
-      onlineCount = (data['onlineCount'] as num?)?.toInt() ?? 0;
-    } catch (_) {
-      // Fallback to the standard endpoint if admin/online is unavailable.
-      final response = await _dio.get(
-        '/users',
-        queryParameters: queryParams,
-        options: Options(headers: authHeaders),
-      );
-      data = response.data as Map<String, dynamic>;
+    Future<Response<dynamic>> requestEndpoint(Map<String, dynamic> params) async {
+      try {
+        return await _dio.get(
+          '/users/admin/online',
+          queryParameters: params,
+          options: Options(headers: authHeaders),
+        );
+      } catch (e) {
+        return await _dio.get(
+          '/users',
+          queryParameters: params,
+          options: Options(headers: authHeaders),
+        );
+      }
     }
 
-    var users = (data['users'] as List).map((e) {
-      final map = Map<String, dynamic>.from(e as Map);
-      final rawCounts = map['_count'] ?? map['counts'];
-      final counts = rawCounts is Map
-          ? Map<String, dynamic>.from(rawCounts)
-          : null;
-      return UserModel.fromJson(map, counts: counts);
-    }).toList();
+    final hasActiveFilters = isVerified != null ||
+        isBanned != null ||
+        isOnline != null ||
+        (role != null && role.isNotEmpty) ||
+        (location != null && location.isNotEmpty) ||
+        createdFrom != null ||
+        createdTo != null;
+
+    final accumulatedMatchingUsers = <UserModel>[];
+    int currentServerPage = hasActiveFilters ? 1 : page;
+    int serverLastPage = page;
+    int serverTotal = 0;
+    int onlineCount = 0;
+    int verifiedCount = 0;
+    int bannedCount = 0;
+    final targetNeededCount = page * limit;
+
+    while (currentServerPage <= serverLastPage &&
+        (!hasActiveFilters || accumulatedMatchingUsers.length < targetNeededCount)) {
+      final queryParams = <String, dynamic>{
+        'page': currentServerPage,
+        'limit': limit,
+        if (search != null && search.isNotEmpty) 'search': search,
+      };
+
+      final response = await requestEndpoint(queryParams);
+      final data = response.data as Map<String, dynamic>;
+      onlineCount = (data['onlineCount'] as num?)?.toInt() ?? onlineCount;
+      verifiedCount = (data['verifiedCount'] as num?)?.toInt() ?? verifiedCount;
+      bannedCount = (data['bannedCount'] as num?)?.toInt() ?? bannedCount;
+
+      final meta = data['meta'] as Map<String, dynamic>?;
+      if (meta != null) {
+        serverLastPage = (meta['lastPage'] as num?)?.toInt() ?? currentServerPage;
+        serverTotal = (meta['total'] as num?)?.toInt() ?? 0;
+      }
+
+      final rawUsers = (data['users'] as List).map((e) {
+        final map = Map<String, dynamic>.from(e as Map);
+        final rawCounts = map['_count'] ?? map['counts'];
+        final counts = rawCounts is Map ? Map<String, dynamic>.from(rawCounts) : null;
+        return UserModel.fromJson(map, counts: counts);
+      }).toList();
+
+      final filtered = _applyClientSideFilters(
+        rawUsers,
+        isVerified: isVerified,
+        isBanned: isBanned,
+        isOnline: isOnline,
+        role: role,
+        location: location,
+        createdFrom: createdFrom,
+        createdTo: createdTo,
+      );
+
+      accumulatedMatchingUsers.addAll(filtered);
+
+      if (!hasActiveFilters) break;
+      if (currentServerPage >= page + 10) break;
+
+      currentServerPage++;
+    }
+
+    List<UserModel> users;
+    if (hasActiveFilters) {
+      final startIndex = (page - 1) * limit;
+      users = accumulatedMatchingUsers.skip(startIndex).take(limit).toList();
+    } else {
+      users = accumulatedMatchingUsers;
+    }
 
     // `/users` often returns denormalized totalLikes as 0. Backfill from
     // user-reports when available (uses counts.postLikes / totalLikes).
@@ -207,13 +305,26 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
       );
     }
 
-    final meta = data['meta'] as Map<String, dynamic>;
+    final finalTotal = hasActiveFilters ? accumulatedMatchingUsers.length : serverTotal;
+    final finalLastPage = hasActiveFilters
+        ? ((accumulatedMatchingUsers.length / limit).ceil()).clamp(1, 9999)
+        : serverLastPage;
+
+    final effectiveVerified = verifiedCount > 0
+        ? verifiedCount
+        : accumulatedMatchingUsers.where((u) => u.isVerified).length;
+    final effectiveBanned = bannedCount > 0
+        ? bannedCount
+        : accumulatedMatchingUsers.where((u) => u.isBanned).length;
+
     return UsersPageModel(
       users: users,
-      total: (meta['total'] as num).toInt(),
-      page: (meta['page'] as num).toInt(),
-      lastPage: (meta['lastPage'] as num).toInt(),
+      total: finalTotal,
+      page: page,
+      lastPage: finalLastPage,
       onlineCount: onlineCount,
+      verifiedCount: effectiveVerified,
+      bannedCount: effectiveBanned,
     );
   }
 

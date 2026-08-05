@@ -21,8 +21,11 @@ class UsersFilterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
 
+    final isRtl = context.isRtl;
     final labels = <UsersUiFilter, String>{
       UsersUiFilter.all: l10n.t('all'),
+      UsersUiFilter.online: '🟢 ${l10n.tOr('online', isRtl ? 'متصل' : 'Online')}',
+      UsersUiFilter.offline: '⚪ ${l10n.tOr('offline', isRtl ? 'غير متصل' : 'Offline')}',
       UsersUiFilter.verified: l10n.t('verified'),
       UsersUiFilter.banned: l10n.t('banned'),
     };
