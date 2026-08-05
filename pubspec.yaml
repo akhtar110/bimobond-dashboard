@@ -62,7 +62,6 @@ dependencies:
   audio_session: ^0.2.4
   flutter_colorpicker: ^1.1.0
   flutter_svg: ^2.3.0
-  pdf: ^3.11.1
 
 dev_dependencies:
   flutter_test:

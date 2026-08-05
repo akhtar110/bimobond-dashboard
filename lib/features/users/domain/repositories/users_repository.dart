@@ -12,6 +12,7 @@ abstract class UsersRepository {
     String? search,
     bool? isVerified,
     bool? isBanned,
+    bool? isOnline,
     String? location,
     String? role,
     DateTime? createdFrom,

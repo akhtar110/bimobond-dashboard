@@ -1,5 +1,8 @@
 {
   "@@locale": "en",
+  "online": "Online",
+  "offline": "Offline",
+  "onlinePresence": "Online Presence",
   "appTitle": "Admin Dashboard",
   "bimoBondAdmin": "Bimo Bond Admin",
   "dashboard": "Dashboard",

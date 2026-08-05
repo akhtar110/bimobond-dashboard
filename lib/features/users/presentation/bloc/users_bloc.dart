@@ -514,7 +514,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
           location: _locationQuery.isEmpty ? null : _locationQuery,
           isVerified: _filter == UsersUiFilter.verified ? true : null,
           isBanned: _filter == UsersUiFilter.banned ? true : null,
-          // online/offline are client-side only; no backend param needed
           role: _role,
           createdFrom: _createdFrom,
           createdTo: _createdTo,
@@ -565,7 +564,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
         location: _locationQuery.isEmpty ? null : _locationQuery,
         isVerified: _filter == UsersUiFilter.verified ? true : null,
         isBanned: _filter == UsersUiFilter.banned ? true : null,
-        // online/offline are client-side only; no backend param needed
         role: _role,
         createdFrom: _createdFrom,
         createdTo: _createdTo,

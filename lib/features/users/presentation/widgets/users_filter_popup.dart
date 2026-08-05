@@ -332,11 +332,16 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
         borderRadius: radius,
         side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.75)),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        width: widget.width ?? 420,
-        height: widget.maxHeight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: widget.width ?? 420,
+          maxHeight: widget.maxHeight.clamp(
+            300.0,
+            MediaQuery.sizeOf(context).height * 0.82,
+          ),
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (widget.showDragHandle)
               Padding(
@@ -380,14 +385,14 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                 children: [
                   GiftsActiveFilters(items: _activeItems(l10n)),
 
-                  // Status filter
+                  // Status filter (Account status: All, Verified, Banned)
                   GiftsFilterSection(
                     title: _sectionTitle(l10n.t('status'), context),
                     child: GiftsFilterChipWrap(
                       children: [
-                        for (final status in UsersUiFilter.values)
+                        for (final status in [UsersUiFilter.all, UsersUiFilter.verified, UsersUiFilter.banned])
                           GiftsFilterChoiceChip(
-                            label: usersStatusLabel(l10n, status),
+                            label: usersStatusLabel(l10n, status, context: context),
                             selected: _status == status,
                             onTap: () => setState(() => _status = status),
                           ),
@@ -410,7 +415,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                     ),
                   ),
 
-                  // Registration Date Range
+                  // Registration Date Range (Calendar)
                   GiftsFilterSection(
                     title: _sectionTitle(l10n.tOr('registrationDate', 'Registration Date'), context),
                     child: Column(
@@ -512,6 +517,37 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                     ),
                   ),
 
+                  // Presence Status filter (Next to Calendar date filter) — Online (متصل) / Offline (غير متصل)
+                  GiftsFilterSection(
+                    title: _sectionTitle(
+                      l10n.tOr('onlinePresence', context.isRtl ? 'حالة الاتصال (متصل / غير متصل)' : 'Presence Status (Online / Offline)'),
+                      context,
+                    ),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        GiftsFilterChoiceChip(
+                          label: l10n.t('all'),
+                          selected: _status != UsersUiFilter.online && _status != UsersUiFilter.offline,
+                          onTap: () {
+                            if (_status == UsersUiFilter.online || _status == UsersUiFilter.offline) {
+                              setState(() => _status = UsersUiFilter.all);
+                            }
+                          },
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: '🟢 ${l10n.tOr('online', context.isRtl ? 'متصل' : 'Online')}',
+                          selected: _status == UsersUiFilter.online,
+                          onTap: () => setState(() => _status = UsersUiFilter.online),
+                        ),
+                        GiftsFilterChoiceChip(
+                          label: '⚪ ${l10n.tOr('offline', context.isRtl ? 'غير متصل' : 'Offline')}',
+                          selected: _status == UsersUiFilter.offline,
+                          onTap: () => setState(() => _status = UsersUiFilter.offline),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Location filter
                   GiftsFilterSection(
                     title: _sectionTitle(l10n.t('location'), context),
@@ -582,12 +618,17 @@ class _QuickDateChip extends StatelessWidget {
   }
 }
 
-String usersStatusLabel(AppLocalizations l10n, UsersUiFilter filter) {
+String usersStatusLabel(
+  AppLocalizations l10n,
+  UsersUiFilter filter, {
+  BuildContext? context,
+}) {
+  final isRtl = context != null ? context.isRtl : false;
   return switch (filter) {
     UsersUiFilter.all => l10n.t('all'),
     UsersUiFilter.verified => l10n.t('verified'),
     UsersUiFilter.banned => l10n.t('banned'),
-    UsersUiFilter.online => l10n.tOr('online', 'Online'),
-    UsersUiFilter.offline => l10n.tOr('offline', 'Offline'),
+    UsersUiFilter.online => l10n.tOr('online', isRtl ? 'متصل' : 'Online'),
+    UsersUiFilter.offline => l10n.tOr('offline', isRtl ? 'غير متصل' : 'Offline'),
   };
 }

@@ -1,5 +1,8 @@
 {
   "@@locale": "ar",
+  "online": "متصل",
+  "offline": "غير متصل",
+  "onlinePresence": "حالة الاتصال",
   "appTitle": "لوحة تحكم المشرف",
   "bimoBondAdmin": "إدارة بيمو بوند",
   "dashboard": "الرئيسية",
