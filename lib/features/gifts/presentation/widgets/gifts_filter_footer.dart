@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/localization.dart';
 
-/// Sticky footer: Reset · Cancel · Apply.
+/// Sticky footer: Reset · Close.
 class GiftsFilterFooter extends StatelessWidget {
   const GiftsFilterFooter({
     super.key,
     required this.onReset,
     required this.onCancel,
-    required this.onApply,
+    this.onApply,
   });
 
   final VoidCallback onReset;
   final VoidCallback onCancel;
-  final VoidCallback onApply;
+  final VoidCallback? onApply;
 
   @override
   Widget build(BuildContext context) {
@@ -68,28 +68,11 @@ class GiftsFilterFooter extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: OutlinedButton(
-                  onPressed: onCancel,
-                  style: outlinedStyle(),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      l10n.tOr('cancel', 'Cancel'),
-                      maxLines: 1,
-                      softWrap: false,
-                      style: labelStyle,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
                 child: FilledButton(
-                  onPressed: onApply,
+                  onPressed: onCancel,
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -99,7 +82,7 @@ class GiftsFilterFooter extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      l10n.tOr('apply', 'Apply'),
+                      l10n.tOr('close', 'Close'),
                       maxLines: 1,
                       softWrap: false,
                       style: labelStyle?.copyWith(color: scheme.onPrimary),

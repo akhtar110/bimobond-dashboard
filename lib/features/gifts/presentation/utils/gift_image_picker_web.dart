@@ -17,7 +17,10 @@ Future<({String name, Uint8List bytes})?> pickGiftImage() async {
 Future<({String name, Uint8List bytes})?> pickGiftAnimation() async {
   return _pickFile(
     accept:
-        'video/mp4,video/webm,video/*,.mp4,.webm,.mov,.pag,.json,.lottie,.gif,.swf,image/gif,application/x-shockwave-flash,application/json,application/zip,application/octet-stream',
+        '.json,.lottie,.pag,.mp4,.webm,.mov,.gif,.swf,'
+        'application/json,text/json,application/zip,application/octet-stream,'
+        'video/mp4,video/webm,image/gif,'
+        'application/x-shockwave-flash',
   );
 }
 

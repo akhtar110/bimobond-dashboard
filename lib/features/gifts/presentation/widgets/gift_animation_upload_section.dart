@@ -205,7 +205,7 @@ class GiftAnimationUploadSection extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              l10n.tOr('animationFormatsHint', 'Supports .pag, .json, .lottie, .mp4, .gif'),
+              l10n.tOr('animationFormatsHint', 'Supports .pag, .json, .lottie, .mp4, .gif, .swf'),
               style: TextStyle(
                 fontSize: 10,
                 color: scheme.onSurfaceVariant,

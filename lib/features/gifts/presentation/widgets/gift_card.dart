@@ -8,6 +8,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gift_schedule_label.dart';
+import 'bulk_gift_confirm_dialog.dart';
 import 'gift_thumbnail_image.dart';
 
 // ─── Main card ────────────────────────────────────────────────────────────────
@@ -278,9 +279,6 @@ class _GiftActionBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow.withValues(alpha: 0.75),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.45),
-          ),
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(
@@ -572,6 +570,33 @@ class _ToggleButton extends StatelessWidget {
   final GiftEntity gift;
   final double size;
 
+  Future<void> _handleToggle(BuildContext context) async {
+    final l10n = context.l10n;
+    final isAr = l10n.locale.languageCode == 'ar';
+    final willActivate = !gift.isActive;
+
+    final title = willActivate
+        ? l10n.tOr('activateGift', isAr ? 'تفعيل الهدية' : 'Activate Gift')
+        : l10n.tOr('deactivateGift', isAr ? 'إلغاء تفعيل الهدية' : 'Deactivate Gift');
+
+    final message = willActivate
+        ? l10n.tOr('confirmActivateGiftMessage', isAr ? 'هل أنت متأكد من تفعيل هذه الهدية؟' : 'Are you sure you want to activate this gift?')
+        : l10n.tOr('confirmDeactivateGiftMessage', isAr ? 'هل أنت متأكد من إلغاء تفعيل هذه الهدية؟' : 'Are you sure you want to deactivate this gift?');
+
+    final confirmed = await confirmGiftAdminAction(
+      context,
+      title: title,
+      message: message,
+      destructive: !willActivate,
+    );
+
+    if (confirmed && context.mounted) {
+      context
+          .read<GiftsBloc>()
+          .add(ToggleGiftActiveEvent(gift.id, willActivate));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -582,9 +607,7 @@ class _ToggleButton extends StatelessWidget {
       child: Tooltip(
         message: gift.isActive ? l10n.t('deactivate') : l10n.t('activate'),
         child: IconButton.outlined(
-          onPressed: () => context
-              .read<GiftsBloc>()
-              .add(ToggleGiftActiveEvent(gift.id, !gift.isActive)),
+          onPressed: () => _handleToggle(context),
           icon: Icon(
             gift.isActive
                 ? Icons.visibility_rounded
