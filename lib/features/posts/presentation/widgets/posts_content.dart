@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../domain/enums/posts_view_type.dart';
 import '../bloc/posts_bloc.dart';
@@ -99,6 +99,7 @@ class PostsContent extends StatelessWidget {
           currentPage: state.currentPage,
           lastPage: state.lastPage,
           total: state.total,
+          pageSize: state.pageSize,
           itemCount: state.posts.length,
         ),
       ],

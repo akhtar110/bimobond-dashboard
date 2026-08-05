@@ -160,7 +160,8 @@ class SellerVerificationActiveFilterChips extends StatelessWidget {
       },
       builder: (context, state) {
         if (state is! SellerVerificationLoaded ||
-            state.statusFilter == null) {
+            state.statusFilter == null ||
+            state.statusFilter!.toUpperCase() == 'ALL') {
           return const SizedBox.shrink();
         }
 

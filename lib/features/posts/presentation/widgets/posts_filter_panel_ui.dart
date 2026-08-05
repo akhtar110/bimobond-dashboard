@@ -12,11 +12,11 @@ class PostsFilterPanelTokens {
   PostsFilterPanelTokens._();
 
   static const spacing = 8.0;
-  static const chipHeight = 28.0;
-  static const chipRadius = 6.0;
-  static const fieldHeight = 34.0;
+  static const chipHeight = 34.0;
+  static const chipRadius = 10.0;
+  static const fieldHeight = 36.0;
   static const sectionIconSize = 14.0;
-  static const labelSize = 11.0;
+  static const labelSize = 11.5;
   static const bodySize = 12.5;
 }
 
@@ -605,11 +605,9 @@ class PostsFilterPanelFooter extends StatelessWidget {
   const PostsFilterPanelFooter({
     super.key,
     required this.onReset,
-    required this.onApply,
   });
 
   final VoidCallback onReset;
-  final VoidCallback onApply;
 
   @override
   Widget build(BuildContext context) {
@@ -630,51 +628,29 @@ class PostsFilterPanelFooter extends StatelessWidget {
         ),
         child: SafeArea(
           top: false,
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onReset,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(PostsFilterPanelTokens.chipRadius),
-                    ),
-                    side: BorderSide(
-                      color: scheme.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                    foregroundColor: scheme.onSurfaceVariant,
-                    textStyle: const TextStyle(
-                      fontSize: PostsFilterPanelTokens.bodySize,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  child: Text(l10n.tOr('resetFilters', 'Reset')),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onReset,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(PostsFilterPanelTokens.chipRadius),
+                ),
+                side: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+                foregroundColor: scheme.onSurfaceVariant,
+                textStyle: const TextStyle(
+                  fontSize: PostsFilterPanelTokens.bodySize,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: PostsFilterPanelTokens.spacing),
-              Expanded(
-                flex: 2,
-                child: FilledButton(
-                  onPressed: onApply,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(PostsFilterPanelTokens.chipRadius),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: PostsFilterPanelTokens.bodySize,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  child: Text(l10n.tOr('apply', 'Apply')),
-                ),
-              ),
-            ],
+              icon: const Icon(Icons.restart_alt_rounded, size: 16),
+              label: Text(l10n.tOr('resetFilters', 'Reset Filters')),
+            ),
           ),
         ),
       ),

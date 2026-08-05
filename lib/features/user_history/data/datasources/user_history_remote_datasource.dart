@@ -20,12 +20,28 @@ class UserHistoryRemoteDataSourceImpl implements UserHistoryRemoteDataSource {
     required String userId,
     required UserHistoryQuery query,
   }) async {
-    final response = await _dio.get(
-      '/activity/admin/users/$userId/timeline',
-      queryParameters: query.toQueryParameters(),
-    );
-    final data = _asMap(response.data);
-    return UserHistoryResponseModel.fromJson(data).toEntity();
+    try {
+      final endpoint = (query.deviceId != null && query.deviceId!.trim().isNotEmpty)
+          ? '/users/admin/$userId/devices/${query.deviceId!.trim()}/history'
+          : '/user-history/admin/users/$userId';
+      final response = await _dio.get(
+        endpoint,
+        queryParameters: query.toQueryParameters(),
+      );
+      final data = _asMap(response.data);
+      return UserHistoryResponseModel.fromJson(data).toEntity();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404 &&
+          (query.deviceId == null || query.deviceId!.trim().isEmpty)) {
+        final response = await _dio.get(
+          '/activity/admin/users/$userId/timeline',
+          queryParameters: query.toQueryParameters(),
+        );
+        final data = _asMap(response.data);
+        return UserHistoryResponseModel.fromJson(data).toEntity();
+      }
+      rethrow;
+    }
   }
 
   Map<String, dynamic> _asMap(dynamic data) {

@@ -13,6 +13,12 @@ class GetUsers {
     bool? isVerified,
     bool? isBanned,
     String? location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
+    String? city,
+    String? region,
+    String? country,
   }) {
     return repository.getUsers(
       page: page,
@@ -21,6 +27,12 @@ class GetUsers {
       isVerified: isVerified,
       isBanned: isBanned,
       location: location,
+      role: role,
+      createdFrom: createdFrom,
+      createdTo: createdTo,
+      city: city,
+      region: region,
+      country: country,
     );
   }
 }

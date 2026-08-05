@@ -102,3 +102,93 @@ bool hasDraftChanges(ManagedPostEntity source, ManagedPostEntity draft) {
       source.allowDuets != draft.allowDuets ||
       source.allowStitch != draft.allowStitch;
 }
+
+/// Builds a PATCH payload containing only fields that differ from [original].
+ManagedPostUpdateData buildManagedPostUpdateDiff(
+  ManagedPostEntity original,
+  ManagedPostEntity draft,
+) {
+  return ManagedPostUpdateData(
+    description:
+        original.description != draft.description ? draft.description : null,
+    categoryId: original.categoryEntity?.id != draft.categoryEntity?.id
+        ? draft.categoryEntity?.id
+        : null,
+    privacyStatus: original.privacyStatus != draft.privacyStatus
+        ? draft.privacyStatus
+        : null,
+    status: original.status != draft.status ? draft.status : null,
+    allowComments: original.allowComments != draft.allowComments
+        ? draft.allowComments
+        : null,
+    allowDuets:
+        original.allowDuets != draft.allowDuets ? draft.allowDuets : null,
+    allowStitch:
+        original.allowStitch != draft.allowStitch ? draft.allowStitch : null,
+  );
+}
+
+bool managedPostUpdateDataHasChanges(ManagedPostUpdateData data) {
+  return data.description != null ||
+      data.categoryId != null ||
+      data.category != null ||
+      data.privacyStatus != null ||
+      data.status != null ||
+      data.allowComments != null ||
+      data.allowDuets != null ||
+      data.allowStitch != null;
+}
+
+/// Human-readable label for a moderation timeline field key.
+String moderationTimelineFieldLabel(AppLocalizations l10n, String fieldKey) {
+  final key = fieldKey.trim().replaceAll(RegExp(r'\s+'), '').toLowerCase();
+  return switch (key) {
+    'description' || 'caption' => l10n.t('caption'),
+    'categoryid' || 'category' => l10n.t('categoryName'),
+    'privacystatus' || 'privacy' => l10n.t('privacy'),
+    'status' => l10n.t('postStatus'),
+    'allowcomments' => l10n.t('allowComments'),
+    'allowduets' => l10n.t('allowDuets'),
+    'allowstitch' => l10n.t('allowStitch'),
+    _ => fieldKey.trim(),
+  };
+}
+
+/// Formats admin field-update timeline messages to list only affected fields.
+String? formatModerationTimelineAdminAction(
+  AppLocalizations l10n, {
+  String? reason,
+  List<String> changedFields = const [],
+}) {
+  final fields = changedFields.isNotEmpty
+      ? changedFields
+      : _parseAdminUpdatedFieldsFromReason(reason);
+  if (fields.isEmpty) return null;
+
+  final labels = fields
+      .map((field) => moderationTimelineFieldLabel(l10n, field))
+      .where((label) => label.isNotEmpty)
+      .toSet()
+      .toList();
+  if (labels.isEmpty) return null;
+
+  final joined = labels.join(', ');
+  return '${l10n.tOr('adminUpdatedPostFieldsPrefix', 'Admin updated')}: $joined';
+}
+
+List<String> _parseAdminUpdatedFieldsFromReason(String? reason) {
+  if (reason == null || reason.trim().isEmpty) return const [];
+
+  final match = RegExp(
+    r'admin\s+update(?:d)?\s+fields?\s*:?\s*(.+)$',
+    caseSensitive: false,
+  ).firstMatch(reason.trim());
+  if (match == null) return const [];
+
+  return match
+      .group(1)!
+      .split(RegExp(r'[,;]'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+}

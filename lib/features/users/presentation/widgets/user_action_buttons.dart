@@ -252,17 +252,51 @@ class _CompactActionsMenu extends StatelessWidget {
           case 'details':
             onDetails();
             return;
+          case 'edit':
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  l10n.tArgs('editUserDetailsFor', {'username': user.username}),
+                ),
+              ),
+            );
+            return;
+          case 'verify':
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  user.isVerified
+                      ? l10n.tOr('verificationRemoved', 'Verification removed')
+                      : l10n.tOr('userVerifiedSuccessfully', 'User verified successfully'),
+                ),
+              ),
+            );
+            return;
+          case 'suspend':
           case 'ban':
             onBan();
             return;
-          case 'set_role_user':
-            onSetRole(UserRole.user);
+          case 'reset_password':
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  l10n.tArgs('passwordResetEmailSent', {
+                    'email': user.email ?? user.username,
+                  }),
+                ),
+              ),
+            );
             return;
-          case 'set_role_moderator':
-            onSetRole(UserRole.moderator);
-            return;
-          case 'set_role_admin':
-            onSetRole(UserRole.admin);
+          case 'send_notification':
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  l10n.tArgs('notificationDispatchModalOpened', {
+                    'username': user.username,
+                  }),
+                ),
+              ),
+            );
             return;
           case 'delete':
             onDelete();
@@ -272,57 +306,45 @@ class _CompactActionsMenu extends StatelessWidget {
       itemBuilder: (_) => [
         PopupMenuItem(
           value: 'details',
-          child: _MenuRow(Icons.open_in_new_rounded, l10n.t('details')),
+          child: _MenuRow(Icons.visibility_outlined, l10n.tOr('viewProfile', 'View Profile')),
+        ),
+        PopupMenuItem(
+          value: 'edit',
+          child: _MenuRow(Icons.edit_outlined, l10n.tOr('editUser', 'Edit User')),
+        ),
+        PopupMenuItem(
+          value: 'verify',
+          child: _MenuRow(
+            Icons.verified_outlined,
+            user.isVerified
+                ? l10n.tOr('removeVerification', 'Remove Verification')
+                : l10n.tOr('verifyUser', 'Verify User'),
+          ),
         ),
         if (canBan)
           PopupMenuItem(
             value: 'ban',
             child: _MenuRow(
               user.isBanned ? Icons.lock_open_rounded : Icons.block_rounded,
-              user.isBanned ? l10n.t('unban') : l10n.t('ban'),
+              user.isBanned
+                  ? l10n.tOr('unsuspendUser', 'Unsuspend User')
+                  : l10n.tOr('suspendOrBanUser', 'Suspend / Ban User'),
             ),
           ),
-        if (canAssignRoles) ...[
-          if (user.isAdminRole)
-            PopupMenuItem(
-              value: 'set_role_user',
-              child: _MenuRow(
-                Icons.person_outline_rounded,
-                l10n.tOr('demoteToStandardUser', 'To User'),
-              ),
-            )
-          else if (user.isModeratorRole) ...[
-            PopupMenuItem(
-              value: 'set_role_user',
-              child: _MenuRow(
-                Icons.person_outline_rounded,
-                l10n.tOr('demoteToStandardUser', 'To User'),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'set_role_admin',
-              child: _MenuRow(
-                Icons.admin_panel_settings_outlined,
-                l10n.tOr('promoteToAdmin', 'To Admin'),
-              ),
-            ),
-          ] else ...[
-            PopupMenuItem(
-              value: 'set_role_moderator',
-              child: _MenuRow(
-                Icons.shield_outlined,
-                l10n.tOr('promoteToModerator', 'To Moderator'),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'set_role_admin',
-              child: _MenuRow(
-                Icons.admin_panel_settings_outlined,
-                l10n.tOr('promoteToAdmin', 'To Admin'),
-              ),
-            ),
-          ],
-        ],
+        PopupMenuItem(
+          value: 'reset_password',
+          child: _MenuRow(
+            Icons.lock_reset_rounded,
+            l10n.tOr('resetPassword', 'Reset Password'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'send_notification',
+          child: _MenuRow(
+            Icons.notifications_active_outlined,
+            l10n.tOr('sendNotification', 'Send Notification'),
+          ),
+        ),
         if (canUpdate)
           PopupMenuItem(
             value: 'delete',

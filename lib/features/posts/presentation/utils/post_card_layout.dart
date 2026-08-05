@@ -42,6 +42,11 @@ class PostCardMetrics {
 
   bool get isTablet => deviceType == PostsDeviceType.tablet;
 
+  bool get isDesktop => deviceType == PostsDeviceType.desktop;
+
+  /// Wide cards on large monitors — slightly roomier typography/avatar.
+  bool get isWideCard => cardWidth >= 340;
+
   /// Full-width mobile cards use a horizontal media + content split.
   PostCardLayoutMode get layoutMode {
     if (isMobile && columns == 1 && cardWidth >= 280) {
@@ -64,6 +69,7 @@ class PostCardMetrics {
   bool get showCommentStat => cardWidth >= 120;
   bool get showViewStat => true;
   bool get showLikeStat => true;
+  bool get showReportStat => cardWidth >= 120;
 
   bool get enableHoverEffects => !isMobile;
 
@@ -72,51 +78,137 @@ class PostCardMetrics {
 
   EdgeInsets get bodyPadding => EdgeInsets.fromLTRB(
         _padH,
-        isHorizontal ? _padV : (narrow ? 5 : 6),
+        isHorizontal ? _padV : (narrow ? 4 : 5),
         _padH,
         _padV,
       );
 
   double get _padH => narrow ? 6 : (compact ? 8 : (isMobile ? 10 : 12));
-  double get _padV => narrow ? 6 : (compact ? 7 : (isMobile ? 10 : 8));
+  double get _padV => narrow ? 5 : (compact ? 6 : (isMobile ? 8 : 7));
 
-  double get sectionGap => narrow ? 3 : (compact ? 4 : (isMobile ? 6 : 5));
+  double get sectionGap => narrow ? 2 : (compact ? 2 : (isMobile ? 4 : 3));
 
-  /// Full-card aspect (width / height). Lower = taller/bigger cards.
+  /// Gap between author, badges, and meta sections in the overlay panel.
+  double get contentSectionGap => sectionGap;
+
+  /// Full-card aspect (width / height). Higher = shorter card.
   double get thumbnailAspect => switch (layoutMode) {
-        PostCardLayoutMode.horizontal => isMobile ? 1.35 : 1.2,
+        PostCardLayoutMode.horizontal => isMobile ? 1.58 : 1.48,
         PostCardLayoutMode.vertical => narrow
-            ? 0.78
+            ? 0.96
             : compact
-                ? 0.74
+                ? 0.92
                 : dense
-                    ? 0.72
-                    : 0.7,
+                    ? 0.88
+                    : isWideCard
+                        ? 0.84
+                        : 0.86,
       };
 
   double get horizontalThumbSize =>
       (cardWidth * 0.27).clamp(isMobile ? 96.0 : 88.0, 132.0);
 
-  double get authorFontSize =>
-      narrow ? 10.5 : (compact ? 11 : (isMobile ? 13 : 12));
+  double get authorFontSize => narrow
+      ? 10
+      : (compact ? 10.5 : (isMobile ? 12.5 : (isWideCard ? 12 : 11.5)));
 
-  double get avatarRadius =>
-      narrow ? 11 : (compact ? 12 : (isMobile && isHorizontal ? 17 : 14));
+  double get authorLineHeight => 1.18;
+
+  double get avatarRadius => narrow
+      ? 10
+      : (compact
+          ? 11
+          : (isMobile && isHorizontal
+              ? 16
+              : (isWideCard ? 14 : (isTablet ? 11 : 12))));
+
+  double get avatarFontSize => narrow ? 9 : (compact ? 9.5 : 10.5);
+
+  double get avatarRingPadding => 1.2;
+
+  double get authorAvatarGap => narrow ? 6 : (compact ? 7 : 8);
 
   double get metaFontSize =>
-      narrow ? 8.5 : (compact ? 9 : (isMobile ? 11 : 10));
+      narrow ? 8 : (compact ? 8.5 : (isMobile ? 10.5 : (isWideCard ? 10 : 9.5)));
 
   double get statFontSize =>
-      narrow ? 8.5 : (compact ? 9 : (isMobile ? 10.5 : 10));
+      narrow ? 8 : (compact ? 8.5 : (isMobile ? 10 : (isWideCard ? 10 : 9.5)));
 
-  double get badgeFontSize => narrow ? 9 : 10;
+  double get badgeFontSize => narrow ? 8.5 : (compact ? 9 : 9.5);
+
+  double get badgeWrapSpacing => narrow ? 4 : (compact ? 5 : 6);
+
+  double get badgeWrapRunSpacing => narrow ? 3 : 4;
+
+  EdgeInsets get badgePadding => EdgeInsets.symmetric(
+        horizontal: narrow ? 6 : (compact ? 7 : 8),
+        vertical: narrow ? 2.5 : 3,
+      );
+
+  double get badgeIconGap => 3;
+
+  double get badgeBorderRadius => narrow ? 16 : (compact ? 18 : 20);
+
+  double get categoryIconSize => badgeFontSize + 3;
+
+  double get statusIconSize => badgeFontSize + 0.5;
+
+  /// Bottom gradient height as a fraction of card height.
+  double get overlayGradientHeightFactor =>
+      narrow ? 0.50 : (compact ? 0.52 : 0.54);
+
+  double get mediaBadgeInset => narrow ? 6 : (compact ? 7 : 8);
+
+  double get playBadgeSize => narrow ? 30 : (compact ? 32 : 34);
+
+  double get playBadgeIconSize => playBadgeSize * 0.58;
+
+  EdgeInsets get glassMediaBadgePadding => EdgeInsets.symmetric(
+        horizontal: narrow ? 5 : 6,
+        vertical: narrow ? 2 : 2.5,
+      );
+
+  double get glassMediaBadgeIconSize => narrow ? 11 : 12;
+
+  double get glassMediaBadgeRadius => narrow ? 7 : 8;
 
   /// Padding for the bottom details band.
   EdgeInsets get premiumBodyPadding => EdgeInsets.fromLTRB(
-        narrow ? 10 : (compact ? 12 : 14),
-        narrow ? 6 : (compact ? 7 : 8),
-        narrow ? 10 : (compact ? 12 : 14),
-        narrow ? 10 : (compact ? 12 : 14),
+        narrow ? 8 : (compact ? 10 : (isWideCard ? 12 : 11)),
+        narrow ? 5 : (compact ? 5 : 6),
+        narrow ? 8 : (compact ? 10 : (isWideCard ? 12 : 11)),
+        narrow ? 8 : (compact ? 9 : (isWideCard ? 11 : 10)),
+      );
+
+  EdgeInsets get metaInsetPadding => EdgeInsets.symmetric(
+        horizontal: narrow ? 6 : (compact ? 7 : 8),
+        vertical: narrow ? 5 : (compact ? 6 : 7),
+      );
+
+  double get metaDateLocationGap => narrow ? 2 : 3;
+
+  double get metaStackGap => narrow ? 5 : 6;
+
+  double get metaDividerGap => narrow ? 4 : 5;
+
+  double get metaStatSpacing => narrow ? 4 : (compact ? 5 : 6);
+
+  double get metaStatRunSpacing => 3;
+
+  double get metaRowInlineGap => narrow ? 6 : 7;
+
+  double get locationRowVerticalPadding => 1;
+
+  double get locationIconSizeOffset => narrow ? 2 : 2.5;
+
+  double get locationFontSizeOffset => narrow ? 0.5 : 0.75;
+
+  double get metaInlineStatIconGap => 2;
+
+  /// Non-premium meta container padding.
+  EdgeInsets get metaContainerPadding => EdgeInsets.symmetric(
+        vertical: narrow ? 2 : 3,
+        horizontal: narrow ? 3 : (compact ? 4 : 5),
       );
 
   int get thumbnailCacheWidth =>

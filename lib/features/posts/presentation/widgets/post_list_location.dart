@@ -157,6 +157,8 @@ class PostListMetaRow extends StatelessWidget {
         premiumBlack ? PostCardPremiumColors.textSecondary : scheme.tertiary;
     final shareColor =
         premiumBlack ? PostCardPremiumColors.textMuted : scheme.secondary;
+    final reportColor =
+        premiumBlack ? PostCardPremiumColors.accentRose : scheme.error;
 
     final stats = <Widget>[
       if (metrics.showViewStat)
@@ -165,35 +167,50 @@ class PostListMetaRow extends StatelessWidget {
           value: _fmt(post.viewCount),
           color: viewColor,
           size: statSize,
+          iconGap: metrics.metaInlineStatIconGap,
           premiumBlack: premiumBlack,
         ),
       if (metrics.showLikeStat) ...[
-        if (metrics.showViewStat) SizedBox(width: metrics.compact ? 6 : 8),
+        if (metrics.showViewStat) SizedBox(width: metrics.metaStatSpacing),
         _InlineStat(
           icon: Icons.favorite_border_rounded,
           value: _fmt(post.likeCount),
           color: likeColor,
           size: statSize,
+          iconGap: metrics.metaInlineStatIconGap,
           premiumBlack: premiumBlack,
         ),
       ],
       if (metrics.showCommentStat) ...[
-        SizedBox(width: metrics.compact ? 6 : 8),
+        SizedBox(width: metrics.metaStatSpacing),
         _InlineStat(
           icon: Icons.chat_bubble_outline_rounded,
           value: _fmt(post.commentCount),
           color: commentColor,
           size: statSize,
+          iconGap: metrics.metaInlineStatIconGap,
           premiumBlack: premiumBlack,
         ),
       ],
       if (metrics.showShareStat) ...[
-        SizedBox(width: metrics.compact ? 6 : 8),
+        SizedBox(width: metrics.metaStatSpacing),
         _InlineStat(
           icon: Icons.share_outlined,
           value: _fmt(post.shareCount),
           color: shareColor,
           size: statSize,
+          iconGap: metrics.metaInlineStatIconGap,
+          premiumBlack: premiumBlack,
+        ),
+      ],
+      if (metrics.showReportStat) ...[
+        SizedBox(width: metrics.metaStatSpacing),
+        _InlineStat(
+          icon: Icons.flag_outlined,
+          value: _fmt(post.reportCount),
+          color: reportColor,
+          size: statSize,
+          iconGap: metrics.metaInlineStatIconGap,
           premiumBlack: premiumBlack,
         ),
       ],
@@ -216,30 +233,32 @@ class PostListMetaRow extends StatelessWidget {
 
     final locationRow = location != null
         ? Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
+            padding: EdgeInsets.symmetric(
+              vertical: metrics.locationRowVerticalPadding,
+            ),
             child: Row(
               children: [
                 Icon(
                   Icons.location_on_rounded,
-                  size: metaSize + 2.5,
+                  size: metaSize + metrics.locationIconSizeOffset,
                   color: premiumBlack
                       ? PostCardPremiumColors.accentGold
                       : scheme.tertiary,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: metrics.badgeIconGap),
                 Expanded(
                   child: Text(
                     location,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: metaSize + (premiumBlack ? 0.75 : 0.5),
+                      fontSize: metaSize + metrics.locationFontSizeOffset,
                       fontWeight: FontWeight.w600,
                       letterSpacing: premiumBlack ? 0.1 : 0,
                       color: premiumBlack
                           ? PostCardPremiumColors.accentGold
                           : scheme.tertiary,
-                      height: 1.15,
+                      height: 1.12,
                     ),
                   ),
                 ),
@@ -254,15 +273,10 @@ class PostListMetaRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               dateRow,
-              SizedBox(height: metrics.compact ? 4 : 5),
+              SizedBox(height: metrics.metaDateLocationGap),
               locationRow,
             ],
           );
-
-    final insetPadding = EdgeInsets.symmetric(
-      horizontal: metrics.compact ? 8 : 10,
-      vertical: metrics.compact ? 8 : 9,
-    );
 
     final insetDecoration = BoxDecoration(
       color: premiumBlack
@@ -284,10 +298,7 @@ class PostListMetaRow extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      padding: premiumBlack ? insetPadding : EdgeInsets.symmetric(
-        vertical: metrics.compact ? 3 : 4,
-        horizontal: metrics.compact ? 4 : 6,
-      ),
+      padding: premiumBlack ? metrics.metaInsetPadding : metrics.metaContainerPadding,
       decoration: premiumBlack ? insetDecoration : BoxDecoration(
         color: hovered && metrics.enableHoverEffects
             ? scheme.surfaceContainerHighest.withValues(alpha: 0.55)
@@ -304,17 +315,17 @@ class PostListMetaRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 dateLocationRow,
-                SizedBox(height: metrics.compact ? 8 : 9),
+                SizedBox(height: metrics.metaStackGap),
                 if (premiumBlack)
                   Divider(
                     height: 1,
                     thickness: 1,
                     color: PostCardPremiumColors.borderSubtle,
                   ),
-                if (premiumBlack) SizedBox(height: metrics.compact ? 7 : 8),
+                if (premiumBlack) SizedBox(height: metrics.metaDividerGap),
                 Wrap(
-                  spacing: metrics.compact ? 4 : 6,
-                  runSpacing: 4,
+                  spacing: metrics.metaStatSpacing,
+                  runSpacing: metrics.metaStatRunSpacing,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: stats,
                 ),
@@ -323,7 +334,7 @@ class PostListMetaRow extends StatelessWidget {
           : Row(
               children: [
                 Expanded(flex: 3, child: dateLocationRow),
-                const SizedBox(width: 8),
+                SizedBox(width: metrics.metaRowInlineGap),
                 ...stats,
               ],
             ),
@@ -337,6 +348,7 @@ class _InlineStat extends StatelessWidget {
     required this.value,
     required this.color,
     required this.size,
+    this.iconGap = 2,
     this.premiumBlack = false,
   });
 
@@ -344,6 +356,7 @@ class _InlineStat extends StatelessWidget {
   final String value;
   final Color color;
   final double size;
+  final double iconGap;
   final bool premiumBlack;
 
   @override
@@ -356,7 +369,7 @@ class _InlineStat extends StatelessWidget {
           size: size + (premiumBlack ? 0.5 : 1),
           color: color.withValues(alpha: premiumBlack ? 0.9 : 0.85),
         ),
-        SizedBox(width: premiumBlack ? 3 : 2),
+        SizedBox(width: premiumBlack ? iconGap + 1 : iconGap),
         Text(
           value,
           style: TextStyle(

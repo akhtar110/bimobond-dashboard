@@ -15,6 +15,7 @@ class UserDetailLoaded extends UserDetailState {
     this.actionFeedbackIsError = false,
     this.userDeleted = false,
     this.isSavingPrivacy = false,
+    this.isRefreshing = false,
   });
 
   final UserDetailEntity userDetail;
@@ -23,8 +24,9 @@ class UserDetailLoaded extends UserDetailState {
   final bool actionFeedbackIsError;
   final bool userDeleted;
   final bool isSavingPrivacy;
+  final bool isRefreshing;
 
-  bool get isBusy => executingAction != null || isSavingPrivacy;
+  bool get isBusy => executingAction != null || isSavingPrivacy || isRefreshing;
 
   UserDetailLoaded copyWith({
     UserDetailEntity? userDetail,
@@ -35,6 +37,7 @@ class UserDetailLoaded extends UserDetailState {
     bool? actionFeedbackIsError,
     bool? userDeleted,
     bool? isSavingPrivacy,
+    bool? isRefreshing,
   }) {
     return UserDetailLoaded(
       userDetail: userDetail ?? this.userDetail,
@@ -46,6 +49,7 @@ class UserDetailLoaded extends UserDetailState {
           actionFeedbackIsError ?? this.actionFeedbackIsError,
       userDeleted: userDeleted ?? this.userDeleted,
       isSavingPrivacy: isSavingPrivacy ?? this.isSavingPrivacy,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 }

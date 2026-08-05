@@ -20,6 +20,12 @@ class UsersRepositoryImpl implements UsersRepository {
     bool? isVerified,
     bool? isBanned,
     String? location,
+    String? role,
+    DateTime? createdFrom,
+    DateTime? createdTo,
+    String? city,
+    String? region,
+    String? country,
   }) async {
     final result = await remoteDataSource.getUsers(
       page: page,
@@ -28,6 +34,12 @@ class UsersRepositoryImpl implements UsersRepository {
       isVerified: isVerified,
       isBanned: isBanned,
       location: location,
+      role: role,
+      createdFrom: createdFrom,
+      createdTo: createdTo,
+      city: city,
+      region: region,
+      country: country,
     );
 
     return UsersPageEntity(
@@ -35,6 +47,7 @@ class UsersRepositoryImpl implements UsersRepository {
       total: result.total,
       page: result.page,
       lastPage: result.lastPage,
+      onlineCount: result.onlineCount,
     );
   }
 

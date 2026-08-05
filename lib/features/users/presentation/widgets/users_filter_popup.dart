@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/localization/localization.dart';
 import '../../../gifts/presentation/widgets/gifts_active_filters.dart';
@@ -13,10 +14,15 @@ import '../users_ui_filter.dart';
 int usersAppliedFilterCount({
   UsersUiFilter filter = UsersUiFilter.all,
   String locationQuery = '',
+  String? role,
+  DateTime? createdFrom,
+  DateTime? createdTo,
 }) {
   var count = 0;
   if (filter != UsersUiFilter.all) count++;
   if (locationQuery.trim().isNotEmpty) count++;
+  if (role != null && role.isNotEmpty) count++;
+  if (createdFrom != null || createdTo != null) count++;
   return count;
 }
 
@@ -24,6 +30,9 @@ Future<void> showUsersFilterPopup({
   required BuildContext context,
   required UsersUiFilter statusFilter,
   required String locationQuery,
+  String? roleFilter,
+  DateTime? createdFrom,
+  DateTime? createdTo,
   required Rect anchorRect,
 }) {
   final bloc = context.read<UsersBloc>();
@@ -44,7 +53,10 @@ Future<void> showUsersFilterPopup({
         UsersFilterPopup(
           appliedStatus: statusFilter,
           appliedLocation: locationQuery,
-          maxHeight: MediaQuery.sizeOf(ctx).height * 0.88,
+          appliedRole: roleFilter,
+          appliedCreatedFrom: createdFrom,
+          appliedCreatedTo: createdTo,
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.90,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           showDragHandle: true,
         ),
@@ -65,8 +77,11 @@ Future<void> showUsersFilterPopup({
             UsersFilterPopup(
               appliedStatus: statusFilter,
               appliedLocation: locationQuery,
-              width: 420,
-              maxHeight: MediaQuery.sizeOf(ctx).height * 0.82,
+              appliedRole: roleFilter,
+              appliedCreatedFrom: createdFrom,
+              appliedCreatedTo: createdTo,
+              width: 440,
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
             ),
           ),
         ),
@@ -74,19 +89,19 @@ Future<void> showUsersFilterPopup({
     );
   }
 
-  const panelWidth = 400.0;
+  const panelWidth = 420.0;
   final media = MediaQuery.sizeOf(context);
   final padding = MediaQuery.paddingOf(context);
-  final isRtl = Directionality.of(context) == TextDirection.rtl;
+  final isRtl = context.isRtl;
 
   var left = isRtl ? anchorRect.right - panelWidth : anchorRect.left;
   left = left.clamp(12.0, media.width - panelWidth - 12);
   var top = anchorRect.bottom + 6;
-  final maxPanelHeight = media.height * 0.72;
-  if (top + 360 > media.height - padding.bottom) {
+  final maxPanelHeight = media.height * 0.78;
+  if (top + 420 > media.height - padding.bottom) {
     top = (anchorRect.top - 6 - maxPanelHeight).clamp(
       padding.top + 12.0,
-      media.height - 360.0,
+      media.height - 420.0,
     );
   }
 
@@ -116,6 +131,9 @@ Future<void> showUsersFilterPopup({
                   UsersFilterPopup(
                     appliedStatus: statusFilter,
                     appliedLocation: locationQuery,
+                    appliedRole: roleFilter,
+                    appliedCreatedFrom: createdFrom,
+                    appliedCreatedTo: createdTo,
                     width: panelWidth,
                     maxHeight: maxPanelHeight,
                   ),
@@ -134,14 +152,20 @@ class UsersFilterPopup extends StatefulWidget {
     super.key,
     required this.appliedStatus,
     required this.appliedLocation,
+    this.appliedRole,
+    this.appliedCreatedFrom,
+    this.appliedCreatedTo,
     this.width,
-    this.maxHeight = 560,
+    this.maxHeight = 620,
     this.borderRadius,
     this.showDragHandle = false,
   });
 
   final UsersUiFilter appliedStatus;
   final String appliedLocation;
+  final String? appliedRole;
+  final DateTime? appliedCreatedFrom;
+  final DateTime? appliedCreatedTo;
   final double? width;
   final double maxHeight;
   final BorderRadius? borderRadius;
@@ -154,12 +178,18 @@ class UsersFilterPopup extends StatefulWidget {
 class _UsersFilterPopupState extends State<UsersFilterPopup> {
   late UsersUiFilter _status;
   late final TextEditingController _locationController;
+  String? _role;
+  DateTime? _createdFrom;
+  DateTime? _createdTo;
 
   @override
   void initState() {
     super.initState();
     _status = widget.appliedStatus;
     _locationController = TextEditingController(text: widget.appliedLocation);
+    _role = widget.appliedRole;
+    _createdFrom = widget.appliedCreatedFrom;
+    _createdTo = widget.appliedCreatedTo;
   }
 
   @override
@@ -177,6 +207,9 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
     setState(() {
       _status = UsersUiFilter.all;
       _locationController.clear();
+      _role = null;
+      _createdFrom = null;
+      _createdTo = null;
     });
   }
 
@@ -187,16 +220,39 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
     if (bloc.activeFilter != _status) {
       bloc.add(FilterUsersEvent(_status));
     }
-    if (bloc.activeLocationQuery != location) {
-      bloc.add(
-        ApplyUsersListFiltersEvent(
-          search: bloc.activeQuery,
-          location: location,
-        ),
-      );
-    }
+
+    bloc.add(
+      ApplyUsersListFiltersEvent(
+        search: bloc.activeQuery,
+        location: location,
+        role: _role,
+        createdFrom: _createdFrom,
+        createdTo: _createdTo,
+      ),
+    );
 
     _close(context);
+  }
+
+  Future<void> _pickDateRange(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: _createdFrom != null && _createdTo != null
+          ? DateTimeRange(start: _createdFrom!, end: _createdTo!)
+          : _createdFrom != null
+              ? DateTimeRange(start: _createdFrom!, end: _createdFrom!)
+              : null,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _createdFrom = picked.start;
+        _createdTo = picked.end;
+      });
+    }
   }
 
   String _sectionTitle(String text, BuildContext context) {
@@ -224,6 +280,33 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
         ),
       );
     }
+    if (_role != null && _role!.isNotEmpty) {
+      items.add(
+        GiftsActiveFilterItem(
+          id: 'role',
+          label: l10n.tArgs('roleFilterPrefix', {'role': _role!}),
+          onRemove: () => setState(() => _role = null),
+        ),
+      );
+    }
+    if (_createdFrom != null || _createdTo != null) {
+      final df = DateFormat('yyyy-MM-dd');
+      final label = _createdFrom != null && _createdTo != null
+          ? '${df.format(_createdFrom!)} - ${df.format(_createdTo!)}'
+          : _createdFrom != null
+              ? l10n.tArgs('dateFromFilter', {'date': df.format(_createdFrom!)})
+              : l10n.tArgs('dateUntilFilter', {'date': df.format(_createdTo!)});
+      items.add(
+        GiftsActiveFilterItem(
+          id: 'dateRange',
+          label: label,
+          onRemove: () => setState(() {
+            _createdFrom = null;
+            _createdTo = null;
+          }),
+        ),
+      );
+    }
     return items;
   }
 
@@ -232,6 +315,14 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final radius = widget.borderRadius ?? BorderRadius.circular(16);
+
+    final roleOptions = <({String? value, String label})>[
+      (value: null, label: l10n.t('all')),
+      (value: 'user', label: l10n.t('roleUser')),
+      (value: 'admin', label: l10n.t('roleAdmin')),
+      (value: 'moderator', label: l10n.t('roleModerator')),
+      (value: 'superAdmin', label: l10n.t('roleSuperAdmin')),
+    ];
 
     return Material(
       color: scheme.surface,
@@ -243,7 +334,7 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
       ),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        width: widget.width ?? 400,
+        width: widget.width ?? 420,
         height: widget.maxHeight,
         child: Column(
           children: [
@@ -288,6 +379,8 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                 padding: const EdgeInsets.only(bottom: 8),
                 children: [
                   GiftsActiveFilters(items: _activeItems(l10n)),
+
+                  // Status filter
                   GiftsFilterSection(
                     title: _sectionTitle(l10n.t('status'), context),
                     child: GiftsFilterChipWrap(
@@ -301,6 +394,125 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
                       ],
                     ),
                   ),
+
+                  // Role filter
+                  GiftsFilterSection(
+                    title: _sectionTitle(l10n.tOr('userRole', 'User Role'), context),
+                    child: GiftsFilterChipWrap(
+                      children: [
+                        for (final opt in roleOptions)
+                          GiftsFilterChoiceChip(
+                            label: opt.label,
+                            selected: _role == opt.value,
+                            onTap: () => setState(() => _role = opt.value),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Registration Date Range
+                  GiftsFilterSection(
+                    title: _sectionTitle(l10n.tOr('registrationDate', 'Registration Date'), context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: () => _pickDateRange(context),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: scheme.outlineVariant),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 18,
+                                  color: scheme.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _createdFrom != null || _createdTo != null
+                                        ? '${_createdFrom != null ? DateFormat('yyyy-MM-dd').format(_createdFrom!) : l10n.tOr('startDate', 'Start')} → ${_createdTo != null ? DateFormat('yyyy-MM-dd').format(_createdTo!) : l10n.tOr('endDate', 'End')}'
+                                        : l10n.tOr('selectDateRange', 'Select Date Range'),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _createdFrom != null
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: _createdFrom != null
+                                          ? scheme.onSurface
+                                          : scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                if (_createdFrom != null || _createdTo != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.clear, size: 16),
+                                    onPressed: () => setState(() {
+                                      _createdFrom = null;
+                                      _createdTo = null;
+                                    }),
+                                    visualDensity: VisualDensity.compact,
+                                  )
+                                else
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            _QuickDateChip(
+                              label: l10n.tOr('today', 'Today'),
+                              onTap: () {
+                                final now = DateTime.now();
+                                setState(() {
+                                  _createdFrom = DateTime(now.year, now.month, now.day);
+                                  _createdTo = now;
+                                });
+                              },
+                            ),
+                            _QuickDateChip(
+                              label: l10n.tOr('last7Days', 'Last 7 Days'),
+                              onTap: () {
+                                final now = DateTime.now();
+                                setState(() {
+                                  _createdFrom = now.subtract(const Duration(days: 7));
+                                  _createdTo = now;
+                                });
+                              },
+                            ),
+                            _QuickDateChip(
+                              label: l10n.tOr('last30Days', 'Last 30 Days'),
+                              onTap: () {
+                                final now = DateTime.now();
+                                setState(() {
+                                  _createdFrom = now.subtract(const Duration(days: 30));
+                                  _createdTo = now;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Location filter
                   GiftsFilterSection(
                     title: _sectionTitle(l10n.t('location'), context),
                     child: TextField(
@@ -338,10 +550,44 @@ class _UsersFilterPopupState extends State<UsersFilterPopup> {
   }
 }
 
+class _QuickDateChip extends StatelessWidget {
+  const _QuickDateChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 String usersStatusLabel(AppLocalizations l10n, UsersUiFilter filter) {
   return switch (filter) {
     UsersUiFilter.all => l10n.t('all'),
     UsersUiFilter.verified => l10n.t('verified'),
     UsersUiFilter.banned => l10n.t('banned'),
+    UsersUiFilter.online => l10n.tOr('online', 'Online'),
+    UsersUiFilter.offline => l10n.tOr('offline', 'Offline'),
   };
 }

@@ -600,6 +600,8 @@ class _EngagementMetrics extends StatelessWidget {
             _metric(Icons.chat_bubble_outline, _fmt(post.commentCount), style),
             const SizedBox(width: 8),
             _metric(Icons.visibility_outlined, _fmt(post.viewCount), style),
+            const SizedBox(width: 8),
+            _metric(Icons.flag_outlined, _fmt(post.reportCount), style),
           ],
         ),
       );
@@ -618,6 +620,8 @@ class _EngagementMetrics extends StatelessWidget {
           _metric(Icons.share_outlined, _fmt(post.shareCount), style),
           const SizedBox(width: 8),
           _metric(Icons.visibility_outlined, _fmt(post.viewCount), style),
+          const SizedBox(width: 8),
+          _metric(Icons.flag_outlined, _fmt(post.reportCount), style),
         ],
       ),
     );

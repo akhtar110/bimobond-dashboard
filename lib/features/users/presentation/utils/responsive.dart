@@ -48,24 +48,24 @@ class UsersLayoutMetrics {
       };
 
   double get pageTopPadding => switch (deviceType) {
-        DeviceType.mobileSmall => 6,
-        DeviceType.mobileLarge => 6,
-        DeviceType.tablet => 8,
-        DeviceType.desktop => 8,
+        DeviceType.mobileSmall => 4,
+        DeviceType.mobileLarge => 4,
+        DeviceType.tablet => 4,
+        DeviceType.desktop => 4,
       };
 
   double get pageBottomPadding => switch (deviceType) {
-        DeviceType.mobileSmall => 10,
-        DeviceType.mobileLarge => 10,
-        DeviceType.tablet => 12,
-        DeviceType.desktop => 12,
-      };
-
-  double get sectionSpacing => switch (deviceType) {
         DeviceType.mobileSmall => 6,
         DeviceType.mobileLarge => 6,
         DeviceType.tablet => 8,
         DeviceType.desktop => 8,
+      };
+
+  double get sectionSpacing => switch (deviceType) {
+        DeviceType.mobileSmall => 4,
+        DeviceType.mobileLarge => 4,
+        DeviceType.tablet => 4,
+        DeviceType.desktop => 4,
       };
 
   double get filterSectionPadding => switch (deviceType) {
@@ -155,8 +155,13 @@ class UsersLayoutMetrics {
   bool toolbarInlineAt(double width) => width >= toolbarInlineBreakpoint;
 
   double inlineSearchWidthFor(double availableWidth) {
+    if (availableWidth.isNaN || availableWidth.isInfinite || availableWidth <= 0) {
+      return searchMaxWidth;
+    }
     final actionsWidth = (filterControlHeight * 2) + (filterGap + 2) * 2 + 16;
-    final maxSearch = (availableWidth - actionsWidth).clamp(120.0, 420.0);
+    final rawMax = availableWidth - actionsWidth;
+    if (rawMax.isNaN || rawMax.isInfinite) return searchMaxWidth;
+    final maxSearch = rawMax.clamp(120.0, 420.0);
     if (availableWidth < toolbarInlineBreakpoint) {
       return availableWidth;
     }

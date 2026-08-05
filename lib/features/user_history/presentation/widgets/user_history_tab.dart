@@ -41,6 +41,7 @@ class _UserHistoryTabState extends State<UserHistoryTab>
     if (!bloc.state.hasLoadedOnce) {
       bloc.add(const LoadUserHistory());
     }
+    bloc.add(const StartRealtimeUserHistoryListening());
   }
 
   Future<void> _onRefresh() async {

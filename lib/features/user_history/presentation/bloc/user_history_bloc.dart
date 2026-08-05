@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/utils/api_error_messages.dart';
@@ -17,12 +18,25 @@ class UserHistoryBloc extends Bloc<UserHistoryEvent, UserHistoryState> {
     on<ChangeUserHistoryPage>(_onChangePage);
     on<ChangeUserHistoryFilters>(_onChangeFilters);
     on<ClearUserHistoryFilters>(_onClearFilters);
+    on<StartRealtimeUserHistoryListening>(_onStartRealtimeListening);
+    on<StopRealtimeUserHistoryListening>(_onStopRealtimeListening);
+    on<PollRealtimeUserHistory>(_onPollRealtime);
   }
 
   final GetUserHistoryUseCase _getUserHistory;
 
   UserHistoryQuery _query = const UserHistoryQuery();
   String _userId = '';
+  Timer? _realtimeTimer;
+  bool _isRealtimeActive = false;
+
+  bool get isRealtimeActive => _isRealtimeActive;
+
+  @override
+  Future<void> close() {
+    _realtimeTimer?.cancel();
+    return super.close();
+  }
 
   void _onSetUserId(
     SetUserHistoryUserId event,
@@ -36,6 +50,67 @@ class UserHistoryBloc extends Bloc<UserHistoryEvent, UserHistoryState> {
         hasLoadedOnce: state.hasLoadedOnce,
       ),
     );
+  }
+
+  Future<void> _onStartRealtimeListening(
+    StartRealtimeUserHistoryListening event,
+    Emitter<UserHistoryState> emit,
+  ) async {
+    _realtimeTimer?.cancel();
+    _isRealtimeActive = true;
+    _realtimeTimer = Timer.periodic(
+      Duration(seconds: event.intervalSeconds.clamp(3, 60)),
+      (_) {
+        if (!isClosed && _userId.isNotEmpty) {
+          add(const PollRealtimeUserHistory());
+        }
+      },
+    );
+  }
+
+  Future<void> _onStopRealtimeListening(
+    StopRealtimeUserHistoryListening event,
+    Emitter<UserHistoryState> emit,
+  ) async {
+    _realtimeTimer?.cancel();
+    _isRealtimeActive = false;
+  }
+
+  Future<void> _onPollRealtime(
+    PollRealtimeUserHistory event,
+    Emitter<UserHistoryState> emit,
+  ) async {
+    if (_userId.isEmpty || _query.page != 1) return;
+    try {
+      final page = await _getUserHistory(
+        userId: _userId,
+        query: _query,
+      );
+
+      final currentItems = _currentItems();
+
+      // Detect if timeline has changed
+      if (page.items.isNotEmpty) {
+        final hasChanges = currentItems.length != page.items.length ||
+            (currentItems.isNotEmpty &&
+                page.items.isNotEmpty &&
+                (currentItems.first.createdAt != page.items.first.createdAt ||
+                    currentItems.first.type != page.items.first.type));
+
+        if (hasChanges) {
+          emit(
+            UserHistoryLoaded(
+              userId: _userId,
+              query: _query,
+              items: page.items,
+              meta: page.meta,
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      // Silent error handling for background realtime polling
+    }
   }
 
   Future<void> _onLoad(

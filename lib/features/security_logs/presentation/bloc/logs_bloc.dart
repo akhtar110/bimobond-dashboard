@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/log_entity.dart';
 import '../../domain/usecases/get_logs_usecase.dart';
+import '../utils/logs_export_service.dart';
 import 'logs_event.dart';
 import 'logs_state.dart';
 
@@ -20,6 +21,8 @@ class LogsBloc extends Bloc<LogsEvent, LogsState> {
     on<LogsApplyFiltersEvent>(_onApplyFilters);
     on<LogsResetFiltersEvent>(_onResetFilters);
     on<ClearLogsMessageEvent>(_onClearMessage);
+    on<ExportLogsEvent>(_onExportLogs);
+    on<ClearLogsExportMessageEvent>(_onClearExportMessage);
   }
 
   final GetLogsUseCase _getLogs;
@@ -210,6 +213,85 @@ class LogsBloc extends Bloc<LogsEvent, LogsState> {
     }
   }
 
+  Future<void> _onExportLogs(
+    ExportLogsEvent event,
+    Emitter<LogsState> emit,
+  ) async {
+    final current = state;
+    if (current is! LogsLoaded || current.isExporting) return;
+
+    emit(current.copyWith(isExporting: true, clearExportMessage: true));
+
+    try {
+      // Build an export query using current filters but a larger page size
+      // to efficiently fetch all matching records.
+      final exportQuery = _query.copyWith(page: 1, limit: 100);
+
+      final allLogs = <LogEntity>[];
+      final seenIds = <String>{};
+
+      int page = 1;
+      int totalPages = 1;
+
+      do {
+        final res = await _getLogs(exportQuery.copyWith(page: page));
+        for (final log in res.data) {
+          if (seenIds.add(log.id)) {
+            allLogs.add(log);
+          }
+        }
+        totalPages = res.meta.totalPages < 1 ? 1 : res.meta.totalPages;
+        page++;
+      } while (page <= totalPages && page <= 50); // safety cap: max 5 000 rows
+
+      final exportList = allLogs.isNotEmpty ? allLogs : current.logs;
+
+      final params = LogsExportParams(
+        logs: exportList,
+        query: _query,
+      );
+
+      await LogsExportService.exportLogs(
+        params: params,
+        format: event.format,
+      );
+
+      final latest = state;
+      if (latest is LogsLoaded) {
+        emit(
+          latest.copyWith(
+            isExporting: false,
+            exportMessage:
+                'Export generated successfully (${exportList.length} records)',
+            exportIsError: false,
+          ),
+        );
+      }
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      final latest = state;
+      if (latest is LogsLoaded) {
+        emit(
+          latest.copyWith(
+            isExporting: false,
+            exportMessage: 'Export failed: $message',
+            exportIsError: true,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onClearExportMessage(
+    ClearLogsExportMessageEvent event,
+    Emitter<LogsState> emit,
+  ) {
+    final current = state;
+    if (current is LogsLoaded) {
+      emit(current.copyWith(clearExportMessage: true));
+    }
+  }
+
   String? _normalizeActorRole(String? value) {
     final role = value?.trim().toUpperCase();
     if (role == null || role.isEmpty) return null;
@@ -238,3 +320,4 @@ class LogsBloc extends Bloc<LogsEvent, LogsState> {
     };
   }
 }
+

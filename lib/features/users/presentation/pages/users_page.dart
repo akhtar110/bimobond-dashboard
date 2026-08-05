@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/bloc/persistent_bloc_provider.dart';
-import '../../../../core/routing/app_router.dart';
+import '../../../../core/localization/localization.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/user_entity.dart';
 import '../bloc/users_bloc.dart';
 import '../utils/responsive.dart';
+import '../widgets/user_detail_drawer.dart';
+import '../widgets/users_analytics_cards.dart';
 import '../widgets/users_page_header.dart';
 import '../widgets/users_selection_header.dart';
 import '../widgets/users_table_panel.dart';
@@ -41,6 +43,7 @@ class _UsersPageView extends StatefulWidget {
 class _UsersPageViewState extends State<_UsersPageView> {
   final ScrollController _horizontalScrollController = ScrollController();
   final ScrollController _listScrollController = ScrollController();
+  UserEntity? _selectedDrawerUser;
 
   @override
   void initState() {
@@ -68,101 +71,169 @@ class _UsersPageViewState extends State<_UsersPageView> {
     }
   }
 
-  void _openUserDetail(UserEntity user) {
-    Navigator.pushNamed(context, AppRoutes.userDetail, arguments: user);
+  void _openUserDrawer(UserEntity user) {
+    setState(() => _selectedDrawerUser = user);
+  }
+
+  void _closeUserDrawer() {
+    setState(() => _selectedDrawerUser = null);
+  }
+
+  UserEntity? _resolveDrawerUser(UsersState state) {
+    if (_selectedDrawerUser == null) return null;
+    if (state is UsersLoaded) {
+      for (final u in state.users) {
+        if (u.id == _selectedDrawerUser!.id) return u;
+      }
+    }
+    return _selectedDrawerUser;
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return BlocListener<UsersBloc, UsersState>(
-      listenWhen: (previous, current) =>
-          current is UsersLoaded &&
-          current.bulkActionMessage != null &&
-          (previous is! UsersLoaded ||
-              previous.bulkActionMessage != current.bulkActionMessage),
-      listener: (context, state) {
-        if (state is! UsersLoaded || state.bulkActionMessage == null) return;
-        final scheme = Theme.of(context).colorScheme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: state.bulkActionIsError
-                ? scheme.errorContainer
-                : null,
-            content: Text(
-              state.bulkActionMessage!,
-              style: TextStyle(
-                color: state.bulkActionIsError
-                    ? scheme.onErrorContainer
-                    : scheme.onInverseSurface,
-              ),
-            ),
-          ),
-        );
-        context.read<UsersBloc>().add(ClearUsersBulkFeedbackEvent());
+      listenWhen: (previous, current) {
+        if (current is! UsersLoaded) return false;
+        final prev = previous is UsersLoaded ? previous : null;
+        final hasNewBulk = current.bulkActionMessage != null &&
+            prev?.bulkActionMessage != current.bulkActionMessage;
+        final hasNewExport = current.exportMessage != null &&
+            prev?.exportMessage != current.exportMessage;
+        return hasNewBulk || hasNewExport;
       },
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              scheme.surfaceContainerLowest,
-              scheme.surface,
-              Color.alphaBlend(
-                scheme.primary.withValues(alpha: 0.06),
-                scheme.surfaceContainerLow,
-              ),
-            ],
-          ),
-        ),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1680),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final metrics = UsersLayoutMetrics(
-                  getDeviceType(constraints.maxWidth),
-                );
+      listener: (context, state) {
+        if (state is! UsersLoaded) return;
+        final scheme = Theme.of(context).colorScheme;
 
-                return Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(
-                    metrics.pageHorizontalPadding,
-                    metrics.pageTopPadding,
-                    metrics.pageHorizontalPadding,
-                    metrics.pageBottomPadding,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      UsersPageHeader(
-                        metrics: metrics,
-                        onRefresh: () => context.read<UsersBloc>().add(
-                          LoadUsersEvent(refresh: true),
-                        ),
+        final bulkMsg = state.bulkActionMessage;
+        if (bulkMsg != null) {
+          final text = state.bulkActionIsError
+              ? bulkMsg
+              : context.l10n.tOr(bulkMsg, bulkMsg);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor:
+                  state.bulkActionIsError ? scheme.errorContainer : null,
+              content: Text(
+                text,
+                style: TextStyle(
+                  color: state.bulkActionIsError
+                      ? scheme.onErrorContainer
+                      : null,
+                ),
+              ),
+            ),
+          );
+          context.read<UsersBloc>().add(ClearUsersBulkFeedbackEvent());
+        }
+
+        final exportMsg = state.exportMessage;
+        if (exportMsg != null) {
+          final text = state.exportIsError
+              ? exportMsg
+              : context.l10n.tOr(exportMsg, exportMsg);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor:
+                  state.exportIsError ? scheme.errorContainer : null,
+              content: Text(
+                text,
+                style: TextStyle(
+                  color: state.exportIsError ? scheme.onErrorContainer : null,
+                ),
+              ),
+            ),
+          );
+          context.read<UsersBloc>().add(ClearUsersExportFeedbackEvent());
+        }
+      },
+      child: Stack(
+        children: [
+          Scaffold(
+            body: SafeArea(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (_) => false,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final metrics = UsersLayoutMetrics(
+                      getDeviceType(constraints.maxWidth),
+                    );
+
+                    return Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        metrics.pageHorizontalPadding,
+                        metrics.pageTopPadding,
+                        metrics.pageHorizontalPadding,
+                        metrics.pageBottomPadding,
                       ),
-                      SizedBox(height: metrics.sectionSpacing),
-                      UsersSelectionHeader(metrics: metrics),
-                      SizedBox(height: metrics.isMobile ? 6 : 8),
-                      Expanded(
-                        child: UsersTablePanel(
-                          metrics: metrics,
-                          horizontalScrollController:
-                              _horizontalScrollController,
-                          listScrollController: _listScrollController,
-                          onUserTap: _openUserDetail,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          UsersPageHeader(
+                            metrics: metrics,
+                            onRefresh: () => context.read<UsersBloc>().add(
+                              LoadUsersEvent(refresh: true),
+                            ),
+                          ),
+                          SizedBox(height: metrics.sectionSpacing),
+                          const UsersAnalyticsCards(),
+                          SizedBox(height: metrics.sectionSpacing),
+                          UsersSelectionHeader(metrics: metrics),
+                          SizedBox(height: metrics.sectionSpacing),
+                          Expanded(
+                            child: UsersTablePanel(
+                              metrics: metrics,
+                              horizontalScrollController:
+                                  _horizontalScrollController,
+                              listScrollController: _listScrollController,
+                              onUserTap: _openUserDrawer,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
           ),
-        ),
+
+          // Right-Side Slide Drawer Overlay synced with UsersBloc live state
+          BlocBuilder<UsersBloc, UsersState>(
+            builder: (context, state) {
+              final activeDrawerUser = _resolveDrawerUser(state);
+              if (activeDrawerUser == null) return const SizedBox.shrink();
+
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _closeUserDrawer,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        color: Colors.black.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: context.isRtl
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    child: SlideTransition(
+                      position: const AlwaysStoppedAnimation(Offset(0, 0)),
+                      child: UserDetailDrawer(
+                        user: activeDrawerUser,
+                        onClose: _closeUserDrawer,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }

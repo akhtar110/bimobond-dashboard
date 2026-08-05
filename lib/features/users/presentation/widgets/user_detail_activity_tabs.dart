@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/localization.dart';
@@ -14,6 +14,8 @@ import '../../../user_activity/presentation/widgets/user_activity_posts_subtabs.
 import '../../../user_activity/presentation/widgets/user_activity_tab.dart';
 import '../../domain/entities/user_entity.dart';
 import '../utils/user_detail_layout_metrics.dart';
+import 'user_detail_admin_actions_tab.dart';
+import 'user_detail_violations_tab.dart';
 import 'user_detail_interests_tab.dart';
 import 'user_detail_locations_tab.dart';
 import 'user_detail_search_history_tab.dart';
@@ -40,7 +42,7 @@ class UserDetailInfoActivitySection extends StatelessWidget {
     final contentHeight = metrics.activityContentHeight(size.height);
 
     final tabsSection = DefaultTabController(
-      length: 13,
+      length: 15,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -81,6 +83,14 @@ class UserDetailInfoActivitySection extends StatelessWidget {
                 Tab(text: l10n.t('activity'), height: 40),
                 Tab(
                   text: l10n.tOr('userHistoryTab', 'User History'),
+                  height: 40,
+                ),
+                Tab(
+                  text: l10n.tOr('adminActionsTitle', 'Admin Actions'),
+                  height: 40,
+                ),
+                Tab(
+                  text: l10n.tOr('violationsHistoryTitle', 'Violations History'),
                   height: 40,
                 ),
                 Tab(text: l10n.t('auctions'), height: 40),
@@ -143,6 +153,14 @@ class UserDetailInfoActivitySection extends StatelessWidget {
                       sourceUser: user,
                     ),
                     UserDetailUserHistoryTab(
+                      user: user,
+                      isDark: isDark,
+                    ),
+                    UserDetailAdminActionsTab(
+                      user: user,
+                      isDark: isDark,
+                    ),
+                    UserDetailViolationsTab(
                       user: user,
                       isDark: isDark,
                     ),

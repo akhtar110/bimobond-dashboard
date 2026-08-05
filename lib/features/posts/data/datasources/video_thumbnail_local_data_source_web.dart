@@ -26,7 +26,8 @@ class VideoThumbnailLocalDataSourceImpl
     try {
       await video.onLoadedMetadata.first.timeout(const Duration(seconds: 30));
 
-      final durationMs = (video.duration * 1000).clamp(0, double.infinity);
+      final rawDur = video.duration * 1000;
+      final durationMs = (rawDur.isNaN || rawDur.isInfinite || rawDur < 0) ? 0.0 : rawDur;
       final seekMs = durationMs > 500 ? 500 : 0;
       video.currentTime = seekMs / 1000;
 

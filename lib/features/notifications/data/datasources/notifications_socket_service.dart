@@ -29,7 +29,7 @@ class NotificationsSocketService {
           .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .enableReconnection()
-          .setReconnectionAttempts(double.infinity.toInt())
+          .setReconnectionAttempts(999999)
           .setReconnectionDelay(3000)
           .build(),
     );

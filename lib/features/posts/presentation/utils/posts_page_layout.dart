@@ -1,4 +1,4 @@
-﻿/// Responsive column count for the admin posts grid.
+/// Responsive column count for the admin posts grid.
 /// Matches gifts/auctions so cards share the same card width.
 int postsGridColumnCount(double width) {
   if (width > 1500) return 7;

@@ -8,6 +8,8 @@ import '../../domain/entities/post_engagement_user_item.dart';
 import '../models/comment_model.dart';
 import '../models/managed_post_model.dart';
 import '../models/post_engagement_user_model.dart';
+import '../models/post_moderation_models.dart';
+import '../../domain/entities/post_moderation_entities.dart';
 import 'managed_post_location_remote_data_source.dart';
 
 abstract class PostManagementRemoteDataSource {
@@ -26,7 +28,20 @@ abstract class PostManagementRemoteDataSource {
   });
   Future<ManagedPostModel> hidePost(String postId);
   Future<ManagedPostModel> banPost(String postId);
-  Future<ManagedPostModel> updatePostStatus(String postId, String status);
+  Future<ManagedPostModel> updatePostStatus(
+    String postId,
+    String status, {
+    String? reason,
+    String? note,
+  });
+
+  Future<void> addPostNote(String postId, String note);
+
+  Future<PostModerationTimelinePage> getPostModerationTimeline(
+    String postId, {
+    required int page,
+    required int limit,
+  });
 
   Future<PostCommentsPageEntity> getPostComments(
     String postId, {
@@ -145,13 +160,53 @@ class PostManagementRemoteDataSourceImpl
   @override
   Future<ManagedPostModel> updatePostStatus(
     String postId,
-    String status,
-  ) async {
+    String status, {
+    String? reason,
+    String? note,
+  }) async {
+    final body = <String, dynamic>{'status': status};
+    if (reason != null && reason.trim().isNotEmpty) {
+      body['reason'] = reason.trim();
+    }
+    if (note != null && note.trim().isNotEmpty) {
+      body['note'] = note.trim();
+    }
     final response = await _dio.patch(
       '/posts/admin/$postId/status',
-      data: {'status': status},
+      data: body,
+      options: Options(contentType: Headers.jsonContentType),
     );
     return _parsePostResponse(response.data);
+  }
+
+  @override
+  Future<void> addPostNote(String postId, String note) async {
+    await _dio.post(
+      '/posts/admin/$postId/notes',
+      data: {'note': note.trim()},
+      options: Options(contentType: Headers.jsonContentType),
+    );
+  }
+
+  @override
+  Future<PostModerationTimelinePage> getPostModerationTimeline(
+    String postId, {
+    required int page,
+    required int limit,
+  }) async {
+    final response = await _dio.get(
+      '/posts/admin/$postId/timeline',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    final raw = response.data;
+    final payload = raw is Map<String, dynamic> && raw['data'] != null
+        ? raw['data']
+        : raw;
+    return PostModerationModels.timelinePageFromJson(
+      payload,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override
@@ -357,11 +412,19 @@ class PostManagementRemoteDataSourceImpl
 
   ManagedPostModel _parsePostResponse(dynamic data) {
     if (data is Map<String, dynamic>) {
-      final payload = data['data'] is Map<String, dynamic>
+      var payload = data['data'] is Map<String, dynamic>
           ? data['data'] as Map<String, dynamic>
           : data['post'] is Map<String, dynamic>
-          ? data['post'] as Map<String, dynamic>
-          : data;
+              ? data['post'] as Map<String, dynamic>
+              : data;
+
+      // Admin status/note responses often wrap the post: { data: { post: {...} } }.
+      if (payload['post'] is Map<String, dynamic>) {
+        payload = payload['post'] as Map<String, dynamic>;
+      } else if (payload['post'] is Map) {
+        payload = Map<String, dynamic>.from(payload['post'] as Map);
+      }
+
       return ManagedPostModel.fromJson(payload);
     }
     throw Exception('Invalid post response format');

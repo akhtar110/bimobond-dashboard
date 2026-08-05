@@ -12,7 +12,8 @@ class UserEngagementBar extends StatelessWidget {
   final UserEntity user;
   final bool compact;
 
-  static String formatCount(int n) {
+  static String formatCount(int? n) {
+    if (n == null || n < 0) return '0';
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return '$n';

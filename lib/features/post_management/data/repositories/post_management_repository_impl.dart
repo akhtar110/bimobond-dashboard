@@ -2,6 +2,7 @@ import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/managed_post_author_enrichment.dart';
 import '../../domain/entities/managed_post_entity.dart';
 import '../../domain/entities/post_engagement_user_item.dart';
+import '../../domain/entities/post_moderation_entities.dart';
 import '../../domain/repositories/post_management_repository.dart';
 import '../datasources/post_management_remote_datasource.dart';
 
@@ -53,8 +54,36 @@ class PostManagementRepositoryImpl implements PostManagementRepository {
   }
 
   @override
-  Future<ManagedPostEntity> updatePostStatus(String postId, String status) {
-    return remoteDataSource.updatePostStatus(postId, status);
+  Future<ManagedPostEntity> updatePostStatus(
+    String postId,
+    String status, {
+    String? reason,
+    String? note,
+  }) {
+    return remoteDataSource.updatePostStatus(
+      postId,
+      status,
+      reason: reason,
+      note: note,
+    );
+  }
+
+  @override
+  Future<void> addPostNote(String postId, String note) {
+    return remoteDataSource.addPostNote(postId, note);
+  }
+
+  @override
+  Future<PostModerationTimelinePage> getPostModerationTimeline(
+    String postId, {
+    required int page,
+    required int limit,
+  }) {
+    return remoteDataSource.getPostModerationTimeline(
+      postId,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override

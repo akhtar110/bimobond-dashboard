@@ -9,6 +9,8 @@ import '../bloc/user_detail_bloc.dart';
 import '../bloc/user_detail_event.dart';
 import '../bloc/user_detail_state.dart';
 import '../utils/user_detail_layout_metrics.dart';
+import '../utils/users_export_service.dart';
+import '../widgets/user_account_risk_section.dart';
 import '../widgets/user_admin_actions/user_admin_actions_section.dart';
 import '../widgets/user_detail_activity_tabs.dart';
 import '../widgets/user_detail_header.dart';
@@ -36,7 +38,10 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       builder: (ctx) {
         final scheme = Theme.of(ctx).colorScheme;
         final size = MediaQuery.sizeOf(ctx);
-        final maxSide = (size.shortestSide * 0.86).clamp(240.0, 520.0);
+        final rawSide = size.shortestSide * 0.86;
+        final maxSide = (rawSide.isNaN || rawSide.isInfinite || rawSide <= 0)
+            ? 360.0
+            : rawSide.clamp(240.0, 520.0);
 
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -179,6 +184,50 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             ),
           ),
           centerTitle: false,
+          actions: [
+            BlocBuilder<UserDetailBloc, UserDetailState>(
+              builder: (context, state) {
+                final isRefreshing =
+                    state is UserDetailLoaded && state.isRefreshing;
+                return Tooltip(
+                  message: l10n.tOr('refreshData', 'Reload all user information'),
+                  child: IconButton(
+                    icon: isRefreshing
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.primary,
+                            ),
+                          )
+                        : Icon(
+                            Icons.refresh_rounded,
+                            color: scheme.onSurface,
+                            size: 20,
+                          ),
+                    onPressed: isRefreshing
+                        ? null
+                        : () {
+                            context
+                                .read<UserDetailBloc>()
+                                .add(RefreshUserDetailEvent());
+                          },
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 4),
+            BlocBuilder<UserDetailBloc, UserDetailState>(
+              builder: (context, state) {
+                final targetUser = state is UserDetailLoaded
+                    ? state.userDetail.user
+                    : widget.user;
+                return UserDetailExportButton(user: targetUser);
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: BlocBuilder<UserDetailBloc, UserDetailState>(
           builder: (context, state) {
@@ -195,24 +244,24 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     children: [
                       Icon(
                         Icons.error_outline_rounded,
-                        size: 48,
                         color: scheme.error,
+                        size: 48,
                       ),
                       const SizedBox(height: 16),
                       Text(
                         state.message,
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge?.copyWith(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      FilledButton.icon(
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh),
+                        label: Text(l10n.t('retry')),
                         onPressed: () => context.read<UserDetailBloc>().add(
                               LoadUserDetailEvent(widget.user),
                             ),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(l10n.t('retry')),
                       ),
                     ],
                   ),
@@ -225,79 +274,287 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               final width = MediaQuery.sizeOf(context).width;
               final metrics = userDetailLayoutMetrics(width);
 
-              return SingleChildScrollView(
-                padding: EdgeInsets.all(metrics.pagePadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    BlocSelector<UserDetailBloc, UserDetailState,
-                        ({
-                          UserEntity user,
-                          UserAdminActionType? executingAction
-                        })?>(
-                      selector: (s) {
-                        if (s is! UserDetailLoaded) return null;
-                        return (
-                          user: s.userDetail.user,
-                          executingAction: s.executingAction,
-                        );
-                      },
-                      builder: (context, data) {
-                        if (data == null) return const SizedBox.shrink();
-                        return UserDetailHeader(
-                          user: data.user,
-                          onAvatarTap: () => _showAvatarPreview(data.user),
-                          adminActions: UserAdminActionsSection(
-                            user: data.user,
-                            executingAction: data.executingAction,
-                            isBusy: data.executingAction != null,
-                          ),
-                        );
-                      },
+              return Column(
+                children: [
+                  if (state.isRefreshing)
+                    LinearProgressIndicator(
+                      minHeight: 2.5,
+                      backgroundColor: scheme.surfaceContainerHighest,
+                      color: scheme.primary,
                     ),
-                    SizedBox(height: metrics.sectionSpacing),
-                    BlocSelector<UserDetailBloc, UserDetailState,
-                        ({
-                          UserEntity user,
-                          UserWalletEntity? wallet,
-                          int followerCount,
-                          int followingCount,
-                        })?>(
-                      selector: (s) {
-                        if (s is! UserDetailLoaded) return null;
-                        final user = s.userDetail.user;
-                        return (
-                          user: user,
-                          wallet: s.userDetail.wallet ?? user.wallet,
-                          followerCount: user.followerCount,
-                          followingCount: user.followingCount,
-                        );
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: scheme.primary,
+                      onRefresh: () async {
+                        context
+                            .read<UserDetailBloc>()
+                            .add(RefreshUserDetailEvent());
                       },
-                      builder: (context, data) {
-                        if (data == null) return const SizedBox.shrink();
-                        return UserDetailStatsGrid(
-                          user: data.user,
-                          wallet: data.wallet,
-                        );
-                      },
-                    ),
-                    SizedBox(height: metrics.sectionSpacing),
-                    if (user.isProfileLocked) ...[
-                      UserDetailLockedCard(user: user),
-                      SizedBox(height: metrics.sectionSpacing),
-                      UserDetailPersonalInfo(user: user),
-                    ] else
-                      UserDetailInfoActivitySection(
-                        user: user,
-                        isDark: isDark,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.all(metrics.pagePadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            BlocSelector<UserDetailBloc, UserDetailState,
+                                ({
+                                  UserEntity user,
+                                  UserAdminActionType? executingAction
+                                })?>(
+                              selector: (s) {
+                                if (s is! UserDetailLoaded) return null;
+                                return (
+                                  user: s.userDetail.user,
+                                  executingAction: s.executingAction,
+                                );
+                              },
+                              builder: (context, data) {
+                                if (data == null) return const SizedBox.shrink();
+                                return UserDetailHeader(
+                                  user: data.user,
+                                  onAvatarTap: () => _showAvatarPreview(data.user),
+                                  adminActions: UserAdminActionsSection(
+                                    user: data.user,
+                                    executingAction: data.executingAction,
+                                    isBusy: data.executingAction != null,
+                                  ),
+                                );
+                              },
+                            ),
+                            SizedBox(height: metrics.sectionSpacing),
+                            BlocSelector<UserDetailBloc, UserDetailState,
+                                ({
+                                  UserEntity user,
+                                  UserWalletEntity? wallet,
+                                  int followerCount,
+                                  int followingCount,
+                                })?>(
+                              selector: (s) {
+                                if (s is! UserDetailLoaded) return null;
+                                final user = s.userDetail.user;
+                                return (
+                                  user: user,
+                                  wallet: s.userDetail.wallet ?? user.wallet,
+                                  followerCount: user.followerCount,
+                                  followingCount: user.followingCount,
+                                );
+                              },
+                              builder: (context, data) {
+                                if (data == null) return const SizedBox.shrink();
+                                return UserDetailStatsGrid(
+                                  user: data.user,
+                                  wallet: data.wallet,
+                                );
+                              },
+                            ),
+                            SizedBox(height: metrics.sectionSpacing),
+                            UserAccountRiskSection(user: user),
+                            SizedBox(height: metrics.sectionSpacing),
+                            if (user.isProfileLocked) ...[
+                              UserDetailLockedCard(user: user),
+                              SizedBox(height: metrics.sectionSpacing),
+                              UserDetailPersonalInfo(user: user),
+                            ] else
+                              UserDetailInfoActivitySection(
+                                user: user,
+                                isDark: isDark,
+                              ),
+                          ],
+                        ),
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               );
             }
 
             return const SizedBox.shrink();
           },
+        ),
+      ),
+    );
+  }
+}
+
+class UserDetailExportButton extends StatefulWidget {
+  const UserDetailExportButton({super.key, required this.user});
+
+  final UserEntity user;
+
+  @override
+  State<UserDetailExportButton> createState() => _UserDetailExportButtonState();
+}
+
+class _UserDetailExportButtonState extends State<UserDetailExportButton> {
+  bool _isExporting = false;
+
+  Future<void> _handleExport(UsersExportFormat format) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      await UsersExportService.exportSingleUser(
+        user: widget.user,
+        format: format,
+      );
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.tArgs('exportUserSuccessMessage', {
+                'username': widget.user.username,
+              }),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.tArgs('exportUserFailedMessage', {
+                'error': e.toString().replaceFirst('Exception: ', ''),
+              }),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l10n = context.l10n;
+
+    if (_isExporting) {
+      return Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              l10n.tOr('exporting', 'Exporting...'),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: scheme.primary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return PopupMenuButton<UsersExportFormat>(
+      tooltip: l10n.tOr('export', 'Export'),
+      offset: const Offset(0, 40),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      onSelected: _handleExport,
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          enabled: false,
+          height: 32,
+          child: Text(
+            l10n.tOr('exportUserDetails', 'EXPORT USER DETAILS'),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: scheme.primary,
+            ),
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.excel,
+          child: Row(
+            children: [
+              const Icon(Icons.table_chart_rounded, size: 18, color: Colors.green),
+              const SizedBox(width: 10),
+              Text(l10n.tOr('exportToExcel', 'Export to Excel (.xlsx)')),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.csv,
+          child: Row(
+            children: [
+              const Icon(Icons.description_rounded, size: 18, color: Colors.blue),
+              const SizedBox(width: 10),
+              Text(l10n.tOr('exportToCsv', 'Export to CSV (.csv)')),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: UsersExportFormat.pdf,
+          child: Row(
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.red),
+              const SizedBox(width: 10),
+              Text(l10n.tOr('exportToPdf', 'Export to PDF (.pdf)')),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.file_download_outlined,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              l10n.tOr('export', 'Export'),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );

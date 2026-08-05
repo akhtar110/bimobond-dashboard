@@ -4,7 +4,7 @@ import '../../../../core/localization/localization.dart';
 import '../users_location_sort.dart';
 import 'users_table_config.dart';
 
-const double kUsersTableHeaderHeight = 36;
+const double kUsersTableHeaderHeight = 32;
 
 class UsersTableHeader extends StatelessWidget {
   const UsersTableHeader({
@@ -57,6 +57,18 @@ class UsersTableHeader extends StatelessWidget {
               child: Text(l10n.t('status'), style: labelStyle),
             ),
           ),
+          if (config.showOnlineStatus) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 16,
+              child: Text(
+                l10n.tOr('onlineStatus', 'Online / Last Seen'),
+                style: labelStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
           if (config.showEngagement) ...[
             const SizedBox(width: 8),
             Expanded(

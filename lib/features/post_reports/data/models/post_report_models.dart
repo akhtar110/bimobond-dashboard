@@ -118,6 +118,9 @@ abstract final class PostReportModels {
       moderationFlags: PostReportJsonParser.parseModerationFlags(
         json['moderationFlags'],
       ),
+      moderationSummary: PostReportJsonParser.parseModerationSummary(
+        json['moderationSummary'],
+      ),
     );
   }
 }

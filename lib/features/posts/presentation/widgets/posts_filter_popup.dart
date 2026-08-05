@@ -176,16 +176,6 @@ class PostsFilterPopup extends StatelessWidget {
     context.read<PostsFilterDraftCubit>().reset();
   }
 
-  void _apply(BuildContext context) {
-    final draft = context.read<PostsFilterDraftCubit>();
-    final postsBloc = context.read<PostsBloc>();
-    final applied = draft.toAppliedFilters(postsBloc.activeFilters);
-    postsBloc.add(
-      UpdatePostFiltersEvent(applied, filterUser: draft.state.user),
-    );
-    _close(context);
-  }
-
   void _applyDatePreset(
     PostsFilterDraftCubit cubit,
     PostsDateTimePreset preset,
@@ -223,7 +213,15 @@ class PostsFilterPopup extends StatelessWidget {
               if (showDragHandle) const _PostsFilterDragHandle(),
               PostsFilterPanelHeader(onClose: () => _close(context)),
               Expanded(
-                child: BlocBuilder<PostsFilterDraftCubit, PostsFilterDraftState>(
+                child: BlocConsumer<PostsFilterDraftCubit, PostsFilterDraftState>(
+                  listener: (context, draft) {
+                    final cubit = context.read<PostsFilterDraftCubit>();
+                    final postsBloc = context.read<PostsBloc>();
+                    final applied = cubit.toAppliedFilters(postsBloc.activeFilters);
+                    postsBloc.add(
+                      UpdatePostFiltersEvent(applied, filterUser: draft.user),
+                    );
+                  },
                   builder: (context, draft) {
                     final cubit = context.read<PostsFilterDraftCubit>();
                     final activeItems = postsDraftActiveFilterItems(
@@ -266,7 +264,7 @@ class PostsFilterPopup extends StatelessWidget {
                             selectedUser: draft.user,
                             hintText: l10n.t('filterPostsByUser'),
                             onUserSelected: cubit.setUser,
-                            onUserConfirmed: () => _apply(context),
+                            onUserConfirmed: () {},
                           ),
                         ),
                         PostsFilterSection(
@@ -315,23 +313,20 @@ class PostsFilterPopup extends StatelessWidget {
                           child: PostsFilterChipGrid(
                             children: [
                               PostsFilterChoiceChip(
-                                label: l10n.t('postFilterAuctionAll'),
+                                label: l10n.tOr('postFilterAuctionAll', 'Posts'),
                                 selected: draft.postType == PostTypeFilter.all,
                                 onTap: () =>
                                     cubit.setPostType(PostTypeFilter.all),
                               ),
                               PostsFilterChoiceChip(
-                                label: l10n.t('postFilterAuctionOnly'),
+                                label: l10n.tOr('postFilterAuctionOnly', 'Auctions Only'),
                                 selected:
                                     draft.postType == PostTypeFilter.auction,
                                 onTap: () =>
                                     cubit.setPostType(PostTypeFilter.auction),
                               ),
                               PostsFilterChoiceChip(
-                                label: context.trOr(
-                                  'postFilterAdsOnly',
-                                  'Ads only',
-                                ),
+                                label: l10n.tOr('postFilterAdsOnly', 'Ads Only'),
                                 selected: draft.postType == PostTypeFilter.ads,
                                 onTap: () =>
                                     cubit.setPostType(PostTypeFilter.ads),
@@ -552,7 +547,6 @@ class PostsFilterPopup extends StatelessWidget {
               ),
               PostsFilterPanelFooter(
                 onReset: () => _resetDraft(context),
-                onApply: () => _apply(context),
               ),
             ],
           ),
@@ -650,9 +644,9 @@ List<GiftsActiveFilterItem> postsDraftActiveFilterItems(
 
   if (draft.postType != PostTypeFilter.all) {
     final label = switch (draft.postType) {
-      PostTypeFilter.auction => l10n.t('postFilterAuctionOnly'),
-      PostTypeFilter.ads => l10n.tOr('postFilterAdsOnly', 'Ads only'),
-      PostTypeFilter.all => l10n.t('postFilterAuctionAll'),
+      PostTypeFilter.auction => l10n.tOr('postFilterAuctionOnly', 'Auctions Only'),
+      PostTypeFilter.ads => l10n.tOr('postFilterAdsOnly', 'Ads Only'),
+      PostTypeFilter.all => l10n.tOr('postFilterAuctionAll', 'Posts'),
     };
     items.add(
       GiftsActiveFilterItem(

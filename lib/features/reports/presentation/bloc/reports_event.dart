@@ -14,11 +14,40 @@ class GoToReportsPageEvent extends ReportsEvent {
   final int page;
 }
 
-/// Switch status/type filter and reload from page 1.
 class FilterReportsEvent extends ReportsEvent {
-  FilterReportsEvent({this.status, this.type});
-  final String? status; // PENDING | RESOLVED | DISMISSED | null = all
-  final String? type;   // post | user | comment | null = all
+  FilterReportsEvent({
+    this.status,
+    this.type,
+    this.reporterId,
+    this.reportedUserId,
+    this.postId,
+    this.commentId,
+    this.storyId,
+    this.search,
+    this.startDate,
+    this.endDate,
+    this.sortBy,
+    this.sortOrder,
+    this.clearAdvanced = false,
+    this.resetStatus = false,
+    this.resetType = false,
+  });
+
+  final String? status;
+  final String? type;
+  final String? reporterId;
+  final String? reportedUserId;
+  final String? postId;
+  final String? commentId;
+  final String? storyId;
+  final String? search;
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final String? sortBy;
+  final String? sortOrder;
+  final bool clearAdvanced;
+  final bool resetStatus;
+  final bool resetType;
 }
 
 /// Reload with the same filters (e.g. after a status update).

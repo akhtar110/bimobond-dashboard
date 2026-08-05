@@ -1,9 +1,20 @@
 /// Normalizes API post status strings for models and UI.
 String normalizePostStatus(String? raw, {String fallback = 'PUBLISHED'}) {
   if (raw == null) return fallback;
-  final value = raw.trim().toUpperCase();
+  var value = raw.trim();
   if (value.isEmpty) return fallback;
-  return value;
+
+  // camelCase → SNAKE_CASE (e.g. underReview → UNDER_REVIEW)
+  value = value.replaceAllMapped(
+    RegExp(r'([a-z0-9])([A-Z])'),
+    (match) => '${match[1]}_${match[2]}',
+  );
+  value = value.replaceAll(RegExp(r'[\s-]+'), '_').toUpperCase();
+
+  const aliases = {
+    'UNDERREVIEW': 'UNDER_REVIEW',
+  };
+  return aliases[value] ?? value;
 }
 
 bool isDraftPostStatus(String status) =>

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../posts/presentation/utils/post_card_layout.dart';
 import '../../../posts/presentation/utils/posts_page_layout.dart';
-import '../../../posts/presentation/widgets/post_card.dart';
+import '../../../posts/presentation/utils/posts_responsive.dart';
 
 class StoriesSkeletonGrid extends StatelessWidget {
   const StoriesSkeletonGrid({super.key});
@@ -49,14 +50,17 @@ class _StorySkeletonCard extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 170;
         final radius = compact ? 10.0 : 12.0;
+        final metrics = PostCardMetrics(
+          cardWidth: constraints.maxWidth,
+          deviceType: getPostsDeviceType(MediaQuery.sizeOf(context).width),
+          columns: postsGridColumnCount(constraints.maxWidth),
+        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             AspectRatio(
-              aspectRatio: compact
-                  ? kPostCardThumbnailAspectCompact
-                  : kPostCardThumbnailAspect,
+              aspectRatio: metrics.thumbnailAspect,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: color,

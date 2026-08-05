@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/report_entity.dart';
+import '../../domain/entities/reports_query_params.dart';
 import '../../domain/usecases/get_reports_usecase.dart';
 import '../../domain/usecases/update_report_status_usecase.dart';
 
@@ -52,7 +53,12 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
       return;
     }
     emit(current.copyWith(isLoadingMore: true));
-    await _fetch(emit, page: current.currentPage + 1, replace: false);
+    await _fetch(
+      emit,
+      page: current.currentPage + 1,
+      replace: false,
+      filters: current.filters,
+    );
   }
 
   Future<void> _onGoToPage(
@@ -60,8 +66,9 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
     Emitter<ReportsState> emit,
   ) async {
     if (event.page < 1) return;
+    final filters = _loaded?.filters ?? const ReportsQueryParams();
     emit(ReportsLoading());
-    await _fetch(emit, page: event.page, replace: true);
+    await _fetch(emit, page: event.page, replace: true, filters: filters);
   }
 
   Future<void> _onFilter(
@@ -69,13 +76,32 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
     Emitter<ReportsState> emit,
   ) async {
     emit(ReportsLoading());
-    await _fetch(
-      emit,
-      page: 1,
-      replace: true,
-      statusFilter: event.status,
-      typeFilter: event.type,
-    );
+    final current = _loaded;
+    final base = current?.filters ?? const ReportsQueryParams();
+    final next = event.clearAdvanced
+        ? ReportsQueryParams(
+            status: event.resetStatus ? null : (event.status ?? base.status),
+            type: event.resetType ? null : (event.type ?? base.type),
+          )
+        : ReportsQueryParams(
+            page: 1,
+            limit: _limit,
+            status: event.resetStatus
+                ? null
+                : (event.status ?? base.status),
+            type: event.resetType ? null : (event.type ?? base.type),
+            reporterId: event.reporterId ?? base.reporterId,
+            reportedUserId: event.reportedUserId ?? base.reportedUserId,
+            postId: event.postId ?? base.postId,
+            commentId: event.commentId ?? base.commentId,
+            storyId: event.storyId ?? base.storyId,
+            search: event.search ?? base.search,
+            startDate: event.startDate ?? base.startDate,
+            endDate: event.endDate ?? base.endDate,
+            sortBy: event.sortBy ?? base.sortBy,
+            sortOrder: event.sortOrder ?? base.sortOrder,
+          );
+    await _fetch(emit, page: 1, replace: true, filters: next);
   }
 
   Future<void> _onRefresh(
@@ -83,15 +109,13 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
     Emitter<ReportsState> emit,
   ) async {
     final current = _loaded;
-    final statusFilter = current?.statusFilter;
-    final typeFilter = current?.typeFilter;
+    final filters = current?.filters ?? const ReportsQueryParams();
     emit(ReportsLoading());
     await _fetch(
       emit,
       page: 1,
       replace: true,
-      statusFilter: statusFilter,
-      typeFilter: typeFilter,
+      filters: filters,
     );
   }
 
@@ -178,15 +202,24 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
     Emitter<ReportsState> emit, {
     required int page,
     required bool replace,
-    String? statusFilter,
-    String? typeFilter,
+    ReportsQueryParams filters = const ReportsQueryParams(),
   }) async {
     try {
       final result = await _getReports(
         page: page,
         limit: _limit,
-        status: statusFilter,
-        type: typeFilter,
+        status: filters.status,
+        type: filters.type,
+        reporterId: filters.reporterId,
+        reportedUserId: filters.reportedUserId,
+        postId: filters.postId,
+        commentId: filters.commentId,
+        storyId: filters.storyId,
+        search: filters.search,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
       );
 
       final prev = _loaded;
@@ -199,8 +232,7 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
         currentPage: page,
         lastPage: result.lastPage,
         total: result.total,
-        statusFilter: statusFilter,
-        typeFilter: typeFilter,
+        filters: filters.copyWith(page: page, limit: _limit),
         isLoadingMore: false,
       ));
     } catch (e) {

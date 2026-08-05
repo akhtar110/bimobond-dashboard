@@ -126,7 +126,7 @@ class AppPaginationToken {
   bool get isEllipsis => page == null;
 }
 
-/// Shared desktop pagination footer used across admin listing screens.
+/// Shared desktop & mobile transparent responsive pagination footer.
 ///
 /// Example controls: `‹ 1 2 3 … 30 ›` + `Go to: [ 10 ]`
 class AppPaginationBar extends StatelessWidget {
@@ -161,7 +161,7 @@ class AppPaginationBar extends StatelessWidget {
   final bool hideWhenSinglePage;
   final bool showTopBorder;
 
-  /// When false, renders without an outer border or shadow.
+  /// When false, renders with a transparent background without borders or shadows.
   final bool showBorder;
 
   /// Retained for API compatibility. First/last jump buttons are no longer
@@ -201,21 +201,29 @@ class AppPaginationBar extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: !showBorder
+            ? Colors.transparent
+            : showTopBorder
+                ? Colors.transparent
+                : scheme.surface.withValues(alpha: 0.85),
         borderRadius: !showBorder || showTopBorder ? null : radius,
         border: !showBorder
             ? null
             : showTopBorder
-                ? Border(top: BorderSide(color: scheme.outlineVariant))
+                ? Border(
+                    top: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                  )
                 : Border.all(
-                    color: scheme.outlineVariant.withValues(alpha: 0.55),
+                    color: scheme.outlineVariant.withValues(alpha: 0.4),
                   ),
         boxShadow: !showBorder || showTopBorder
             ? null
             : [
                 BoxShadow(
-                  color: scheme.shadow.withValues(alpha: 0.04),
-                  blurRadius: 12,
+                  color: scheme.shadow.withValues(alpha: 0.03),
+                  blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -225,51 +233,58 @@ class AppPaginationBar extends StatelessWidget {
           final width = constraints.maxWidth;
           final compact = width < compactBreakpoint;
           final tight = width < 380;
+          final ultraTight = width < 320;
+
+          final effectiveSiblings = ultraTight ? 0 : siblingCount;
 
           final tokens = buildAppPaginationTokens(
             currentPage: safeCurrent,
             lastPage: safeLast,
-            siblingCount: siblingCount,
+            siblingCount: effectiveSiblings,
             boundaryCount: boundaryCount,
           );
 
-          final pageControls = Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _PageIconButton(
-                icon: isRtl
-                    ? Icons.chevron_right_rounded
-                    : Icons.chevron_left_rounded,
-                enabled: safeCurrent > 1,
-                tooltip:
-                    context.l10n.tOr('paginationPrevious', 'Previous page'),
-                onTap: () => _goTo(safeCurrent - 1),
-              ),
-              SizedBox(width: tight ? 4 : 6),
-              for (final token in tokens)
-                Padding(
-                  padding: EdgeInsetsDirectional.only(end: tight ? 2 : 4),
-                  child: token.isEllipsis
-                      ? _EllipsisButton(
-                          onTap: () => _goTo(token.jumpTo!),
-                        )
-                      : _PageNumberButton(
-                          page: token.page!,
-                          isActive: token.page == safeCurrent,
-                          onTap: () => _goTo(token.page!),
-                        ),
+          final pageControls = SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _PageIconButton(
+                  icon: isRtl
+                      ? Icons.chevron_right_rounded
+                      : Icons.chevron_left_rounded,
+                  enabled: safeCurrent > 1,
+                  tooltip:
+                      context.l10n.tOr('paginationPrevious', 'Previous page'),
+                  onTap: () => _goTo(safeCurrent - 1),
                 ),
-              SizedBox(width: tight ? 0 : 2),
-              _PageIconButton(
-                icon: isRtl
-                    ? Icons.chevron_left_rounded
-                    : Icons.chevron_right_rounded,
-                enabled: safeCurrent < safeLast,
-                tooltip: context.l10n.tOr('paginationNext', 'Next page'),
-                onTap: () => _goTo(safeCurrent + 1),
-              ),
-            ],
+                SizedBox(width: tight ? 4 : 6),
+                for (final token in tokens)
+                  Padding(
+                    padding: EdgeInsetsDirectional.only(end: tight ? 2 : 4),
+                    child: token.isEllipsis
+                        ? _EllipsisButton(
+                            onTap: () => _goTo(token.jumpTo!),
+                          )
+                        : _PageNumberButton(
+                            page: token.page!,
+                            isActive: token.page == safeCurrent,
+                            onTap: () => _goTo(token.page!),
+                          ),
+                  ),
+                SizedBox(width: tight ? 0 : 2),
+                _PageIconButton(
+                  icon: isRtl
+                      ? Icons.chevron_left_rounded
+                      : Icons.chevron_right_rounded,
+                  enabled: safeCurrent < safeLast,
+                  tooltip: context.l10n.tOr('paginationNext', 'Next page'),
+                  onTap: () => _goTo(safeCurrent + 1),
+                ),
+              ],
+            ),
           );
 
           final goToField = _PaginationGoToField(
@@ -417,37 +432,18 @@ class _PaginationGoToFieldState extends State<_PaginationGoToField> {
           end: 4,
         ),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: AlignmentDirectional.centerStart,
-            end: AlignmentDirectional.centerEnd,
-            colors: active
-                ? [
-                    scheme.primary.withValues(alpha: 0.10),
-                    scheme.primary.withValues(alpha: 0.04),
-                  ]
-                : [
-                    scheme.surfaceContainerHighest.withValues(alpha: 0.45),
-                    scheme.surfaceContainerLowest,
-                  ],
-          ),
+          color: active
+              ? scheme.primary.withValues(alpha: 0.08)
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(height / 2),
           border: Border.all(
             color: focused
                 ? scheme.primary.withValues(alpha: 0.65)
                 : active
                     ? scheme.primary.withValues(alpha: 0.28)
-                    : scheme.outlineVariant.withValues(alpha: 0.55),
+                    : scheme.outlineVariant.withValues(alpha: 0.4),
             width: focused ? 1.4 : 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: focused
-                  ? scheme.primary.withValues(alpha: 0.18)
-                  : scheme.shadow.withValues(alpha: active ? 0.08 : 0.04),
-              blurRadius: focused ? 14 : 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -469,20 +465,13 @@ class _PaginationGoToFieldState extends State<_PaginationGoToField> {
               height: height - 10,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: scheme.surface,
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular((height - 10) / 2),
                 border: Border.all(
                   color: focused
                       ? scheme.primary.withValues(alpha: 0.45)
-                      : scheme.outlineVariant.withValues(alpha: 0.5),
+                      : scheme.outlineVariant.withValues(alpha: 0.35),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.shadow.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
               ),
               child: TextField(
                 controller: _controller,
@@ -535,14 +524,14 @@ class _PaginationGoToFieldState extends State<_PaginationGoToField> {
                         end: Alignment.bottomRight,
                         colors: [
                           scheme.primary,
-                          scheme.primary.withValues(alpha: 0.82),
+                          scheme.primary.withValues(alpha: 0.85),
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: scheme.primary.withValues(alpha: 0.35),
-                          blurRadius: active ? 10 : 6,
-                          offset: const Offset(0, 2),
+                          color: scheme.primary.withValues(alpha: 0.28),
+                          blurRadius: active ? 8 : 4,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
@@ -592,14 +581,14 @@ class _PageNumberButtonState extends State<_PageNumberButton> {
     final active = widget.isActive;
 
     final background = active
-        ? scheme.primary.withValues(alpha: 0.12)
+        ? scheme.primary.withValues(alpha: 0.15)
         : _hovered
-            ? scheme.primary.withValues(alpha: 0.06)
+            ? scheme.primary.withValues(alpha: 0.08)
             : Colors.transparent;
 
     final foreground = active
         ? scheme.primary
-        : scheme.onSurfaceVariant.withValues(alpha: _hovered ? 0.95 : 0.8);
+        : scheme.onSurfaceVariant.withValues(alpha: _hovered ? 0.95 : 0.78);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -627,9 +616,9 @@ class _PageNumberButtonState extends State<_PageNumberButton> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: active
-                    ? scheme.primary.withValues(alpha: 0.28)
+                    ? scheme.primary.withValues(alpha: 0.3)
                     : _hovered
-                        ? scheme.outlineVariant.withValues(alpha: 0.7)
+                        ? scheme.outlineVariant.withValues(alpha: 0.6)
                         : Colors.transparent,
               ),
             ),
@@ -755,20 +744,20 @@ class _PageIconButtonState extends State<_PageIconButton> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: enabled && _hovered
-                  ? scheme.primary.withValues(alpha: 0.08)
-                  : scheme.surfaceContainerLowest,
+                  ? scheme.primary.withValues(alpha: 0.10)
+                  : scheme.surfaceContainerHighest.withValues(alpha: 0.25),
               border: Border.all(
                 color: enabled
                     ? (_hovered
                         ? scheme.primary.withValues(alpha: 0.35)
-                        : scheme.outlineVariant.withValues(alpha: 0.75))
-                    : scheme.outlineVariant.withValues(alpha: 0.4),
+                        : scheme.outlineVariant.withValues(alpha: 0.45))
+                    : scheme.outlineVariant.withValues(alpha: 0.2),
               ),
               boxShadow: enabled && _hovered
                   ? [
                       BoxShadow(
-                        color: scheme.shadow.withValues(alpha: 0.06),
-                        blurRadius: 6,
+                        color: scheme.shadow.withValues(alpha: 0.04),
+                        blurRadius: 4,
                         offset: const Offset(0, 1),
                       ),
                     ]
@@ -778,7 +767,7 @@ class _PageIconButtonState extends State<_PageIconButton> {
               widget.icon,
               size: 18,
               color: enabled
-                  ? scheme.onSurface.withValues(alpha: 0.78)
+                  ? scheme.onSurface.withValues(alpha: 0.85)
                   : scheme.onSurfaceVariant.withValues(alpha: 0.35),
             ),
           ),

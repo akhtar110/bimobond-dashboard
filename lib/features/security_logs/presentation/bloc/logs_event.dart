@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../users/domain/entities/user_entity.dart';
+import '../utils/logs_export_service.dart';
 
 abstract class LogsEvent extends Equatable {
   const LogsEvent();
@@ -120,3 +121,17 @@ class LogsResetFiltersEvent extends LogsEvent {
 class ClearLogsMessageEvent extends LogsEvent {
   const ClearLogsMessageEvent();
 }
+
+class ExportLogsEvent extends LogsEvent {
+  const ExportLogsEvent({required this.format});
+
+  final LogsExportFormat format;
+
+  @override
+  List<Object?> get props => [format];
+}
+
+class ClearLogsExportMessageEvent extends LogsEvent {
+  const ClearLogsExportMessageEvent();
+}
+

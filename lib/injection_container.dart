@@ -85,6 +85,7 @@ import 'features/auction_reports/presentation/bloc/auction_reports_bloc.dart';
 import 'features/reports/presentation/bloc/reports_center_overview_cubit.dart';
 
 import 'features/users/data/datasources/users_remote_data_source.dart';
+import 'features/users/data/datasources/users_presence_socket_service.dart';
 import 'features/users/data/repositories/users_repository_impl.dart';
 import 'features/users/domain/repositories/users_repository.dart';
 import 'features/users/domain/usecases/bulk_activate_users.dart';
@@ -183,6 +184,8 @@ import 'features/post_management/domain/usecases/update_post_details_usecase.dar
 import 'features/post_management/domain/usecases/delete_comment_admin.dart';
 import 'features/post_management/domain/usecases/get_post_comments.dart';
 import 'features/post_management/domain/usecases/get_post_engagement_users.dart';
+import 'features/post_management/domain/usecases/add_post_note_usecase.dart';
+import 'features/post_management/domain/usecases/get_post_moderation_timeline_usecase.dart';
 import 'features/post_management/domain/usecases/update_post_status_usecase.dart';
 import 'features/post_management/presentation/bloc/post_management_bloc.dart';
 
@@ -721,6 +724,7 @@ Future<void> init() async {
       deleteUser: sl<DeleteUser>(),
       updateUserRoles: sl<UpdateUserRoles>(),
       updateUserPrivacySettings: sl<UpdateUserPrivacySettings>(),
+      presenceSocketService: sl<UsersPresenceSocketService>(),
     ),
   );
 
@@ -783,8 +787,12 @@ Future<void> init() async {
         UserUnifiedActivityBloc(getUserActivityFeed: sl<GetUserActivityFeed>()),
   );
 
+  sl.registerLazySingleton(
+    () => UsersPresenceSocketService(baseUrl: socketBaseUrl),
+  );
+
   sl.registerFactory(
-        () => UsersBloc(
+    () => UsersBloc(
       getUsers: sl<GetUsers>(),
       banUser: sl<BanUser>(),
       unbanUser: sl<UnbanUser>(),
@@ -798,6 +806,7 @@ Future<void> init() async {
       bulkPromoteUsers: sl<BulkPromoteUsers>(),
       bulkDemoteUsers: sl<BulkDemoteUsers>(),
       resetUserPassword: sl<ResetUserPasswordUseCase>(),
+      presenceSocketService: sl<UsersPresenceSocketService>(),
     ),
   );
 
@@ -1187,6 +1196,12 @@ Future<void> init() async {
     () => UpdatePostStatus(sl<PostManagementRepository>()),
   );
   sl.registerLazySingleton(
+    () => AddPostNote(sl<PostManagementRepository>()),
+  );
+  sl.registerLazySingleton(
+    () => GetPostModerationTimeline(sl<PostManagementRepository>()),
+  );
+  sl.registerLazySingleton(
     () => GetPostComments(sl<PostManagementRepository>()),
   );
   sl.registerLazySingleton(
@@ -1206,6 +1221,14 @@ Future<void> init() async {
       hidePost: sl<HidePost>(),
       banPost: sl<BanPost>(),
       updatePostStatus: sl<UpdatePostStatus>(),
+      addPostNote: sl<AddPostNote>(),
+      getPostModerationTimeline: sl<GetPostModerationTimeline>(),
+      getPostReportDetail: sl<GetPostReportDetail>(),
+      getCameraFilter: sl<GetCameraFilterUseCase>(),
+      getCameraEffect: sl<GetCameraEffectUseCase>(),
+      getCameraFilters: sl<GetCameraFiltersUseCase>(),
+      getCameraEffects: sl<GetCameraEffectsUseCase>(),
+      getReports: sl<GetReports>(),
       getPostComments: sl<GetPostComments>(),
       deleteCommentAdmin: sl<DeleteCommentAdmin>(),
       getPostEngagementUsers: sl<GetPostEngagementUsers>(),

@@ -63,7 +63,8 @@ String? userLocationTooltip(BuildContext context, UserEntity user) {
   }
 
   if (loc?.updatedAt != null) {
-    final formatted = DateFormat.yMMMd().add_jm().format(loc!.updatedAt!.toLocal());
+    final locale = Localizations.localeOf(context).languageCode;
+    final formatted = DateFormat.yMMMd(locale).add_jm().format(loc!.updatedAt!.toLocal());
     lines.add('${l10n.t('lastUpdated')}: $formatted');
   }
 
