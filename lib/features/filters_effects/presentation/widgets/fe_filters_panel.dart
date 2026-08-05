@@ -335,9 +335,14 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
     _renderType = widget.query.renderType;
   }
 
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _apply(close: false);
+  }
+
   void _reset() {
-    setState(() {
-      _status = FiltersEffectsStatusFilter.all;
+    _updateFilter(() {
+      _status = FiltersEffectsStatusFilter.active;
       _renderType = null;
     });
   }
@@ -347,7 +352,7 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
     if (nav.canPop()) nav.pop();
   }
 
-  void _apply() {
+  void _apply({bool close = false}) {
     widget.bloc.add(
       FiltersEffectsFilterChanged(
         status: _status,
@@ -355,7 +360,9 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
         clearRenderType: _renderType == null,
       ),
     );
-    _close();
+    if (close) {
+      _close();
+    }
   }
 
   @override
@@ -367,7 +374,7 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
 
     final activeItems = <GiftsActiveFilterItem>[
       if (widget.showStatusFilter &&
-          _status != FiltersEffectsStatusFilter.all)
+          _status != FiltersEffectsStatusFilter.active)
         GiftsActiveFilterItem(
           id: 'status',
           label: switch (_status) {
@@ -378,14 +385,15 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
             FiltersEffectsStatusFilter.all =>
               l10n.tOr('feStatusAll', 'All statuses'),
           },
-          onRemove: () =>
-              setState(() => _status = FiltersEffectsStatusFilter.all),
+          onRemove: () => _updateFilter(
+            () => _status = FiltersEffectsStatusFilter.active,
+          ),
         ),
       if (isEffects && _renderType != null && _renderType!.trim().isNotEmpty)
         GiftsActiveFilterItem(
           id: 'renderType',
           label: feEffectRenderTypeLabel(context, _renderType!),
-          onRemove: () => setState(() => _renderType = null),
+          onRemove: () => _updateFilter(() => _renderType = null),
         ),
     ];
 
@@ -418,7 +426,7 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: l10n.tOr('feStatusAll', 'All statuses'),
                             selected: _status == FiltersEffectsStatusFilter.all,
-                            onTap: () => setState(
+                            onTap: () => _updateFilter(
                               () => _status = FiltersEffectsStatusFilter.all,
                             ),
                           ),
@@ -426,7 +434,7 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
                             label: l10n.tOr('feActive', 'Active'),
                             selected:
                                 _status == FiltersEffectsStatusFilter.active,
-                            onTap: () => setState(
+                            onTap: () => _updateFilter(
                               () => _status = FiltersEffectsStatusFilter.active,
                             ),
                           ),
@@ -434,7 +442,7 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
                             label: l10n.tOr('feInactive', 'Inactive'),
                             selected:
                                 _status == FiltersEffectsStatusFilter.inactive,
-                            onTap: () => setState(
+                            onTap: () => _updateFilter(
                               () => _status =
                                   FiltersEffectsStatusFilter.inactive,
                             ),
@@ -455,7 +463,8 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
                               'All render types',
                             ),
                             selected: _renderType == null,
-                            onTap: () => setState(() => _renderType = null),
+                            onTap: () =>
+                                _updateFilter(() => _renderType = null),
                           ),
                           for (final type in renderOptions)
                             GiftsFilterChoiceChip(
@@ -465,7 +474,8 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
                                         _renderType!,
                                       ) ==
                                       type,
-                              onTap: () => setState(() => _renderType = type),
+                              onTap: () =>
+                                  _updateFilter(() => _renderType = type),
                             ),
                         ],
                       ),
@@ -477,7 +487,6 @@ class _FeFilterPopupState extends State<_FeFilterPopup> {
             GiftsFilterFooter(
               onReset: _reset,
               onCancel: _close,
-              onApply: _apply,
             ),
           ],
         ),

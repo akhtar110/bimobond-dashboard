@@ -204,12 +204,12 @@ class CategoriesActiveFilterChips extends StatelessWidget {
 
         final chips = <Widget>[];
 
-        if (state.filter != CategoryFilter.all) {
+        if (state.filter != CategoryFilter.active) {
           chips.add(
             _ActiveFilterChip(
               label: categoryStatusLabel(l10n, state.filter),
               onRemove: () => context.read<CategoriesBloc>().add(
-                    ChangeCategoryFilterEvent(CategoryFilter.all),
+                    ChangeCategoryFilterEvent(CategoryFilter.active),
                   ),
             ),
           );
@@ -263,7 +263,7 @@ class CategoriesActiveFilterChips extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   final bloc = context.read<CategoriesBloc>();
-                  bloc.add(ChangeCategoryFilterEvent(CategoryFilter.all));
+                  bloc.add(ChangeCategoryFilterEvent(CategoryFilter.active));
                   bloc.add(UpdateCategoryTypeFilterEvent(CategoryTypeFilter.all));
                   bloc.add(
                     UpdateCategoryHasChildrenFilterEvent(

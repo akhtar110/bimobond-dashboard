@@ -130,7 +130,7 @@ class AuctionsLoaded extends AuctionsState {
     required this.currentPage,
     required this.lastPage,
     required this.total,
-    this.statusFilter,
+    this.statusFilter = 'ACTIVE',
     this.searchQuery = '',
     this.sortOption = AuctionSortOption.newestFirst,
     this.typeFilter = AuctionTypeFilter.all,
@@ -323,7 +323,7 @@ class AuctionsBloc extends Bloc<AuctionsEvent, AuctionsState> {
   bool _pendingRefresh = false;
   int _loadToken = 0;
 
-  String? _statusFilter;
+  String? _statusFilter = 'ACTIVE';
   String _searchQuery = '';
   AuctionSortOption _sortOption = AuctionSortOption.newestFirst;
   AuctionTypeFilter _typeFilter = AuctionTypeFilter.all;

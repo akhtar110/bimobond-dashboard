@@ -59,7 +59,7 @@ List<SoundEntity> soundsForDisplay({
 
 int soundsAppliedFilterCount(SoundsQuery query) {
   var count = 0;
-  if (query.isActive != null) count++;
+  if (query.isActive != true) count++;
   if (query.isFromDashboard != null) count++;
   if (query.sort != SoundSortMode.trending) count++;
   return count;

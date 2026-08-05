@@ -205,7 +205,7 @@ class SoundsQuery extends Equatable {
     this.limit = 20,
     this.search,
     this.sort = SoundSortMode.trending,
-    this.isActive,
+    this.isActive = true,
     this.creatorId,
     this.isFromDashboard,
   });
