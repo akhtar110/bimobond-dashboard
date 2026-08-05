@@ -456,14 +456,18 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         current is PostsLoaded && current.filters != _filters;
     final filterUserChanged =
         current is PostsLoaded && current.filterUser?.id != _filterUser?.id;
+    final pageSizeChanged =
+        current is PostsLoaded && current.pageSize != _pageSize;
 
-    if (current is PostsLoaded && (filtersChanged || filterUserChanged)) {
+    if (current is PostsLoaded &&
+        (filtersChanged || filterUserChanged || pageSizeChanged)) {
       emit(
         _withUiState(
           current.copyWith(
             isApplyingFilters: true,
             filters: _filters,
             filterUser: _filterUser,
+            pageSize: _pageSize,
           ),
         ),
       );

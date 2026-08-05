@@ -1,5 +1,7 @@
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/user_model.dart';
 
 abstract class AuthLocalDataSource {
@@ -9,20 +11,20 @@ abstract class AuthLocalDataSource {
 }
 
 class AuthLocalDataSourceImpl implements AuthLocalDataSource {
-  final FlutterSecureStorage storage;
-  static const String _sessionKey = 'user_session';
+  AuthLocalDataSourceImpl(this._prefs);
 
-  AuthLocalDataSourceImpl(this.storage);
+  final SharedPreferences _prefs;
+  static const String _sessionKey = 'user_session';
 
   @override
   Future<void> saveSession(DashboardUserModel user) async {
     final jsonString = json.encode(user.toJson());
-    await storage.write(key: _sessionKey, value: jsonString);
+    await _prefs.setString(_sessionKey, jsonString);
   }
 
   @override
   Future<DashboardUserModel?> getSession() async {
-    final jsonString = await storage.read(key: _sessionKey);
+    final jsonString = _prefs.getString(_sessionKey);
     if (jsonString != null) {
       final Map<String, dynamic> jsonMap = json.decode(jsonString);
       return DashboardUserModel.fromJson(jsonMap);
@@ -32,6 +34,6 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
 
   @override
   Future<void> clearSession() async {
-    await storage.delete(key: _sessionKey);
+    await _prefs.remove(_sessionKey);
   }
 }

@@ -210,6 +210,7 @@ class _PostsPageViewState extends State<_PostsPageView> {
                                             prev.currentPage !=
                                                 next.currentPage ||
                                             prev.lastPage != next.lastPage ||
+                                            prev.pageSize != next.pageSize ||
                                             prev.total != next.total ||
                                             prev.isPerformingBulkAction !=
                                                 next.isPerformingBulkAction)),
