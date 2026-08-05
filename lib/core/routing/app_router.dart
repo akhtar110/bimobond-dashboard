@@ -18,6 +18,7 @@ import '../../features/profile/presentation/pages/profile_page.dart';
 import '../bloc/persistent_bloc_provider.dart';
 import '../localization/localization.dart';
 import '../routing/admin_detail_page_route.dart';
+import '../services/navigation_persistence_service.dart';
 import '../sidebar/bloc/sidebar_bloc.dart';
 import '../widgets/web_dashboard_layout.dart';
 import '../../features/reports/presentation/reports_page.dart';
@@ -374,11 +375,17 @@ class _HomeShellState extends State<HomeShell> {
         const <String>{};
     if (!_tabVisible(index, roles, permissions)) return;
     setState(() => _index = index);
+    di.sl<NavigationPersistenceService>().saveLastPageIndex(index);
   }
 
   @override
   void initState() {
     super.initState();
+    final savedIndex =
+        di.sl<NavigationPersistenceService>().getSavedPageIndex();
+    if (savedIndex != null && savedIndex >= 0 && savedIndex < _tabCount) {
+      _index = savedIndex;
+    }
     // Shell may be created before login; refresh RBAC once auth is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -402,7 +409,9 @@ class _HomeShellState extends State<HomeShell> {
               context.read<RbacBloc>().state.authContext?.permissionKeys ??
               const <String>{};
           if (!_tabVisible(_index, roles, permissions)) {
-            setState(() => _index = _firstAllowedTab(roles, permissions));
+            final firstAllowed = _firstAllowedTab(roles, permissions);
+            setState(() => _index = firstAllowed);
+            di.sl<NavigationPersistenceService>().saveLastPageIndex(firstAllowed);
           }
         }
       },
@@ -424,7 +433,12 @@ class _HomeShellState extends State<HomeShell> {
                   : _firstAllowedTab(roles, permissions);
               if (safeIndex != _index) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() => _index = safeIndex);
+                  if (mounted) {
+                    setState(() => _index = safeIndex);
+                    di.sl<NavigationPersistenceService>().saveLastPageIndex(
+                          safeIndex,
+                        );
+                  }
                 });
               }
               return _HomeShellChrome(

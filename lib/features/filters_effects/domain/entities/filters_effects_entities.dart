@@ -1260,7 +1260,7 @@ class BulkCameraEffectsResult extends Equatable {
 class FiltersEffectsListQuery extends Equatable {
   const FiltersEffectsListQuery({
     this.search = '',
-    this.status = FiltersEffectsStatusFilter.all,
+    this.status = FiltersEffectsStatusFilter.active,
     this.renderType,
     this.category,
     this.categoryId,

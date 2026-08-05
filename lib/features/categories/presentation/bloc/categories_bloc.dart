@@ -158,7 +158,7 @@ class CategoriesLoaded extends CategoriesState {
   CategoriesLoaded(
     this.categories, {
     List<CategoryEntity>? catalogCategories,
-    this.filter = CategoryFilter.all,
+    this.filter = CategoryFilter.active,
     this.searchQuery = '',
     this.typeFilter = CategoryTypeFilter.all,
     this.isSubmitting = false,
@@ -556,7 +556,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
 
   CategoryFilter get activeStatusFilter => switch (state) {
         CategoriesLoaded(:final filter) => filter,
-        _ => CategoryFilter.all,
+        _ => CategoryFilter.active,
       };
 
   CategoryTypeFilter get activeTypeFilter => switch (state) {

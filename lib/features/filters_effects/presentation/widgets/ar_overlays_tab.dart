@@ -277,9 +277,9 @@ class _ArOverlaysTabState extends State<ArOverlaysTab> {
                           )
                         : const SizedBox.shrink();
 
-                    final statusFilter = loaded?.statusFilter ?? ArOverlayStatusFilter.all;
+                    final statusFilter = loaded?.statusFilter ?? ArOverlayStatusFilter.active;
                     final filterActiveCount =
-                        statusFilter == ArOverlayStatusFilter.all ? 0 : 1;
+                        statusFilter == ArOverlayStatusFilter.active ? 0 : 1;
 
                     final filterButton = Builder(
                       builder: (buttonContext) {
@@ -756,8 +756,13 @@ class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
     _status = widget.statusFilter;
   }
 
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _apply(close: false);
+  }
+
   void _reset() {
-    setState(() => _status = ArOverlayStatusFilter.all);
+    _updateFilter(() => _status = ArOverlayStatusFilter.active);
   }
 
   void _close() {
@@ -765,9 +770,11 @@ class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
     if (nav.canPop()) nav.pop();
   }
 
-  void _apply() {
+  void _apply({bool close = false}) {
     widget.bloc.add(FilterArOverlaysByStatusEvent(_status));
-    _close();
+    if (close) {
+      _close();
+    }
   }
 
   @override
@@ -777,7 +784,7 @@ class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
     final radius = widget.borderRadius ?? BorderRadius.circular(20);
 
     final activeItems = <GiftsActiveFilterItem>[
-      if (_status != ArOverlayStatusFilter.all)
+      if (_status != ArOverlayStatusFilter.active)
         GiftsActiveFilterItem(
           id: 'status',
           label: switch (_status) {
@@ -787,7 +794,9 @@ class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
             ArOverlayStatusFilter.all =>
               l10n.tOr('feStatusAll', 'All statuses'),
           },
-          onRemove: () => setState(() => _status = ArOverlayStatusFilter.all),
+          onRemove: () => _updateFilter(
+            () => _status = ArOverlayStatusFilter.active,
+          ),
         ),
     ];
 
@@ -817,21 +826,21 @@ class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
                         GiftsFilterChoiceChip(
                           label: l10n.tOr('feStatusAll', 'All statuses'),
                           selected: _status == ArOverlayStatusFilter.all,
-                          onTap: () => setState(
+                          onTap: () => _updateFilter(
                             () => _status = ArOverlayStatusFilter.all,
                           ),
                         ),
                         GiftsFilterChoiceChip(
                           label: l10n.tOr('feActive', 'Active'),
                           selected: _status == ArOverlayStatusFilter.active,
-                          onTap: () => setState(
+                          onTap: () => _updateFilter(
                             () => _status = ArOverlayStatusFilter.active,
                           ),
                         ),
                         GiftsFilterChoiceChip(
                           label: l10n.tOr('feInactive', 'Inactive'),
                           selected: _status == ArOverlayStatusFilter.inactive,
-                          onTap: () => setState(
+                          onTap: () => _updateFilter(
                             () => _status = ArOverlayStatusFilter.inactive,
                           ),
                         ),
@@ -845,7 +854,6 @@ class _ArOverlayFilterPopupState extends State<_ArOverlayFilterPopup> {
             GiftsFilterFooter(
               onReset: _reset,
               onCancel: _close,
-              onApply: _apply,
             ),
           ],
         ),
