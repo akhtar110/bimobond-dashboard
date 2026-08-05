@@ -74,40 +74,14 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     final formData = FormData();
     final originalName =
         filename.trim().isEmpty ? 'gift-animation.pag' : filename.trim();
-    final lower = originalName.toLowerCase();
-
-    final isLottieJson = _looksLikeLottieJsonAsset(originalName, bytes);
-    final isSwf = lower.endsWith('.swf') || _giftBytesLookLikeSwf(bytes);
-    final isVideo = !isLottieJson &&
-        !isSwf &&
-        (lower.endsWith('.mp4') ||
-            lower.endsWith('.webm') ||
-            lower.endsWith('.mov') ||
-            (bytes.length >= 8 &&
-                bytes[4] == 0x66 &&
-                bytes[5] == 0x74 &&
-                bytes[6] == 0x79 &&
-                bytes[7] == 0x70));
-
-    final uploadName = isSwf
-        ? _swfUploadMediaFilename(originalName)
-        : (isLottieJson
-            ? _lottieJsonUploadMediaFilename(originalName)
-            : originalName);
-
-    final DioMediaType? contentType = lower.endsWith('.svg')
-        ? DioMediaType('image', 'svg+xml')
-        : (isSwf || isLottieJson || isVideo)
-            ? DioMediaType('video', 'mp4')
-            : null;
 
     formData.files.add(
       MapEntry(
         'files',
         MultipartFile.fromBytes(
           bytes,
-          filename: uploadName,
-          contentType: contentType,
+          filename: originalName,
+          contentType: _contentTypeForGiftUpload(originalName, bytes),
         ),
       ),
     );
@@ -140,6 +114,9 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     }
     // Keep relative paths for gift group `iconUrl` (API max 500). Callers
     // resolve for display via [resolveMediaUrl].
+    if (_isGiftAnimationFilename(originalName)) {
+      return _ensureAnimationUrlExtension(url, originalName);
+    }
     return url;
   }
 
@@ -159,18 +136,106 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
         bytes[2] == 0x53;
   }
 
-  static String _swfUploadMediaFilename(String originalName) {
-    final base = originalName
-        .trim()
-        .replaceAll(RegExp(r'\.swf$', caseSensitive: false), '');
-    final safe = base.isEmpty
-        ? 'gift-swf'
-        : base.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
-    return '$safe.mp4';
+  static bool _isGiftAnimationFilename(String filename) {
+    final lower = filename.trim().toLowerCase();
+    return lower.endsWith('.json') ||
+        lower.endsWith('.lottie') ||
+        lower.endsWith('.pag') ||
+        lower.endsWith('.swf') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.mp4') ||
+        lower.endsWith('.webm') ||
+        lower.endsWith('.mov');
   }
 
-  /// `/posts/upload` only allows image/audio/video MIME types — Lottie JSON and
-  /// DotLottie archives must be sent with a video filename/content-type wrapper.
+  /// `/posts/upload` allows image/audio/video MIME types. Keep the original
+  /// filename (and extension) but wrap non-video animation types with a video
+  /// content-type when needed so the upload is accepted.
+  static DioMediaType? _contentTypeForGiftUpload(
+    String filename,
+    Uint8List bytes,
+  ) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.svg')) {
+      return DioMediaType('image', 'svg+xml');
+    }
+    if (lower.endsWith('.gif')) {
+      return DioMediaType('image', 'gif');
+    }
+    if (lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp')) {
+      return null;
+    }
+    if (lower.endsWith('.mp3')) {
+      return DioMediaType('audio', 'mpeg');
+    }
+    if (lower.endsWith('.m4a')) {
+      return DioMediaType('audio', 'mp4');
+    }
+    if (lower.endsWith('.wav')) {
+      return DioMediaType('audio', 'wav');
+    }
+    if (lower.endsWith('.ogg')) {
+      return DioMediaType('audio', 'ogg');
+    }
+    if (lower.endsWith('.aac')) {
+      return DioMediaType('audio', 'aac');
+    }
+    if (lower.endsWith('.mp4') ||
+        lower.endsWith('.webm') ||
+        lower.endsWith('.mov')) {
+      return DioMediaType('video', 'mp4');
+    }
+    if (lower.endsWith('.json') ||
+        lower.endsWith('.lottie') ||
+        lower.endsWith('.pag') ||
+        lower.endsWith('.swf') ||
+        _looksLikeLottieJsonAsset(filename, bytes) ||
+        _giftBytesLookLikeSwf(bytes)) {
+      return DioMediaType('video', 'mp4');
+    }
+    return null;
+  }
+
+  /// Ensures the returned CDN path keeps the uploaded animation extension.
+  /// Only rewrites a mistaken `.mp4` suffix (legacy upload disguise).
+  static String _ensureAnimationUrlExtension(String url, String originalName) {
+    final desired = _fileExtension(originalName);
+    if (desired == null) return url;
+
+    final splitQuery = url.split('?');
+    final path = splitQuery.first;
+    final query =
+        splitQuery.length > 1 ? '?${splitQuery.sublist(1).join('?')}' : '';
+
+    final current = _fileExtension(path);
+    if (current != null && current.toLowerCase() == desired.toLowerCase()) {
+      return url;
+    }
+    if (desired.toLowerCase() == '.mp4') {
+      return url;
+    }
+    if (current == null || current.toLowerCase() != '.mp4') {
+      return url;
+    }
+
+    final dot = path.lastIndexOf('.');
+    final slash = path.lastIndexOf('/');
+    final base = dot > slash ? path.substring(0, dot) : path;
+    return '$base$desired$query';
+  }
+
+  static String? _fileExtension(String path) {
+    final clean = path.split('?').first;
+    final dot = clean.lastIndexOf('.');
+    final slash = clean.lastIndexOf('/');
+    if (dot <= slash || dot == clean.length - 1) return null;
+    return clean.substring(dot);
+  }
+
+  /// Detects Lottie JSON / DotLottie payloads for MIME wrapping only.
   static bool _looksLikeLottieJsonAsset(String filename, Uint8List bytes) {
     final lower = filename.trim().toLowerCase();
     if (lower.endsWith('.json') ||
@@ -188,16 +253,6 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       return b == 0x7B || b == 0x5B;
     }
     return false;
-  }
-
-  static String _lottieJsonUploadMediaFilename(String originalName) {
-    final base = originalName
-        .trim()
-        .replaceAll(RegExp(r'\.(json|lottie)$', caseSensitive: false), '');
-    final safe = base.isEmpty
-        ? 'gift-lottie'
-        : base.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
-    return '$safe.mp4';
   }
 
   // ── Create gift ────────────────────────────────────────────────────────────
