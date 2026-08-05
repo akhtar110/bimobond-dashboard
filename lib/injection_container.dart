@@ -28,7 +28,6 @@ import 'features/rbac/domain/usecases/get_roles.dart';
 import 'features/rbac/domain/usecases/get_user_roles.dart';
 import 'features/rbac/domain/usecases/update_role.dart';
 import 'features/rbac/presentation/bloc/rbac_bloc.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'features/auth/data/datasource/auth_local_data_source.dart';
 
@@ -392,10 +391,6 @@ Future<void> init() async {
   // =========================
   sl.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
 
-  sl.registerLazySingleton<FlutterSecureStorage>(
-    () => const FlutterSecureStorage(),
-  );
-
   final sharedPreferences = await SharedPreferences.getInstance();
   sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
 
@@ -640,7 +635,7 @@ Future<void> init() async {
   );
 
   sl.registerLazySingleton<AuthLocalDataSource>(
-    () => AuthLocalDataSourceImpl(sl<FlutterSecureStorage>()),
+    () => AuthLocalDataSourceImpl(sl<SharedPreferences>()),
   );
 
   sl.registerLazySingleton<AuthRepository>(
