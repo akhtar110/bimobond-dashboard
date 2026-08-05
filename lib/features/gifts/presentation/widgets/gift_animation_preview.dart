@@ -155,10 +155,10 @@ _AnimKind _kindFromBytes(Uint8List bytes, String? fileName, String? networkUrl) 
   if (giftBytesLookLikeGif(bytes)) return _AnimKind.image;
   if (giftBytesLookLikeSwf(bytes)) return _AnimKind.swf;
   if (giftBytesLookLikeJson(bytes)) return _AnimKind.json;
+  // Sniff DotLottie zips before trusting a `.mp4` URL from upload disguise.
+  if (giftBytesLookLikeLottieZip(bytes)) return _AnimKind.json;
   final named = _kindFromName(fileName, networkUrl);
   if (named != _AnimKind.unknown) return named;
-  // Bare ZIP without a useful extension → treat as DotLottie.
-  if (giftBytesLookLikeLottieZip(bytes)) return _AnimKind.json;
   if (giftAnimationLooksLikePag(fileName) ||
       giftAnimationLooksLikePag(networkUrl)) {
     return _AnimKind.pag;
@@ -332,10 +332,33 @@ class _GiftAnimationPreviewState extends State<GiftAnimationPreview> {
       return;
     }
 
-    // Extension-clear video/image/json: no byte download needed.
-    if (named == _AnimKind.video ||
-        named == _AnimKind.image ||
-        named == _AnimKind.json) {
+    // Video URLs may be Lottie JSON/DotLottie in disguise — download once and
+    // sniff magic bytes (same workaround as `/posts/upload` MIME limits).
+    if (named == _AnimKind.video) {
+      final cached = GiftAnimationBytesCache.peek(url);
+      if (cached != null) {
+        final kind = _kindFromBytes(cached, widget.fileName, url);
+        if (identical(_resolvedBytes, cached) &&
+            _resolvedKind == kind &&
+            !_resolving &&
+            _resolveError == null) {
+          return;
+        }
+        _resolveToken++;
+        setState(() {
+          _resolvedBytes = cached;
+          _resolvedKind = kind;
+          _resolving = false;
+          _resolveError = null;
+        });
+        return;
+      }
+      _startNetworkResolve(url);
+      return;
+    }
+
+    // Extension-clear image/json: players resolve network URLs themselves.
+    if (named == _AnimKind.image || named == _AnimKind.json) {
       if (_resolvedBytes == null &&
           _resolvedKind == named &&
           !_resolving &&

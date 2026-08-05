@@ -8,6 +8,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/enums/gift_type.dart';
 import '../bloc/gifts_bloc.dart';
 import '../utils/gifts_page_layout.dart';
+import 'bulk_gift_confirm_dialog.dart';
 import 'gift_thumbnail_image.dart';
 
 const double kGiftsTableHeaderHeight = 40;
@@ -592,6 +593,32 @@ class _GiftTableActions extends StatelessWidget {
   final VoidCallback? onPreview;
   final VoidCallback onDelete;
 
+  Future<void> _handleToggle(BuildContext context) async {
+    final isAr = l10n.locale.languageCode == 'ar';
+    final willActivate = !gift.isActive;
+
+    final title = willActivate
+        ? l10n.tOr('activateGift', isAr ? 'تفعيل الهدية' : 'Activate Gift')
+        : l10n.tOr('deactivateGift', isAr ? 'إلغاء تفعيل الهدية' : 'Deactivate Gift');
+
+    final message = willActivate
+        ? l10n.tOr('confirmActivateGiftMessage', isAr ? 'هل أنت متأكد من تفعيل هذه الهدية؟' : 'Are you sure you want to activate this gift?')
+        : l10n.tOr('confirmDeactivateGiftMessage', isAr ? 'هل أنت متأكد من إلغاء تفعيل هذه الهدية؟' : 'Are you sure you want to deactivate this gift?');
+
+    final confirmed = await confirmGiftAdminAction(
+      context,
+      title: title,
+      message: message,
+      destructive: !willActivate,
+    );
+
+    if (confirmed && context.mounted) {
+      context
+          .read<GiftsBloc>()
+          .add(ToggleGiftActiveEvent(gift.id, willActivate));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final buttonSize = switch (density) {
@@ -630,9 +657,7 @@ class _GiftTableActions extends StatelessWidget {
             width: buttonSize,
             height: buttonSize,
             child: IconButton.outlined(
-              onPressed: () => context.read<GiftsBloc>().add(
-                    ToggleGiftActiveEvent(gift.id, !gift.isActive),
-                  ),
+              onPressed: () => _handleToggle(context),
               icon: Icon(
                 gift.isActive
                     ? Icons.visibility_rounded

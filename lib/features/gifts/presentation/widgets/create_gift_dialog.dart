@@ -55,7 +55,7 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
   Uint8List? _animationBytes;
   bool _uploadingAnimation = false;
   String? _animationError;
-  GiftSize _selectedSize = GiftSize.medium;
+  GiftSize _selectedSize = GiftSize.large;
   GiftType _selectedType = GiftType.image;
   String? _selectedColor;
   bool _isActive = true;
@@ -74,10 +74,23 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
     _loadGroups();
   }
 
+  void _selectDefaultGroupIfAvailable() {
+    if (_selectedGroupId != null) return;
+    for (final group in _groups) {
+      if (group.name.trim().toLowerCase() == 'gifts') {
+        _selectedGroupId = group.id;
+        break;
+      }
+    }
+  }
+
   Future<void> _loadGroups() async {
     final blocState = widget.pageContext.read<GiftGroupsBloc>().state;
     if (blocState is GiftGroupsLoaded) {
-      setState(() => _groups = blocState.groups);
+      setState(() {
+        _groups = blocState.groups;
+        _selectDefaultGroupIfAvailable();
+      });
       return;
     }
     setState(() => _loadingGroups = true);
@@ -87,6 +100,7 @@ class CreateGiftDialogState extends State<CreateGiftDialog> {
       setState(() {
         _groups = groups;
         _loadingGroups = false;
+        _selectDefaultGroupIfAvailable();
       });
     } catch (_) {
       if (!mounted) return;

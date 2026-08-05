@@ -189,6 +189,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
       _minCtrl.clear();
       _maxCtrl.clear();
     });
+    _apply(close: false);
   }
 
   void _close() {
@@ -198,7 +199,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
     }
   }
 
-  void _apply() {
+  void _apply({bool close = false}) {
     _syncPriceFromFields();
 
     var min = _draft.minPrice;
@@ -237,7 +238,9 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
         toDate: to,
       ),
     );
-    _close();
+    if (close) {
+      _close();
+    }
   }
 
   Future<void> _pickFrom() async {
@@ -254,6 +257,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
         _draft.toDate = picked;
       }
     });
+    _apply(close: false);
   }
 
   Future<void> _pickTo() async {
@@ -270,6 +274,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
         _draft.fromDate = picked;
       }
     });
+    _apply(close: false);
   }
 
   @override
@@ -286,6 +291,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
         _minCtrl.text = giftsFilterFormatPrice(_draft.minPrice);
         _maxCtrl.text = giftsFilterFormatPrice(_draft.maxPrice);
         setState(() {});
+        _apply(close: false);
       },
     );
 
@@ -319,7 +325,10 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: giftsFilterStatusLabel(l10n, tab),
                             selected: _draft.status == tab,
-                            onTap: () => setState(() => _draft.status = tab),
+                            onTap: () {
+                              setState(() => _draft.status = tab);
+                              _apply(close: false);
+                            },
                           ),
                       ],
                     ),
@@ -333,7 +342,10 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: giftsFilterSortLabel(l10n, sort),
                             selected: _draft.sort == sort,
-                            onTap: () => setState(() => _draft.sort = sort),
+                            onTap: () {
+                              setState(() => _draft.sort = sort);
+                              _apply(close: false);
+                            },
                           ),
                       ],
                     ),
@@ -346,15 +358,19 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                         GiftsFilterChoiceChip(
                           label: giftsFilterTypeLabel(l10n, null),
                           selected: _draft.typeFilter == null,
-                          onTap: () =>
-                              setState(() => _draft.typeFilter = null),
+                          onTap: () {
+                            setState(() => _draft.typeFilter = null);
+                            _apply(close: false);
+                          },
                         ),
                         for (final type in GiftType.values)
                           GiftsFilterChoiceChip(
                             label: giftsFilterTypeLabel(l10n, type),
                             selected: _draft.typeFilter == type,
-                            onTap: () =>
-                                setState(() => _draft.typeFilter = type),
+                            onTap: () {
+                              setState(() => _draft.typeFilter = type);
+                              _apply(close: false);
+                            },
                           ),
                       ],
                     ),
@@ -368,7 +384,10 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: giftsFilterTagLabel(l10n, tag),
                             selected: _draft.tagFilter == tag,
-                            onTap: () => setState(() => _draft.tagFilter = tag),
+                            onTap: () {
+                              setState(() => _draft.tagFilter = tag);
+                              _apply(close: false);
+                            },
                           ),
                       ],
                     ),
@@ -381,15 +400,19 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                         GiftsFilterChoiceChip(
                           label: giftsFilterSizeLabel(l10n, null),
                           selected: _draft.sizeFilter == null,
-                          onTap: () =>
-                              setState(() => _draft.sizeFilter = null),
+                          onTap: () {
+                            setState(() => _draft.sizeFilter = null);
+                            _apply(close: false);
+                          },
                         ),
                         for (final size in GiftSize.values)
                           GiftsFilterChoiceChip(
                             label: giftsFilterSizeLabel(l10n, size),
                             selected: _draft.sizeFilter == size,
-                            onTap: () =>
-                                setState(() => _draft.sizeFilter = size),
+                            onTap: () {
+                              setState(() => _draft.sizeFilter = size);
+                              _apply(close: false);
+                            },
                           ),
                       ],
                     ),
@@ -405,9 +428,12 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                           GiftsFilterChoiceChip(
                             label: giftsFilterPublishedLabel(l10n, published),
                             selected: _draft.publishedFilter == published,
-                            onTap: () => setState(
-                              () => _draft.publishedFilter = published,
-                            ),
+                            onTap: () {
+                              setState(
+                                () => _draft.publishedFilter = published,
+                              );
+                              _apply(close: false);
+                            },
                           ),
                       ],
                     ),
@@ -430,6 +456,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                             onChanged: (_) {
                               _syncPriceFromFields();
                               setState(() {});
+                              _apply(close: false);
                             },
                             decoration: InputDecoration(
                               labelText: l10n.t('minPriceLabel'),
@@ -460,6 +487,7 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
                             onChanged: (_) {
                               _syncPriceFromFields();
                               setState(() {});
+                              _apply(close: false);
                             },
                             decoration: InputDecoration(
                               labelText: l10n.t('maxPriceLabel'),
@@ -530,7 +558,6 @@ class _GiftsFilterPopupState extends State<GiftsFilterPopup> {
             GiftsFilterFooter(
               onReset: _resetDraft,
               onCancel: _close,
-              onApply: _apply,
             ),
           ],
         ),

@@ -72,16 +72,41 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   @override
   Future<String> uploadGiftImage(Uint8List bytes, String filename) async {
     final formData = FormData();
-    final lower = filename.toLowerCase();
-    final contentType = lower.endsWith('.svg')
+    final originalName =
+        filename.trim().isEmpty ? 'gift-animation.pag' : filename.trim();
+    final lower = originalName.toLowerCase();
+
+    final isLottieJson = _looksLikeLottieJsonAsset(originalName, bytes);
+    final isSwf = lower.endsWith('.swf') || _giftBytesLookLikeSwf(bytes);
+    final isVideo = !isLottieJson &&
+        !isSwf &&
+        (lower.endsWith('.mp4') ||
+            lower.endsWith('.webm') ||
+            lower.endsWith('.mov') ||
+            (bytes.length >= 8 &&
+                bytes[4] == 0x66 &&
+                bytes[5] == 0x74 &&
+                bytes[6] == 0x79 &&
+                bytes[7] == 0x70));
+
+    final uploadName = isSwf
+        ? _swfUploadMediaFilename(originalName)
+        : (isLottieJson
+            ? _lottieJsonUploadMediaFilename(originalName)
+            : originalName);
+
+    final DioMediaType? contentType = lower.endsWith('.svg')
         ? DioMediaType('image', 'svg+xml')
-        : null;
+        : (isSwf || isLottieJson || isVideo)
+            ? DioMediaType('video', 'mp4')
+            : null;
+
     formData.files.add(
       MapEntry(
         'files',
         MultipartFile.fromBytes(
           bytes,
-          filename: filename,
+          filename: uploadName,
           contentType: contentType,
         ),
       ),
@@ -124,6 +149,55 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       return (entry['url'] ?? entry['path'] ?? '').toString();
     }
     return '';
+  }
+
+  static bool _giftBytesLookLikeSwf(List<int> bytes) {
+    if (bytes.length < 3) return false;
+    final a = bytes[0];
+    return (a == 0x46 || a == 0x43 || a == 0x5A) &&
+        bytes[1] == 0x57 &&
+        bytes[2] == 0x53;
+  }
+
+  static String _swfUploadMediaFilename(String originalName) {
+    final base = originalName
+        .trim()
+        .replaceAll(RegExp(r'\.swf$', caseSensitive: false), '');
+    final safe = base.isEmpty
+        ? 'gift-swf'
+        : base.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
+    return '$safe.mp4';
+  }
+
+  /// `/posts/upload` only allows image/audio/video MIME types — Lottie JSON and
+  /// DotLottie archives must be sent with a video filename/content-type wrapper.
+  static bool _looksLikeLottieJsonAsset(String filename, Uint8List bytes) {
+    final lower = filename.trim().toLowerCase();
+    if (lower.endsWith('.json') ||
+        lower.endsWith('.lottie') ||
+        lower.contains('.json')) {
+      return true;
+    }
+    if (bytes.length >= 2 && bytes[0] == 0x50 && bytes[1] == 0x4B) {
+      return true;
+    }
+    for (var i = 0; i < bytes.length && i < 64; i++) {
+      final b = bytes[i];
+      if (b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D) continue;
+      if (b == 0xEF && i + 2 < bytes.length) continue;
+      return b == 0x7B || b == 0x5B;
+    }
+    return false;
+  }
+
+  static String _lottieJsonUploadMediaFilename(String originalName) {
+    final base = originalName
+        .trim()
+        .replaceAll(RegExp(r'\.(json|lottie)$', caseSensitive: false), '');
+    final safe = base.isEmpty
+        ? 'gift-lottie'
+        : base.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
+    return '$safe.mp4';
   }
 
   // ── Create gift ────────────────────────────────────────────────────────────

@@ -95,7 +95,7 @@ class _GiftSwfPlayerState extends State<GiftSwfPlayer> {
     return _ruffleLoading ??= () async {
       final completer = Completer<void>();
       final script = html.ScriptElement()
-        ..src = 'https://unpkg.com/@ruffle-rs/ruffle'
+        ..src = 'https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle/ruffle.js'
         ..async = true
         ..setAttribute('data-gift-ruffle', '1');
       script.onLoad.listen((_) {
@@ -166,11 +166,15 @@ class _GiftSwfPlayerState extends State<GiftSwfPlayer> {
       ..setProperty('letterbox'.toJS, 'on'.toJS)
       ..setProperty('scale'.toJS, 'showAll'.toJS);
 
-    final loadPromise = player.callMethod<JSPromise<JSAny?>>(
-      'load'.toJS,
-      config,
-    );
-    await loadPromise.toDart;
+    try {
+      final loadPromise = player.callMethod<JSPromise<JSAny?>>(
+        'load'.toJS,
+        config,
+      );
+      await loadPromise.toDart;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Ruffle load promise notice: $e');
+    }
   }
 
   void _onViewCreated(int _) {
