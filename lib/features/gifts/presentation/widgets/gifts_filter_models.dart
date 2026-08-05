@@ -8,7 +8,7 @@ import '../bloc/gifts_bloc.dart';
 /// Counts applied catalog filters (excludes search — search stays outside).
 int giftsAppliedFilterCount(GiftsLoaded loaded) {
   var count = 0;
-  if (loaded.selectedTab != GiftFilterTab.all) count++;
+  if (loaded.selectedTab != GiftFilterTab.active) count++;
   if (loaded.selectedSort != GiftSortType.dateNewToOld) count++;
   if (loaded.minPriceFilter != null) count++;
   if (loaded.maxPriceFilter != null) count++;
@@ -76,7 +76,7 @@ class GiftsFilterDraft {
       );
 
   void reset() {
-    status = GiftFilterTab.all;
+    status = GiftFilterTab.active;
     sort = GiftSortType.dateNewToOld;
     minPrice = null;
     maxPrice = null;
@@ -90,7 +90,7 @@ class GiftsFilterDraft {
 
   int get activeCount {
     var count = 0;
-    if (status != GiftFilterTab.all) count++;
+    if (status != GiftFilterTab.active) count++;
     if (sort != GiftSortType.dateNewToOld) count++;
     if (minPrice != null) count++;
     if (maxPrice != null) count++;
@@ -195,13 +195,13 @@ List<GiftsActiveFilterItem> giftsActiveFilterItems(
 }) {
   final items = <GiftsActiveFilterItem>[];
 
-  if (draft.status != GiftFilterTab.all) {
+  if (draft.status != GiftFilterTab.active) {
     items.add(
       GiftsActiveFilterItem(
         id: 'status',
         label: giftsFilterStatusLabel(l10n, draft.status),
         onRemove: () {
-          draft.status = GiftFilterTab.all;
+          draft.status = GiftFilterTab.active;
           onChanged();
         },
       ),

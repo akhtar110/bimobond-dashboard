@@ -239,7 +239,7 @@ class GiftsLoading extends GiftsState {}
 class GiftsLoaded extends GiftsState {
   GiftsLoaded({
     required this.gifts,
-    this.selectedTab = GiftFilterTab.all,
+    this.selectedTab = GiftFilterTab.active,
     this.selectedSort = GiftSortType.dateNewToOld,
     this.viewType = GiftsViewType.grid,
     this.searchQuery = '',
