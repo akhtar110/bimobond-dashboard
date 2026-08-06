@@ -17,9 +17,10 @@ class LogsRemoteDataSourceImpl implements LogsRemoteDataSource {
   Future<PaginatedResult<LogEntity>> getLogs(LogsQuery query) async {
     try {
       if (query.userId != null && query.userId!.trim().isNotEmpty) {
+        final uid = query.userId!.trim();
         try {
           final response = await _dio.get(
-            '/users/admin/${query.userId}/audit-logs',
+            '/users/admin/$uid/audit-logs',
           );
           final rawData = response.data;
           if (rawData is List) {
@@ -65,10 +66,8 @@ class LogsRemoteDataSourceImpl implements LogsRemoteDataSource {
           } else if (rawData is Map<String, dynamic>) {
             return LogsResponseModel.fromJson(rawData);
           }
-        } on DioException catch (e) {
-          if (e.response?.statusCode != 404) {
-            // Continue to fallback endpoint if not 404 or on error
-          }
+        } on DioException catch (_) {
+          // Gracefully continue to global logs / user timeline endpoint if audit logs 404s or fails
         }
       }
 
@@ -78,6 +77,17 @@ class LogsRemoteDataSourceImpl implements LogsRemoteDataSource {
       );
       return LogsResponseModel.fromJson(response.data ?? const {});
     } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return LogsResponseModel(
+          data: const [],
+          meta: PaginationMeta(
+            total: 0,
+            page: query.page,
+            limit: query.limit,
+            totalPages: 1,
+          ),
+        );
+      }
       throw Exception(_dioMessage(e));
     }
   }
@@ -89,6 +99,9 @@ class LogsRemoteDataSourceImpl implements LogsRemoteDataSource {
       if (message != null && message.toString().trim().isNotEmpty) {
         return message.toString();
       }
+    }
+    if (e.response?.statusCode == 404) {
+      return 'The requested logs endpoint or resource was not found (404).';
     }
     return e.message ?? e.toString();
   }

@@ -52,32 +52,36 @@ class UserViolationsRemoteDataSourceImpl implements UserViolationsRemoteDataSour
             return LogsResponseModel.fromJson(data);
           }
         } on DioException catch (_) {
-          // Fallback to Category Filter: /user-history/admin/logs?userId=X&category=MODERATION
-          final response = await _dio.get<Map<String, dynamic>>(
-            '/user-history/admin/logs',
-            queryParameters: {
-              'userId': userId,
-              'category': 'MODERATION',
-              'page': page,
-              'limit': limit,
-            },
-          );
-          return LogsResponseModel.fromJson(response.data ?? const {});
+          try {
+            // Fallback to Category Filter: /user-history/admin/logs?userId=X&category=MODERATION
+            final response = await _dio.get<Map<String, dynamic>>(
+              '/user-history/admin/logs',
+              queryParameters: {
+                'userId': userId,
+                'category': 'MODERATION',
+                'page': page,
+                'limit': limit,
+              },
+            );
+            return LogsResponseModel.fromJson(response.data ?? const {});
+          } on DioException catch (_) {
+            return LogsResponseModel(
+              data: const [],
+              meta: PaginationMeta(total: 0, page: page, limit: limit, totalPages: 1),
+            );
+          }
         }
       }
-      rethrow;
+      return LogsResponseModel(
+        data: const [],
+        meta: PaginationMeta(total: 0, page: page, limit: limit, totalPages: 1),
+      );
     }
 
     // Default fallback
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/user-history/admin/logs',
-      queryParameters: {
-        'userId': userId,
-        'category': 'MODERATION',
-        'page': page,
-        'limit': limit,
-      },
+    return LogsResponseModel(
+      data: const [],
+      meta: PaginationMeta(total: 0, page: page, limit: limit, totalPages: 1),
     );
-    return LogsResponseModel.fromJson(response.data ?? const {});
   }
 }

@@ -163,6 +163,9 @@ abstract final class LogTargetNavigation {
       }
     }
 
+    // Unconditionally remove "Open report" targets ("NO THING CALLED OPEN REPORT")
+    results.removeWhere((t) => t.type == LogTargetType.report);
+
     return results;
   }
 
