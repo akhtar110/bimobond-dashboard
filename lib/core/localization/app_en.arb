@@ -3306,5 +3306,19 @@
   "confirmedReports": "Confirmed Reports",
   "resolvedReports": "Resolved Reports",
   "dismissedReports": "Dismissed Reports",
-  "zeroRiskImpact": "0 risk impact"
+  "zeroRiskImpact": "0 risk impact",
+  "trafficSourceForYou": "For You",
+  "trafficSourceFollowing": "Following",
+  "trafficSourceProfile": "Profile",
+  "trafficSourceSearch": "Search",
+  "trafficSourceHashtags": "Hashtags",
+  "trafficSourceShares": "Shares / links",
+  "trafficSourceSound": "Sound",
+  "trafficSourceLive": "Live",
+  "trafficSourceNotification": "Notification",
+  "trafficSourceSaved": "Saved",
+  "trafficSourceLiked": "Liked",
+  "trafficSourceRepost": "Repost",
+  "trafficSourceChat": "Chat",
+  "trafficSourceOther": "Other"
 }

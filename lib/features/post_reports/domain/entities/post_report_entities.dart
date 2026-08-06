@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../post_management/domain/entities/managed_post_entity.dart';
-import '../../../post_management/domain/entities/post_media_entity.dart';
+
 class ReportPeriod extends Equatable {
   const ReportPeriod({required this.from, required this.to});
 
@@ -174,24 +174,110 @@ class PostReportMetrics extends Equatable {
 }
 
 class PostReportTrafficSourceBreakdown extends Equatable {
-  const PostReportTrafficSourceBreakdown({
-    this.forYou = 0,
-    this.profile = 0,
-    this.search = 0,
-    this.hashtags = 0,
-    this.shares = 0,
-  });
+  const PostReportTrafficSourceBreakdown([this.bySource = const {}]);
 
-  final int forYou;
-  final int profile;
-  final int search;
-  final int hashtags;
-  final int shares;
+  factory PostReportTrafficSourceBreakdown.fromMap(Map<dynamic, dynamic>? raw) {
+    if (raw == null || raw.isEmpty) {
+      return const PostReportTrafficSourceBreakdown();
+    }
+    final Map<String, int> map = {};
+    raw.forEach((key, val) {
+      if (key != null) {
+        final canonical = normalizeKey(key.toString());
+        int numVal = 0;
+        if (val is num) {
+          numVal = val.toInt();
+        } else if (val is String) {
+          numVal = int.tryParse(val) ?? 0;
+        }
+        if (numVal > 0) {
+          map[canonical] = (map[canonical] ?? 0) + numVal;
+        }
+      }
+    });
+    return PostReportTrafficSourceBreakdown(map);
+  }
 
-  int get total => forYou + profile + search + hashtags + shares;
+  final Map<String, int> bySource;
+
+  /// Normalizes legacy/alias source strings to canonical UPPER_SNAKE_CASE.
+  static String normalizeKey(String key) {
+    final trimmedUpper = key.trim().toUpperCase();
+    return switch (trimmedUpper) {
+      'HASHTAG' => 'HASHTAGS',
+      'SHARE_LINK' || 'SHARE' || 'LINK' => 'SHARES',
+      'AUDIO' || 'MUSIC' || 'TRACK' => 'SOUND',
+      'LIVE_STREAM' || 'BROADCAST' => 'LIVE',
+      'NOTIF' || 'PUSH' || 'PUSH_NOTIFICATION' => 'NOTIFICATION',
+      'BOOKMARK' || 'BOOKMARKS' || 'SAVED_POSTS' => 'SAVED',
+      'LIKES' || 'LIKED_POSTS' => 'LIKED',
+      'REPOSTS' || 'SHARED_POST' => 'REPOST',
+      'DM' || 'DIRECT' || 'DIRECT_MESSAGE' || 'MESSAGES' => 'CHAT',
+      'DISCOVER' || 'EXPLORE_PAGE' => 'EXPLORE',
+      'STORIES' || 'STORY_FEED' => 'STORY',
+      'RECOMMENDATION' || 'SUGGESTED' || 'SUGGESTED_FOR_YOU' => 'RECOMMENDED',
+      'AD' || 'ADS' || 'SPONSORED' || 'PROMOTED' => 'PROMOTION',
+      'EXTERNAL_LINK' => 'EXTERNAL',
+      '' => 'FOR_YOU',
+      'FOR_YOU' ||
+      'FOLLOWING' ||
+      'PROFILE' ||
+      'SEARCH' ||
+      'HASHTAGS' ||
+      'SHARES' ||
+      'SOUND' ||
+      'LIVE' ||
+      'NOTIFICATION' ||
+      'SAVED' ||
+      'LIKED' ||
+      'REPOST' ||
+      'CHAT' ||
+      'EXPLORE' ||
+      'STORY' ||
+      'RECOMMENDED' ||
+      'PROMOTION' ||
+      'EXTERNAL' =>
+        trimmedUpper,
+      _ => 'OTHER',
+    };
+  }
+
+  int valueFor(String key) => bySource[normalizeKey(key)] ?? 0;
+
+  int get forYou => valueFor('FOR_YOU');
+  int get following => valueFor('FOLLOWING');
+  int get profile => valueFor('PROFILE');
+  int get search => valueFor('SEARCH');
+  int get hashtags => valueFor('HASHTAGS');
+  int get shares => valueFor('SHARES');
+  int get sound => valueFor('SOUND');
+  int get live => valueFor('LIVE');
+  int get notification => valueFor('NOTIFICATION');
+  int get saved => valueFor('SAVED');
+  int get liked => valueFor('LIKED');
+  int get repost => valueFor('REPOST');
+  int get chat => valueFor('CHAT');
+  int get other => valueFor('OTHER');
+
+  int get total => bySource.values.fold(0, (sum, val) => sum + val);
+
+  bool get isEmpty => bySource.isEmpty || total == 0;
+  bool get isNotEmpty => !isEmpty;
+
+  List<MapEntry<String, int>> get sortedEntries {
+    final list = bySource.entries
+        .where((e) => e.value > 0)
+        .toList()
+      ..sort((a, b) {
+        final cmp = b.value.compareTo(a.value);
+        if (cmp != 0) return cmp;
+        return a.key.compareTo(b.key);
+      });
+    return list;
+  }
 
   @override
-  List<Object?> get props => [forYou, profile, search, hashtags, shares];
+  List<Object?> get props => [bySource];
 }
 
 class PostReportModerationLog extends Equatable {
