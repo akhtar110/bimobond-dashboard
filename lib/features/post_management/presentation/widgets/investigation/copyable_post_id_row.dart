@@ -55,7 +55,7 @@ class CopyablePostIdRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            Expanded(
+            Flexible(
               child: Text(
                 postId,
                 maxLines: 1,
@@ -67,7 +67,7 @@ class CopyablePostIdRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             Icon(
               Icons.copy_rounded,
               size: 14,
