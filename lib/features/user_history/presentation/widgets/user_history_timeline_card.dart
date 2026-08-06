@@ -85,8 +85,7 @@ class UserHistoryTimelineCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          DateFormat('MMM d · HH:mm')
-                              .format(item.createdAt),
+                          DateFormat('MMM d · HH:mm').format(item.createdAt),
                           style: TextStyle(
                             fontSize: 11,
                             color: scheme.onSurfaceVariant,
@@ -149,47 +148,58 @@ class UserHistoryTimelineCard extends StatelessWidget {
   ) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final type = item.normalizedType;
+    final type = normalizeUserHistoryType(item.type);
+
+    _HistoryPresentation base;
 
     switch (type) {
       case UserHistoryTypes.screenView:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.smartphone_outlined,
           color: theme.colorScheme.primary,
           title: l10n.tOr('userHistoryScreenViewed', 'Screen Viewed'),
           lines: [
-            if (item.dataString('targetId') != null)
+            if (item.dataString('targetId') != null ||
+                item.dataString('screen') != null ||
+                item.dataString('screenName') != null)
               '${l10n.tOr('userHistoryTargetScreen', 'Target Screen')}: '
-                  '${item.dataString('targetId')}',
+                  '${item.dataString('targetId') ?? item.dataString('screen') ?? item.dataString('screenName')}',
             if (_metaPath(item) != null)
               '${l10n.tOr('userHistoryPath', 'Path')}: ${_metaPath(item)}',
           ],
         );
+
       case UserHistoryTypes.profileView:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.person_search_outlined,
           color: theme.colorScheme.secondary,
           title: l10n.tOr('userHistoryViewedProfile', 'Viewed Profile'),
           lines: [
+            if (_username(item, 'profile') != null)
+              '${l10n.tOr('username', 'Username')}: ${_username(item, 'profile')}',
             if (item.dataString('targetId') != null ||
                 item.nestedString('profile', 'id') != null)
               '${l10n.tOr('userHistoryProfileId', 'Profile ID')}: '
                   '${item.dataString('targetId') ?? item.nestedString('profile', 'id')}',
           ],
         );
+
       case UserHistoryTypes.share:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.share_outlined,
           color: theme.colorScheme.tertiary,
           title: l10n.tOr('userHistorySharedContent', 'Shared Content'),
           lines: [
-            if (item.dataString('targetId') != null)
+            if (_postDescription(item) != null) _postDescription(item)!,
+            if (item.dataString('targetId') != null ||
+                item.dataString('postId') != null)
               '${l10n.tOr('userHistoryTargetId', 'Target ID')}: '
-                  '${item.dataString('targetId')}',
+                  '${item.dataString('targetId') ?? item.dataString('postId')}',
           ],
         );
+
       case UserHistoryTypes.profileVisitGiven:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.outbound_outlined,
           color: theme.colorScheme.primary,
           title: l10n.tOr('userHistoryVisitedProfile', 'Visited Profile'),
@@ -204,8 +214,9 @@ class UserHistoryTimelineCard extends StatelessWidget {
                   '${item.dataString('source')}',
           ],
         );
+
       case UserHistoryTypes.profileVisitReceived:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.login_outlined,
           color: theme.colorScheme.secondary,
           title: l10n.tOr('userHistoryProfileVisitor', 'Profile Visitor'),
@@ -217,8 +228,9 @@ class UserHistoryTimelineCard extends StatelessWidget {
                   '${item.dataNum('visitCount')}',
           ],
         );
+
       case UserHistoryTypes.createPost:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.videocam_outlined,
           color: theme.colorScheme.primary,
           title: l10n.tOr('userHistoryCreatedPost', 'Created Post'),
@@ -227,8 +239,9 @@ class UserHistoryTimelineCard extends StatelessWidget {
           ],
           thumbnailUrl: _postThumbnail(item),
         );
+
       case UserHistoryTypes.likePost:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.favorite_border,
           color: theme.colorScheme.error,
           title: l10n.tOr('userHistoryLikedPost', 'Liked Post'),
@@ -237,23 +250,26 @@ class UserHistoryTimelineCard extends StatelessWidget {
           ],
           thumbnailUrl: _postThumbnail(item),
         );
+
       case UserHistoryTypes.comment:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.chat_bubble_outline,
           color: theme.colorScheme.secondary,
           title: l10n.tOr('userHistoryCommented', 'Commented'),
           lines: [
             if (item.dataString('content') != null ||
-                item.dataString('comment') != null)
+                item.dataString('comment') != null ||
+                item.dataString('text') != null)
               '${l10n.tOr('userHistoryComment', 'Comment')}: '
-                  '${item.dataString('content') ?? item.dataString('comment')}',
+                  '${item.dataString('content') ?? item.dataString('comment') ?? item.dataString('text')}',
             if (_postDescription(item) != null)
               '${l10n.tOr('userHistoryRelatedPost', 'Related Post')}: '
                   '${_postDescription(item)}',
           ],
         );
+
       case UserHistoryTypes.repost:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.repeat_rounded,
           color: theme.colorScheme.tertiary,
           title: l10n.tOr('userHistoryReposted', 'Reposted'),
@@ -264,8 +280,9 @@ class UserHistoryTimelineCard extends StatelessWidget {
           ],
           thumbnailUrl: _postThumbnail(item),
         );
+
       case UserHistoryTypes.sendGift:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.card_giftcard,
           color: theme.colorScheme.tertiary,
           title: l10n.tOr('userHistoryGiftSent', 'Gift Sent'),
@@ -280,6 +297,7 @@ class UserHistoryTimelineCard extends StatelessWidget {
               '${l10n.tOr('userHistoryCoins', 'Coins')}: ${_coins(item)}',
           ],
         );
+
       case UserHistoryTypes.postView:
         final sourceKey = item.dataString('trafficSource');
         final sourceLabel = sourceKey != null
@@ -300,8 +318,9 @@ class UserHistoryTimelineCard extends StatelessWidget {
           ],
           thumbnailUrl: _postThumbnail(item),
         );
+
       case UserHistoryTypes.save:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.bookmark_border_rounded,
           color: theme.colorScheme.secondary,
           title: l10n.tOr('userHistorySavedPost', 'Saved Post'),
@@ -310,8 +329,9 @@ class UserHistoryTimelineCard extends StatelessWidget {
           ],
           thumbnailUrl: _postThumbnail(item),
         );
+
       case UserHistoryTypes.storyView:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.auto_stories_outlined,
           color: theme.colorScheme.tertiary,
           title: l10n.tOr('userHistoryViewedStory', 'Viewed Story'),
@@ -321,19 +341,24 @@ class UserHistoryTimelineCard extends StatelessWidget {
                   '${_storyOwner(item)}',
           ],
         );
+
       case UserHistoryTypes.search:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.search_rounded,
           color: theme.colorScheme.primary,
           title: l10n.tOr('userHistorySearchKeyword', 'Search Keyword'),
           lines: [
             if (item.dataString('query') != null ||
-                item.dataString('keyword') != null)
-              item.dataString('query') ?? item.dataString('keyword')!,
+                item.dataString('keyword') != null ||
+                item.dataString('search') != null)
+              item.dataString('query') ??
+                  item.dataString('keyword') ??
+                  item.dataString('search')!,
           ],
         );
+
       case UserHistoryTypes.location:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.location_on_outlined,
           color: theme.colorScheme.error,
           title: l10n.tOr('userHistoryLocation', 'Location'),
@@ -354,37 +379,183 @@ class UserHistoryTimelineCard extends StatelessWidget {
                   '${item.dataString('country')}',
           ],
         );
+
+      case UserHistoryTypes.authLogin:
+        base = _HistoryPresentation(
+          icon: Icons.login_rounded,
+          color: theme.colorScheme.primary,
+          title: l10n.tOr('userHistoryAuthLogin', 'User Login'),
+          lines: [
+            if (item.dataString('ip') != null || item.dataString('ipAddress') != null)
+              'IP: ${item.dataString('ip') ?? item.dataString('ipAddress')}',
+            if (item.dataString('device') != null || item.dataString('deviceName') != null)
+              '${l10n.tOr('device', 'Device')}: ${item.dataString('device') ?? item.dataString('deviceName')}',
+          ],
+        );
+
+      case UserHistoryTypes.authLogout:
+        base = _HistoryPresentation(
+          icon: Icons.logout_rounded,
+          color: theme.colorScheme.outline,
+          title: l10n.tOr('userHistoryAuthLogout', 'User Logout'),
+          lines: [
+            if (item.dataString('ip') != null || item.dataString('ipAddress') != null)
+              'IP: ${item.dataString('ip') ?? item.dataString('ipAddress')}',
+          ],
+        );
+
       default:
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.timeline,
           color: theme.colorScheme.outline,
-          title: item.type,
+          title: _formatTitle(item.type),
           lines: const [],
         );
     }
+
+    // Ensure lines is never empty by extracting fallback data if needed
+    final cleanLines = base.lines.where((l) => l.trim().isNotEmpty).toList();
+    if (cleanLines.isEmpty) {
+      final fallbacks = _extractFallbackLines(context, item);
+      return _HistoryPresentation(
+        icon: base.icon,
+        color: base.color,
+        title: base.title,
+        lines: fallbacks,
+        thumbnailUrl: base.thumbnailUrl ?? _postThumbnail(item),
+      );
+    }
+
+    return _HistoryPresentation(
+      icon: base.icon,
+      color: base.color,
+      title: base.title,
+      lines: cleanLines,
+      thumbnailUrl: base.thumbnailUrl,
+    );
+  }
+
+  static String _formatTitle(String rawType) {
+    if (rawType.trim().isEmpty) return 'Activity Log';
+    final parts = rawType.trim().split(RegExp(r'[_-\s]+'));
+    return parts
+        .map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  static List<String> _extractFallbackLines(
+    BuildContext context,
+    UserHistoryEntity item,
+  ) {
+    final l10n = context.l10n;
+    final lines = <String>[];
+
+    final desc = _postDescription(item);
+    if (desc != null && desc.isNotEmpty) {
+      lines.add(desc);
+    }
+
+    final detailText = item.dataString('description') ??
+        item.dataString('content') ??
+        item.dataString('comment') ??
+        item.dataString('text') ??
+        item.dataString('message') ??
+        item.dataString('title') ??
+        item.dataString('details') ??
+        item.dataString('query') ??
+        item.dataString('keyword') ??
+        item.dataString('action');
+    if (detailText != null &&
+        detailText.isNotEmpty &&
+        !lines.contains(detailText)) {
+      lines.add(detailText);
+    }
+
+    final username = _username(item, 'user') ??
+        _username(item, 'profile') ??
+        _username(item, 'target') ??
+        _username(item, 'viewer');
+    if (username != null && username.isNotEmpty) {
+      lines.add('${l10n.tOr('user', 'User')}: $username');
+    }
+
+    final targetId = item.dataString('targetId') ??
+        item.dataString('postId') ??
+        item.dataString('id');
+    if (targetId != null &&
+        targetId.isNotEmpty &&
+        !lines.any((l) => l.contains(targetId))) {
+      lines.add('${l10n.tOr('userHistoryTargetId', 'ID')}: $targetId');
+    }
+
+    final ipOrDevice = item.dataString('ip') ??
+        item.dataString('ipAddress') ??
+        item.dataString('device') ??
+        item.dataString('deviceName') ??
+        _metaPath(item);
+    if (ipOrDevice != null &&
+        ipOrDevice.isNotEmpty &&
+        !lines.any((l) => l.contains(ipOrDevice))) {
+      lines.add(ipOrDevice);
+    }
+
+    return lines;
   }
 
   static String? _metaPath(UserHistoryEntity item) {
-    final meta = item.dataMap('meta');
-    final path = meta?['path']?.toString().trim();
+    final meta = item.dataMap('meta') ?? item.dataMap('metadata');
+    final path = meta?['path']?.toString().trim() ??
+        meta?['route']?.toString().trim() ??
+        meta?['url']?.toString().trim();
     if (path != null && path.isNotEmpty) return path;
-    return item.dataString('path');
+    return item.dataString('path') ??
+        item.dataString('route') ??
+        item.dataString('url') ??
+        item.dataString('screen') ??
+        item.dataString('screenName') ??
+        item.dataString('targetId');
   }
 
   static String? _username(UserHistoryEntity item, String mapKey) {
     return item.nestedString(mapKey, 'username') ??
-        item.nestedString(mapKey, 'fullName');
+        item.nestedString(mapKey, 'fullName') ??
+        item.nestedString(mapKey, 'name') ??
+        item.dataString('${mapKey}Username') ??
+        item.dataString('${mapKey}Name') ??
+        item.dataString('username') ??
+        item.dataString('targetUsername') ??
+        item.dataString('targetId');
   }
 
   static String? _postDescription(UserHistoryEntity item) {
     return item.nestedString('post', 'description') ??
+        item.nestedString('post', 'caption') ??
+        item.nestedString('post', 'title') ??
+        item.nestedString('post', 'text') ??
+        item.nestedString('post', 'content') ??
+        item.nestedString('target', 'description') ??
+        item.nestedString('target', 'caption') ??
+        item.nestedString('target', 'title') ??
         item.dataString('description') ??
-        item.dataString('postDescription');
+        item.dataString('postDescription') ??
+        item.dataString('caption') ??
+        item.dataString('title') ??
+        item.dataString('text') ??
+        item.dataString('content') ??
+        item.dataString('targetId') ??
+        item.dataString('postId');
   }
 
   static String? _postThumbnail(UserHistoryEntity item) {
     final raw = item.nestedString('post', 'thumbnailUrl') ??
-        item.dataString('thumbnailUrl');
+        item.nestedString('post', 'coverUrl') ??
+        item.nestedString('post', 'mediaUrl') ??
+        item.nestedString('post', 'image') ??
+        item.dataString('thumbnailUrl') ??
+        item.dataString('coverUrl') ??
+        item.dataString('mediaUrl') ??
+        item.dataString('imageUrl') ??
+        item.dataString('thumbnail');
     return resolveMediaUrl(raw);
   }
 

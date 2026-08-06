@@ -11,15 +11,19 @@ import '../../../user_activity/presentation/utils/activity_navigation.dart';
 import '../../../users/data/models/user_post_model.dart';
 import '../../../users/domain/entities/user_entity.dart';
 import '../../domain/entities/user_history_entity.dart';
+import '../../domain/utils/user_history_type_utils.dart';
 
 bool canOpenUserHistoryItem(UserHistoryEntity item) {
-  final type = item.normalizedType;
-  if (type == UserHistoryTypes.storyView) {
+  final normalized = normalizeUserHistoryType(item.type);
+
+  if (isStoryNavigableUserHistoryType(normalized)) {
     return userHistoryStoryId(item)?.isNotEmpty == true;
   }
-  if (_isPostNavigableType(type)) {
+
+  if (isPostNavigableUserHistoryType(normalized)) {
     return userHistoryPostId(item)?.isNotEmpty == true;
   }
+
   return false;
 }
 
@@ -28,14 +32,14 @@ Future<void> openUserHistoryItem(
   UserHistoryEntity item, {
   UserEntity? sourceUser,
 }) async {
-  final type = item.normalizedType;
+  final normalized = normalizeUserHistoryType(item.type);
 
-  if (type == UserHistoryTypes.storyView) {
+  if (isStoryNavigableUserHistoryType(normalized)) {
     await openUserHistoryStory(context, item);
     return;
   }
 
-  if (_isPostNavigableType(type)) {
+  if (isPostNavigableUserHistoryType(normalized)) {
     await openUserHistoryPost(
       context,
       item,
@@ -44,33 +48,52 @@ Future<void> openUserHistoryItem(
   }
 }
 
-bool _isPostNavigableType(String type) {
-  return type == UserHistoryTypes.postView ||
-      type == UserHistoryTypes.likePost ||
-      type == UserHistoryTypes.comment ||
-      type == UserHistoryTypes.createPost ||
-      type == UserHistoryTypes.sendGift;
-}
-
 String? userHistoryPostId(UserHistoryEntity item) {
-  final direct = item.dataString('postId') ?? item.nestedString('post', 'id');
-  if (direct != null && direct.isNotEmpty) return direct;
+  final targetType = item.dataString('targetType')?.toUpperCase();
 
-  if (item.dataString('targetType')?.toUpperCase() == 'POST') {
-    final targetId = item.dataString('targetId');
-    if (targetId != null && targetId.isNotEmpty) return targetId;
+  if (targetType == 'STORY') {
+    return null;
   }
 
-  // CREATE_POST payload is typically the post itself under `data`.
-  if (item.normalizedType == UserHistoryTypes.createPost) {
+  final direct = item.dataString('postId') ??
+      item.nestedString('post', 'id') ??
+      item.nestedString('post', 'postId') ??
+      item.nestedString('target', 'id') ??
+      item.nestedString('target', 'postId') ??
+      item.nestedString('comment', 'postId') ??
+      item.nestedString('meta', 'postId') ??
+      item.dataString('post_id');
+  if (direct != null && direct.isNotEmpty) return direct;
+
+  final targetId = item.dataString('targetId') ?? item.dataString('target_id');
+  if (targetId != null && targetId.isNotEmpty) {
+    if (targetType == null ||
+        targetType == 'POST' ||
+        targetType == 'COMMENT' ||
+        isPostNavigableUserHistoryType(item.type)) {
+      return targetId;
+    }
+  }
+
+  if (isPostNavigableUserHistoryType(item.type)) {
     final id = item.dataString('id');
-    if (id != null && id.isNotEmpty) return id;
+    if (id != null && id.isNotEmpty) {
+      final normalized = normalizeUserHistoryType(item.type);
+      if (normalized == UserHistoryTypes.createPost ||
+          normalized == UserHistoryTypes.postView) {
+        return id;
+      }
+    }
   }
 
   return null;
 }
 
 String? userHistoryStoryId(UserHistoryEntity item) {
+  if (item.dataString('targetType')?.toUpperCase() == 'POST') {
+    return null;
+  }
+
   final direct =
       item.dataString('storyId') ?? item.nestedString('story', 'id');
   if (direct != null && direct.isNotEmpty) return direct;
@@ -80,7 +103,6 @@ String? userHistoryStoryId(UserHistoryEntity item) {
     if (targetId != null && targetId.isNotEmpty) return targetId;
   }
 
-  // Some payloads nest the story fields directly on `data`.
   final hasMediaList = item.data['media'] is List;
   if (hasMediaList || item.dataString('description') != null) {
     final id = item.dataString('id');
@@ -93,9 +115,8 @@ String? userHistoryStoryId(UserHistoryEntity item) {
 ManagedPostEntity managedPostFromUserHistoryItem(UserHistoryEntity item) {
   var postMap = item.dataMap('post');
 
-  // CREATE_POST usually places post fields directly on `data`.
   if (postMap == null &&
-      item.normalizedType == UserHistoryTypes.createPost &&
+      normalizeUserHistoryType(item.type) == UserHistoryTypes.createPost &&
       (item.dataString('id')?.isNotEmpty ?? false)) {
     postMap = Map<String, dynamic>.from(item.data);
   }
@@ -119,7 +140,8 @@ ManagedPostEntity managedPostFromUserHistoryItem(UserHistoryEntity item) {
   final seed = managedPostSeed(postId);
   final description = item.nestedString('post', 'description') ??
       item.dataString('description') ??
-      item.dataString('postDescription');
+      item.dataString('postDescription') ??
+      item.dataString('caption');
   final thumbnail = item.nestedString('post', 'thumbnailUrl') ??
       item.dataString('thumbnailUrl');
   final videoUrl =
@@ -148,11 +170,10 @@ StoryEntity? storyFromUserHistoryItem(UserHistoryEntity item) {
     }
   }
 
-  // Treat root data as story when it looks like one.
   final hasMediaList = item.data['media'] is List;
   if (hasMediaList ||
       (item.dataString('id')?.isNotEmpty == true &&
-          item.normalizedType == UserHistoryTypes.storyView)) {
+          isStoryNavigableUserHistoryType(item.type))) {
     try {
       return StoryModel.fromJson(Map<String, dynamic>.from(item.data));
     } catch (_) {
@@ -207,19 +228,20 @@ StoryEntity? storyFromUserHistoryItem(UserHistoryEntity item) {
 }
 
 ActivityContext _activityContextForItem(UserHistoryEntity item) {
-  final type = item.normalizedType;
-  switch (type) {
+  switch (normalizeUserHistoryType(item.type)) {
     case UserHistoryTypes.likePost:
       return ActivityContext.like(
         likeId: item.dataString('id') ?? '',
         activityDate: item.createdAt,
       );
     case UserHistoryTypes.comment:
-      final commentId = item.dataString('commentId') ?? item.dataString('id') ?? '';
+      final commentId =
+          item.dataString('commentId') ?? item.dataString('id') ?? '';
       return ActivityContext.comment(
         commentId: commentId,
         commentText: item.dataString('content') ??
             item.dataString('comment') ??
+            item.dataString('text') ??
             '',
         activityDate: item.createdAt,
         commentUserId: item.dataString('userId'),
@@ -228,6 +250,9 @@ ActivityContext _activityContextForItem(UserHistoryEntity item) {
     case UserHistoryTypes.createPost:
     case UserHistoryTypes.postView:
     case UserHistoryTypes.sendGift:
+    case UserHistoryTypes.repost:
+    case UserHistoryTypes.save:
+    case UserHistoryTypes.share:
       return ActivityContext.post(activityDate: item.createdAt);
     default:
       return ActivityContext.feed(
@@ -264,7 +289,6 @@ Future<void> openUserHistoryStory(
   await showStoryDetailsDialog(context, story: story);
 }
 
-/// Kept for callers that still reference the old name.
 Future<void> openUserHistoryViewedPost(
   BuildContext context,
   UserHistoryEntity item, {

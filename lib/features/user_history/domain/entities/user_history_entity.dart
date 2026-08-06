@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../utils/user_history_type_utils.dart';
+
 /// Single merged timeline entry from `GET /activity/admin/users/:id/timeline`.
 class UserHistoryEntity extends Equatable {
   const UserHistoryEntity({
@@ -199,18 +201,48 @@ class UserHistoryQuery extends Equatable {
     );
   }
 
-  Map<String, dynamic> toQueryParameters() {
-    return {
+  Map<String, dynamic> toQueryParameters({bool forTimeline = false}) {
+    final fromIso = from != null ? _toIso(from!) : null;
+    final toIso = to != null ? _toIsoEndOfDay(to!) : null;
+
+    final params = <String, dynamic>{
       'page': page,
       'limit': limit,
-      if (from != null) 'from': _toIso(from!),
-      if (to != null) 'to': _toIsoEndOfDay(to!),
-      if (types.isNotEmpty) 'types': types.join(','),
+      if (fromIso != null) ...{
+        'from': fromIso,
+        'startDate': fromIso,
+      },
+      if (toIso != null) ...{
+        'to': toIso,
+        'endDate': toIso,
+      },
       if (category != null && category!.isNotEmpty) 'category': category,
       if (action != null && action!.isNotEmpty) 'action': action,
       if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
     };
+
+    if (types.isEmpty) return params;
+
+    if (forTimeline) {
+      params['types'] = types.join(',');
+      if (types.length == 1) {
+        params['type'] = types.first;
+      }
+      return params;
+    }
+
+    if (types.length == 1) {
+      final audit = userHistoryAuditFilterForType(types.first);
+      if (audit != null) {
+        params['category'] = audit.category;
+        params['action'] = audit.action;
+      }
+    }
+
+    return params;
   }
+
+  bool get prefersTimelineEndpoint => userHistoryQueryPrefersTimeline(this);
 
   static String _toIso(DateTime value) {
     final utc = DateTime.utc(value.year, value.month, value.day);

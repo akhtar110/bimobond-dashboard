@@ -791,7 +791,7 @@ Future<void> init() async {
   );
 
   sl.registerFactory(
-    () => UsersBloc(
+        () => UsersBloc(
       getUsers: sl<GetUsers>(),
       banUser: sl<BanUser>(),
       unbanUser: sl<UnbanUser>(),
