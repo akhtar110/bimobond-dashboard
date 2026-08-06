@@ -130,6 +130,7 @@ class SubcategoryRow extends StatelessWidget {
     required this.selected,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
     this.showParentColumn = true,
   });
 
@@ -140,6 +141,7 @@ class SubcategoryRow extends StatelessWidget {
   final bool selected;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
   final bool showParentColumn;
 
   @override
@@ -157,6 +159,7 @@ class SubcategoryRow extends StatelessWidget {
             metrics: metrics,
             onFormRequest: onFormRequest,
             onDeleteRequest: onDeleteRequest,
+            onToggleStatusRequest: onToggleStatusRequest,
           );
         }
 
@@ -170,6 +173,7 @@ class SubcategoryRow extends StatelessWidget {
           showParentColumn: showParentColumn,
           onFormRequest: onFormRequest,
           onDeleteRequest: onDeleteRequest,
+          onToggleStatusRequest: onToggleStatusRequest,
         );
       },
     );
@@ -187,6 +191,7 @@ class _SubcategoryTableRow extends StatelessWidget {
     required this.showParentColumn,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
   });
 
   final CategoryEntity subcategory;
@@ -198,6 +203,7 @@ class _SubcategoryTableRow extends StatelessWidget {
   final bool showParentColumn;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -277,6 +283,7 @@ class _SubcategoryTableRow extends StatelessWidget {
             compact: compact || metrics.isNarrow,
             onFormRequest: onFormRequest,
             onDeleteRequest: onDeleteRequest,
+            onToggleStatusRequest: onToggleStatusRequest,
           ),
         ),
       ),
@@ -294,6 +301,7 @@ class _SubcategoryCard extends StatelessWidget {
     required this.metrics,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
   });
 
   final CategoryEntity subcategory;
@@ -304,6 +312,7 @@ class _SubcategoryCard extends StatelessWidget {
   final CategoriesPanelMetrics metrics;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +403,7 @@ class _SubcategoryCard extends StatelessWidget {
                       compact: true,
                       onFormRequest: onFormRequest,
                       onDeleteRequest: onDeleteRequest,
+                      onToggleStatusRequest: onToggleStatusRequest,
                     ),
                   ],
                 ),
@@ -412,12 +422,14 @@ class _SubcategoryActions extends StatelessWidget {
     required this.compact,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
   });
 
   final CategoryEntity subcategory;
   final bool compact;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -441,6 +453,25 @@ class _SubcategoryActions extends StatelessWidget {
             ),
           ),
           PopupMenuItem(
+            value: 'toggle_status',
+            child: ListTile(
+              dense: true,
+              leading: Icon(
+                subcategory.isActive
+                    ? Icons.pause_circle_outline_rounded
+                    : Icons.check_circle_outline_rounded,
+                size: 18,
+                color: subcategory.isActive ? scheme.error : scheme.primary,
+              ),
+              title: Text(
+                subcategory.isActive
+                    ? l10n.tOr('inActive', 'Inactive')
+                    : l10n.tOr('active', 'Active'),
+              ),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem(
             value: 'delete',
             child: ListTile(
               dense: true,
@@ -455,6 +486,8 @@ class _SubcategoryActions extends StatelessWidget {
           switch (value) {
             case 'edit':
               onFormRequest(editing: subcategory);
+            case 'toggle_status':
+              onToggleStatusRequest?.call(subcategory);
             case 'delete':
               onDeleteRequest(subcategory);
           }
@@ -465,6 +498,22 @@ class _SubcategoryActions extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        IconButton(
+          icon: Icon(
+            subcategory.isActive
+                ? Icons.pause_circle_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            size: 18,
+            color: subcategory.isActive ? scheme.error : scheme.primary,
+          ),
+          tooltip: subcategory.isActive
+              ? l10n.tOr('inActive', 'Inactive')
+              : l10n.tOr('active', 'Active'),
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: () => onToggleStatusRequest?.call(subcategory),
+        ),
         IconButton(
           icon: const Icon(Icons.edit_outlined, size: 18),
           tooltip: l10n.t('edit'),

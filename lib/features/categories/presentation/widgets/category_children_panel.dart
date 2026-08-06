@@ -17,6 +17,7 @@ class CategoryChildrenPanel extends StatefulWidget {
     required this.root,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
     this.showBackButton = false,
     this.onBack,
   });
@@ -24,6 +25,7 @@ class CategoryChildrenPanel extends StatefulWidget {
   final CategoryEntity root;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
   final bool showBackButton;
   final VoidCallback? onBack;
 
@@ -124,6 +126,8 @@ class _CategoryChildrenPanelState extends State<CategoryChildrenPanel> {
                                         onFormRequest: widget.onFormRequest,
                                         onDeleteRequest:
                                             widget.onDeleteRequest,
+                                        onToggleStatusRequest:
+                                            widget.onToggleStatusRequest,
                                       ),
                                     );
                                   },
