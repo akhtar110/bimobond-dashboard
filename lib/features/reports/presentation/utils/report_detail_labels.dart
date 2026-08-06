@@ -170,6 +170,48 @@ abstract final class ReportDetailLabels {
   static String auctionsWon(AppLocalizations l10n) =>
       l10n.tOr('reportDetailAuctionsWon', 'Auctions won');
 
+  // ── Post traffic source breakdown ─────────────────────────────────────────
+
+  static String trafficSourceBreakdown(AppLocalizations l10n) =>
+      l10n.tOr('reportDetailTrafficSourceBreakdown', 'Traffic source breakdown');
+
+  static String trafficSourceBreakdownSubtitle(AppLocalizations l10n) =>
+      l10n.tOr('reportDetailTrafficSourceBreakdownSubtitle',
+          'View count grouped by where viewers came from');
+
+  static String noTrafficSourceData(AppLocalizations l10n) =>
+      l10n.tOr('reportDetailNoTrafficSourceData', 'No view source data yet');
+
+  static String trafficSourceTotal(AppLocalizations l10n, int total) =>
+      l10n.tOr('reportDetailTrafficSourceTotal', '{total} tracked views')
+          .replaceAll('{total}', '$total');
+
+  /// Friendly EN label for a canonical traffic source key.
+  static String trafficSourceLabel(AppLocalizations l10n, String key) {
+    return switch (key) {
+      'FOR_YOU' => l10n.tOr('trafficSourceForYou', 'For You'),
+      'FOLLOWING' => l10n.tOr('trafficSourceFollowing', 'Following'),
+      'PROFILE' => l10n.tOr('trafficSourceProfile', 'Profile'),
+      'SEARCH' => l10n.tOr('trafficSourceSearch', 'Search'),
+      'HASHTAGS' => l10n.tOr('trafficSourceHashtags', 'Hashtags'),
+      'SHARES' => l10n.tOr('trafficSourceShares', 'Shares / Links'),
+      'SOUND' => l10n.tOr('trafficSourceSound', 'Sound'),
+      'LIVE' => l10n.tOr('trafficSourceLive', 'Live'),
+      'NOTIFICATION' => l10n.tOr('trafficSourceNotification', 'Notification'),
+      'SAVED' => l10n.tOr('trafficSourceSaved', 'Saved'),
+      'LIKED' => l10n.tOr('trafficSourceLiked', 'Liked'),
+      'REPOST' => l10n.tOr('trafficSourceRepost', 'Repost'),
+      'CHAT' => l10n.tOr('trafficSourceChat', 'Chat / DM'),
+      'EXPLORE' => l10n.tOr('trafficSourceExplore', 'Explore / Discover'),
+      'STORY' => l10n.tOr('trafficSourceStory', 'Story'),
+      'RECOMMENDED' => l10n.tOr('trafficSourceRecommended', 'Recommended'),
+      'PROMOTION' => l10n.tOr('trafficSourcePromotion', 'Promoted / Ads'),
+      'EXTERNAL' => l10n.tOr('trafficSourceExternal', 'External Link'),
+      'OTHER' => l10n.tOr('trafficSourceOther', 'Other'),
+      _ => key,
+    };
+  }
+
   // ── Post report ──────────────────────────────────────────────────────────
 
   static String recentComments(AppLocalizations l10n) =>

@@ -5,6 +5,8 @@ import '../../domain/entities/post_moderation_entities.dart';
 import '../bloc/post_management_bloc.dart';
 import '../utils/post_detail_labels.dart';
 
+import '../../../reports/presentation/utils/report_detail_labels.dart';
+
 enum PostDetailExportFormat { csv, excel, pdf }
 
 class PostDetailExportRow {
@@ -233,25 +235,11 @@ class PostDetailExportData {
         l10n.tOr('watchTime', 'Watch Time'),
         '${metrics.totalWatchTimeSeconds}s',
       ),
-      PostDetailExportRow(
-        l10n.tOr('forYou', 'For You'),
-        '${metrics.trafficSourceBreakdown.forYou}',
-      ),
-      PostDetailExportRow(
-        l10n.tOr('profile', 'Profile'),
-        '${metrics.trafficSourceBreakdown.profile}',
-      ),
-      PostDetailExportRow(
-        l10n.tOr('search', 'Search'),
-        '${metrics.trafficSourceBreakdown.search}',
-      ),
-      PostDetailExportRow(
-        l10n.tOr('hashtags', 'Hashtags'),
-        '${metrics.trafficSourceBreakdown.hashtags}',
-      ),
-      PostDetailExportRow(
-        l10n.tOr('shares', 'Shares'),
-        '${metrics.trafficSourceBreakdown.shares}',
+      ...metrics.trafficSourceBreakdown.sortedEntries.map(
+        (e) => PostDetailExportRow(
+          ReportDetailLabels.trafficSourceLabel(l10n, e.key),
+          '${e.value}',
+        ),
       ),
     ];
   }

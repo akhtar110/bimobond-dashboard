@@ -46,6 +46,7 @@ class AdminDashboardApp extends StatelessWidget {
 
           return MaterialApp(
             navigatorKey: AppRouter.rootNavigatorKey,
+            navigatorObservers: [AppRouter.navigationObserver],
             debugShowCheckedModeBanner: false,
             restorationScopeId: null,
             onGenerateTitle: (context) =>

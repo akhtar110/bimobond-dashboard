@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../../core/localization/localization.dart';
 import '../../../../../core/routing/app_router.dart';
+import '../../../../reports/presentation/utils/report_detail_labels.dart';
 import '../../../../users/domain/entities/user_entity.dart';
 import '../../../domain/entities/post_engagement_user_item.dart';
 import '../../bloc/post_management_bloc.dart';
@@ -102,6 +103,8 @@ class _PostEngagementUsersPanelState extends State<PostEngagementUsersPanel>
                   item: item,
                   dateFormat: dateFormat,
                   subtitleLabel: widget.subtitleLabel,
+                  showTrafficSource:
+                      widget.kind == PostEngagementKind.views,
                 ),
               ),
             ),
@@ -151,11 +154,13 @@ class _UserRow extends StatefulWidget {
     required this.item,
     required this.dateFormat,
     this.subtitleLabel,
+    this.showTrafficSource = false,
   });
 
   final PostEngagementUserItem item;
   final DateFormat dateFormat;
   final String? subtitleLabel;
+  final bool showTrafficSource;
 
   @override
   State<_UserRow> createState() => _UserRowState();
@@ -163,6 +168,53 @@ class _UserRow extends StatefulWidget {
 
 class _UserRowState extends State<_UserRow> {
   bool _hovered = false;
+
+  // ── Traffic source colours & icons (mirrors _TrafficBreakdownCard) ──────────
+  static Color _sourceAccent(String key, ColorScheme scheme) => switch (key) {
+        'FOR_YOU' => const Color(0xFF2563EB),
+        'FOLLOWING' => const Color(0xFF7C3AED),
+        'PROFILE' => const Color(0xFF0891B2),
+        'SEARCH' => const Color(0xFFD97706),
+        'HASHTAGS' => const Color(0xFF059669),
+        'SHARES' => const Color(0xFFDB2777),
+        'SOUND' => const Color(0xFF9333EA),
+        'LIVE' => const Color(0xFFDC2626),
+        'NOTIFICATION' => const Color(0xFFF59E0B),
+        'SAVED' => const Color(0xFF0284C7),
+        'LIKED' => const Color(0xFFE11D48),
+        'REPOST' => const Color(0xFF16A34A),
+        'CHAT' => const Color(0xFF0EA5E9),
+        'EXPLORE' => const Color(0xFF0D9488),
+        'STORY' => const Color(0xFFC026D3),
+        'RECOMMENDED' => const Color(0xFF6D28D9),
+        'PROMOTION' => const Color(0xFFEA580C),
+        'EXTERNAL' => const Color(0xFF475569),
+        'OTHER' => scheme.outline,
+        _ => scheme.primary,
+      };
+
+  static IconData _sourceIcon(String key) => switch (key) {
+        'FOR_YOU' => Icons.home_outlined,
+        'FOLLOWING' => Icons.people_outline_rounded,
+        'PROFILE' => Icons.person_outline_rounded,
+        'SEARCH' => Icons.search_rounded,
+        'HASHTAGS' => Icons.tag_rounded,
+        'SHARES' => Icons.share_outlined,
+        'SOUND' => Icons.music_note_outlined,
+        'LIVE' => Icons.videocam_outlined,
+        'NOTIFICATION' => Icons.notifications_none_rounded,
+        'SAVED' => Icons.bookmark_border_rounded,
+        'LIKED' => Icons.favorite_border_rounded,
+        'REPOST' => Icons.repeat_rounded,
+        'CHAT' => Icons.chat_bubble_outline_rounded,
+        'EXPLORE' => Icons.explore_outlined,
+        'STORY' => Icons.auto_stories_outlined,
+        'RECOMMENDED' => Icons.auto_awesome_outlined,
+        'PROMOTION' => Icons.campaign_outlined,
+        'EXTERNAL' => Icons.open_in_new_rounded,
+        'OTHER' => Icons.more_horiz_rounded,
+        _ => Icons.alt_route_rounded,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +224,13 @@ class _UserRowState extends State<_UserRow> {
     final display = item.fullName?.isNotEmpty == true
         ? item.fullName!
         : (item.username != null ? '@${item.username}' : item.userId);
+
+    final source = widget.showTrafficSource ? item.trafficSource : null;
+    final sourceAccent = source != null ? _sourceAccent(source, scheme) : null;
+    final sourceIcon = source != null ? _sourceIcon(source) : null;
+    final sourceLabel = source != null
+        ? ReportDetailLabels.trafficSourceLabel(l10n, source)
+        : null;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -251,6 +310,36 @@ class _UserRowState extends State<_UserRow> {
                       ),
                     ),
                   ],
+                  // ── Traffic source chip ──────────────────────────────────
+                  if (source != null && sourceAccent != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: sourceAccent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: sourceAccent.withValues(alpha: 0.30),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(sourceIcon, size: 10, color: sourceAccent),
+                          const SizedBox(width: 3),
+                          Text(
+                            sourceLabel ?? source,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: sourceAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -305,6 +394,7 @@ class _UserRowState extends State<_UserRow> {
     );
   }
 }
+
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({
