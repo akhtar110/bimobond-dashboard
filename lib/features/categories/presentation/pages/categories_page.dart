@@ -236,6 +236,8 @@ class _CategoriesPageBody extends StatelessWidget {
         ),
         onDeleteRequest: (category) =>
             confirmDeleteCategory(context, category),
+        onToggleStatusRequest: (category) =>
+            confirmToggleCategoryStatus(context, category),
       );
     }
     return const SizedBox.shrink();

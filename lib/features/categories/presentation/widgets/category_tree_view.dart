@@ -16,11 +16,13 @@ class CategoryTreeView extends StatefulWidget {
     required this.state,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
   });
 
   final CategoriesLoaded state;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
 
   @override
   State<CategoryTreeView> createState() => _CategoryTreeViewState();
@@ -96,6 +98,7 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
                     rootsScrollController: _rootsScrollController,
                     onFormRequest: widget.onFormRequest,
                     onDeleteRequest: widget.onDeleteRequest,
+                    onToggleStatusRequest: widget.onToggleStatusRequest,
                     useInfiniteScroll: metrics.useInfiniteScroll,
                     layoutMetrics: metrics,
                     totalWidth: width,
@@ -106,6 +109,7 @@ class _CategoryTreeViewState extends State<CategoryTreeView> {
                   rootsScrollController: _rootsScrollController,
                   onFormRequest: widget.onFormRequest,
                   onDeleteRequest: widget.onDeleteRequest,
+                  onToggleStatusRequest: widget.onToggleStatusRequest,
                   useInfiniteScroll: metrics.useInfiniteScroll,
                 );
               },
@@ -124,6 +128,7 @@ class _SplitMasterDetailView extends StatelessWidget {
     required this.rootsScrollController,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
     required this.useInfiniteScroll,
     required this.layoutMetrics,
     required this.totalWidth,
@@ -133,6 +138,7 @@ class _SplitMasterDetailView extends StatelessWidget {
   final ScrollController rootsScrollController;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
   final bool useInfiniteScroll;
   final CategoriesLayoutMetrics layoutMetrics;
   final double totalWidth;
@@ -171,6 +177,7 @@ class _SplitMasterDetailView extends StatelessWidget {
                     panelMetrics: CategoriesPanelMetrics(constraints.maxWidth),
                     onFormRequest: onFormRequest,
                     onDeleteRequest: onDeleteRequest,
+                    onToggleStatusRequest: onToggleStatusRequest,
                     useInfiniteScroll: useInfiniteScroll,
                   );
                 },
@@ -194,6 +201,7 @@ class _SplitMasterDetailView extends StatelessWidget {
                       root: focusedRoot,
                       onFormRequest: onFormRequest,
                       onDeleteRequest: onDeleteRequest,
+                      onToggleStatusRequest: onToggleStatusRequest,
                     );
                   },
                 ),
@@ -209,6 +217,7 @@ class _MobileMasterDetailView extends StatelessWidget {
     required this.rootsScrollController,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
     required this.useInfiniteScroll,
   });
 
@@ -216,6 +225,7 @@ class _MobileMasterDetailView extends StatelessWidget {
   final ScrollController rootsScrollController;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
   final bool useInfiniteScroll;
 
   @override
@@ -236,6 +246,7 @@ class _MobileMasterDetailView extends StatelessWidget {
                 .add(ClearFocusedRootEvent()),
             onFormRequest: onFormRequest,
             onDeleteRequest: onDeleteRequest,
+            onToggleStatusRequest: onToggleStatusRequest,
           );
         }
 
@@ -247,6 +258,7 @@ class _MobileMasterDetailView extends StatelessWidget {
           ),
           onFormRequest: onFormRequest,
           onDeleteRequest: onDeleteRequest,
+          onToggleStatusRequest: onToggleStatusRequest,
           useInfiniteScroll: useInfiniteScroll,
         );
       },
@@ -261,6 +273,7 @@ class _RootCategoriesPanel extends StatelessWidget {
     required this.panelMetrics,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
     required this.useInfiniteScroll,
   });
 
@@ -269,6 +282,7 @@ class _RootCategoriesPanel extends StatelessWidget {
   final CategoriesPanelMetrics panelMetrics;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
   final bool useInfiniteScroll;
 
   @override
@@ -385,6 +399,7 @@ class _RootCategoriesPanel extends StatelessWidget {
                       panelMetrics: panelMetrics,
                       onFormRequest: onFormRequest,
                       onDeleteRequest: onDeleteRequest,
+                      onToggleStatusRequest: onToggleStatusRequest,
                     ),
                   );
                 },

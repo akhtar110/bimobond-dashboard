@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 double categoriesPageHorizontalPadding(double width) {
   if (width >= 1600) return 32;
@@ -134,7 +134,7 @@ class CategoriesPanelMetrics {
   bool get subcategoryShowChildren => width >= 460;
   bool get subcategoryShowParent => width >= 560;
 
-  double get subcategoryActionsWidth => width < 320 ? 40 : width < 400 ? 56 : 72;
+  double get subcategoryActionsWidth => width < 320 ? 40 : width < 480 ? 56 : 96;
 }
 
 CategoriesLayoutMetrics categoriesMetricsOf(BuildContext context) {

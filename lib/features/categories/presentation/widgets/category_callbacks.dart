@@ -6,3 +6,6 @@ typedef CategoryFormCallback = void Function({
 });
 
 typedef CategoryDeleteCallback = void Function(CategoryEntity category);
+
+typedef CategoryToggleStatusCallback = void Function(CategoryEntity category);
+

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -64,6 +64,74 @@ void confirmDeleteCategory(BuildContext context, CategoryEntity category) {
     ),
   );
 }
+
+void confirmToggleCategoryStatus(BuildContext context, CategoryEntity category) {
+  final l10n = context.l10n;
+  final scheme = Theme.of(context).colorScheme;
+  final bloc = context.read<CategoriesBloc>();
+  final willActivate = !category.isActive;
+  final titleText = willActivate
+      ? l10n.tOr('activateCategoryTitle', 'Activate Category')
+      : l10n.tOr('deactivateCategoryTitle', 'Deactivate Category');
+  final actionText = willActivate
+      ? l10n.tOr('active', 'Active')
+      : l10n.tOr('inActive', 'Inactive');
+  final messageText = willActivate
+      ? l10n.tOr(
+          'activateCategoryMessage',
+          'Are you sure you want to activate category "${category.name}"?',
+        )
+      : l10n.tOr(
+          'deactivateCategoryMessage',
+          'Are you sure you want to deactivate category "${category.name}"?',
+        );
+
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(
+            willActivate
+                ? Icons.check_circle_outline_rounded
+                : Icons.pause_circle_outline_rounded,
+            color: willActivate ? scheme.primary : scheme.error,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(titleText)),
+        ],
+      ),
+      content: Text(messageText),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(l10n.t('cancel')),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: willActivate ? scheme.primary : scheme.error,
+            foregroundColor: willActivate ? scheme.onPrimary : scheme.onError,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () {
+            Navigator.of(ctx).pop();
+            bloc.add(
+              UpdateCategoryEvent(
+                id: category.id,
+                data: UpdateCategoryData(isActive: willActivate),
+              ),
+            );
+          },
+          child: Text(actionText),
+        ),
+      ],
+    ),
+  );
+}
+
 
 
 // â”€â”€â”€ Create / Edit dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

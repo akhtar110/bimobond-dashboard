@@ -20,6 +20,7 @@ class RootCategoryTile extends StatelessWidget {
     required this.panelMetrics,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
   });
 
   final CategoryEntity category;
@@ -29,6 +30,7 @@ class RootCategoryTile extends StatelessWidget {
   final CategoriesPanelMetrics panelMetrics;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +57,7 @@ class RootCategoryTile extends StatelessWidget {
             panelMetrics: panelMetrics,
             onFormRequest: onFormRequest,
             onDeleteRequest: onDeleteRequest,
+            onToggleStatusRequest: onToggleStatusRequest,
           ),
         );
       },
@@ -88,6 +91,7 @@ class _RootCategoryTileBody extends StatelessWidget {
     required this.panelMetrics,
     required this.onFormRequest,
     required this.onDeleteRequest,
+    this.onToggleStatusRequest,
   });
 
   final CategoryEntity category;
@@ -99,6 +103,7 @@ class _RootCategoryTileBody extends StatelessWidget {
   final CategoriesPanelMetrics panelMetrics;
   final CategoryFormCallback onFormRequest;
   final CategoryDeleteCallback onDeleteRequest;
+  final CategoryToggleStatusCallback? onToggleStatusRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +152,25 @@ class _RootCategoryTileBody extends StatelessWidget {
           ),
         ),
         PopupMenuItem(
+          value: 'toggle_status',
+          child: ListTile(
+            dense: true,
+            leading: Icon(
+              category.isActive
+                  ? Icons.pause_circle_outline_rounded
+                  : Icons.check_circle_outline_rounded,
+              size: 18,
+              color: category.isActive ? scheme.error : scheme.primary,
+            ),
+            title: Text(
+              category.isActive
+                  ? l10n.tOr('inActive', 'Inactive')
+                  : l10n.tOr('active', 'Active'),
+            ),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem(
           value: 'delete',
           child: ListTile(
             dense: true,
@@ -163,6 +187,8 @@ class _RootCategoryTileBody extends StatelessWidget {
             onFormRequest(editing: category);
           case 'add_sub':
             onFormRequest(parentForNew: category);
+          case 'toggle_status':
+            onToggleStatusRequest?.call(category);
           case 'delete':
             onDeleteRequest(category);
         }
