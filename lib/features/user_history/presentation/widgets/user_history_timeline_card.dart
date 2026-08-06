@@ -6,6 +6,7 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../user_activity/presentation/widgets/activity_list_widgets.dart';
 import '../../domain/entities/user_history_entity.dart';
+import '../../../reports/presentation/utils/report_detail_labels.dart';
 
 class UserHistoryTimelineCard extends StatelessWidget {
   const UserHistoryTimelineCard({
@@ -280,12 +281,22 @@ class UserHistoryTimelineCard extends StatelessWidget {
           ],
         );
       case UserHistoryTypes.postView:
+        final sourceKey = item.dataString('trafficSource');
+        final sourceLabel = sourceKey != null
+            ? ReportDetailLabels.trafficSourceLabel(l10n, sourceKey)
+            : null;
+        final watchTime =
+            item.dataNum('watchedDuration') ?? item.dataNum('watchTime');
         return _HistoryPresentation(
           icon: Icons.visibility_outlined,
           color: theme.colorScheme.primary,
           title: l10n.tOr('userHistoryViewedPost', 'Viewed Post'),
           lines: [
             if (_postDescription(item) != null) _postDescription(item)!,
+            if (sourceLabel != null)
+              '${l10n.tOr('trafficSource', 'Traffic Source')}: $sourceLabel',
+            if (watchTime != null && watchTime > 0)
+              '${l10n.tOr('watchTime', 'Watch Time')}: ${watchTime.toInt()}s',
           ],
           thumbnailUrl: _postThumbnail(item),
         );

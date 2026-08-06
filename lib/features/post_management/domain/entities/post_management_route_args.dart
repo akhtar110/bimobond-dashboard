@@ -18,6 +18,13 @@ class PostManagementRouteArgs {
   bool get isInvestigation =>
       sourceUser != null || activityContext != null;
 
+  Map<String, dynamic> toMap() => {
+        'postId': post.id,
+        if (activityContext?.commentId != null)
+          'commentId': activityContext!.commentId,
+        if (activityContext != null) 'activity': activityContext!.type.name,
+      };
+
   /// Returns null when [arguments] cannot be parsed (e.g. navigator restore on hot reload).
   static PostManagementRouteArgs? tryResolve(Object? arguments) {
     if (arguments == null) return null;

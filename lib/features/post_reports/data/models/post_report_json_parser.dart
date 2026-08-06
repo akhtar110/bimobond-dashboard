@@ -175,14 +175,7 @@ abstract final class PostReportJsonParser {
     dynamic value,
   ) {
     if (value is! Map) return const PostReportTrafficSourceBreakdown();
-    final m = Map<String, dynamic>.from(value);
-    return PostReportTrafficSourceBreakdown(
-      forYou: asInt(m['FOR_YOU'] ?? m['forYou']),
-      profile: asInt(m['PROFILE'] ?? m['profile']),
-      search: asInt(m['SEARCH'] ?? m['search']),
-      hashtags: asInt(m['HASHTAGS'] ?? m['hashtags']),
-      shares: asInt(m['SHARES'] ?? m['shares']),
-    );
+    return PostReportTrafficSourceBreakdown.fromMap(value);
   }
 
   static PostReportModerationLog parseModerationLog(Map<String, dynamic> m) {

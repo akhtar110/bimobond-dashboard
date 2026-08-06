@@ -9,6 +9,7 @@ class PostEngagementUserItem {
     this.isBanned = false,
     required this.createdAt,
     this.subtitle,
+    this.trafficSource,
   });
 
   final String id;
@@ -20,6 +21,8 @@ class PostEngagementUserItem {
   final bool isBanned;
   final DateTime createdAt;
   final String? subtitle;
+  /// Canonical traffic source key, only populated for view items (e.g. 'FOR_YOU').
+  final String? trafficSource;
 }
 
 class PostEngagementUsersPageEntity {
