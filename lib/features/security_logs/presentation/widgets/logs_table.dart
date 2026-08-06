@@ -465,22 +465,31 @@ class _RowState extends State<_Row> {
             SizedBox(
               width: spec.actionsWidth,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   if (navTargets.isNotEmpty)
-                    IconButton(
-                      tooltip: navTargets.first.label(isArabic),
-                      onPressed: () =>
-                          LogTargetNavigation.open(context, navTargets.first),
+                    SizedBox(
+                      width: 36,
+                      child: IconButton(
+                        tooltip: navTargets.first.label(isArabic),
+                        onPressed: () =>
+                            LogTargetNavigation.open(context, navTargets.first),
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(navTargets.first.icon, size: 18),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 36),
+                  SizedBox(
+                    width: 36,
+                    child: IconButton(
+                      tooltip: l10n.tOr('logsViewDetails', 'View details'),
+                      onPressed: widget.onDetails,
                       visualDensity: VisualDensity.compact,
-                      icon: Icon(navTargets.first.icon, size: 18),
+                      icon: const Icon(Icons.visibility_outlined, size: 18),
                     ),
-                  IconButton(
-                    tooltip: l10n.tOr('logsViewDetails', 'View details'),
-                    onPressed: widget.onDetails,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.visibility_outlined, size: 18),
                   ),
+                  SizedBox(width: spec.cellPad),
                 ],
               ),
             ),

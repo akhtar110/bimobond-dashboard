@@ -83,8 +83,23 @@ class AppRoutes {
   static const walletDetail = '/wallet-detail';
 }
 
+class DashboardNavigationObserver extends NavigatorObserver {
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    super.didPop(route, previousRoute);
+    final prevName = previousRoute?.settings.name;
+    if (prevName == AppRoutes.root ||
+        prevName == AppRoutes.dashboard ||
+        prevName == null ||
+        prevName.isEmpty) {
+      di.sl<NavigationPersistenceService>().clearActiveRoute();
+    }
+  }
+}
+
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
+  static final navigationObserver = DashboardNavigationObserver();
 
   static Widget _homeShell() => BlocProvider.value(
     value: di.sl<RbacBloc>()..add(const LoadCurrentPermissions(force: true)),
@@ -130,6 +145,17 @@ class AppRouter {
         );
       case AppRoutes.userDetail:
         final user = settings.arguments as UserEntity;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.userDetail,
+          args: user is UserModel
+              ? user.toJson()
+              : {
+                  'id': user.id,
+                  'username': user.username,
+                  'fullName': user.fullName,
+                  'avatarUrl': user.avatarUrl,
+                },
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessAdminDashboard,
@@ -151,6 +177,10 @@ class AppRouter {
               builder: (_) => _homeShell(),
             );
           }
+          di.sl<NavigationPersistenceService>().saveActiveRoute(
+            AppRoutes.postManagementDetail,
+            args: args.toMap(),
+          );
           return AdminDetailPageRoute(
             settings: settings,
             builder: (_) => _guarded(
@@ -167,6 +197,10 @@ class AppRouter {
         }
       case AppRoutes.auctionDetail:
         final auction = settings.arguments as AuctionEntity;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.auctionDetail,
+          args: {'id': auction.id, 'hostId': auction.hostId, 'status': auction.status},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canReadAuctions,
@@ -183,6 +217,10 @@ class AppRouter {
         );
       case AppRoutes.campaignDetail:
         final campaignId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.campaignDetail,
+          args: {'campaignId': campaignId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -191,6 +229,10 @@ class AppRouter {
         );
       case AppRoutes.promotedPostAnalytics:
         final postId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.promotedPostAnalytics,
+          args: {'postId': postId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -198,6 +240,7 @@ class AppRouter {
           ),
         );
       case AppRoutes.chatManagement:
+        di.sl<NavigationPersistenceService>().saveActiveRoute(AppRoutes.chatManagement);
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canReadChatAdmin,
@@ -215,6 +258,10 @@ class AppRouter {
         );
       case AppRoutes.walletDetail:
         final userId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.walletDetail,
+          args: {'userId': userId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessAdminDashboard,
@@ -230,6 +277,10 @@ class AppRouter {
         );
       case AppRoutes.giftReportDetail:
         final giftId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.giftReportDetail,
+          args: {'giftId': giftId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -238,6 +289,10 @@ class AppRouter {
         );
       case AppRoutes.categoryReportDetail:
         final categoryId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.categoryReportDetail,
+          args: {'categoryId': categoryId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -246,6 +301,10 @@ class AppRouter {
         );
       case AppRoutes.userReportDetail:
         final userId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.userReportDetail,
+          args: {'userId': userId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -258,6 +317,10 @@ class AppRouter {
         );
       case AppRoutes.postReportDetail:
         final postId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.postReportDetail,
+          args: {'postId': postId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -270,6 +333,10 @@ class AppRouter {
         );
       case AppRoutes.auctionReportDetail:
         final auctionId = settings.arguments as String;
+        di.sl<NavigationPersistenceService>().saveActiveRoute(
+          AppRoutes.auctionReportDetail,
+          args: {'auctionId': auctionId},
+        );
         return MaterialPageRoute(
           builder: (_) => _guarded(
             canAccess: PermissionManager.canAccessStaffDashboard,
@@ -396,13 +463,113 @@ class _HomeShellState extends State<HomeShell> {
 
         final routeName = di.sl<NavigationPersistenceService>().getSavedRouteName();
         final routeArgsMap = di.sl<NavigationPersistenceService>().getSavedRouteArgs();
-        if (routeName == AppRoutes.userDetail && routeArgsMap != null) {
+        if (routeName != null) {
           try {
-            final user = UserModel.fromJson(routeArgsMap);
-            AppRouter.rootNavigatorKey.currentState?.pushNamed(
-              AppRoutes.userDetail,
-              arguments: user,
-            );
+            switch (routeName) {
+              case AppRoutes.userDetail:
+                if (routeArgsMap != null) {
+                  final user = UserModel.fromJson(routeArgsMap);
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.userDetail,
+                    arguments: user,
+                  );
+                }
+              case AppRoutes.postManagementDetail:
+                if (routeArgsMap != null) {
+                  final args = PostManagementRouteArgs.fromMap(routeArgsMap);
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.postManagementDetail,
+                    arguments: args,
+                  );
+                }
+              case AppRoutes.auctionDetail:
+                if (routeArgsMap != null) {
+                  final id = routeArgsMap['id']?.toString() ?? '';
+                  if (id.isNotEmpty) {
+                    final auction = AuctionEntity(
+                      id: id,
+                      hostId: routeArgsMap['hostId']?.toString() ?? '',
+                      startingPriceCoins: 0,
+                      targetPriceCoins: 0,
+                      currentTotalCoins: 0,
+                      status: routeArgsMap['status']?.toString() ?? 'ACTIVE',
+                      startedAt: DateTime.now(),
+                    );
+                    AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                      AppRoutes.auctionDetail,
+                      arguments: auction,
+                    );
+                  }
+                }
+              case AppRoutes.campaignDetail:
+                final id = routeArgsMap?['campaignId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.campaignDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.promotedPostAnalytics:
+                final id = routeArgsMap?['postId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.promotedPostAnalytics,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.walletDetail:
+                final id = routeArgsMap?['userId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.walletDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.giftReportDetail:
+                final id = routeArgsMap?['giftId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.giftReportDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.categoryReportDetail:
+                final id = routeArgsMap?['categoryId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.categoryReportDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.userReportDetail:
+                final id = routeArgsMap?['userId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.userReportDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.postReportDetail:
+                final id = routeArgsMap?['postId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.postReportDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.auctionReportDetail:
+                final id = routeArgsMap?['auctionId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                    AppRoutes.auctionReportDetail,
+                    arguments: id,
+                  );
+                }
+              case AppRoutes.chatManagement:
+                AppRouter.rootNavigatorKey.currentState?.pushNamed(
+                  AppRoutes.chatManagement,
+                );
+            }
           } catch (_) {}
         }
       }

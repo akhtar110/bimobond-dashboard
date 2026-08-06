@@ -16,6 +16,7 @@ class PostEngagementUserModel extends PostEngagementUserItem {
     super.isBanned,
     required super.createdAt,
     super.subtitle,
+    super.trafficSource,
   });
 
   factory PostEngagementUserModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +33,12 @@ class PostEngagementUserModel extends PostEngagementUserItem {
       subtitle = mentionText.trim();
     }
 
+    // Normalize trafficSource the same way the server does.
+    final rawSource = json['trafficSource']?.toString().trim().toUpperCase();
+    final trafficSource = rawSource != null && rawSource.isNotEmpty
+        ? rawSource
+        : null;
+
     return PostEngagementUserModel(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? user['id']?.toString() ?? '',
@@ -46,6 +53,7 @@ class PostEngagementUserModel extends PostEngagementUserItem {
       isBanned: user['isBanned'] as bool? ?? false,
       createdAt: _readDate(json['createdAt']),
       subtitle: subtitle,
+      trafficSource: trafficSource,
     );
   }
 
