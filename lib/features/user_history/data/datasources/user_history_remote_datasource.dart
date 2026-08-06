@@ -31,16 +31,28 @@ class UserHistoryRemoteDataSourceImpl implements UserHistoryRemoteDataSource {
       final data = _asMap(response.data);
       return UserHistoryResponseModel.fromJson(data).toEntity();
     } on DioException catch (e) {
-      if (e.response?.statusCode == 404 &&
-          (query.deviceId == null || query.deviceId!.trim().isEmpty)) {
-        final response = await _dio.get(
-          '/activity/admin/users/$userId/timeline',
-          queryParameters: query.toQueryParameters(),
+      if (e.response?.statusCode == 404) {
+        if (query.deviceId == null || query.deviceId!.trim().isEmpty) {
+          try {
+            final response = await _dio.get(
+              '/activity/admin/users/$userId/timeline',
+              queryParameters: query.toQueryParameters(),
+            );
+            final data = _asMap(response.data);
+            return UserHistoryResponseModel.fromJson(data).toEntity();
+          } on DioException catch (_) {
+            return const UserHistoryPageEntity(
+              items: [],
+              meta: UserHistoryMetaEntity(total: 0, page: 1, limit: 15, totalPages: 1),
+            );
+          }
+        }
+        return const UserHistoryPageEntity(
+          items: [],
+          meta: UserHistoryMetaEntity(total: 0, page: 1, limit: 15, totalPages: 1),
         );
-        final data = _asMap(response.data);
-        return UserHistoryResponseModel.fromJson(data).toEntity();
       }
-      rethrow;
+      throw Exception(_dioMessage(e));
     }
   }
 
@@ -48,5 +60,19 @@ class UserHistoryRemoteDataSourceImpl implements UserHistoryRemoteDataSource {
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
     throw Exception('Invalid user history API response');
+  }
+
+  String _dioMessage(DioException e) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final message = data['message'] ?? data['error'] ?? data['msg'];
+      if (message != null && message.toString().trim().isNotEmpty) {
+        return message.toString();
+      }
+    }
+    if (e.response?.statusCode == 404) {
+      return 'User history resource not found (404)';
+    }
+    return e.message ?? e.toString();
   }
 }
