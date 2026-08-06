@@ -4,6 +4,7 @@ import 'package:bimo_bond_dashboard/features/auctions/presentation/pages/auction
 import 'package:bimo_bond_dashboard/features/post_management/domain/entities/post_management_route_args.dart';
 import 'package:bimo_bond_dashboard/features/post_management/presentation/screens/post_management_detail_screen.dart';
 import 'package:bimo_bond_dashboard/features/users/domain/entities/user_entity.dart';
+import '../../features/users/data/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -392,6 +393,18 @@ class _HomeShellState extends State<HomeShell> {
       final auth = context.read<AuthBloc>().state;
       if (auth is Authenticated) {
         context.read<RbacBloc>().add(const LoadCurrentPermissions(force: true));
+
+        final routeName = di.sl<NavigationPersistenceService>().getSavedRouteName();
+        final routeArgsMap = di.sl<NavigationPersistenceService>().getSavedRouteArgs();
+        if (routeName == AppRoutes.userDetail && routeArgsMap != null) {
+          try {
+            final user = UserModel.fromJson(routeArgsMap);
+            AppRouter.rootNavigatorKey.currentState?.pushNamed(
+              AppRoutes.userDetail,
+              arguments: user,
+            );
+          } catch (_) {}
+        }
       }
     });
   }

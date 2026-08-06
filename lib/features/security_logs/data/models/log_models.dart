@@ -17,6 +17,7 @@ class LogModel extends LogEntity {
     super.targetId,
     super.meta,
     super.description,
+    super.descriptionEn,
     super.ipAddress,
     super.userAgent,
     super.deviceId,
@@ -46,6 +47,7 @@ class LogModel extends LogEntity {
     final description = _str(root['description']) ??
         _str(root['message']) ??
         _metaSummary(meta);
+    final descriptionEn = _str(root['descriptionEn']);
 
     final createdAt = _parseDate(root['createdAt']) ??
         DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
@@ -66,6 +68,7 @@ class LogModel extends LogEntity {
       targetId: _str(root['targetId']),
       meta: meta,
       description: description,
+      descriptionEn: descriptionEn,
       ipAddress: _str(root['ipAddress']),
       userAgent: _str(root['userAgent']),
       deviceId: _str(root['deviceId']),

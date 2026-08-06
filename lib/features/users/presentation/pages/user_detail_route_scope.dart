@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/routing/app_router.dart';
+import '../../../../core/services/navigation_persistence_service.dart';
 import '../../../../injection_container.dart' as di;
+import '../../data/models/user_model.dart';
 import '../../../categories/presentation/bloc/categories_bloc.dart';
 import '../../../notifications/presentation/bloc/user_notifications_bloc.dart';
 import '../../../user_activity/presentation/bloc/user_activity_bloc.dart';
@@ -47,6 +50,13 @@ class _UserDetailRouteScopeState extends State<UserDetailRouteScope> {
   void initState() {
     super.initState();
     final user = widget.user;
+    try {
+      final userModel = UserModel.fromEntity(user);
+      di.sl<NavigationPersistenceService>().saveActiveRoute(
+        AppRoutes.userDetail,
+        args: userModel.toJson(),
+      );
+    } catch (_) {}
 
     _detailBloc = di.sl<UserDetailBloc>()..add(LoadUserDetailEvent(user));
     if (kDebugMode) debugPrint('UserDetailBloc created');

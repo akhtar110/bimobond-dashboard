@@ -3202,5 +3202,21 @@
   "affectedContent": "المحتوى المتأثر",
   "severityHighRisk": "مرتفع (خطر على الحساب)",
   "severityMediumWarning": "متوسط (إنذار / مخالفة)",
-  "severityStandardPolicy": "قياسي (مخالفة السياسة)"
+  "severityStandardPolicy": "قياسي (مخالفة السياسة)",
+  "accountUnderControl": "حالة الحساب مستقرة",
+  "noActiveModerationIssues": "لا توجد بلاغات معلقة أو قيود نشطة. تم معالجة جميع البلاغات.",
+  "activeModerationSummary": "ملخص الإشراف النشط",
+  "activeRiskFactors": "عوامل الخطر النشطة",
+  "pendingReportsCount": "البلاغات المعلقة: {count}",
+  "activeViolationsCount": "المخالفات النشطة: {count}",
+  "accountBannedNotice": "الحساب محظور",
+  "profileLockedNotice": "الملف الشخصي مقيد",
+  "noPendingReports": "لا توجد بلاغات معلقة",
+  "requiresReview": "يحتاج إلى مراجعة",
+  "totalReports": "إجمالي البلاغات",
+  "permanentHistory": "سجل دائم",
+  "confirmedReports": "البلاغات المؤكدة",
+  "resolvedReports": "البلاغات المحسومة",
+  "dismissedReports": "البلاغات المرفوضة",
+  "zeroRiskImpact": "بدون تأثير على الخطر"
 }

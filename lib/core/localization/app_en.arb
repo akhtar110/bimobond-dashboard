@@ -3290,5 +3290,21 @@
   "affectedContent": "Affected Content",
   "severityHighRisk": "HIGH (Account Risk)",
   "severityMediumWarning": "MEDIUM (Warning / Strike)",
-  "severityStandardPolicy": "STANDARD (Policy Violation)"
+  "severityStandardPolicy": "STANDARD (Policy Violation)",
+  "accountUnderControl": "Account Under Control",
+  "noActiveModerationIssues": "No active pending reports or account restrictions. All reports processed.",
+  "activeModerationSummary": "Active Moderation Summary",
+  "activeRiskFactors": "Active Risk Factors",
+  "pendingReportsCount": "Pending Reports: {count}",
+  "activeViolationsCount": "Active Violations: {count}",
+  "accountBannedNotice": "Account Banned",
+  "profileLockedNotice": "Profile Restricted",
+  "noPendingReports": "No pending reports",
+  "requiresReview": "Requires review",
+  "totalReports": "Total Reports",
+  "permanentHistory": "Permanent history",
+  "confirmedReports": "Confirmed Reports",
+  "resolvedReports": "Resolved Reports",
+  "dismissedReports": "Dismissed Reports",
+  "zeroRiskImpact": "0 risk impact"
 }

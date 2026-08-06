@@ -9,6 +9,7 @@ import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../security_logs/data/datasources/user_audit_log_socket_service.dart';
 import '../../../security_logs/data/datasources/user_violations_remote_datasource.dart';
 import '../../../security_logs/presentation/bloc/user_violations_bloc.dart';
+import '../../../security_logs/presentation/utils/log_target_navigation.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
 import '../../../security_logs/presentation/widgets/admin_and_violation_detail_dialogs.dart';
 import '../../domain/entities/user_entity.dart';
@@ -247,8 +248,10 @@ class _UserDetailViolationsView extends StatelessWidget {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = state.violations[index];
-                    final actionLabel = logsActionLabel(l10n, item);
+                    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+                    final actionLabel = logsDisplayTitle(l10n, item, isArabic: isArabic);
                     final categoryLabel = logsCategoryLabel(l10n, item.category);
+                    final navTargets = LogTargetNavigation.resolveAll(item);
 
                     return Material(
                       color: isDark
@@ -270,7 +273,7 @@ class _UserDetailViolationsView extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
-                                  Icons.gavel_rounded,
+                                  Icons.warning_amber_rounded,
                                   size: 20,
                                   color: Colors.red,
                                 ),
@@ -312,6 +315,25 @@ class _UserDetailViolationsView extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                    if (navTargets.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: navTargets.map((target) {
+                                          return ActionChip(
+                                            avatar: Icon(target.icon, size: 14),
+                                            label: Text(
+                                              target.label(isArabic),
+                                              style: const TextStyle(fontSize: 11),
+                                            ),
+                                            visualDensity: VisualDensity.compact,
+                                            onPressed: () =>
+                                                LogTargetNavigation.open(context, target),
+                                          );
+                                        }).toList(growable: false),
+                                      ),
+                                    ],
                                     const SizedBox(height: 4),
                                     Text(
                                       item.description ?? item.displayTarget ?? '—',
