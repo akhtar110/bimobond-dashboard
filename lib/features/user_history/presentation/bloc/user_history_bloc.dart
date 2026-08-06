@@ -87,22 +87,23 @@ class UserHistoryBloc extends Bloc<UserHistoryEvent, UserHistoryState> {
         query: _query,
       );
 
+      final filtered = page.items;
       final currentItems = _currentItems();
 
       // Detect if timeline has changed
-      if (page.items.isNotEmpty) {
-        final hasChanges = currentItems.length != page.items.length ||
+      if (filtered.isNotEmpty) {
+        final hasChanges = currentItems.length != filtered.length ||
             (currentItems.isNotEmpty &&
-                page.items.isNotEmpty &&
-                (currentItems.first.createdAt != page.items.first.createdAt ||
-                    currentItems.first.type != page.items.first.type));
+                filtered.isNotEmpty &&
+                (currentItems.first.createdAt != filtered.first.createdAt ||
+                    currentItems.first.type != filtered.first.type));
 
         if (hasChanges) {
           emit(
             UserHistoryLoaded(
               userId: _userId,
               query: _query,
-              items: page.items,
+              items: filtered,
               meta: page.meta,
             ),
           );
