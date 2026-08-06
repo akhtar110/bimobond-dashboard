@@ -8,6 +8,7 @@ import '../../../../injection_container.dart' as di;
 import '../../../rbac/presentation/utils/permission_manager.dart';
 import '../../../security_logs/data/datasources/user_audit_log_socket_service.dart';
 import '../../../security_logs/domain/usecases/get_logs_usecase.dart';
+import '../../../security_logs/presentation/utils/log_target_navigation.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
 import '../../../security_logs/presentation/widgets/admin_and_violation_detail_dialogs.dart';
 import '../../domain/entities/user_entity.dart';
@@ -230,8 +231,10 @@ class _UserDetailAdminActionsView extends StatelessWidget {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = state.logs[index];
-                    final actionLabel = logsActionLabel(l10n, item);
+                    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+                    final actionLabel = logsDisplayTitle(l10n, item, isArabic: isArabic);
                     final categoryLabel = logsCategoryLabel(l10n, item.category);
+                    final navTargets = LogTargetNavigation.resolveAll(item);
 
                     return Material(
                       color: isDark
@@ -293,6 +296,25 @@ class _UserDetailAdminActionsView extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                    if (navTargets.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: navTargets.map((target) {
+                                          return ActionChip(
+                                            avatar: Icon(target.icon, size: 14),
+                                            label: Text(
+                                              target.label(isArabic),
+                                              style: const TextStyle(fontSize: 11),
+                                            ),
+                                            visualDensity: VisualDensity.compact,
+                                            onPressed: () =>
+                                                LogTargetNavigation.open(context, target),
+                                          );
+                                        }).toList(growable: false),
+                                      ),
+                                    ],
                                     const SizedBox(height: 4),
                                     Text(
                                       item.description ?? item.displayTarget ?? '—',

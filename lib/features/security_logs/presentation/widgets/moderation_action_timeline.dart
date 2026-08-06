@@ -9,6 +9,7 @@ import '../../../../injection_container.dart' as di;
 import '../../data/datasources/user_audit_log_socket_service.dart';
 import '../../domain/entities/log_entity.dart';
 import '../../domain/usecases/get_logs_usecase.dart';
+import '../utils/log_target_navigation.dart';
 import '../utils/logs_labels.dart';
 import 'logs_detail_dialog.dart';
 
@@ -619,8 +620,10 @@ class _TimelineRecordNode extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
 
-    final actionLabel = logsActionLabel(l10n, log);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final actionLabel = logsDisplayTitle(l10n, log, isArabic: isArabic);
     final categoryLabel = logsCategoryLabel(l10n, log.category);
+    final navTargets = LogTargetNavigation.resolveAll(log);
 
     final (icon, color) = _getVisualsForAction(log.action, log.category, scheme);
     final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
@@ -712,6 +715,26 @@ class _TimelineRecordNode extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
+                    ],
+
+                    if (navTargets.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: navTargets.map((target) {
+                          return ActionChip(
+                            avatar: Icon(target.icon, size: 14),
+                            label: Text(
+                              target.label(isArabic),
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () =>
+                                LogTargetNavigation.open(context, target),
+                          );
+                        }).toList(growable: false),
+                      ),
                     ],
 
                     // Meta Row: Admin Actor, Timestamp, IP Address

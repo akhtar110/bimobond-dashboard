@@ -10,6 +10,7 @@ import '../../domain/entities/log_entity.dart';
 import '../bloc/logs_bloc.dart';
 import '../bloc/logs_event.dart';
 import '../bloc/logs_state.dart';
+import '../utils/log_target_navigation.dart';
 import '../utils/logs_labels.dart';
 import '../utils/logs_responsive.dart';
 import 'logs_detail_dialog.dart';
@@ -29,12 +30,10 @@ class _LogsColumnSpec {
     required this.roleFlex,
     required this.categoryFlex,
     required this.actionFlex,
-    required this.targetFlex,
     required this.deviceFlex,
     required this.actionsWidth,
     required this.cellPad,
     required this.showRole,
-    required this.showTarget,
     required this.showDevice,
   });
 
@@ -43,12 +42,10 @@ class _LogsColumnSpec {
   final int roleFlex;
   final int categoryFlex;
   final int actionFlex;
-  final int targetFlex;
   final int deviceFlex;
   final double actionsWidth;
   final double cellPad;
   final bool showRole;
-  final bool showTarget;
   final bool showDevice;
 }
 
@@ -58,44 +55,38 @@ const double _kActionsColWidth = 112;
 _LogsColumnSpec _columnSpec(_LogsTableDensity density) => switch (density) {
       _LogsTableDensity.wide => const _LogsColumnSpec(
           dateFlex: 3,
-          userFlex: 3,
+          userFlex: 4,
           roleFlex: 2,
           categoryFlex: 2,
-          actionFlex: 3,
-          targetFlex: 3,
+          actionFlex: 5,
           deviceFlex: 2,
           actionsWidth: _kActionsColWidth,
           cellPad: 10,
           showRole: true,
-          showTarget: true,
           showDevice: true,
         ),
       _LogsTableDensity.medium => const _LogsColumnSpec(
           dateFlex: 3,
-          userFlex: 3,
+          userFlex: 4,
           roleFlex: 2,
           categoryFlex: 2,
-          actionFlex: 3,
-          targetFlex: 3,
+          actionFlex: 5,
           deviceFlex: 0,
           actionsWidth: _kActionsColWidth,
           cellPad: 8,
           showRole: true,
-          showTarget: true,
           showDevice: false,
         ),
       _LogsTableDensity.compact => const _LogsColumnSpec(
           dateFlex: 3,
-          userFlex: 3,
+          userFlex: 4,
           roleFlex: 0,
           categoryFlex: 2,
-          actionFlex: 3,
-          targetFlex: 0,
+          actionFlex: 5,
           deviceFlex: 0,
           actionsWidth: _kActionsColWidth,
           cellPad: 6,
           showRole: false,
-          showTarget: false,
           showDevice: false,
         ),
     };
@@ -301,8 +292,6 @@ class _Header extends StatelessWidget {
             ),
           cell(l10n.tOr('logsColCategory', 'Category'), flex: spec.categoryFlex),
           cell(l10n.tOr('logsColAction', 'Action'), flex: spec.actionFlex),
-          if (spec.showTarget)
-            cell(l10n.tOr('logsColTarget', 'Target'), flex: spec.targetFlex),
           if (spec.showDevice)
             cell(l10n.tOr('logsColDevice', 'Device'), flex: spec.deviceFlex),
           SizedBox(
@@ -438,6 +427,10 @@ class _RowState extends State<_Row> {
       );
     }
 
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final title = logsDisplayTitle(l10n, widget.log, isArabic: isArabic);
+    final navTargets = LogTargetNavigation.resolveAll(widget.log);
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -465,24 +458,30 @@ class _RowState extends State<_Row> {
               logsCategoryLabel(l10n, widget.log.category),
               flex: spec.categoryFlex,
             ),
-            cell(logsActionLabel(l10n, widget.log), flex: spec.actionFlex),
-            if (spec.showTarget)
-              cell(
-                logsDash(widget.log.displayTarget),
-                flex: spec.targetFlex,
-              ),
+            cell(title, flex: spec.actionFlex),
             if (spec.showDevice)
               cell(logsDash(widget.log.deviceId ?? widget.log.userAgent),
                   flex: spec.deviceFlex),
             SizedBox(
               width: spec.actionsWidth,
-              child: Center(
-                child: IconButton(
-                  tooltip: l10n.tOr('logsViewDetails', 'View details'),
-                  onPressed: widget.onDetails,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (navTargets.isNotEmpty)
+                    IconButton(
+                      tooltip: navTargets.first.label(isArabic),
+                      onPressed: () =>
+                          LogTargetNavigation.open(context, navTargets.first),
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(navTargets.first.icon, size: 18),
+                    ),
+                  IconButton(
+                    tooltip: l10n.tOr('logsViewDetails', 'View details'),
+                    onPressed: widget.onDetails,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                  ),
+                ],
               ),
             ),
           ],
@@ -500,12 +499,12 @@ class _LogsCardList extends StatelessWidget {
 
   final LogsLoaded state;
   final LogsLayoutMetrics metrics;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final dateFmt = DateFormat.yMMMd().add_jm();
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final bloc = context.read<LogsBloc>();
 
     return Column(
@@ -519,6 +518,9 @@ class _LogsCardList extends StatelessWidget {
                 SizedBox(height: metrics.toolbarFilterGap),
             itemBuilder: (context, index) {
               final log = state.logs[index];
+              final title = logsDisplayTitle(l10n, log, isArabic: isArabic);
+              final navTargets = LogTargetNavigation.resolveAll(log);
+
               return Material(
                 color: scheme.surface,
                 borderRadius: BorderRadius.circular(14),
@@ -533,45 +535,91 @@ class _LogsCardList extends StatelessWidget {
                         color: scheme.outlineVariant.withValues(alpha: 0.55),
                       ),
                     ),
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          dateFmt.format(log.createdAt.toLocal()),
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          logsDash(log.displayUser),
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          [
-                            logsActorRoleLabel(l10n, log.actorRole),
-                            logsCategoryLabel(l10n, log.category),
-                            logsActionLabel(l10n, log),
-                          ].join(' · '),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                        ),
-                        if ((log.displayTarget ?? '').trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            log.displayTarget!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: scheme.primaryContainer.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ],
+                          child: Icon(
+                            _categoryIcon(log.category),
+                            size: 20,
+                            color: scheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      title,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ),
+                                  if (log.category.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: scheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        logsCategoryLabel(l10n, log.category),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: scheme.onPrimaryContainer,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${log.displayUser.isNotEmpty ? (log.displayUser.startsWith('@') ? log.displayUser : '@${log.displayUser}') : ''} · ${dateFmt.format(log.createdAt.toLocal())}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                              ),
+                              if (navTargets.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: navTargets.map((target) {
+                                    return ActionChip(
+                                      avatar: Icon(target.icon, size: 14),
+                                      label: Text(target.label(isArabic)),
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () =>
+                                          LogTargetNavigation.open(context, target),
+                                    );
+                                  }).toList(growable: false),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -594,6 +642,19 @@ class _LogsCardList extends StatelessWidget {
     );
   }
 }
+
+IconData _categoryIcon(String category) => switch (category.trim().toUpperCase()) {
+      'AUTH' => Icons.lock_outline,
+      'SOCIAL' => Icons.people_outline,
+      'CONTENT' => Icons.article_outlined,
+      'COMMERCE' => Icons.shopping_bag_outlined,
+      'MESSAGING' => Icons.chat_outlined,
+      'MODERATION' => Icons.gavel_outlined,
+      'ADMIN' => Icons.admin_panel_settings_outlined,
+      'NAVIGATION' => Icons.explore_outlined,
+      'SETTINGS' => Icons.settings_outlined,
+      _ => Icons.history_outlined,
+    };
 
 void _openUser(BuildContext context, LogEntity log) {
   final id = log.actorId?.trim() ?? '';

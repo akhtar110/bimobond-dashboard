@@ -41,7 +41,8 @@ class LogsRemoteDataSourceImpl implements LogsRemoteDataSource {
                 'avatarUrl': moderator?['avatarUrl'],
                 'targetType': 'USER',
                 'targetId': map['targetUserId'],
-                'description': map['note'] ?? map['reason'],
+                'description': map['description'] ?? map['note'] ?? map['reason'],
+                'descriptionEn': map['descriptionEn'],
                 'meta': {
                   if (map['reason'] != null) 'reason': map['reason'],
                   if (map['note'] != null) 'note': map['note'],

@@ -36,6 +36,23 @@ String logsCategoryLabel(AppLocalizations l10n, String? category) {
   };
 }
 
+String logsDisplayTitle(
+  AppLocalizations l10n,
+  LogEntity log, {
+  required bool isArabic,
+}) {
+  if (isArabic) {
+    final desc = log.description?.trim();
+    if (desc != null && desc.isNotEmpty) return desc;
+  } else {
+    final descEn = log.descriptionEn?.trim();
+    if (descEn != null && descEn.isNotEmpty) return descEn;
+    final desc = log.description?.trim();
+    if (desc != null && desc.isNotEmpty) return desc;
+  }
+  return logsActionLabel(l10n, log);
+}
+
 String logsActionLabel(AppLocalizations l10n, LogEntity log) {
   final rawAction = log.action.trim();
   if (rawAction.isEmpty) {

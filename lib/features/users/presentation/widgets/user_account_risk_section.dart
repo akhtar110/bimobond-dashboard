@@ -14,6 +14,7 @@ import '../../../reports/presentation/utils/report_target_navigation.dart';
 import '../../../security_logs/data/datasources/user_violations_remote_datasource.dart';
 import '../../../security_logs/domain/entities/log_entity.dart';
 import '../../../security_logs/domain/usecases/get_logs_usecase.dart';
+import '../../../security_logs/presentation/utils/log_target_navigation.dart';
 import '../../../security_logs/presentation/utils/logs_labels.dart';
 import '../../../security_logs/presentation/widgets/logs_detail_dialog.dart';
 
@@ -1514,8 +1515,10 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
                             separatorBuilder: (_, _) => const SizedBox(height: 8),
                             itemBuilder: (context, index) {
                               final item = _logs[index];
-                              final actionLabel = logsActionLabel(l10n, item);
+                              final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+                              final actionLabel = logsDisplayTitle(l10n, item, isArabic: isArabic);
                               final categoryLabel = logsCategoryLabel(l10n, item.category);
+                              final navTargets = LogTargetNavigation.resolveAll(item);
 
                               return Material(
                                 color: scheme.surfaceContainerLow,
@@ -1586,6 +1589,25 @@ class _UserRiskLogsDetailSheetState extends State<_UserRiskLogsDetailSheet> {
                                                   fontSize: 11.5,
                                                 ),
                                               ),
+                                              if (navTargets.isNotEmpty) ...[
+                                                const SizedBox(height: 6),
+                                                Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 4,
+                                                  children: navTargets.map((target) {
+                                                    return ActionChip(
+                                                      avatar: Icon(target.icon, size: 14),
+                                                      label: Text(
+                                                        target.label(isArabic),
+                                                        style: const TextStyle(fontSize: 11),
+                                                      ),
+                                                      visualDensity: VisualDensity.compact,
+                                                      onPressed: () =>
+                                                          LogTargetNavigation.open(context, target),
+                                                    );
+                                                  }).toList(growable: false),
+                                                ),
+                                              ],
                                               const SizedBox(height: 6),
                                               Row(
                                                 children: [

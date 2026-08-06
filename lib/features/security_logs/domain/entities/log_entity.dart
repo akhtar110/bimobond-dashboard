@@ -19,6 +19,7 @@ class LogEntity extends Equatable {
     this.targetId,
     this.meta,
     this.description,
+    this.descriptionEn,
     this.ipAddress,
     this.userAgent,
     this.deviceId,
@@ -48,6 +49,7 @@ class LogEntity extends Equatable {
   final String? targetId;
   final Map<String, dynamic>? meta;
   final String? description;
+  final String? descriptionEn;
   final String? ipAddress;
   final String? userAgent;
   final String? deviceId;
@@ -106,6 +108,8 @@ class LogEntity extends Equatable {
         userEmail,
         targetType,
         targetId,
+        description,
+        descriptionEn,
         ipAddress,
         userAgent,
         deviceId,
