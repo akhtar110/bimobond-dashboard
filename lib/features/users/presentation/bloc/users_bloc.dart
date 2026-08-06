@@ -3,9 +3,7 @@ import 'dart:async';
 import 'package:bimo_bond_dashboard/features/users/domain/entities/user_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/services/navigation_persistence_service.dart';
 import '../../../../core/utils/api_error_messages.dart';
-import '../../../../injection_container.dart' as di;
 import '../../data/datasources/users_presence_socket_service.dart';
 import '../../domain/entities/admin_bulk_users_result_entity.dart';
 import '../../domain/usecases/bulk_activate_users.dart';
@@ -508,51 +506,8 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
   String? _pendingBulkMessage;
   bool _pendingBulkIsError = false;
 
-  void _persistCurrentFilters() {
-    try {
-      di.sl<NavigationPersistenceService>().saveUsersFilters({
-        'query': _query,
-        'locationQuery': _locationQuery,
-        'role': _role,
-        'statusFilter': _filter.name,
-        'presenceFilter': _presenceFilter.name,
-        'locationSort': _locationSort.name,
-        'page': _currentPage,
-      });
-    } catch (_) {}
-  }
-
   Future<void> _onLoad(LoadUsersEvent event, Emitter<UsersState> emit) async {
-    if (event.refresh && event.page == null) {
-      try {
-        final savedFilters = di.sl<NavigationPersistenceService>().getUsersFilters();
-        if (savedFilters != null) {
-          _query = (savedFilters['query'] as String?) ?? _query;
-          _locationQuery = (savedFilters['locationQuery'] as String?) ?? _locationQuery;
-          _role = savedFilters['role'] as String?;
-          if (savedFilters['statusFilter'] != null) {
-            _filter = UsersUiFilter.values.firstWhere(
-              (e) => e.name == savedFilters['statusFilter'],
-              orElse: () => UsersUiFilter.all,
-            );
-          }
-          if (savedFilters['presenceFilter'] != null) {
-            _presenceFilter = UsersPresenceFilter.values.firstWhere(
-              (e) => e.name == savedFilters['presenceFilter'],
-              orElse: () => UsersPresenceFilter.all,
-            );
-          }
-          if (savedFilters['locationSort'] != null) {
-            _locationSort = UsersLocationSortOrder.values.firstWhere(
-              (e) => e.name == savedFilters['locationSort'],
-              orElse: () => UsersLocationSortOrder.none,
-            );
-          }
-          _currentPage = (savedFilters['page'] as int?) ?? 1;
-        }
-      } catch (_) {}
-    }
-    final page = event.page ?? _currentPage;
+    final page = event.refresh ? 1 : (event.page ?? _currentPage);
     await _fetchPage(emit, page: page, replace: true);
   }
 
@@ -810,8 +765,6 @@ class UsersBloc extends Bloc<UsersEvent, UsersState> {
       emit(UsersEmpty());
       return;
     }
-
-    _persistCurrentFilters();
 
     emit(
       UsersLoaded(
