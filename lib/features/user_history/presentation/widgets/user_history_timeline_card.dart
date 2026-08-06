@@ -6,6 +6,7 @@ import '../../../../core/localization/localization.dart';
 import '../../../../core/utils/media_url_resolver.dart';
 import '../../../user_activity/presentation/widgets/activity_list_widgets.dart';
 import '../../domain/entities/user_history_entity.dart';
+import '../../domain/utils/user_history_type_utils.dart';
 import '../../../reports/presentation/utils/report_detail_labels.dart';
 
 class UserHistoryTimelineCard extends StatelessWidget {
@@ -305,7 +306,7 @@ class UserHistoryTimelineCard extends StatelessWidget {
             : null;
         final watchTime =
             item.dataNum('watchedDuration') ?? item.dataNum('watchTime');
-        return _HistoryPresentation(
+        base = _HistoryPresentation(
           icon: Icons.visibility_outlined,
           color: theme.colorScheme.primary,
           title: l10n.tOr('userHistoryViewedPost', 'Viewed Post'),
